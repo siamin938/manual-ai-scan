@@ -108,6 +108,21 @@ function ManualReportPage() {
     },
   });
 
+  const { data: competitorLinks = [] } = useQuery({
+    queryKey: ["business-competitors", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("business_competitors")
+        .select("competitor_business_id, active")
+        .eq("org_id", activeOrgId!)
+        .eq("target_business_id", businessId)
+        .eq("active", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const { data: recommendations = [] } = useQuery({
     queryKey: ["recommendations", activeOrgId, businessId],
     enabled: !!activeOrgId && !!businessId,
@@ -122,6 +137,7 @@ function ManualReportPage() {
       return data ?? [];
     },
   });
+
 
   const addRec = useMutation({
     mutationFn: async () => {
