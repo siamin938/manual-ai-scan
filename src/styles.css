@@ -143,3 +143,15 @@
     color: var(--color-foreground);
   }
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+  .print-page {
+    padding: 0 !important;
+  }
+}
