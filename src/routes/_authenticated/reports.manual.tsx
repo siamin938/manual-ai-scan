@@ -59,11 +59,34 @@ type Business = {
   is_client_business: boolean;
 };
 
+/** NFKC 정규화 + 소문자 + 공백/줄바꿈/특수문자 제거 */
 function normalizeText(value: string): string {
   return (value ?? "")
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[^0-9a-z\uac00-\ud7a3\u3131-\u318e]+/g, "");
+}
+
+/** 정규화 문자열에서 needle 위치를 찾아 원문에서 대응 문구를 추출 */
+function findMatchSnippet(raw: string, needle: string): string | null {
+  const chars: string[] = [];
+  const indexes: number[] = [];
+  const normalizedRaw = (raw ?? "").normalize("NFKC").toLowerCase();
+  for (let i = 0; i < normalizedRaw.length; i += 1) {
+    const ch = normalizedRaw[i]!;
+    if (/[0-9a-z\uac00-\ud7a3\u3131-\u318e]/.test(ch)) {
+      chars.push(ch);
+      indexes.push(i);
+    }
+  }
+  const joined = chars.join("");
+  const at = joined.indexOf(needle);
+  if (at < 0) return null;
+  const start = indexes[at]!;
+  const end = indexes[at + needle.length - 1]!;
+  return normalizedRaw.slice(start, end + 1) === ""
+    ? null
+    : (raw ?? "").normalize("NFKC").slice(start, end + 1);
 }
 
 function priorityLabel(score: number): string {
