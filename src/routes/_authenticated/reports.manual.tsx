@@ -59,13 +59,23 @@ type Business = {
   is_client_business: boolean;
 };
 
+function priorityLabel(score: number): string {
+  if (score >= 80) return "최우선";
+  if (score >= 60) return "높음";
+  if (score >= 40) return "보통";
+  return "낮음";
+}
+
 function ManualReportPage() {
   const { activeOrgId, canWrite, role } = useOrg();
   const qc = useQueryClient();
   const [businessId, setBusinessId] = useState("");
   const [recTitle, setRecTitle] = useState("");
   const [recRationale, setRecRationale] = useState("");
-  const [recPriority, setRecPriority] = useState("3");
+  const [recPriority, setRecPriority] = useState("50");
+
+  const priorityValue = Math.min(100, Math.max(0, Math.round(Number(recPriority))));
+  const priorityValid = recPriority.trim() !== "" && Number.isFinite(Number(recPriority)) && Number.isInteger(Number(recPriority)) && Number(recPriority) >= 0 && Number(recPriority) <= 100;
 
   const { data: businesses = [] } = useQuery({
     queryKey: ["businesses-report", activeOrgId],
@@ -121,7 +131,7 @@ function ManualReportPage() {
         title: recTitle.trim(),
         action_type: "manual_followup",
         rationale: recRationale.trim(),
-        priority_score: Number(recPriority) || 1,
+        priority_score: priorityValue,
         effort_level: "medium",
         evidence_experiments: 0,
       });
@@ -131,6 +141,7 @@ function ManualReportPage() {
       toast.success("다음 행동 우선순위를 추가했습니다.");
       setRecTitle("");
       setRecRationale("");
+      setRecPriority("50");
       qc.invalidateQueries({ queryKey: ["recommendations", activeOrgId, businessId] });
     },
     onError: (e: Error) => toast.error(`추가 실패: ${e.message}`),
@@ -304,7 +315,9 @@ function ManualReportPage() {
                   <li key={r.id} className="rounded-md border p-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium">{r.title}</p>
-                      <Badge variant="secondary">우선순위 {r.priority_score}</Badge>
+                      <Badge variant="secondary">
+                        {priorityLabel(Number(r.priority_score))} ({Number(r.priority_score)}점)
+                      </Badge>
                     </div>
                     <p className="mt-1 text-muted-foreground">{r.rationale}</p>
                   </li>
@@ -321,15 +334,21 @@ function ManualReportPage() {
                   <Input id="rec-title" value={recTitle} onChange={(e) => setRecTitle(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rec-prio">우선순위 점수</Label>
+                  <Label htmlFor="rec-prio">우선순위 점수 (0~100)</Label>
                   <Input
                     id="rec-prio"
                     type="number"
-                    min="1"
-                    max="10"
+                    min="0"
+                    max="100"
+                    step="1"
                     value={recPriority}
-                    onChange={(e) => setRecPriority(e.target.value)}
+                    onChange={(e) => setRecPriority(e.target.value.replace(/[^0-9]/g, ""))}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {priorityValid
+                      ? `${priorityValue}점 · ${priorityLabel(priorityValue)}`
+                      : "0에서 100 사이의 정수를 입력하세요."}
+                  </p>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="rec-why">근거</Label>
@@ -343,7 +362,7 @@ function ManualReportPage() {
                 <div className="sm:col-span-2">
                   <Button
                     onClick={() => addRec.mutate()}
-                    disabled={!recTitle.trim() || !recRationale.trim() || addRec.isPending}
+                    disabled={!recTitle.trim() || !recRationale.trim() || !priorityValid || addRec.isPending}
                   >
                     추가
                   </Button>
