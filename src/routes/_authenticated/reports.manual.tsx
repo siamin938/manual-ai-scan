@@ -59,7 +59,15 @@ type Business = {
   is_client_business: boolean;
 };
 
+function normalizeText(value: string): string {
+  return (value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^0-9a-z\uac00-\ud7a3\u3131-\u318e]+/g, "");
+}
+
 function priorityLabel(score: number): string {
+
   if (score >= 80) return "최우선";
   if (score >= 60) return "높음";
   if (score >= 40) return "보통";
@@ -108,6 +116,21 @@ function ManualReportPage() {
     },
   });
 
+  const { data: competitorLinks = [] } = useQuery({
+    queryKey: ["business-competitors", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("business_competitors")
+        .select("competitor_business_id, active")
+        .eq("org_id", activeOrgId!)
+        .eq("target_business_id", businessId)
+        .eq("active", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const { data: recommendations = [] } = useQuery({
     queryKey: ["recommendations", activeOrgId, businessId],
     enabled: !!activeOrgId && !!businessId,
@@ -122,6 +145,7 @@ function ManualReportPage() {
       return data ?? [];
     },
   });
+
 
   const addRec = useMutation({
     mutationFn: async () => {
@@ -148,30 +172,43 @@ function ManualReportPage() {
   });
 
   const target = businesses.find((b) => b.id === businessId);
-  const competitors = businesses.filter((b) => !b.is_client_business && b.id !== businessId);
+  const linkedIds = new Set(competitorLinks.map((l) => l.competitor_business_id));
+  const competitors = businesses.filter(
+    (b) => b.id !== businessId && (linkedIds.size > 0 ? linkedIds.has(b.id) : !b.is_client_business),
+  );
 
   const platformsUsed = Array.from(new Set(checks.map((c) => c.platform)));
   const questionsCount = new Set(checks.map((c) => c.prompt_text)).size;
   const mentioned = checks.filter((c) => c.was_client_mentioned);
 
+  const normalizedChecks = checks.map((c) => normalizeText(c.response_text));
+
   const competitorMentions = competitors
     .map((c) => {
-      const names = [c.name, ...(c.aliases ?? [])].filter(Boolean);
-      const hits = checks.filter((chk) => names.some((n) => chk.response_text.includes(n)));
-      return { name: c.name, count: hits.length };
+      const needles = [c.name, ...(c.aliases ?? [])]
+        .map(normalizeText)
+        .filter((n) => n.length > 0);
+      const count = normalizedChecks.filter((text) => needles.some((n) => text.includes(n))).length;
+      return { name: c.name, count };
     })
     .filter((c) => c.count > 0)
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  const topCount = competitorMentions[0]?.count ?? 0;
+  const topCompetitors = competitorMentions.filter((c) => c.count === topCount);
 
   const observations = [
     `총 ${checks.length}건의 수동 점검 중 ${mentioned.length}건에서 업체명이 답변에 포함되었습니다.`,
     platformsUsed.length > 0
       ? `확인 플랫폼: ${platformsUsed.map((p) => PLATFORM_LABELS[p]).join(", ")}`
       : "확인한 플랫폼이 없습니다.",
-    competitorMentions.length > 0
-      ? `가장 자주 언급된 경쟁업체: ${competitorMentions[0]!.name} (${competitorMentions[0]!.count}건)`
-      : "답변에서 등록된 경쟁업체 언급이 확인되지 않았습니다.",
+    topCompetitors.length > 1
+      ? `가장 자주 언급된 경쟁업체(공동 1위): ${topCompetitors.map((c) => c.name).join(", ")} (각 ${topCount}건)`
+      : topCompetitors.length === 1
+        ? `가장 자주 언급된 경쟁업체: ${topCompetitors[0]!.name} (${topCount}건)`
+        : "답변에서 등록된 경쟁업체 언급이 확인되지 않았습니다.",
   ];
+
 
   return (
     <div className="print-page space-y-6">
