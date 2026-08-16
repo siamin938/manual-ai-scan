@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { PLATFORM_LABELS, MANUAL_DISCLAIMER, formatSeoul } from "@/lib/format";
@@ -59,11 +59,34 @@ type Business = {
   is_client_business: boolean;
 };
 
+/** NFKC 정규화 + 소문자 + 공백/줄바꿈/특수문자 제거 */
 function normalizeText(value: string): string {
   return (value ?? "")
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[^0-9a-z\uac00-\ud7a3\u3131-\u318e]+/g, "");
+}
+
+/** 정규화 문자열에서 needle 위치를 찾아 원문에서 대응 문구를 추출 */
+function findMatchSnippet(raw: string, needle: string): string | null {
+  const chars: string[] = [];
+  const indexes: number[] = [];
+  const normalizedRaw = (raw ?? "").normalize("NFKC").toLowerCase();
+  for (let i = 0; i < normalizedRaw.length; i += 1) {
+    const ch = normalizedRaw[i]!;
+    if (/[0-9a-z\uac00-\ud7a3\u3131-\u318e]/.test(ch)) {
+      chars.push(ch);
+      indexes.push(i);
+    }
+  }
+  const joined = chars.join("");
+  const at = joined.indexOf(needle);
+  if (at < 0) return null;
+  const start = indexes[at]!;
+  const end = indexes[at + needle.length - 1]!;
+  return normalizedRaw.slice(start, end + 1) === ""
+    ? null
+    : (raw ?? "").normalize("NFKC").slice(start, end + 1);
 }
 
 function priorityLabel(score: number): string {
@@ -81,6 +104,11 @@ function ManualReportPage() {
   const [recTitle, setRecTitle] = useState("");
   const [recRationale, setRecRationale] = useState("");
   const [recPriority, setRecPriority] = useState("50");
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    setGeneratedAt(new Date().toISOString());
+  }, [businessId]);
 
   const priorityValue = Math.min(100, Math.max(0, Math.round(Number(recPriority))));
   const priorityValid = recPriority.trim() !== "" && Number.isFinite(Number(recPriority)) && Number.isInteger(Number(recPriority)) && Number(recPriority) >= 0 && Number(recPriority) <= 100;
@@ -181,16 +209,26 @@ function ManualReportPage() {
   const questionsCount = new Set(checks.map((c) => c.prompt_text)).size;
   const mentioned = checks.filter((c) => c.was_client_mentioned);
 
-  const normalizedChecks = checks.map((c) => normalizeText(c.response_text));
+  // 저장된 값이 아니라 매번 현재 경쟁업체 목록으로 response_text 전체를 재분석
+  const competitorAnalysis = competitors.map((c) => {
+    const terms = [c.name, ...(c.aliases ?? [])].filter((t) => (t ?? "").trim().length > 0);
+    const needles = terms.map((t) => ({ term: t, needle: normalizeText(t) })).filter((t) => t.needle.length > 0);
+    const snippets: string[] = [];
+    let count = 0;
+    for (const check of checks) {
+      const normalized = normalizeText(check.response_text);
+      // 한 답변 안에서 여러 번 등장해도 1회로 집계
+      const hit = needles.find((n) => normalized.includes(n.needle));
+      if (hit) {
+        count += 1;
+        const snippet = findMatchSnippet(check.response_text, hit.needle);
+        if (snippet) snippets.push(snippet);
+      }
+    }
+    return { id: c.id, name: c.name, aliases: c.aliases ?? [], count, snippets };
+  });
 
-  const competitorMentions = competitors
-    .map((c) => {
-      const needles = [c.name, ...(c.aliases ?? [])]
-        .map(normalizeText)
-        .filter((n) => n.length > 0);
-      const count = normalizedChecks.filter((text) => needles.some((n) => text.includes(n))).length;
-      return { name: c.name, count };
-    })
+  const competitorMentions = competitorAnalysis
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
@@ -248,7 +286,7 @@ function ManualReportPage() {
               {[target.category, target.region, target.city].filter(Boolean).join(" · ")}
               {target.website_url ? ` · ${target.website_url}` : ""}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">생성 시각(KST): {formatSeoul(new Date().toISOString())}</p>
+            <p className="mt-1 text-xs text-muted-foreground">생성 시각(KST): {generatedAt ? formatSeoul(generatedAt) : "-"}</p>
           </header>
 
           <section className="grid gap-4 sm:grid-cols-3">
@@ -406,6 +444,32 @@ function ManualReportPage() {
                 </div>
               </div>
             )}
+          </section>
+
+          <section className="no-print rounded-md border border-dashed p-4">
+            <h2 className="text-sm font-semibold">임시 진단 영역 (개발 확인용)</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              연결된 경쟁업체 {competitors.length}곳 · 분석한 점검 기록 {checks.length}건
+            </p>
+            <div className="mt-3 space-y-2">
+              {competitorAnalysis.map((c) => (
+                <div key={c.id} className="rounded-md border p-3 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{c.name}</span>
+                    <Badge variant={c.count > 0 ? "default" : "secondary"}>
+                      {c.count > 0 ? `매칭 성공 · ${c.count}회` : "매칭 실패"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">별칭: {c.aliases.length ? c.aliases.join(", ") : "-"}</p>
+                  <p className="mt-1 text-muted-foreground">
+                    매칭된 문구: {c.snippets.length ? c.snippets.join(" | ") : "-"}
+                  </p>
+                </div>
+              ))}
+              {competitors.length === 0 && (
+                <p className="text-xs text-muted-foreground">연결된 경쟁업체가 없습니다.</p>
+              )}
+            </div>
           </section>
 
           <footer className="rounded-md border bg-muted p-4 text-xs leading-relaxed text-muted-foreground">

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -69,6 +70,7 @@ const EMPTY = {
   city: "",
   is_client_business: true,
   active: true,
+  competitor_of: "",
 };
 
 function BusinessesPage() {
@@ -93,6 +95,23 @@ function BusinessesPage() {
     },
   });
 
+  const { data: links = [] } = useQuery({
+    queryKey: ["business-competitor-links", activeOrgId],
+    enabled: !!activeOrgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("business_competitors")
+        .select("target_business_id, competitor_business_id, active")
+        .eq("org_id", activeOrgId!)
+        .eq("active", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const clientBusinesses = businesses.filter((b) => b.is_client_business);
+  const autoTargetId = clientBusinesses.length === 1 ? clientBusinesses[0]!.id : "";
+
   const save = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -113,11 +132,28 @@ function BusinessesPage() {
         is_client_business: form.is_client_business,
         active: form.active,
       };
+      let businessId = form.id;
       if (form.id) {
         const { error } = await supabase.from("businesses").update(payload).eq("id", form.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("businesses").insert(payload);
+        const { data, error } = await supabase.from("businesses").insert(payload).select("id").single();
+        if (error) throw error;
+        businessId = data!.id;
+      }
+
+      // 경쟁업체로 등록하면 대상 업체와의 관계를 business_competitors에 저장
+      const targetId = form.is_client_business ? "" : form.competitor_of || autoTargetId;
+      if (!form.is_client_business && targetId) {
+        const { error } = await supabase.from("business_competitors").upsert(
+          {
+            org_id: activeOrgId!,
+            target_business_id: targetId,
+            competitor_business_id: businessId,
+            active: true,
+          },
+          { onConflict: "target_business_id,competitor_business_id" },
+        );
         if (error) throw error;
       }
     },
@@ -125,6 +161,7 @@ function BusinessesPage() {
       toast.success("저장되었습니다.");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["businesses", activeOrgId] });
+      qc.invalidateQueries({ queryKey: ["business-competitor-links", activeOrgId] });
     },
     onError: (e: Error) => toast.error(`저장 실패: ${e.message}`),
   });
@@ -158,6 +195,8 @@ function BusinessesPage() {
       city: b.city ?? "",
       is_client_business: b.is_client_business,
       active: b.active,
+      competitor_of:
+        links.find((l) => l.competitor_business_id === b.id)?.target_business_id ?? "",
     });
     setOpen(true);
   }
@@ -313,6 +352,29 @@ function BusinessesPage() {
                 onCheckedChange={(v) => setForm({ ...form, is_client_business: v })}
               />
             </div>
+            {!form.is_client_business && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label>어느 대상 업체의 경쟁업체인가요?</Label>
+                <Select
+                  value={form.competitor_of || autoTargetId}
+                  onValueChange={(v) => setForm({ ...form, competitor_of: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="대상 업체 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientBusinesses.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  선택한 대상 업체와의 관계가 business_competitors에 저장되어 보고서 분석에 반영됩니다.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between rounded-md border p-3 sm:col-span-2">
               <p className="text-sm font-medium">활성 상태</p>
               <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
