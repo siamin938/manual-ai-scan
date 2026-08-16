@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { OrgProvider, useOrg, useSession } from "@/lib/org";
+import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { ROLE_LABELS } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +41,7 @@ function AuthedLayout() {
 }
 
 function Shell() {
-  const { memberships, activeOrgId, setActiveOrgId, role } = useOrg();
+  const { memberships, activeOrgId, setActiveOrgId, role, loading } = useOrg();
   const navigate = useNavigate();
 
   async function signOut() {
@@ -69,7 +70,7 @@ function Shell() {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             {memberships.length > 0 && (
-              <Select value={activeOrgId ?? undefined} onValueChange={setActiveOrgId}>
+              <Select value={activeOrgId ?? ""} onValueChange={setActiveOrgId}>
                 <SelectTrigger className="h-8 w-[180px] text-xs">
                   <SelectValue placeholder="조직 선택" />
                 </SelectTrigger>
@@ -90,7 +91,13 @@ function Shell() {
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <Outlet />
+        {loading ? (
+          <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>
+        ) : memberships.length === 0 ? (
+          <OrgOnboarding />
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   );
