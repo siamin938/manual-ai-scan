@@ -65,7 +65,10 @@ function ManualReportPage() {
   const [businessId, setBusinessId] = useState("");
   const [recTitle, setRecTitle] = useState("");
   const [recRationale, setRecRationale] = useState("");
-  const [recPriority, setRecPriority] = useState("3");
+  const [recPriority, setRecPriority] = useState("50");
+
+  const priorityValue = Math.min(100, Math.max(0, Math.round(Number(recPriority))));
+  const priorityValid = recPriority.trim() !== "" && Number.isFinite(Number(recPriority)) && Number.isInteger(Number(recPriority)) && Number(recPriority) >= 0 && Number(recPriority) <= 100;
 
   const { data: businesses = [] } = useQuery({
     queryKey: ["businesses-report", activeOrgId],
@@ -121,7 +124,7 @@ function ManualReportPage() {
         title: recTitle.trim(),
         action_type: "manual_followup",
         rationale: recRationale.trim(),
-        priority_score: Number(recPriority) || 1,
+        priority_score: priorityValue,
         effort_level: "medium",
         evidence_experiments: 0,
       });
@@ -131,6 +134,7 @@ function ManualReportPage() {
       toast.success("다음 행동 우선순위를 추가했습니다.");
       setRecTitle("");
       setRecRationale("");
+      setRecPriority("50");
       qc.invalidateQueries({ queryKey: ["recommendations", activeOrgId, businessId] });
     },
     onError: (e: Error) => toast.error(`추가 실패: ${e.message}`),
