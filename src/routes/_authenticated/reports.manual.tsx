@@ -104,6 +104,11 @@ function ManualReportPage() {
   const [recTitle, setRecTitle] = useState("");
   const [recRationale, setRecRationale] = useState("");
   const [recPriority, setRecPriority] = useState("50");
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    setGeneratedAt(new Date().toISOString());
+  }, [businessId]);
 
   const priorityValue = Math.min(100, Math.max(0, Math.round(Number(recPriority))));
   const priorityValid = recPriority.trim() !== "" && Number.isFinite(Number(recPriority)) && Number.isInteger(Number(recPriority)) && Number(recPriority) >= 0 && Number(recPriority) <= 100;
