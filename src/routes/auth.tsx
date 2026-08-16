@@ -39,7 +39,10 @@ function AuthPage() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) return toast.error(`로그인 실패: ${error.message}`);
+    if (error) {
+      toast.error(`로그인 실패: ${error.message}`);
+      return;
+    }
     navigate({ to: "/dashboard" });
   }
 
@@ -55,7 +58,10 @@ function AuthPage() {
       },
     });
     setBusy(false);
-    if (error) return toast.error(`회원가입 실패: ${error.message}`);
+    if (error) {
+      toast.error(`회원가입 실패: ${error.message}`);
+      return;
+    }
     toast.success("회원가입이 완료되었습니다. 이메일 인증이 필요할 수 있습니다.");
     navigate({ to: "/dashboard" });
   }
