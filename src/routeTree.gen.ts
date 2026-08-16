@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authenticated/businesses'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
 import { Route as AuthenticatedQuestionsRouteImport } from './routes/_authenticated/questions'
 
 const IndexRoute = IndexRouteImport.update({
@@ -40,6 +41,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedManualChecksRoute =
+  AuthenticatedManualChecksRouteImport.update({
+    id: '/manual-checks',
+    path: '/manual-checks',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedQuestionsRoute = AuthenticatedQuestionsRouteImport.update({
   id: '/questions',
   path: '/questions',
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/questions': typeof AuthenticatedQuestionsRoute
 }
 export interface FileRoutesByTo {
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/questions': typeof AuthenticatedQuestionsRoute
 }
 export interface FileRoutesById {
@@ -67,13 +76,26 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/businesses': typeof AuthenticatedBusinessesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
   '/_authenticated/questions': typeof AuthenticatedQuestionsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/businesses' | '/dashboard' | '/questions'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/businesses'
+    | '/dashboard'
+    | '/manual-checks'
+    | '/questions'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/businesses' | '/dashboard' | '/questions'
+  to:
+    | '/'
+    | '/auth'
+    | '/businesses'
+    | '/dashboard'
+    | '/manual-checks'
+    | '/questions'
   id:
     | '__root__'
     | '/'
@@ -81,6 +103,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/businesses'
     | '/_authenticated/dashboard'
+    | '/_authenticated/manual-checks'
     | '/_authenticated/questions'
   fileRoutesById: FileRoutesById
 }
@@ -127,6 +150,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/manual-checks': {
+      id: '/_authenticated/manual-checks'
+      path: '/manual-checks'
+      fullPath: '/manual-checks'
+      preLoaderRoute: typeof AuthenticatedManualChecksRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/questions': {
       id: '/_authenticated/questions'
       path: '/questions'
@@ -140,12 +170,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedBusinessesRoute: typeof AuthenticatedBusinessesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
   AuthenticatedQuestionsRoute: typeof AuthenticatedQuestionsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBusinessesRoute: AuthenticatedBusinessesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
   AuthenticatedQuestionsRoute: AuthenticatedQuestionsRoute,
 }
 
