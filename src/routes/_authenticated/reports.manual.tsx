@@ -204,16 +204,26 @@ function ManualReportPage() {
   const questionsCount = new Set(checks.map((c) => c.prompt_text)).size;
   const mentioned = checks.filter((c) => c.was_client_mentioned);
 
-  const normalizedChecks = checks.map((c) => normalizeText(c.response_text));
+  // 저장된 값이 아니라 매번 현재 경쟁업체 목록으로 response_text 전체를 재분석
+  const competitorAnalysis = competitors.map((c) => {
+    const terms = [c.name, ...(c.aliases ?? [])].filter((t) => (t ?? "").trim().length > 0);
+    const needles = terms.map((t) => ({ term: t, needle: normalizeText(t) })).filter((t) => t.needle.length > 0);
+    const snippets: string[] = [];
+    let count = 0;
+    for (const check of checks) {
+      const normalized = normalizeText(check.response_text);
+      // 한 답변 안에서 여러 번 등장해도 1회로 집계
+      const hit = needles.find((n) => normalized.includes(n.needle));
+      if (hit) {
+        count += 1;
+        const snippet = findMatchSnippet(check.response_text, hit.needle);
+        if (snippet) snippets.push(snippet);
+      }
+    }
+    return { id: c.id, name: c.name, aliases: c.aliases ?? [], count, snippets };
+  });
 
-  const competitorMentions = competitors
-    .map((c) => {
-      const needles = [c.name, ...(c.aliases ?? [])]
-        .map(normalizeText)
-        .filter((n) => n.length > 0);
-      const count = normalizedChecks.filter((text) => needles.some((n) => text.includes(n))).length;
-      return { name: c.name, count };
-    })
+  const competitorMentions = competitorAnalysis
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
