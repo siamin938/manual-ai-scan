@@ -8,6 +8,7 @@ import {
   MANUAL_DISCLAIMER,
   formatSeoul,
   nowSeoulLocalInput,
+  isoToSeoulLocalInput,
   seoulLocalToIso,
 } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -275,7 +276,7 @@ function ManualChecksPage() {
                             response_text: c.response_text,
                             was_client_mentioned: c.was_client_mentioned,
                             client_position: c.client_position ? String(c.client_position) : "",
-                            observed_at: new Date(c.observed_at).toISOString().slice(0, 16),
+                            observed_at: isoToSeoulLocalInput(c.observed_at),
                             logged_in: c.logged_in,
                             personalized: c.personalized,
                             notes: c.notes ?? "",
