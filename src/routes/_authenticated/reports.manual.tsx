@@ -59,7 +59,15 @@ type Business = {
   is_client_business: boolean;
 };
 
+function normalizeText(value: string): string {
+  return (value ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^0-9a-z\uac00-\ud7a3\u3131-\u318e]+/g, "");
+}
+
 function priorityLabel(score: number): string {
+
   if (score >= 80) return "최우선";
   if (score >= 60) return "높음";
   if (score >= 40) return "보통";
