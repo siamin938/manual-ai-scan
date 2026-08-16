@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -160,6 +161,7 @@ function BusinessesPage() {
       toast.success("저장되었습니다.");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["businesses", activeOrgId] });
+      qc.invalidateQueries({ queryKey: ["business-competitor-links", activeOrgId] });
     },
     onError: (e: Error) => toast.error(`저장 실패: ${e.message}`),
   });
@@ -350,6 +352,29 @@ function BusinessesPage() {
                 onCheckedChange={(v) => setForm({ ...form, is_client_business: v })}
               />
             </div>
+            {!form.is_client_business && (
+              <div className="space-y-2 sm:col-span-2">
+                <Label>어느 대상 업체의 경쟁업체인가요?</Label>
+                <Select
+                  value={form.competitor_of || autoTargetId}
+                  onValueChange={(v) => setForm({ ...form, competitor_of: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="대상 업체 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientBusinesses.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  선택한 대상 업체와의 관계가 business_competitors에 저장되어 보고서 분석에 반영됩니다.
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between rounded-md border p-3 sm:col-span-2">
               <p className="text-sm font-medium">활성 상태</p>
               <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
