@@ -20,6 +20,23 @@ export function seoulLocalToIso(local: string): string {
   return new Date(`${local}:00+09:00`).toISOString();
 }
 
+/** ISO 문자열을 datetime-local 입력용 KST 문자열로 */
+export function isoToSeoulLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return nowSeoulLocalInput();
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: SEOUL_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(d)
+    .replace(" ", "T");
+}
+
 /** 현재 시각을 datetime-local 입력용 KST 문자열로 */
 export function nowSeoulLocalInput(): string {
   const parts = new Intl.DateTimeFormat("sv-SE", {
