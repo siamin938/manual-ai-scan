@@ -69,6 +69,7 @@ const EMPTY = {
   city: "",
   is_client_business: true,
   active: true,
+  competitor_of: "",
 };
 
 function BusinessesPage() {
@@ -113,11 +114,28 @@ function BusinessesPage() {
         is_client_business: form.is_client_business,
         active: form.active,
       };
+      let businessId = form.id;
       if (form.id) {
         const { error } = await supabase.from("businesses").update(payload).eq("id", form.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("businesses").insert(payload);
+        const { data, error } = await supabase.from("businesses").insert(payload).select("id").single();
+        if (error) throw error;
+        businessId = data!.id;
+      }
+
+      // 경쟁업체로 등록하면 대상 업체와의 관계를 business_competitors에 저장
+      const targetId = form.is_client_business ? "" : form.competitor_of || autoTargetId;
+      if (!form.is_client_business && targetId) {
+        const { error } = await supabase.from("business_competitors").upsert(
+          {
+            org_id: activeOrgId!,
+            target_business_id: targetId,
+            competitor_business_id: businessId,
+            active: true,
+          },
+          { onConflict: "target_business_id,competitor_business_id" },
+        );
         if (error) throw error;
       }
     },
