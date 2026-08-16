@@ -281,7 +281,7 @@ function ManualReportPage() {
               {[target.category, target.region, target.city].filter(Boolean).join(" · ")}
               {target.website_url ? ` · ${target.website_url}` : ""}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">생성 시각(KST): {formatSeoul(new Date().toISOString())}</p>
+            <p className="mt-1 text-xs text-muted-foreground">생성 시각(KST): {generatedAt ? formatSeoul(generatedAt) : "-"}</p>
           </header>
 
           <section className="grid gap-4 sm:grid-cols-3">
@@ -439,6 +439,32 @@ function ManualReportPage() {
                 </div>
               </div>
             )}
+          </section>
+
+          <section className="no-print rounded-md border border-dashed p-4">
+            <h2 className="text-sm font-semibold">임시 진단 영역 (개발 확인용)</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              연결된 경쟁업체 {competitors.length}곳 · 분석한 점검 기록 {checks.length}건
+            </p>
+            <div className="mt-3 space-y-2">
+              {competitorAnalysis.map((c) => (
+                <div key={c.id} className="rounded-md border p-3 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{c.name}</span>
+                    <Badge variant={c.count > 0 ? "default" : "secondary"}>
+                      {c.count > 0 ? `매칭 성공 · ${c.count}회` : "매칭 실패"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">별칭: {c.aliases.length ? c.aliases.join(", ") : "-"}</p>
+                  <p className="mt-1 text-muted-foreground">
+                    매칭된 문구: {c.snippets.length ? c.snippets.join(" | ") : "-"}
+                  </p>
+                </div>
+              ))}
+              {competitors.length === 0 && (
+                <p className="text-xs text-muted-foreground">연결된 경쟁업체가 없습니다.</p>
+              )}
+            </div>
           </section>
 
           <footer className="rounded-md border bg-muted p-4 text-xs leading-relaxed text-muted-foreground">
