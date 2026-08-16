@@ -94,6 +94,23 @@ function BusinessesPage() {
     },
   });
 
+  const { data: links = [] } = useQuery({
+    queryKey: ["business-competitor-links", activeOrgId],
+    enabled: !!activeOrgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("business_competitors")
+        .select("target_business_id, competitor_business_id, active")
+        .eq("org_id", activeOrgId!)
+        .eq("active", true);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const clientBusinesses = businesses.filter((b) => b.is_client_business);
+  const autoTargetId = clientBusinesses.length === 1 ? clientBusinesses[0]!.id : "";
+
   const save = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -176,6 +193,8 @@ function BusinessesPage() {
       city: b.city ?? "",
       is_client_business: b.is_client_business,
       active: b.active,
+      competitor_of:
+        links.find((l) => l.competitor_business_id === b.id)?.target_business_id ?? "",
     });
     setOpen(true);
   }
