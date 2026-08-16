@@ -59,6 +59,13 @@ type Business = {
   is_client_business: boolean;
 };
 
+function priorityLabel(score: number): string {
+  if (score >= 80) return "최우선";
+  if (score >= 60) return "높음";
+  if (score >= 40) return "보통";
+  return "낮음";
+}
+
 function ManualReportPage() {
   const { activeOrgId, canWrite, role } = useOrg();
   const qc = useQueryClient();
@@ -308,7 +315,9 @@ function ManualReportPage() {
                   <li key={r.id} className="rounded-md border p-3">
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-medium">{r.title}</p>
-                      <Badge variant="secondary">우선순위 {r.priority_score}</Badge>
+                      <Badge variant="secondary">
+                        {priorityLabel(Number(r.priority_score))} ({Number(r.priority_score)}점)
+                      </Badge>
                     </div>
                     <p className="mt-1 text-muted-foreground">{r.rationale}</p>
                   </li>
@@ -325,15 +334,21 @@ function ManualReportPage() {
                   <Input id="rec-title" value={recTitle} onChange={(e) => setRecTitle(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rec-prio">우선순위 점수</Label>
+                  <Label htmlFor="rec-prio">우선순위 점수 (0~100)</Label>
                   <Input
                     id="rec-prio"
                     type="number"
-                    min="1"
-                    max="10"
+                    min="0"
+                    max="100"
+                    step="1"
                     value={recPriority}
-                    onChange={(e) => setRecPriority(e.target.value)}
+                    onChange={(e) => setRecPriority(e.target.value.replace(/[^0-9]/g, ""))}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {priorityValid
+                      ? `${priorityValue}점 · ${priorityLabel(priorityValue)}`
+                      : "0에서 100 사이의 정수를 입력하세요."}
+                  </p>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="rec-why">근거</Label>
@@ -347,7 +362,7 @@ function ManualReportPage() {
                 <div className="sm:col-span-2">
                   <Button
                     onClick={() => addRec.mutate()}
-                    disabled={!recTitle.trim() || !recRationale.trim() || addRec.isPending}
+                    disabled={!recTitle.trim() || !recRationale.trim() || !priorityValid || addRec.isPending}
                   >
                     추가
                   </Button>
