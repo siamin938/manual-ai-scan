@@ -17,6 +17,8 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
 import { Route as AuthenticatedQuestionsRouteImport } from './routes/_authenticated/questions'
 import { Route as AuthenticatedReportsManualRouteImport } from './routes/_authenticated/reports.manual'
+import { Route as AuthenticatedRunsIndexRouteImport } from './routes/_authenticated/runs.index'
+import { Route as AuthenticatedRunsRunIdRouteImport } from './routes/_authenticated/runs.$runId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -59,6 +61,16 @@ const AuthenticatedReportsManualRoute =
     path: '/reports/manual',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedRunsIndexRoute = AuthenticatedRunsIndexRouteImport.update({
+  id: '/runs/',
+  path: '/runs/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedRunsRunIdRoute = AuthenticatedRunsRunIdRouteImport.update({
+  id: '/runs/$runId',
+  path: '/runs/$runId',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -68,6 +80,8 @@ export interface FileRoutesByFullPath {
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
+  '/runs/$runId': typeof AuthenticatedRunsRunIdRoute
+  '/runs/': typeof AuthenticatedRunsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -77,6 +91,8 @@ export interface FileRoutesByTo {
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
+  '/runs/$runId': typeof AuthenticatedRunsRunIdRoute
+  '/runs': typeof AuthenticatedRunsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -88,6 +104,8 @@ export interface FileRoutesById {
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
   '/_authenticated/questions': typeof AuthenticatedQuestionsRoute
   '/_authenticated/reports/manual': typeof AuthenticatedReportsManualRoute
+  '/_authenticated/runs/$runId': typeof AuthenticatedRunsRunIdRoute
+  '/_authenticated/runs/': typeof AuthenticatedRunsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -99,6 +117,8 @@ export interface FileRouteTypes {
     | '/manual-checks'
     | '/questions'
     | '/reports/manual'
+    | '/runs/$runId'
+    | '/runs/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -108,6 +128,8 @@ export interface FileRouteTypes {
     | '/manual-checks'
     | '/questions'
     | '/reports/manual'
+    | '/runs/$runId'
+    | '/runs'
   id:
     | '__root__'
     | '/'
@@ -118,6 +140,8 @@ export interface FileRouteTypes {
     | '/_authenticated/manual-checks'
     | '/_authenticated/questions'
     | '/_authenticated/reports/manual'
+    | '/_authenticated/runs/$runId'
+    | '/_authenticated/runs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -184,6 +208,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReportsManualRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/runs/': {
+      id: '/_authenticated/runs/'
+      path: '/runs'
+      fullPath: '/runs/'
+      preLoaderRoute: typeof AuthenticatedRunsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/runs/$runId': {
+      id: '/_authenticated/runs/$runId'
+      path: '/runs/$runId'
+      fullPath: '/runs/$runId'
+      preLoaderRoute: typeof AuthenticatedRunsRunIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -193,6 +231,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
   AuthenticatedQuestionsRoute: typeof AuthenticatedQuestionsRoute
   AuthenticatedReportsManualRoute: typeof AuthenticatedReportsManualRoute
+  AuthenticatedRunsRunIdRoute: typeof AuthenticatedRunsRunIdRoute
+  AuthenticatedRunsIndexRoute: typeof AuthenticatedRunsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -201,6 +241,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
   AuthenticatedQuestionsRoute: AuthenticatedQuestionsRoute,
   AuthenticatedReportsManualRoute: AuthenticatedReportsManualRoute,
+  AuthenticatedRunsRunIdRoute: AuthenticatedRunsRunIdRoute,
+  AuthenticatedRunsIndexRoute: AuthenticatedRunsIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
