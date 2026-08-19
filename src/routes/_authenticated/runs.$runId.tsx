@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -312,9 +312,8 @@ function RunDetailPage() {
                     const needsReview = !!m && (m.manual_review_required || m.parse_confidence === "low");
                     const open = openJob === j.id;
                     return (
-                      <>
+                      <Fragment key={j.id}>
                         <TableRow
-                          key={j.id}
                           className="cursor-pointer"
                           onClick={() => setOpenJob(open ? null : j.id)}
                         >
@@ -338,7 +337,7 @@ function RunDetailPage() {
                           </TableCell>
                         </TableRow>
                         {open ? (
-                          <TableRow key={`${j.id}-detail`}>
+                          <TableRow>
                             <TableCell colSpan={6} className="bg-muted/40">
                               <JobDetail
                                 job={j}
@@ -351,7 +350,7 @@ function RunDetailPage() {
                             </TableCell>
                           </TableRow>
                         ) : null}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </TableBody>
