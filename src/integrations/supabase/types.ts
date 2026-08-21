@@ -296,6 +296,346 @@ export type Database = {
           },
         ]
       }
+      insight_actions: {
+        Row: {
+          action_key: string
+          action_payload: Json
+          action_type: string
+          business_id: string
+          confidence_score: number
+          created_at: string
+          engine_run_id: string
+          evidence_grade: string
+          id: string
+          org_id: string
+          primary_finding_id: string
+          priority_score: number
+          rationale: string
+          recommendation_mode: string
+          recommended_action: string
+          source_finding_ids: string[]
+          status: string
+          title: string
+          updated_at: string
+          validation_plan: string
+        }
+        Insert: {
+          action_key: string
+          action_payload?: Json
+          action_type: string
+          business_id: string
+          confidence_score: number
+          created_at?: string
+          engine_run_id: string
+          evidence_grade: string
+          id?: string
+          org_id: string
+          primary_finding_id: string
+          priority_score: number
+          rationale: string
+          recommendation_mode: string
+          recommended_action: string
+          source_finding_ids?: string[]
+          status?: string
+          title: string
+          updated_at?: string
+          validation_plan: string
+        }
+        Update: {
+          action_key?: string
+          action_payload?: Json
+          action_type?: string
+          business_id?: string
+          confidence_score?: number
+          created_at?: string
+          engine_run_id?: string
+          evidence_grade?: string
+          id?: string
+          org_id?: string
+          primary_finding_id?: string
+          priority_score?: number
+          rationale?: string
+          recommendation_mode?: string
+          recommended_action?: string
+          source_finding_ids?: string[]
+          status?: string
+          title?: string
+          updated_at?: string
+          validation_plan?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insight_actions_engine_run_id_fkey"
+            columns: ["engine_run_id"]
+            isOneToOne: false
+            referencedRelation: "insight_engine_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_actions_primary_finding_id_fkey"
+            columns: ["primary_finding_id"]
+            isOneToOne: false
+            referencedRelation: "insight_findings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insight_engine_runs: {
+        Row: {
+          analysis_scope: Json
+          business_id: string
+          completed_at: string | null
+          created_at: string
+          eligible_measurement_count: number
+          engine_version: string
+          error_code: string | null
+          error_message: string | null
+          excluded_measurement_count: number
+          experiment_id: string | null
+          finding_count: number
+          id: string
+          input_fingerprint: string | null
+          input_measurement_count: number
+          org_id: string
+          requested_by: string | null
+          source_run_id: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          analysis_scope?: Json
+          business_id: string
+          completed_at?: string | null
+          created_at?: string
+          eligible_measurement_count?: number
+          engine_version?: string
+          error_code?: string | null
+          error_message?: string | null
+          excluded_measurement_count?: number
+          experiment_id?: string | null
+          finding_count?: number
+          id?: string
+          input_fingerprint?: string | null
+          input_measurement_count?: number
+          org_id: string
+          requested_by?: string | null
+          source_run_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          analysis_scope?: Json
+          business_id?: string
+          completed_at?: string | null
+          created_at?: string
+          eligible_measurement_count?: number
+          engine_version?: string
+          error_code?: string | null
+          error_message?: string | null
+          excluded_measurement_count?: number
+          experiment_id?: string | null
+          finding_count?: number
+          id?: string
+          input_fingerprint?: string | null
+          input_measurement_count?: number
+          org_id?: string
+          requested_by?: string | null
+          source_run_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insight_engine_runs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_engine_runs_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_effects"
+            referencedColumns: ["experiment_id"]
+          },
+          {
+            foreignKeyName: "insight_engine_runs_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_effects_by_provider"
+            referencedColumns: ["experiment_id"]
+          },
+          {
+            foreignKeyName: "insight_engine_runs_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_engine_runs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_engine_runs_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insight_findings: {
+        Row: {
+          baseline_value: number | null
+          business_id: string
+          causal_claim_allowed: boolean
+          claim_type: string
+          comparison_value: number | null
+          competitor_business_id: string | null
+          confidence_score: number
+          created_at: string
+          delta_value: number | null
+          denominator: number | null
+          engine_run_id: string
+          evidence_grade: string
+          evidence_payload: Json
+          experiment_id: string | null
+          finding_key: string
+          finding_type: string
+          id: string
+          metric_name: string | null
+          metric_value: number | null
+          numerator: number | null
+          org_id: string
+          priority_score: number
+          question_id: string | null
+          sample_size: number
+          summary: string
+          title: string
+        }
+        Insert: {
+          baseline_value?: number | null
+          business_id: string
+          causal_claim_allowed?: boolean
+          claim_type?: string
+          comparison_value?: number | null
+          competitor_business_id?: string | null
+          confidence_score?: number
+          created_at?: string
+          delta_value?: number | null
+          denominator?: number | null
+          engine_run_id: string
+          evidence_grade?: string
+          evidence_payload?: Json
+          experiment_id?: string | null
+          finding_key: string
+          finding_type: string
+          id?: string
+          metric_name?: string | null
+          metric_value?: number | null
+          numerator?: number | null
+          org_id: string
+          priority_score?: number
+          question_id?: string | null
+          sample_size?: number
+          summary?: string
+          title: string
+        }
+        Update: {
+          baseline_value?: number | null
+          business_id?: string
+          causal_claim_allowed?: boolean
+          claim_type?: string
+          comparison_value?: number | null
+          competitor_business_id?: string | null
+          confidence_score?: number
+          created_at?: string
+          delta_value?: number | null
+          denominator?: number | null
+          engine_run_id?: string
+          evidence_grade?: string
+          evidence_payload?: Json
+          experiment_id?: string | null
+          finding_key?: string
+          finding_type?: string
+          id?: string
+          metric_name?: string | null
+          metric_value?: number | null
+          numerator?: number | null
+          org_id?: string
+          priority_score?: number
+          question_id?: string | null
+          sample_size?: number
+          summary?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insight_findings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_findings_competitor_business_id_fkey"
+            columns: ["competitor_business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_findings_engine_run_id_fkey"
+            columns: ["engine_run_id"]
+            isOneToOne: false
+            referencedRelation: "insight_engine_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_findings_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_effects"
+            referencedColumns: ["experiment_id"]
+          },
+          {
+            foreignKeyName: "insight_findings_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiment_effects_by_provider"
+            referencedColumns: ["experiment_id"]
+          },
+          {
+            foreignKeyName: "insight_findings_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "experiments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_findings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insight_findings_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       manual_ui_checks: {
         Row: {
           business_id: string
@@ -475,8 +815,10 @@ export type Database = {
       measurement_mentions: {
         Row: {
           confidence: Database["public"]["Enums"]["parse_confidence"]
+          count_as_confirmed_business: boolean
           created_at: string
           display_name: string
+          entity_kind: string | null
           explicit_rank: boolean
           id: string
           matched_alias: string | null
@@ -484,11 +826,16 @@ export type Database = {
           measurement_id: string
           org_id: string
           position: number
+          resolution_confidence: string | null
+          resolution_evidence: Json
+          specificity: string | null
         }
         Insert: {
           confidence?: Database["public"]["Enums"]["parse_confidence"]
+          count_as_confirmed_business?: boolean
           created_at?: string
           display_name: string
+          entity_kind?: string | null
           explicit_rank?: boolean
           id?: string
           matched_alias?: string | null
@@ -496,11 +843,16 @@ export type Database = {
           measurement_id: string
           org_id: string
           position: number
+          resolution_confidence?: string | null
+          resolution_evidence?: Json
+          specificity?: string | null
         }
         Update: {
           confidence?: Database["public"]["Enums"]["parse_confidence"]
+          count_as_confirmed_business?: boolean
           created_at?: string
           display_name?: string
+          entity_kind?: string | null
           explicit_rank?: boolean
           id?: string
           matched_alias?: string | null
@@ -508,6 +860,9 @@ export type Database = {
           measurement_id?: string
           org_id?: string
           position?: number
+          resolution_confidence?: string | null
+          resolution_evidence?: Json
+          specificity?: string | null
         }
         Relationships: [
           {
