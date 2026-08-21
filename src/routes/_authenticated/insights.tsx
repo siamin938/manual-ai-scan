@@ -332,7 +332,7 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
   return (
     <Card>
       <CardContent className="space-y-1 py-5">
