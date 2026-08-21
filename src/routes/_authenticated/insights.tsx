@@ -152,6 +152,13 @@ function InsightsPage() {
         </p>
       </header>
 
+      {run?.business_name && (
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground">분석 대상</p>
+          <p className="text-lg font-semibold tracking-tight">{run.business_name}</p>
+        </div>
+      )}
+
       {isLoading || (isFetching && !data) ? (
         <LoadingState />
       ) : isError ? (
@@ -190,8 +197,9 @@ function InsightsPage() {
               <Meta label="분석 시점" value={formatSeoul(run.completed_at)} />
               <Meta label="Insight Engine 버전" value={`v${run.engine_version}`} />
               <Meta
-                label="분석 사용 measurement 수"
-                value={`${run.eligible_measurement_count} / ${run.input_measurement_count}건`}
+                label="분석 데이터"
+                value={`포함 ${run.eligible_measurement_count}건 · 제외 ${run.excluded_measurement_count}건`}
+                sub={`입력 측정 ${run.input_measurement_count}건`}
               />
               <Meta label="Evidence Grade" value={gradeLabel(data?.evidence_grade)} />
               <Meta
@@ -207,10 +215,10 @@ function InsightsPage() {
             <StatCard label="추천 액션" value={`${actions.length}건`} />
             <StatCard
               label="가장 높은 Priority"
-              value={findings.length + actions.length ? `${topPriority}` : "-"}
+              value={findings.length + actions.length ? fmtNum(topPriority) : "-"}
               sub={findings.length + actions.length ? priorityLabel(topPriority) : undefined}
             />
-            <StatCard label="데이터 신뢰 수준" value={gradeLabel(data?.evidence_grade)} sub={run.business_name ?? undefined} />
+            <StatCard label="데이터 신뢰 수준" value={gradeLabel(data?.evidence_grade)} />
           </div>
 
           {/* 핵심 인사이트 */}
@@ -228,7 +236,7 @@ function InsightsPage() {
                           <Badge variant="outline">{FINDING_TYPE_LABELS[f.finding_type] ?? f.finding_type}</Badge>
                           <Badge variant="secondary">{gradeLabel(f.evidence_grade)}</Badge>
                           <Badge variant={priorityVariant(f.priority_score)}>
-                            {priorityLabel(f.priority_score)} · {f.priority_score}
+                            {priorityLabel(f.priority_score)} · {fmtNum(f.priority_score)}
                           </Badge>
                         </div>
                         <CardTitle className="pt-2 text-base leading-snug">{f.title}</CardTitle>
@@ -240,11 +248,7 @@ function InsightsPage() {
                             {f.question_text ? `관련 질문: ${f.question_text}` : `관련 경쟁업체: ${f.competitor_name}`}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground">
-                          관찰된 근거: 표본 {f.sample_size}건
-                          {f.numerator !== null && f.denominator !== null ? ` · ${f.numerator}/${f.denominator}` : ""}
-                          {f.metric_value !== null ? ` · ${f.metric_name} ${pct(f.metric_value)}` : ""}
-                        </p>
+                        <p className="text-xs text-muted-foreground">관찰된 근거: {evidenceText(f)}</p>
                       </CardContent>
                     </Card>
                   </button>
@@ -268,21 +272,34 @@ function InsightsPage() {
                           <Badge variant="outline">{ACTION_TYPE_LABELS[a.action_type] ?? a.action_type}</Badge>
                           <Badge variant="secondary">{gradeLabel(a.evidence_grade)}</Badge>
                           <Badge variant={priorityVariant(a.priority_score)}>
-                            {priorityLabel(a.priority_score)} · {a.priority_score}
+                            {priorityLabel(a.priority_score)} · {fmtNum(a.priority_score)}
                           </Badge>
                           {a.recommendation_mode === "test" && <Badge>테스트 권장</Badge>}
                         </div>
                         <CardTitle className="pt-2 text-base leading-snug">{a.title}</CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <p>{a.recommended_action}</p>
-                        <p className="text-xs text-muted-foreground">{a.rationale}</p>
+                      <CardContent className="space-y-4 text-sm">
+                        <Block title="무엇을 해볼까요?" body={a.recommended_action} />
+                        <Block title="왜 이 테스트를 하나요?" body={a.rationale} />
+                        <Block title="어떻게 검증하나요?" body={a.validation_plan} />
                         {a.recommendation_mode === "test" && (
-                          <p className="text-xs text-muted-foreground">
-                            효과가 확정된 행동이 아니라 검증이 필요한 실험입니다.
+                          <p className="rounded-md bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                            효과가 확인된 방법이 아니라 추가 측정을 통해 검증할 실험입니다.
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground">연결된 인사이트 {a.source_finding_count}건</p>
+                        <Separator />
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                          <MetaSmall label="Evidence Grade" value={gradeLabel(a.evidence_grade)} />
+                          <MetaSmall
+                            label="Recommendation Mode"
+                            value={a.recommendation_mode === "test" ? "테스트 권장" : a.recommendation_mode}
+                          />
+                          <MetaSmall
+                            label="Priority"
+                            value={`${fmtNum(a.priority_score)} · ${priorityLabel(a.priority_score)}`}
+                          />
+                          <MetaSmall label="연결된 인사이트" value={`${a.source_finding_count}건`} />
+                        </dl>
                       </CardContent>
                     </Card>
                   </button>
@@ -307,17 +324,10 @@ function InsightsPage() {
               <div className="space-y-3 text-sm">
                 <p>{openFinding.summary}</p>
                 <Separator />
-                <Meta label="우선순위" value={`${openFinding.priority_score} (${priorityLabel(openFinding.priority_score)})`} />
-                <Meta label="신뢰도 점수" value={`${openFinding.confidence_score}`} />
+                <Meta label="우선순위" value={`${fmtNum(openFinding.priority_score)} (${priorityLabel(openFinding.priority_score)})`} />
+                <Meta label="신뢰도 점수" value={fmtNum(openFinding.confidence_score)} />
                 <Meta label="주장 유형" value={openFinding.claim_type} />
-                <Meta
-                  label="관찰된 근거"
-                  value={`표본 ${openFinding.sample_size}건${
-                    openFinding.numerator !== null && openFinding.denominator !== null
-                      ? ` · ${openFinding.numerator}/${openFinding.denominator}`
-                      : ""
-                  }${openFinding.metric_value !== null ? ` · ${openFinding.metric_name} ${pct(openFinding.metric_value)}` : ""}`}
-                />
+                <Meta label="관찰된 근거" value={evidenceText(openFinding)} />
                 {openFinding.question_text && <Meta label="관련 질문" value={openFinding.question_text} />}
                 {openFinding.competitor_name && <Meta label="관련 경쟁업체" value={openFinding.competitor_name} />}
                 {openFinding.small_sample && (
@@ -343,12 +353,12 @@ function InsightsPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-sm">
-                <Meta label="추천 행동" value={openAction.recommended_action} />
-                <Meta label="추천 이유" value={openAction.rationale} />
-                <Meta label="검증 방법" value={openAction.validation_plan} />
+                <Block title="무엇을 해볼까요?" body={openAction.recommended_action} />
+                <Block title="왜 이 테스트를 하나요?" body={openAction.rationale} />
+                <Block title="어떻게 검증하나요?" body={openAction.validation_plan} />
                 <Separator />
-                <Meta label="우선순위" value={`${openAction.priority_score} (${priorityLabel(openAction.priority_score)})`} />
-                <Meta label="신뢰도 점수" value={`${openAction.confidence_score}`} />
+                <Meta label="우선순위" value={`${fmtNum(openAction.priority_score)} (${priorityLabel(openAction.priority_score)})`} />
+                <Meta label="신뢰도 점수" value={fmtNum(openAction.confidence_score)} />
                 <Meta
                   label="Recommendation Mode"
                   value={openAction.recommendation_mode === "test" ? "테스트 권장" : openAction.recommendation_mode}
@@ -356,7 +366,7 @@ function InsightsPage() {
                 <Meta label="연결된 인사이트" value={`${openAction.source_finding_count}건`} />
                 {openAction.recommendation_mode === "test" && (
                   <Alert>
-                    <AlertDescription>효과가 확정된 행동이 아니라 검증이 필요한 실험입니다.</AlertDescription>
+                    <AlertDescription>효과가 확인된 방법이 아니라 추가 측정을 통해 검증할 실험입니다.</AlertDescription>
                   </Alert>
                 )}
               </div>
@@ -368,11 +378,30 @@ function InsightsPage() {
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
   return (
     <div className="space-y-0.5">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm font-medium break-words">{value}</p>
+      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+function MetaSmall({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-0.5">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="font-medium break-words">{value}</dd>
+    </div>
+  );
+}
+
+function Block({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-muted-foreground">{title}</p>
+      <p className="text-sm leading-relaxed whitespace-pre-line break-words">{body}</p>
     </div>
   );
 }
