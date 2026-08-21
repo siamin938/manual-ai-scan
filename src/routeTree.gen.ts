@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authenticated/businesses'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
 import { Route as AuthenticatedQuestionsRouteImport } from './routes/_authenticated/questions'
 import { Route as AuthenticatedReportsManualRouteImport } from './routes/_authenticated/reports.manual'
@@ -42,6 +43,11 @@ const AuthenticatedBusinessesRoute = AuthenticatedBusinessesRouteImport.update({
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedManualChecksRoute =
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/businesses': typeof AuthenticatedBusinessesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
   '/_authenticated/questions': typeof AuthenticatedQuestionsRoute
   '/_authenticated/reports/manual': typeof AuthenticatedReportsManualRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/businesses'
     | '/dashboard'
+    | '/insights'
     | '/manual-checks'
     | '/questions'
     | '/reports/manual'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/businesses'
     | '/dashboard'
+    | '/insights'
     | '/manual-checks'
     | '/questions'
     | '/reports/manual'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/businesses'
     | '/_authenticated/dashboard'
+    | '/_authenticated/insights'
     | '/_authenticated/manual-checks'
     | '/_authenticated/questions'
     | '/_authenticated/reports/manual'
@@ -187,6 +199,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/insights': {
+      id: '/_authenticated/insights'
+      path: '/insights'
+      fullPath: '/insights'
+      preLoaderRoute: typeof AuthenticatedInsightsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/manual-checks': {
       id: '/_authenticated/manual-checks'
       path: '/manual-checks'
@@ -228,6 +247,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedBusinessesRoute: typeof AuthenticatedBusinessesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
   AuthenticatedQuestionsRoute: typeof AuthenticatedQuestionsRoute
   AuthenticatedReportsManualRoute: typeof AuthenticatedReportsManualRoute
@@ -238,6 +258,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBusinessesRoute: AuthenticatedBusinessesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
   AuthenticatedQuestionsRoute: AuthenticatedQuestionsRoute,
   AuthenticatedReportsManualRoute: AuthenticatedReportsManualRoute,
