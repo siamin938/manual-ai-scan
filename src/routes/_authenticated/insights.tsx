@@ -78,8 +78,53 @@ function priorityVariant(score: number): "default" | "secondary" | "outline" {
 
 function pct(n: number | null) {
   if (n === null) return null;
-  return `${Math.round(n * 1000) / 10}%`;
+  return `${fmtNum(Math.round(n * 1000) / 10)}%`;
 }
+
+/** 불필요한 .0 없이 숫자 표시 (값 자체는 변경하지 않음) */
+function fmtNum(n: number) {
+  return Number.isInteger(n) ? `${n}` : `${n}`.replace(/\.0+$/, "");
+}
+
+const METRIC_LABELS: Record<string, string> = {
+  substitution_share: "경쟁업체 대체 관찰률",
+  target_visibility_rate: "대상 업체 노출률",
+  rate_spread: "질문별 노출률 차이",
+  visibility_rate_spread: "질문별 노출률 차이",
+};
+
+/** 내부 metric code를 노출하지 않는 한글 근거 문장 (DB 값은 그대로 사용) */
+function evidenceText(f: InsightFindingDTO): string {
+  const metric = f.metric_name ?? "";
+  const rate = f.metric_value !== null ? pct(f.metric_value) : null;
+  const hasFraction = f.numerator !== null && f.denominator !== null;
+
+  if (metric === "substitution_share") {
+    const base = hasFraction
+      ? `표본 ${f.denominator}건 중 ${f.numerator}건에서 경쟁업체가 관찰됨`
+      : `표본 ${f.sample_size}건`;
+    return rate ? `${base} · 대체 관찰률 ${rate}` : base;
+  }
+
+  if (metric === "target_visibility_rate") {
+    const base = hasFraction
+      ? `${f.denominator}회 측정 중 대상 업체 노출 ${f.numerator}회`
+      : `표본 ${f.sample_size}건`;
+    return rate ? `${base} · 노출률 ${rate}` : base;
+  }
+
+  if (metric === "rate_spread" || metric === "visibility_rate_spread") {
+    const base = `표본 ${f.sample_size}건`;
+    return rate ? `${base} · 질문별 노출률 차이 ${rate.replace("%", "%p")}` : base;
+  }
+
+  const parts = [`표본 ${f.sample_size}건`];
+  if (hasFraction) parts.push(`${f.numerator}/${f.denominator}건 관찰`);
+  if (rate && metric && METRIC_LABELS[metric]) parts.push(`${METRIC_LABELS[metric]} ${rate}`);
+  else if (rate) parts.push(rate);
+  return parts.join(" · ");
+}
+
 
 function InsightsPage() {
   const { activeOrgId } = useOrg();
