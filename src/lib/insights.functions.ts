@@ -210,7 +210,9 @@ export const getInsightOverview = createServerFn({ method: "POST" })
           "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_start_at, followup_end_at, evaluated_at, result_classification, evidence_grade, source_insight_action_id, created_at",
         )
         .eq("org_id", data.orgId)
+        .eq("source_type", "insight_action")
         .in("source_insight_action_id", actionIds)
+
         .in("status", ["draft", "baseline", "action_applied", "followup"])
         .order("created_at", { ascending: false });
 

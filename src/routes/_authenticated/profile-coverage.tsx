@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { toast } from "sonner";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import {
@@ -8,12 +10,25 @@ import {
   type CoverageGapActionDTO,
   type ProfileCoverageItemDTO,
 } from "@/lib/profile-coverage.functions";
+import {
+  createExperimentFromCoverageItem,
+  type CreateCoverageExperimentErrorCode,
+} from "@/lib/experiments.functions";
+import { useExperimentFlow } from "@/components/experiment-flow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -22,6 +37,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+/** 서버 오류 코드 → 안전한 한글 문구 */
+const COVERAGE_EXPERIMENT_ERROR_MESSAGES: Partial<
+  Record<CreateCoverageExperimentErrorCode, string>
+> = {
+  FORBIDDEN: "실험을 생성할 권한이 없습니다.",
+  COVERAGE_ITEM_NOT_FOUND: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  COVERAGE_ITEM_SCOPE_MISMATCH: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  COVERAGE_STATUS_NOT_EXPERIMENTABLE: "현재 항목은 실험 대상이 아닙니다.",
+  COVERAGE_RUN_NOT_USABLE: "이 분석 결과로는 실험을 시작할 수 없습니다.",
+  COVERAGE_SOURCE_RUN_NOT_FOUND: "기준이 되는 측정 실행을 찾을 수 없습니다.",
+  QUESTION_SCOPE_MISMATCH: "질문 정보를 확인할 수 없습니다.",
+  BUSINESS_SCOPE_MISMATCH: "업체 정보를 확인할 수 없습니다.",
+  EXPERIMENT_ALREADY_ACTIVE: "이미 진행 중인 실험이 있습니다.",
+  EXPERIMENT_CREATE_FAILED: "실험 생성 중 오류가 발생했습니다.",
+  INTERNAL_ERROR: "실험 생성 중 오류가 발생했습니다.",
+};
+
 
 export const Route = createFileRoute("/_authenticated/profile-coverage")({
   head: () => ({
@@ -94,9 +127,15 @@ function priorityBadge(level: string) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function ActionCard({ action }: { action: CoverageGapActionDTO }) {
+function ActionCard({
+  action,
+  cta,
+}: {
+  action: CoverageGapActionDTO;
+  cta: React.ReactNode;
+}) {
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center gap-2">
           {priorityBadge(action.priority_level)}
@@ -105,7 +144,7 @@ function ActionCard({ action }: { action: CoverageGapActionDTO }) {
         <CardTitle className="text-base">{action.title}</CardTitle>
         <p className="text-sm text-muted-foreground">{action.question_text ?? "질문 정보 없음"}</p>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="flex flex-1 flex-col space-y-3 text-sm">
         <div>
           <p className="text-xs text-muted-foreground">관찰 근거</p>
           <p className="tabular-nums">
@@ -131,10 +170,28 @@ function ActionCard({ action }: { action: CoverageGapActionDTO }) {
             {action.evidence_grade ? (GRADE_LABELS[action.evidence_grade] ?? "기타") : "-"}
           </Badge>
         </div>
+        {action.active_experiment && (
+          <p className="text-xs text-muted-foreground">
+            실험 상태: {EXPERIMENT_STATUS_LABELS[action.active_experiment.status] ?? "진행 중"}
+            {action.active_experiment.evaluation_recorded &&
+            action.active_experiment.result_classification
+              ? ` · 결과 ${action.active_experiment.result_classification}`
+              : ""}
+          </p>
+        )}
+        <div className="mt-auto pt-1">{cta}</div>
       </CardContent>
     </Card>
   );
 }
+
+const EXPERIMENT_STATUS_LABELS: Record<string, string> = {
+  draft: "초안",
+  baseline: "Baseline",
+  action_applied: "변경 적용됨",
+  followup: "Follow-up",
+};
+
 
 function MetricCard({
   title,
@@ -171,6 +228,31 @@ function ProfileCoveragePage() {
   const run = data?.run ?? null;
   const items: ProfileCoverageItemDTO[] = data?.items ?? [];
   const actions: CoverageGapActionDTO[] = data?.actions ?? [];
+
+  // Experiment 단계 실행 흐름 (비용은 Baseline/Follow-up 최종 확인 버튼에서만 발생)
+  const flow = useExperimentFlow(activeOrgId ?? null, () => void refetch());
+  const createExperimentFn = useServerFn(createExperimentFromCoverageItem);
+  const [createTarget, setCreateTarget] = useState<CoverageGapActionDTO | null>(null);
+
+  const createExperiment = useMutation({
+    // 클라이언트는 orgId와 coverage item id만 전달한다. 나머지는 서버가 계보로 결정한다.
+    mutationFn: (coverageItemId: string) =>
+      createExperimentFn({
+        data: { orgId: activeOrgId as string, profileCoverageItemId: coverageItemId },
+      }),
+    onSuccess: (result) => {
+      if (result.ok) toast.success("실험 초안이 생성되었습니다.");
+      else toast.error(COVERAGE_EXPERIMENT_ERROR_MESSAGES[result.error] ?? "실험 생성 중 오류가 발생했습니다.");
+      setCreateTarget(null);
+      void refetch();
+    },
+    onError: () => {
+      toast.error("실험 생성 중 오류가 발생했습니다.");
+      setCreateTarget(null);
+      void refetch();
+    },
+  });
+
 
   return (
     <div className="space-y-6">
@@ -341,9 +423,19 @@ function ProfileCoveragePage() {
                 확인된 것은 아니며, 변경 후 재측정으로 검증해야 합니다.
               </p>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {actions.map((action, idx) => (
-                  <ActionCard key={`${action.title}-${idx}`} action={action} />
+                {actions.map((action) => (
+                  <ActionCard
+                    key={action.coverage_item_id}
+                    action={action}
+                    cta={flow.renderCta({
+                      experiment: action.active_experiment,
+                      title: action.title,
+                      recommendedAction: action.profile_fields.join(", "),
+                      onCreate: () => setCreateTarget(action),
+                    })}
+                  />
                 ))}
+
               </div>
             </section>
           )}
@@ -415,6 +507,54 @@ function ProfileCoveragePage() {
           </Card>
         </>
       )}
+
+      {/* 실험 초안 생성 확인 — 측정/비용 발생 없음 */}
+      <Dialog
+        open={!!createTarget}
+        onOpenChange={(o) => {
+          if (!o && !createExperiment.isPending) setCreateTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          {createTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">이 항목으로 실험을 시작할까요?</DialogTitle>
+                <DialogDescription>{createTarget.title}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  {createTarget.question_text ?? "질문 정보 없음"}
+                </p>
+                <Alert>
+                  <AlertDescription className="leading-relaxed">
+                    지금은 실험 초안만 생성합니다. AI 측정이 실행되지 않으므로 비용이 발생하지
+                    않습니다. 실제 측정은 다음 단계의 Baseline 시작 확인에서만 진행됩니다.
+                  </AlertDescription>
+                </Alert>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setCreateTarget(null)}
+                  disabled={createExperiment.isPending}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={() => createExperiment.mutate(createTarget.coverage_item_id)}
+                  disabled={createExperiment.isPending}
+                >
+                  {createExperiment.isPending ? "생성 중..." : "실험 초안 생성"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {flow.dialogs}
     </div>
+
   );
 }

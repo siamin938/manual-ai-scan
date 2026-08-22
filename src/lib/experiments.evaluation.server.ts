@@ -56,6 +56,9 @@ type ExperimentRow = {
   changed_by: string | null;
   action_application_snapshot: unknown;
   source_insight_action_id: string | null;
+  source_type: string | null;
+  source_profile_coverage_item_id: string | null;
+
   evaluation_snapshot: unknown;
   evaluated_at: string | null;
   evaluated_by: string | null;
@@ -69,7 +72,8 @@ type ExperimentRow = {
 };
 
 const EXPERIMENT_COLUMNS =
-  "id, org_id, business_id, status, baseline_run_id, followup_run_id, baseline_condition_snapshot, followup_condition_snapshot, baseline_start_at, baseline_end_at, followup_start_at, followup_end_at, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot, source_insight_action_id, evaluation_snapshot, evaluated_at, evaluated_by, evaluation_version, evidence_grade, primary_metric, baseline_value, followup_value, delta_value, result_classification";
+  "id, org_id, business_id, status, baseline_run_id, followup_run_id, baseline_condition_snapshot, followup_condition_snapshot, baseline_start_at, baseline_end_at, followup_start_at, followup_end_at, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot, source_insight_action_id, source_type, source_profile_coverage_item_id, evaluation_snapshot, evaluated_at, evaluated_by, evaluation_version, evidence_grade, primary_metric, baseline_value, followup_value, delta_value, result_classification";
+
 
 /** 두 ISO 문자열이 같은 instant인지(문자열 포맷 차이 허용, parse 실패는 불일치). */
 function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
@@ -403,14 +407,44 @@ async function computeEvaluation(args: {
     return { ok: false, error: "EVALUATION_CONDITION_MISMATCH" };
   }
   // Action Applied 감사정보 strict 검증 (자동 보정/overwrite 없음)
+  const expSourceType =
+    experiment.source_type === "profile_coverage_item" ? "profile_coverage_item" : "insight_action";
   if (
     !sameInstant(actionRecord["applied_at"] as string | null, experiment.intervention_at) ||
     !sameInstant(actionRecord["recorded_at"] as string | null, experiment.intervention_confirmed_at) ||
     actionRecord["recorded_by"] !== experiment.changed_by ||
-    actionRecord["source_insight_action_id"] !== experiment.source_insight_action_id
+    (actionRecord["source_insight_action_id"] ?? null) !==
+      (experiment.source_insight_action_id ?? null)
   ) {
     return { ok: false, error: "EVALUATION_INVALID_STATE" };
   }
+  // source_type 분기 provenance 검증 (기존 snapshot에는 source_type이 없을 수 있다)
+  const recordSourceType =
+    actionRecord["source_type"] === undefined
+      ? "insight_action"
+      : (actionRecord["source_type"] as string);
+  if (recordSourceType !== expSourceType) {
+    return { ok: false, error: "EVALUATION_INVALID_STATE" };
+  }
+  if (expSourceType === "profile_coverage_item") {
+    if (
+      !experiment.source_profile_coverage_item_id ||
+      actionRecord["source_profile_coverage_item_id"] !== experiment.source_profile_coverage_item_id
+    ) {
+      return { ok: false, error: "EVALUATION_INVALID_STATE" };
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: item, error: itemErr } = await supabaseAdmin
+      .from("profile_coverage_items")
+      .select("id, org_id, business_id")
+      .eq("id", experiment.source_profile_coverage_item_id)
+      .eq("org_id", experiment.org_id)
+      .eq("business_id", experiment.business_id)
+      .maybeSingle();
+    if (itemErr) return { ok: false, error: "INTERNAL_ERROR" };
+    if (!item) return { ok: false, error: "EVALUATION_INVALID_STATE" };
+  }
+
 
   // --- 조건 동일성 ---
   if (baselineSnapshot.condition_hash !== followupSnapshot.condition_hash) {

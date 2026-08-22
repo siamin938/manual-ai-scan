@@ -13,6 +13,12 @@ import {
   type ActionAppliedResult,
   type RecordActionAppliedInput,
 } from "./experiments.helpers";
+import {
+  COVERAGE_EXPERIMENT_ACTION_TYPE,
+  coverageActionFields,
+  coverageActionTitle,
+} from "./profile-coverage.helpers";
+
 
 type UserClient = SupabaseClient<Database>;
 
@@ -82,7 +88,7 @@ export async function recordExperimentActionAppliedImpl(args: {
   const { data: experiment, error: expErr } = await supabaseAdmin
     .from("experiments")
     .select(
-      "id, org_id, business_id, status, baseline_run_id, baseline_start_at, baseline_end_at, baseline_condition_snapshot, source_insight_action_id, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot",
+      "id, org_id, business_id, status, baseline_run_id, baseline_start_at, baseline_end_at, baseline_condition_snapshot, source_type, source_insight_action_id, source_profile_coverage_item_id, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot",
     )
     .eq("id", experimentId)
     .eq("org_id", orgId)
@@ -99,7 +105,16 @@ export async function recordExperimentActionAppliedImpl(args: {
   if (alreadyRecorded) return fail("ACTION_APPLY_ALREADY_RECORDED");
 
   if (experiment.status !== "baseline") return fail("ACTION_APPLY_INVALID_STATE");
-  if (!experiment.source_insight_action_id) return fail("ACTION_APPLY_INVALID_STATE");
+
+  const sourceType =
+    experiment.source_type === "profile_coverage_item" ? "profile_coverage_item" : "insight_action";
+  if (sourceType === "insight_action" && !experiment.source_insight_action_id) {
+    return fail("ACTION_APPLY_INVALID_STATE");
+  }
+  if (sourceType === "profile_coverage_item" && !experiment.source_profile_coverage_item_id) {
+    return fail("ACTION_APPLY_INVALID_STATE");
+  }
+
 
   const baselineRunId = experiment.baseline_run_id;
   if (!baselineRunId) return fail("ACTION_APPLY_BASELINE_NOT_FINALIZED");
@@ -144,16 +159,56 @@ export async function recordExperimentActionAppliedImpl(args: {
   if (!Number.isFinite(baselineEndMs)) return fail("ACTION_APPLY_BASELINE_NOT_FINALIZED");
   if (appliedMs < baselineEndMs) return fail("ACTION_APPLY_TIME_INVALID");
 
-  // 6) 추천 액션은 브라우저 입력이 아니라 DB에서 서버가 읽는다
-  const { data: action, error: actErr } = await supabaseAdmin
-    .from("insight_actions")
-    .select("id, org_id, business_id, action_type, title, recommended_action, recommendation_mode")
-    .eq("id", experiment.source_insight_action_id)
-    .eq("org_id", orgId)
-    .eq("business_id", experiment.business_id)
-    .maybeSingle();
-  if (actErr) return fail("INTERNAL_ERROR");
-  if (!action) return fail("ACTION_APPLY_INVALID_STATE");
+  // 6) 추천 액션 정보는 브라우저 입력이 아니라 DB에서 서버가 읽는다 (source_type 분기)
+  let recommendedAction: {
+    action_type: string;
+    title: string;
+    recommended_action: string | null;
+    recommendation_mode: string | null;
+  };
+
+  if (sourceType === "insight_action") {
+    const { data: action, error: actErr } = await supabaseAdmin
+      .from("insight_actions")
+      .select("id, org_id, business_id, action_type, title, recommended_action, recommendation_mode")
+      .eq("id", experiment.source_insight_action_id!)
+      .eq("org_id", orgId)
+      .eq("business_id", experiment.business_id)
+      .maybeSingle();
+    if (actErr) return fail("INTERNAL_ERROR");
+    if (!action) return fail("ACTION_APPLY_INVALID_STATE");
+    recommendedAction = {
+      action_type: action.action_type,
+      title: action.title,
+      recommended_action: action.recommended_action,
+      recommendation_mode: action.recommendation_mode,
+    };
+  } else {
+    const { data: item, error: itemErr } = await supabaseAdmin
+      .from("profile_coverage_items")
+      .select("id, org_id, business_id, coverage_status, question_id")
+      .eq("id", experiment.source_profile_coverage_item_id!)
+      .eq("org_id", orgId)
+      .eq("business_id", experiment.business_id)
+      .maybeSingle();
+    if (itemErr) return fail("INTERNAL_ERROR");
+    if (!item) return fail("ACTION_APPLY_INVALID_STATE");
+
+    const { data: question, error: qErr } = await supabaseAdmin
+      .from("questions")
+      .select("id, intent_type")
+      .eq("id", item.question_id)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (qErr) return fail("INTERNAL_ERROR");
+
+    recommendedAction = {
+      action_type: COVERAGE_EXPERIMENT_ACTION_TYPE,
+      title: coverageActionTitle(question?.intent_type ?? null),
+      recommended_action: coverageActionFields(question?.intent_type ?? null).join(", "),
+      recommendation_mode: "test",
+    };
+  }
 
   const recordedAtIso = new Date(nowMs).toISOString();
 
@@ -163,21 +218,21 @@ export async function recordExperimentActionAppliedImpl(args: {
     experiment_id: experiment.id,
     org_id: experiment.org_id,
     business_id: experiment.business_id,
-    source_insight_action_id: action.id,
+    source_type: sourceType,
+    source_insight_action_id:
+      sourceType === "insight_action" ? experiment.source_insight_action_id : null,
+    source_profile_coverage_item_id:
+      sourceType === "profile_coverage_item" ? experiment.source_profile_coverage_item_id : null,
     baseline_run_id: baselineRunId,
     baseline_condition_hash: conditionHash,
-    recommended_action: {
-      action_type: action.action_type,
-      title: action.title,
-      recommended_action: action.recommended_action,
-      recommendation_mode: action.recommendation_mode,
-    },
+    recommended_action: recommendedAction,
     actual_change_summary: summary,
     evidence_note: note,
     applied_at: appliedAtIso,
     recorded_at: recordedAtIso,
     recorded_by: userId,
   };
+
 
   // 8) CAS write (동시 기록 안전)
   const { data: updated, error: updErr } = await supabaseAdmin

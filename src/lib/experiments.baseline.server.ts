@@ -78,7 +78,9 @@ export async function prepareBaselineSnapshotData(args: {
   // 1) Experiment (id + org_id)
   const { data: experiment, error: expErr } = await supabaseAdmin
     .from("experiments")
-    .select("id, org_id, business_id, status, baseline_run_id, source_insight_action_id")
+    .select(
+      "id, org_id, business_id, status, baseline_run_id, source_type, source_insight_action_id, source_profile_coverage_item_id",
+    )
     .eq("id", experimentId)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -86,41 +88,76 @@ export async function prepareBaselineSnapshotData(args: {
   if (!experiment) return { ok: false, error: "EXPERIMENT_NOT_FOUND" };
   if (experiment.baseline_run_id) return { ok: false, error: "BASELINE_ALREADY_EXISTS" };
   if (experiment.status !== "draft") return { ok: false, error: "INVALID_EXPERIMENT_STATE" };
-  if (!experiment.source_insight_action_id) {
-    return { ok: false, error: "SOURCE_ACTION_SCOPE_MISMATCH" };
-  }
 
-  // 2) Insight Action → engine run → source measurement run
-  const { data: action, error: actErr } = await supabaseAdmin
-    .from("insight_actions")
-    .select("id, org_id, business_id, engine_run_id")
-    .eq("id", experiment.source_insight_action_id)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  if (actErr) return { ok: false, error: "INTERNAL_ERROR" };
-  if (!action || action.business_id !== experiment.business_id) {
-    return { ok: false, error: "SOURCE_ACTION_SCOPE_MISMATCH" };
-  }
+  const sourceType =
+    experiment.source_type === "profile_coverage_item" ? "profile_coverage_item" : "insight_action";
 
-  const { data: engineRun, error: engErr } = await supabaseAdmin
-    .from("insight_engine_runs")
-    .select("id, source_run_id")
-    .eq("id", action.engine_run_id)
-    .eq("org_id", orgId)
-    .eq("business_id", experiment.business_id)
-    .maybeSingle();
-  if (engErr) return { ok: false, error: "INTERNAL_ERROR" };
-  if (!engineRun?.source_run_id) return { ok: false, error: "SOURCE_RUN_NOT_FOUND" };
+  // 2) source 계보 → source measurement run (source_type 분기)
+  let sourceRunId: string | null = null;
+
+  if (sourceType === "insight_action") {
+    if (!experiment.source_insight_action_id) {
+      return { ok: false, error: "SOURCE_ACTION_SCOPE_MISMATCH" };
+    }
+    const { data: action, error: actErr } = await supabaseAdmin
+      .from("insight_actions")
+      .select("id, org_id, business_id, engine_run_id")
+      .eq("id", experiment.source_insight_action_id)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (actErr) return { ok: false, error: "INTERNAL_ERROR" };
+    if (!action || action.business_id !== experiment.business_id) {
+      return { ok: false, error: "SOURCE_ACTION_SCOPE_MISMATCH" };
+    }
+
+    const { data: engineRun, error: engErr } = await supabaseAdmin
+      .from("insight_engine_runs")
+      .select("id, source_run_id")
+      .eq("id", action.engine_run_id)
+      .eq("org_id", orgId)
+      .eq("business_id", experiment.business_id)
+      .maybeSingle();
+    if (engErr) return { ok: false, error: "INTERNAL_ERROR" };
+    if (!engineRun?.source_run_id) return { ok: false, error: "SOURCE_RUN_NOT_FOUND" };
+    sourceRunId = engineRun.source_run_id;
+  } else {
+    if (!experiment.source_profile_coverage_item_id) {
+      return { ok: false, error: "SOURCE_ACTION_SCOPE_MISMATCH" };
+    }
+    const { data: item, error: itemErr } = await supabaseAdmin
+      .from("profile_coverage_items")
+      .select("id, org_id, business_id, coverage_run_id")
+      .eq("id", experiment.source_profile_coverage_item_id)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (itemErr) return { ok: false, error: "INTERNAL_ERROR" };
+    if (!item || item.business_id !== experiment.business_id) {
+      return { ok: false, error: "SOURCE_ACTION_SCOPE_MISMATCH" };
+    }
+    const { data: coverageRun, error: crErr } = await supabaseAdmin
+      .from("profile_coverage_runs")
+      .select("id, org_id, business_id, status, source_run_id")
+      .eq("id", item.coverage_run_id)
+      .eq("org_id", orgId)
+      .eq("business_id", experiment.business_id)
+      .maybeSingle();
+    if (crErr) return { ok: false, error: "INTERNAL_ERROR" };
+    if (!coverageRun || coverageRun.status !== "completed" || !coverageRun.source_run_id) {
+      return { ok: false, error: "SOURCE_RUN_NOT_FOUND" };
+    }
+    sourceRunId = coverageRun.source_run_id;
+  }
 
   const { data: sourceRun, error: srcErr } = await supabaseAdmin
     .from("measurement_runs")
     .select("id, org_id, business_id, question_set_id")
-    .eq("id", engineRun.source_run_id)
+    .eq("id", sourceRunId)
     .eq("org_id", orgId)
     .eq("business_id", experiment.business_id)
     .maybeSingle();
   if (srcErr) return { ok: false, error: "INTERNAL_ERROR" };
   if (!sourceRun) return { ok: false, error: "SOURCE_RUN_NOT_FOUND" };
+
 
   // 3) Question set + 현재 active 질문 (서버가 결정, 클라이언트 입력 없음)
   const { data: questionSet, error: qsErr } = await supabaseAdmin
@@ -265,7 +302,12 @@ export async function prepareBaselineSnapshotData(args: {
     experiment_id: experiment.id,
     org_id: orgId,
     business_id: experiment.business_id,
-    source_insight_action_id: experiment.source_insight_action_id,
+    source_type: sourceType,
+    source_insight_action_id:
+      sourceType === "insight_action" ? experiment.source_insight_action_id : null,
+    source_profile_coverage_item_id:
+      sourceType === "profile_coverage_item" ? experiment.source_profile_coverage_item_id : null,
+
     reference_source_run_id: sourceRun.id,
     question_set_id: questionSet.id,
     questions,
