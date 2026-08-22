@@ -241,7 +241,31 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
     };
   });
 
+/**
+ * Profile Coverage 공백 항목에서 실험 초안을 생성한다.
+ * 브라우저는 orgId + profileCoverageItemId만 전달하며, 나머지는 서버가 계보로 결정한다.
+ * 외부 AI/Provider 호출 없음 → 이 호출 자체로는 측정 비용이 발생하지 않는다.
+ */
+export const createExperimentFromCoverageItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: CreateCoverageExperimentInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.profileCoverageItemId)) throw badRequest("INVALID_ACTION");
+    return { orgId: input.orgId, profileCoverageItemId: input.profileCoverageItemId };
+  })
+  .handler(async ({ data, context }): Promise<CreateCoverageExperimentResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { createExperimentFromCoverageItemImpl } = await import("./experiments.coverage.server");
+    return createExperimentFromCoverageItemImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      profileCoverageItemId: data.profileCoverageItemId,
+    });
+  });
+
 /** READ ONLY. 비용 확인 Dialog용 safe summary만 반환한다. */
+
 export const previewExperimentBaseline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: PreviewExperimentBaselineInput) => {
