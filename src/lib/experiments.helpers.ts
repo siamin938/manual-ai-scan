@@ -228,14 +228,29 @@ export function baselineFail(
   return summary ? { ok: false, error, summary } : { ok: false, error };
 }
 
-/** 재귀적으로 object key를 정렬하는 stable stringify. */
+/**
+ * 재귀적으로 object key를 정렬하는 stable stringify.
+ * undefined 처리 정책: undefined는 null과 동일하게 'null' 문자열로 직렬화한다.
+ * (JSON.stringify(undefined)는 undefined를 반환해 canonical JSON을 깨뜨린다.)
+ * 배열 요소 / object 값 / 최상위 값 모두 동일 규칙을 적용하며,
+ * Edge Function(Deno)에서도 같은 코드로 재구현 가능한 순수 로직이다.
+ */
 export function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
+  if (value === undefined) return "null";
+  if (value === null || typeof value !== "object") {
+    const out = JSON.stringify(value);
+    return out === undefined ? "null" : out;
+  }
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
   const obj = value as Record<string, unknown>;
   const keys = Object.keys(obj).sort();
+  // key는 값이 undefined여도 생략하지 않는다 (deterministic).
   return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
 }
+
+/** 허용되는 search_context_size 값 (DB 제약과 동일) */
+export const ALLOWED_SEARCH_CONTEXT_SIZES = ["low", "medium", "high"] as const;
+
 
 function canonicalBusiness(b: SnapshotBusinessRef) {
   return {
