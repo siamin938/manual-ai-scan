@@ -1153,6 +1153,188 @@ function InsightsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 실험 결과 비교 v0.1 — 추가 측정/비용 없음, 방향성 비교만 표시 */}
+      <Dialog
+        open={!!evaluationTarget}
+        onOpenChange={(o) => {
+          if (!o && !finalizeEvaluation.isPending) setEvaluationTarget(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          {evaluationTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">실험 결과 비교</DialogTitle>
+                <DialogDescription>{evaluationTarget.action.title}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">
+                    {outcomeLabel(evaluationTarget.evaluation.outcome)}
+                  </Badge>
+                  <Badge variant="outline">증거 등급: 방향성</Badge>
+                  {evaluationTarget.evaluation.recorded && (
+                    <Badge variant="outline">
+                      확정됨 · {formatSeoul(evaluationTarget.evaluation.evaluatedAt)}
+                    </Badge>
+                  )}
+                </div>
+
+                <Alert>
+                  <AlertTitle>해석 주의</AlertTitle>
+                  <AlertDescription>{evaluationTarget.evaluation.caution}</AlertDescription>
+                </Alert>
+
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-muted/50 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">지표</th>
+                        <th className="px-3 py-2 font-medium">변경 전</th>
+                        <th className="px-3 py-2 font-medium">변경 후</th>
+                        <th className="px-3 py-2 font-medium">변화</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">AI 답변 포함률</td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.baseline.inclusionRate)} (
+                          {evaluationTarget.evaluation.baseline.inclusionCount}/
+                          {evaluationTarget.evaluation.baseline.validCount})
+                        </td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.followup.inclusionRate)} (
+                          {evaluationTarget.evaluation.followup.inclusionCount}/
+                          {evaluationTarget.evaluation.followup.validCount})
+                        </td>
+                        <td className="px-3 py-2">
+                          {ppText(evaluationTarget.evaluation.delta.inclusionPp)} (
+                          {signedText(evaluationTarget.evaluation.delta.inclusionCount)}건)
+                        </td>
+                      </tr>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">상위 3순위 노출률</td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.baseline.top3Rate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.followup.top3Rate)}
+                        </td>
+                        <td className="px-3 py-2">{ppText(evaluationTarget.evaluation.delta.top3Pp)}</td>
+                      </tr>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">경쟁사 대체 노출률</td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.baseline.substitutionRate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.followup.substitutionRate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {ppText(evaluationTarget.evaluation.delta.substitutionPp)}
+                        </td>
+                      </tr>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">자사 도메인 인용률</td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.baseline.domainCitedRate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.followup.domainCitedRate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {ppText(evaluationTarget.evaluation.delta.domainCitationPp)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">질문별 변화</p>
+                  <div className="space-y-2">
+                    {evaluationTarget.evaluation.questionResults.map((q) => (
+                      <div key={q.label} className="rounded-md border px-3 py-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">{q.label}</p>
+                            <p className="truncate text-sm">{q.promptSnippet}</p>
+                          </div>
+                          <Badge
+                            variant={
+                              q.direction === "up"
+                                ? "default"
+                                : q.direction === "down"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                          >
+                            {q.direction === "up" ? "증가" : q.direction === "down" ? "감소" : "동일"}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {q.baselineInclusionCount}/{q.baselineValidCount} →{" "}
+                          {q.followupInclusionCount}/{q.followupValidCount} ({ppText(q.deltaPp)})
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                  <div>
+                    <p>변경 적용 시각</p>
+                    <p className="text-foreground">
+                      {formatSeoul(evaluationTarget.evaluation.actionAppliedAt)}
+                    </p>
+                  </div>
+                  <div>
+                    <p>측정 조건</p>
+                    <p className="text-foreground">
+                      {evaluationTarget.evaluation.quality.providerModel} / parser{" "}
+                      {evaluationTarget.evaluation.quality.parserVersion}
+                    </p>
+                  </div>
+                </div>
+
+                {evaluationTarget.evaluation.actualChangeSummary && (
+                  <div className="rounded-md bg-muted/40 px-3 py-2 text-xs">
+                    <p className="text-muted-foreground">실제 적용한 변경</p>
+                    <p className="mt-1 whitespace-pre-wrap text-foreground">
+                      {evaluationTarget.evaluation.actualChangeSummary}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setEvaluationTarget(null)}
+                  disabled={finalizeEvaluation.isPending}
+                >
+                  닫기
+                </Button>
+                {!evaluationTarget.evaluation.recorded && (
+                  <Button
+                    onClick={() =>
+                      finalizeEvaluation.mutate(evaluationTarget.evaluation.experimentId)
+                    }
+                    disabled={finalizeEvaluation.isPending}
+                  >
+                    {finalizeEvaluation.isPending ? "확정 중..." : "결과 확정하기"}
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
