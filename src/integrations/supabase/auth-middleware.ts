@@ -7,17 +7,21 @@ import type { Database } from './types'
 
 
 /**
- * Fixed-shape HTTP errors. `statusCode` lets the app-level errorMiddleware
- * emit a proper status instead of converting a plain Error to a generic 500.
- * Never carries token/claim/Supabase/env details.
+ * Fixed-shape HTTP failures. A thrown Response is returned verbatim by the
+ * server runtime, and the `statusCode` marker keeps the app-level
+ * errorMiddleware from rewriting it into a generic 500 HTML page.
+ * Body text is fixed: never token, claim, Supabase or env details.
  */
-function httpError(statusCode: number, message: string): Error & { statusCode: number } {
-  const err = new Error(message) as Error & { statusCode: number };
-  err.statusCode = statusCode;
-  return err;
+function httpError(statusCode: number, message: string): Response {
+  const res = new Response(message, {
+    status: statusCode,
+    headers: { 'content-type': 'text/plain; charset=utf-8' },
+  });
+  (res as Response & { statusCode?: number }).statusCode = statusCode;
+  return res;
 }
 
-function unauthorized(): Error & { statusCode: number } {
+function unauthorized(): Response {
   return httpError(401, 'Unauthorized');
 }
 
