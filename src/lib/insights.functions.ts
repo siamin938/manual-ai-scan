@@ -223,7 +223,7 @@ export const getInsightOverview = createServerFn({ method: "POST" })
             ? (runStatusMap.get(e.baseline_run_id) ?? null)
             : null,
           baseline_finalized: finalized,
-          baseline_finalized: finalized,
+
         });
       }
     }
