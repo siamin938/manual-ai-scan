@@ -182,6 +182,43 @@ export const getInsightOverview = createServerFn({ method: "POST" })
       };
     });
 
+    // 진행 중인 Experiment (snapshot은 SELECT/DTO에 포함하지 않는다)
+    const actionIds = rawActions.map((a) => a.id);
+    const expByAction = new Map<string, ActiveExperimentDTO>();
+    if (actionIds.length) {
+      const { data: exps } = await supabaseAdmin
+        .from("experiments")
+        .select("id, status, baseline_run_id, source_insight_action_id, created_at")
+        .eq("org_id", data.orgId)
+        .in("source_insight_action_id", actionIds)
+        .in("status", ["draft", "baseline", "action_applied", "followup"])
+        .order("created_at", { ascending: false });
+
+      const runIds = [...new Set((exps ?? []).map((e) => e.baseline_run_id).filter(Boolean))] as string[];
+      const runStatusMap = new Map<string, string>();
+      if (runIds.length) {
+        const { data: runs } = await supabaseAdmin
+          .from("measurement_runs")
+          .select("id, status")
+          .eq("org_id", data.orgId)
+          .in("id", runIds);
+        for (const r of runs ?? []) runStatusMap.set(r.id, r.status);
+      }
+
+      for (const e of exps ?? []) {
+        const key = e.source_insight_action_id;
+        if (!key || expByAction.has(key)) continue; // 방어적으로 최신 1개만
+        expByAction.set(key, {
+          id: e.id,
+          status: e.status,
+          baseline_run_id: e.baseline_run_id,
+          baseline_run_status: e.baseline_run_id
+            ? (runStatusMap.get(e.baseline_run_id) ?? null)
+            : null,
+        });
+      }
+    }
+
     const actions: InsightActionDTO[] = rawActions.map((a) => ({
       id: a.id,
       action_type: a.action_type,
@@ -196,7 +233,9 @@ export const getInsightOverview = createServerFn({ method: "POST" })
       status: a.status,
       primary_finding_id: a.primary_finding_id,
       source_finding_count: (a.source_finding_ids ?? []).length,
+      active_experiment: expByAction.get(a.id) ?? null,
     }));
+
 
     return {
       run: {
