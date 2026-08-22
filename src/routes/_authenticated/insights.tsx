@@ -109,20 +109,54 @@ const BASELINE_ERROR_MESSAGES: Partial<Record<BaselineErrorCode, string>> = {
 };
 
 
+/** Action Applied 서버 오류 코드 → 안전한 한글 문구. raw DB error 노출 금지. */
+const ACTION_APPLY_ERROR_MESSAGES: Record<ActionAppliedErrorCode, string> = {
+  FORBIDDEN: "변경 적용을 기록할 권한이 없습니다.",
+  ACTION_APPLY_INVALID_STATE: "현재 실험 상태에서는 변경 적용을 기록할 수 없습니다.",
+  ACTION_APPLY_INVALID_INPUT: "입력한 내용을 다시 확인해주세요. (변경 내용은 10자 이상 2000자 이하)",
+  ACTION_APPLY_BASELINE_NOT_FINALIZED: "Baseline 확정이 완료된 뒤에 기록할 수 있습니다.",
+  ACTION_APPLY_TIME_INVALID: "적용 시각이 올바르지 않습니다. Baseline 종료 이후이면서 미래가 아닌 시각을 입력해주세요.",
+  ACTION_APPLY_ALREADY_RECORDED: "이미 변경 적용이 기록되어 있습니다. 기록은 덮어쓸 수 없습니다.",
+  ACTION_APPLY_FAILED: "변경 적용 기록 중 오류가 발생했습니다.",
+  INTERNAL_ERROR: "변경 적용 기록 중 오류가 발생했습니다.",
+};
+
+function actionApplyErrorText(code: ActionAppliedErrorCode): string {
+  return ACTION_APPLY_ERROR_MESSAGES[code] ?? "변경 적용 기록 중 오류가 발생했습니다.";
+}
+
 function baselineErrorText(code: BaselineErrorCode): string {
   return BASELINE_ERROR_MESSAGES[code] ?? "Baseline 처리 중 오류가 발생했습니다.";
+}
+
+/** datetime-local 기본값: 현재 시각(KST) */
+function nowSeoulLocalInput(): string {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 16);
+}
+
+/** datetime-local(KST 기준 입력) → ISO(UTC) */
+function seoulLocalInputToIso(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const ms = Date.parse(`${value}:00+09:00`);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
 
 type BaselineCta =
   | { kind: "create" }
   | { kind: "start"; label: string }
   | { kind: "finalize"; label: string }
+  | { kind: "apply"; label: string }
   | { kind: "disabled"; label: string }
   | { kind: "none" };
 
 function baselineCta(a: InsightActionDTO): BaselineCta {
   const exp = a.active_experiment;
   if (!exp) return canStartExperiment(a) ? { kind: "create" } : { kind: "none" };
+
+  if (exp.status === "action_applied") {
+    return { kind: "disabled", label: "변경 적용 기록 완료" };
+  }
 
   if (exp.status === "draft" && !exp.baseline_run_id) {
     return { kind: "start", label: "Baseline 시작하기" };
@@ -136,15 +170,17 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
       case "running":
         return { kind: "disabled", label: "Baseline 측정 중" };
       case "completed":
-        return exp.baseline_finalized
-          ? { kind: "disabled", label: "Baseline 확정 완료" }
-          : { kind: "finalize", label: "Baseline 확정하기" };
+        if (!exp.baseline_finalized) return { kind: "finalize", label: "Baseline 확정하기" };
+        return exp.action_applied
+          ? { kind: "disabled", label: "변경 적용 기록 완료" }
+          : { kind: "apply", label: "변경 내용 기록하기" };
       default:
         return { kind: "disabled", label: "Baseline 확인 필요" };
     }
   }
   return { kind: "disabled", label: "Baseline 확인 필요" };
 }
+
 
 
 const FINDING_TYPE_LABELS: Record<string, string> = {
