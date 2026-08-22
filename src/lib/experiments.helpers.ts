@@ -442,6 +442,8 @@ export type FollowupErrorCode =
   | "FOLLOWUP_RUN_REQUIRES_REVIEW"
   | "FOLLOWUP_RUN_NOT_COMPLETED"
   | "FOLLOWUP_FINALIZE_MISMATCH"
+  | "FOLLOWUP_COST_LIMIT_EXCEEDED"
+  | "FOLLOWUP_START_DISABLED"
   | "INTERNAL_ERROR";
 
 /** 클라이언트 노출 가능한 Follow-up 실행 계획 요약 (snapshot 미노출) */
