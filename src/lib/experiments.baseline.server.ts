@@ -538,6 +538,64 @@ export async function previewExperimentBaselineImpl(args: {
   return { ok: false, error: "INVALID_EXPERIMENT_STATE" };
 }
 
+/**
+ * 사용자 요청의 Bearer JWT를 명시적으로 전달해 enqueue-run Edge Function을 호출한다.
+ * service_role key는 절대 전달하지 않으며, 로그에 secret/raw body를 노출하지 않는다.
+ */
+async function invokeEnqueueRunWithUserJwt(
+  runId: string,
+): Promise<{ ok: true } | { ok: false; status: number | null; code: string | null }> {
+  const [{ getRequest }, env] = await Promise.all([
+    import("@tanstack/react-start/server"),
+    Promise.resolve({
+      SUPABASE_URL: process.env["SUPABASE_URL"],
+      SUPABASE_PUBLISHABLE_KEY: process.env["SUPABASE_PUBLISHABLE_KEY"],
+    }),
+  ]);
+  const request = getRequest();
+  const authorization = request?.headers?.get("authorization");
+
+  if (!authorization?.startsWith("Bearer ")) {
+    return { ok: false, status: null, code: "MISSING_USER_JWT" };
+  }
+
+  const SUPABASE_URL = env.SUPABASE_URL;
+  const SUPABASE_PUBLISHABLE_KEY = env.SUPABASE_PUBLISHABLE_KEY;
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    return { ok: false, status: null, code: "SUPABASE_ENV_MISSING" };
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/enqueue-run`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: authorization,
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+    },
+    body: JSON.stringify({ runId }),
+  });
+
+  if (response.ok) return { ok: true };
+
+  let code: string | null = null;
+  try {
+    const body = await response.json();
+    if (body && typeof body === "object") {
+      if (typeof body.error === "string") code = body.error;
+      else if (typeof body.code === "string") code = body.code;
+    }
+  } catch {
+    // ignore malformed body
+  }
+
+  console.error("[baseline] enqueue HTTP failed", {
+    runId,
+    status: response.status,
+    code,
+  });
+  return { ok: false, status: response.status, code };
+}
+
 /** canonical run 상태별 enqueue 처리. draft만 enqueue-run을 호출한다. */
 async function enqueueIfNeeded(args: {
   supabase: UserClient;
@@ -564,16 +622,8 @@ async function enqueueIfNeeded(args: {
   }
 
   // draft — 사용자 JWT로 enqueue-run 호출 (service_role key 미전달)
-  try {
-    const { error } = await args.supabase.functions.invoke("enqueue-run", {
-      body: { runId: run.id },
-    });
-    if (error) {
-      console.error("[baseline] enqueue failed", { runId: run.id, experimentId: experiment.id });
-      return baselineFail("BASELINE_ENQUEUE_FAILED", base) as StartExperimentBaselineResult;
-    }
-  } catch {
-    console.error("[baseline] enqueue threw", { runId: run.id, experimentId: experiment.id });
+  const enqueued = await invokeEnqueueRunWithUserJwt(run.id);
+  if (!enqueued.ok) {
     return baselineFail("BASELINE_ENQUEUE_FAILED", base) as StartExperimentBaselineResult;
   }
 
@@ -588,6 +638,7 @@ async function enqueueIfNeeded(args: {
 
   return { ok: true, baseline: { ...base, runStatus: refreshed?.status ?? run.status } };
 }
+
 
 /**
  * Baseline 실행 준비 + enqueue.
