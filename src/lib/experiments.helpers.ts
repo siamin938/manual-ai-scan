@@ -494,3 +494,10 @@ export function followupFail(
 ): { ok: false; error: FollowupErrorCode; followup?: Partial<FollowupRunStateDTO> } {
   return followup ? { ok: false, error, followup } : { ok: false, error };
 }
+
+/** 하위호환: source_type이 없는 기존 snapshot은 insight_action으로 간주한다. */
+export function snapshotSourceType(
+  snapshot: Pick<ExperimentConditionSnapshotV1, "source_type"> | null | undefined,
+): "insight_action" | "profile_coverage_item" {
+  return snapshot?.source_type === "profile_coverage_item" ? "profile_coverage_item" : "insight_action";
+}
