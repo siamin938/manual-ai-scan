@@ -360,6 +360,35 @@ function InsightsPage() {
     },
   });
 
+  // 4단계: 실제 적용한 변경 기록 (측정/비용 없음). 서버가 최종 검증한다.
+  const applyRecord = useMutation({
+    mutationFn: (vars: { experimentId: string; appliedAt: string }) =>
+      recordActionApplied({
+        data: {
+          orgId: activeOrgId as string,
+          experimentId: vars.experimentId,
+          actualChangeSummary: applySummary,
+          evidenceNote: applyNote.trim() ? applyNote : null,
+          appliedAt: vars.appliedAt,
+        },
+      }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("변경 적용 기록이 저장되었습니다.");
+        setApplyTarget(null);
+        setApplySummary("");
+        setApplyNote("");
+      } else {
+        toast.error(actionApplyErrorText(result.error));
+      }
+      void refetch();
+    },
+    onError: () => {
+      toast.error("변경 적용 기록 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
+
 
 
 
