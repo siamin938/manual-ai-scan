@@ -104,11 +104,11 @@ function evaluationErrorText(code: EvaluationErrorCode): string {
 }
 
 const OUTCOME_LABELS: Record<string, string> = {
-  improved: "개선 방향",
-  worsened: "악화 방향",
-  no_change: "변화 없음",
-  inconclusive: "판단 보류",
+  directional_improvement: "개선 방향성 관찰",
+  directional_decline: "악화 방향성 관찰",
+  no_clear_change: "뚜렷한 변화 없음",
 };
+
 
 function pctText(rate: number | null): string {
   return rate === null ? "-" : `${(rate * 100).toFixed(1)}%`;
