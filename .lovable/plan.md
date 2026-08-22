@@ -169,10 +169,23 @@ begin
 end;
 $$;
 
+-- (G) 트리거 컬럼 목록 확장 (필수)
+-- 현재: BEFORE UPDATE OF source_insight_action_id, org_id, business_id
+-- 신규 컬럼만 바뀌는 UPDATE에서는 트리거가 아예 발화하지 않으므로 재생성 필요.
+drop trigger if exists trg_experiments_provenance_immutable on public.experiments;
+create trigger trg_experiments_provenance_immutable
+  before update of source_insight_action_id, org_id, business_id,
+                   source_type, source_profile_coverage_item_id
+  on public.experiments
+  for each row execute function public.enforce_experiment_provenance_immutable();
+
 commit;
 ```
 
-주의: (A)의 UNIQUE 추가는 `profile_coverage_items`가 커지면 인덱스 생성 비용이 있습니다. 현재 행 수는 매우 적어 즉시 완료됩니다.
+주의 1: (A)의 UNIQUE 추가는 `profile_coverage_items`가 커지면 인덱스 생성 비용이 있습니다. 현재 행 수는 매우 적어 즉시 완료됩니다.
+
+주의 2: `create or replace function`은 기존 ACL(anon/authenticated EXECUTE revoke 상태)을 그대로 보존하므로 보안 하드닝은 유지됩니다.
+
 
 ## 5. 검증 쿼리 (migration 후 READ ONLY)
 
