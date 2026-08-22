@@ -197,7 +197,7 @@ export const getInsightOverview = createServerFn({ method: "POST" })
       const { data: exps } = await supabaseAdmin
         .from("experiments")
         .select(
-          "id, status, baseline_run_id, baseline_start_at, baseline_end_at, source_insight_action_id, created_at",
+          "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, source_insight_action_id, created_at",
         )
         .eq("org_id", data.orgId)
         .in("source_insight_action_id", actionIds)
@@ -227,9 +227,11 @@ export const getInsightOverview = createServerFn({ method: "POST" })
             ? (runStatusMap.get(e.baseline_run_id) ?? null)
             : null,
           baseline_finalized: finalized,
-
+          action_applied: !!e.intervention_at,
+          action_applied_at: e.intervention_at,
         });
       }
+
     }
 
 
