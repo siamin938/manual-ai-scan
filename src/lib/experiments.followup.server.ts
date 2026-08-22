@@ -26,11 +26,21 @@ type UserClient = SupabaseClient<Database>;
 
 const COST_TOLERANCE_USD = 0.005;
 
+/**
+ * Follow-up 실제 실행 게이트.
+ * 현재 원격 Edge pipeline(enqueue-run / process-measurement-job) 소스를 이 저장소에서
+ * READ 할 수 없고, measurement_jobs에는 question_id / provider_model만 pin되고
+ * prompt_text·parser(업체/경쟁사 alias, 도메인)는 처리 시점에 live DB에서 다시 읽히므로
+ * "시작 직전 precheck"만으로는 Baseline과의 exact reproducibility를 보장할 수 없다.
+ * pipeline이 job/snapshot pin을 사용하도록 확인/보강되기 전까지 실제 시작을 차단한다.
+ */
+const FOLLOWUP_START_ENABLED = false;
+
 const RUN_COLUMNS =
   "id, org_id, business_id, experiment_id, question_set_id, run_type, phase, status, selected_providers, repetitions, max_cost_usd, estimated_cost_usd, actual_cost_usd, total_jobs, completed_jobs, failed_jobs, started_at, completed_at";
 
 const EXPERIMENT_COLUMNS =
-  "id, org_id, business_id, name, status, baseline_run_id, baseline_condition_snapshot, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_condition_snapshot, followup_start_at, followup_end_at, source_insight_action_id";
+  "id, org_id, business_id, name, status, baseline_run_id, baseline_condition_snapshot, baseline_start_at, baseline_end_at, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot, followup_run_id, followup_condition_snapshot, followup_start_at, followup_end_at, source_insight_action_id";
 
 type ExperimentRow = {
   id: string;
@@ -43,6 +53,9 @@ type ExperimentRow = {
   baseline_start_at: string | null;
   baseline_end_at: string | null;
   intervention_at: string | null;
+  intervention_confirmed_at: string | null;
+  changed_by: string | null;
+  action_application_snapshot: unknown;
   followup_run_id: string | null;
   followup_condition_snapshot: unknown;
   followup_start_at: string | null;
