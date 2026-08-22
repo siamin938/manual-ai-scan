@@ -83,6 +83,59 @@ function statusBadge(status: string) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
+const PRIORITY_LABELS: Record<string, string> = {
+  high: "높음",
+  medium: "중간",
+};
+
+function priorityBadge(level: string) {
+  const label = PRIORITY_LABELS[level] ?? level;
+  const variant = level === "high" ? "default" : "secondary";
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+function ActionCard({ action }: { action: CoverageGapActionDTO }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {priorityBadge(action.priority_level)}
+          <Badge variant="outline">테스트 후보</Badge>
+        </div>
+        <CardTitle className="text-base">{action.title}</CardTitle>
+        <p className="text-sm text-muted-foreground">{action.question_text ?? "질문 정보 없음"}</p>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <div>
+          <p className="text-xs text-muted-foreground">관찰 근거</p>
+          <p className="tabular-nums">
+            {action.measurement_count}회 측정 · 노출 {action.mentioned_count}회 · 노출률{" "}
+            {pct(action.mention_rate)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">보강해볼 프로필 정보</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
+            {action.profile_fields.map((field, idx) => (
+              <li key={idx}>{field}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">검증 방법</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">{action.validation_plan}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Evidence Grade</p>
+          <Badge variant="secondary">
+            {action.evidence_grade ? (GRADE_LABELS[action.evidence_grade] ?? "기타") : "-"}
+          </Badge>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function MetricCard({
   title,
   value,
