@@ -287,11 +287,6 @@ function InsightsPage() {
   });
 
 
-  const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["insight-overview", activeOrgId],
-    enabled: !!activeOrgId,
-    queryFn: () => fetchOverview({ data: { orgId: activeOrgId as string } }),
-  });
 
   const run = data?.run ?? null;
   const findings = data?.findings ?? [];
