@@ -132,8 +132,12 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
   return { kind: "disabled", label: "Baseline 확인 필요" };
 }
 
+const FINDING_TYPE_LABELS: Record<string, string> = {
+  visibility_gap: "노출 공백",
+  competitor_substitution: "경쟁업체 대체",
   question_sensitivity: "질문 민감도",
 };
+
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
   visibility_gap_test: "노출 공백 테스트",
