@@ -21,6 +21,14 @@ import {
   type StartExperimentBaselineInput,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
+import type {
+  PreviewExperimentFollowupInput,
+  PreviewExperimentFollowupResult,
+  StartExperimentFollowupInput,
+  StartExperimentFollowupResult,
+  FinalizeExperimentFollowupInput,
+  FinalizeExperimentFollowupResult,
+} from "./experiments.helpers";
 
 export type {
   CreateExperimentInput,
@@ -41,6 +49,15 @@ export type {
   ActionAppliedResult,
   ActionAppliedDTO,
   ActionAppliedErrorCode,
+  PreviewExperimentFollowupInput,
+  PreviewExperimentFollowupResult,
+  StartExperimentFollowupInput,
+  StartExperimentFollowupResult,
+  FinalizeExperimentFollowupInput,
+  FinalizeExperimentFollowupResult,
+  FollowupErrorCode,
+  FollowupPlanSummary,
+  FollowupRunStateDTO,
 } from "./experiments.helpers";
 
 
