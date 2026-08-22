@@ -302,7 +302,12 @@ export async function prepareBaselineSnapshotData(args: {
     experiment_id: experiment.id,
     org_id: orgId,
     business_id: experiment.business_id,
-    source_insight_action_id: experiment.source_insight_action_id,
+    source_type: sourceType,
+    source_insight_action_id:
+      sourceType === "insight_action" ? experiment.source_insight_action_id : null,
+    source_profile_coverage_item_id:
+      sourceType === "profile_coverage_item" ? experiment.source_profile_coverage_item_id : null,
+
     reference_source_run_id: sourceRun.id,
     question_set_id: questionSet.id,
     questions,
