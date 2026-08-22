@@ -57,8 +57,9 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
         ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
       ];
       const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
+      // Variable names stay in the server log only; the client sees a fixed 500.
       console.error(`[Supabase] ${message}`);
-      throw new Error(message);
+      throw httpError(500, 'Internal Server Error');
     }
     
     const request = getRequest();
