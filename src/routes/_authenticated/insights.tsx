@@ -296,6 +296,23 @@ function InsightsPage() {
     },
   });
 
+  // 3단계: Baseline 확정 (추가 측정/비용 없음). 사용자의 명시적 클릭에서만 호출.
+  const finalize = useMutation({
+    mutationFn: (experimentId: string) =>
+      confirmBaseline({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) toast.success("Baseline이 확정되었습니다.");
+      else toast.error(baselineErrorText(result.error));
+      void refetch();
+    },
+    onError: () => {
+      toast.error("Baseline 확정 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
+
+
+
 
 
   const run = data?.run ?? null;
