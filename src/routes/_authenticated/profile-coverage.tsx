@@ -5,6 +5,7 @@ import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import {
   getProfileCoverageOverview,
+  type CoverageGapActionDTO,
   type ProfileCoverageItemDTO,
 } from "@/lib/profile-coverage.functions";
 import { Badge } from "@/components/ui/badge";
