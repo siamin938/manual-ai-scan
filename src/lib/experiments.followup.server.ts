@@ -26,11 +26,21 @@ type UserClient = SupabaseClient<Database>;
 
 const COST_TOLERANCE_USD = 0.005;
 
+/**
+ * Follow-up 실제 실행 게이트.
+ * 현재 원격 Edge pipeline(enqueue-run / process-measurement-job) 소스를 이 저장소에서
+ * READ 할 수 없고, measurement_jobs에는 question_id / provider_model만 pin되고
+ * prompt_text·parser(업체/경쟁사 alias, 도메인)는 처리 시점에 live DB에서 다시 읽히므로
+ * "시작 직전 precheck"만으로는 Baseline과의 exact reproducibility를 보장할 수 없다.
+ * pipeline이 job/snapshot pin을 사용하도록 확인/보강되기 전까지 실제 시작을 차단한다.
+ */
+const FOLLOWUP_START_ENABLED = false;
+
 const RUN_COLUMNS =
   "id, org_id, business_id, experiment_id, question_set_id, run_type, phase, status, selected_providers, repetitions, max_cost_usd, estimated_cost_usd, actual_cost_usd, total_jobs, completed_jobs, failed_jobs, started_at, completed_at";
 
 const EXPERIMENT_COLUMNS =
-  "id, org_id, business_id, name, status, baseline_run_id, baseline_condition_snapshot, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_condition_snapshot, followup_start_at, followup_end_at, source_insight_action_id";
+  "id, org_id, business_id, name, status, baseline_run_id, baseline_condition_snapshot, baseline_start_at, baseline_end_at, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot, followup_run_id, followup_condition_snapshot, followup_start_at, followup_end_at, source_insight_action_id";
 
 type ExperimentRow = {
   id: string;
@@ -43,6 +53,9 @@ type ExperimentRow = {
   baseline_start_at: string | null;
   baseline_end_at: string | null;
   intervention_at: string | null;
+  intervention_confirmed_at: string | null;
+  changed_by: string | null;
+  action_application_snapshot: unknown;
   followup_run_id: string | null;
   followup_condition_snapshot: unknown;
   followup_start_at: string | null;
@@ -143,7 +156,53 @@ function summaryFromSnapshot(
   };
 }
 
-/** Baseline snapshot이 확정(finalize)됐고 scope가 맞는지 검증. */
+/** ISO timestamp 두 개가 같은 instant인지. parse 실패는 false. */
+function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return false;
+  return ta === tb;
+}
+
+/** Action Applied 기록이 완전한지 검증 (자동 보정/덮어쓰기 금지). */
+function requireCompleteActionApplied(
+  experiment: ExperimentRow,
+  baseline: ExperimentConditionSnapshotV1,
+): { ok: true } | { ok: false; error: FollowupErrorCode } {
+  if (!experiment.intervention_at || !experiment.intervention_confirmed_at || !experiment.changed_by) {
+    return { ok: false, error: "ACTION_NOT_APPLIED" };
+  }
+  const snap = experiment.action_application_snapshot;
+  if (!snap || typeof snap !== "object" || Array.isArray(snap)) {
+    return { ok: false, error: "ACTION_NOT_APPLIED" };
+  }
+  const s = snap as Record<string, unknown>;
+  if (s["snapshot_version"] !== "1") return { ok: false, error: "ACTION_NOT_APPLIED" };
+  if (
+    s["experiment_id"] !== experiment.id ||
+    s["org_id"] !== experiment.org_id ||
+    s["business_id"] !== experiment.business_id ||
+    s["baseline_run_id"] !== experiment.baseline_run_id
+  ) {
+    return { ok: false, error: "ACTION_NOT_APPLIED" };
+  }
+  if (s["baseline_condition_hash"] !== baseline.condition_hash) {
+    return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+  }
+  if (
+    !sameInstant(typeof s["applied_at"] === "string" ? s["applied_at"] : null, experiment.intervention_at) ||
+    !sameInstant(
+      typeof s["recorded_at"] === "string" ? s["recorded_at"] : null,
+      experiment.intervention_confirmed_at,
+    )
+  ) {
+    return { ok: false, error: "ACTION_NOT_APPLIED" };
+  }
+  return { ok: true };
+}
+
+/** Baseline snapshot이 확정(finalize)됐고 scope가 맞는지 검증. canonical run도 실제로 READ 한다. */
 async function requireFinalizedBaseline(
   experiment: ExperimentRow,
 ): Promise<
@@ -175,6 +234,39 @@ async function requireFinalizedBaseline(
     parsing_context: snap.parsing_context,
   });
   if (recomputed !== snap.condition_hash) return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+
+  // canonical Baseline Run 실제 재검증 (snapshot만 믿지 않는다)
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: baseRun, error: runErr } = await supabaseAdmin
+    .from("measurement_runs")
+    .select(RUN_COLUMNS)
+    .eq("id", experiment.baseline_run_id)
+    .eq("org_id", experiment.org_id)
+    .maybeSingle();
+  if (runErr) return { ok: false, error: "INTERNAL_ERROR" };
+  if (!baseRun) return { ok: false, error: "BASELINE_NOT_FINALIZED" };
+  const br = baseRun as unknown as RunRow;
+  if (
+    br.org_id !== experiment.org_id ||
+    br.business_id !== experiment.business_id ||
+    br.experiment_id !== experiment.id ||
+    br.question_set_id !== snap.question_set_id ||
+    br.run_type !== "experiment" ||
+    br.phase !== "baseline" ||
+    br.status !== "completed" ||
+    !br.started_at ||
+    !br.completed_at
+  ) {
+    return { ok: false, error: "BASELINE_NOT_FINALIZED" };
+  }
+  if (
+    !sameInstant(br.started_at, experiment.baseline_start_at) ||
+    !sameInstant(br.completed_at, experiment.baseline_end_at) ||
+    !sameInstant(br.started_at, snap.observed.run_started_at) ||
+    !sameInstant(br.completed_at, snap.observed.run_completed_at)
+  ) {
+    return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+  }
   return { ok: true, snapshot: snap };
 }
 
@@ -241,7 +333,7 @@ async function assertLiveMatchesBaseline(
   const { data: ps, error: psErr } = await supabaseAdmin
     .from("provider_settings")
     .select(
-      "enabled, model_name, search_context_size, paid_account_confirmed, terms_reviewed, automated_benchmark_approved",
+      "enabled, model_name, search_context_size, paid_account_confirmed, terms_reviewed, automated_benchmark_approved, estimated_cost_per_request_usd",
     )
     .eq("org_id", orgId)
     .eq("provider", "openai")
@@ -260,6 +352,22 @@ async function assertLiveMatchesBaseline(
   ) {
     return { ok: false, error: "PROVIDER_NOT_READY" };
   }
+
+  // 현재 live 단가 기준 예상 비용이 실험 비용 한도 이내인지 확인한다.
+  const unitCost = Number(ps.estimated_cost_per_request_usd);
+  const plannedJobs = Number(baseline.planned.planned_jobs);
+  if (!Number.isFinite(unitCost) || unitCost < 0 || !Number.isFinite(plannedJobs) || plannedJobs <= 0) {
+    return { ok: false, error: "PROVIDER_NOT_READY" };
+  }
+  const liveEstimate = unitCost * plannedJobs;
+  if (
+    !Number.isFinite(liveEstimate) ||
+    liveEstimate < 0 ||
+    liveEstimate > Number(baseline.planned.max_cost_usd) + COST_TOLERANCE_USD
+  ) {
+    return { ok: false, error: "FOLLOWUP_COST_LIMIT_EXCEEDED" };
+  }
+
 
   const { data: targetBiz, error: bizErr } = await supabaseAdmin
     .from("businesses")
@@ -327,6 +435,10 @@ async function loadFollowupContext(
 
   const baseline = await requireFinalizedBaseline(experiment);
   if (!baseline.ok) return baseline;
+
+  const applied = requireCompleteActionApplied(experiment, baseline.snapshot);
+  if (!applied.ok) return applied;
+
   return { ok: true, experiment, baseline: baseline.snapshot };
 }
 
@@ -394,6 +506,8 @@ export async function previewExperimentFollowupImpl(args: {
 /* ============================ Start (측정 비용 발생) ============================ */
 
 async function enqueueIfNeeded(args: {
+  orgId: string;
+  baseline: ExperimentConditionSnapshotV1;
   experiment: ExperimentRow;
   run: RunRow;
   summary: FollowupPlanSummary;
@@ -413,6 +527,10 @@ async function enqueueIfNeeded(args: {
   if (run.status !== "draft") {
     return followupFail("FOLLOWUP_RUN_REQUIRES_REVIEW", base) as StartExperimentFollowupResult;
   }
+
+  // draft 재시도 경로에서도 실제 enqueue 직전에 live 조건을 반드시 다시 검증한다.
+  const live = await assertLiveMatchesBaseline(args.orgId, args.baseline);
+  if (!live.ok) return followupFail(live.error, base) as StartExperimentFollowupResult;
 
   const enqueued = await invokeEnqueueRunWithUserJwt(run.id);
   if (!enqueued.ok) {
@@ -443,6 +561,11 @@ export async function startExperimentFollowupImpl(args: {
   if (!ctx.ok) return followupFail(ctx.error) as StartExperimentFollowupResult;
   const experiment = ctx.experiment;
 
+  // 파이프라인 재현성 보장 전까지 실제 시작(Run 생성/enqueue) 차단
+  if (!FOLLOWUP_START_ENABLED) {
+    return followupFail("FOLLOWUP_START_DISABLED") as StartExperimentFollowupResult;
+  }
+
   // 기존 canonical Follow-up 재사용 (새 Run 생성 금지)
   if (experiment.followup_run_id) {
     const stored = experiment.followup_condition_snapshot as ExperimentConditionSnapshotV1 | null;
@@ -453,7 +576,13 @@ export async function startExperimentFollowupImpl(args: {
     if (!summary.ok) return followupFail(summary.error) as StartExperimentFollowupResult;
     const run = await loadCanonicalFollowupRun(experiment);
     if (!run.ok) return followupFail(run.error) as StartExperimentFollowupResult;
-    return enqueueIfNeeded({ experiment, run: run.run, summary: summary.summary });
+    return enqueueIfNeeded({
+      orgId: args.orgId,
+      baseline: ctx.baseline,
+      experiment,
+      run: run.run,
+      summary: summary.summary,
+    });
   }
 
   if (experiment.status !== "action_applied") {
@@ -463,6 +592,7 @@ export async function startExperimentFollowupImpl(args: {
   // 현재 조건이 Baseline과 동일할 때만 실행
   const live = await assertLiveMatchesBaseline(args.orgId, ctx.baseline);
   if (!live.ok) return followupFail(live.error) as StartExperimentFollowupResult;
+
 
   const summaryRes = summaryFromSnapshot(ctx.baseline);
   if (!summaryRes.ok) return followupFail(summaryRes.error) as StartExperimentFollowupResult;
@@ -546,7 +676,13 @@ export async function startExperimentFollowupImpl(args: {
     if (reloaded.ok && reloaded.experiment.followup_run_id) {
       const run = await loadCanonicalFollowupRun(reloaded.experiment);
       if (run.ok) {
-        return enqueueIfNeeded({ experiment: reloaded.experiment, run: run.run, summary });
+        return enqueueIfNeeded({
+          orgId: args.orgId,
+          baseline: ctx.baseline,
+          experiment: reloaded.experiment,
+          run: run.run,
+          summary,
+        });
       }
     }
     console.error("[followup] pointer link failed", { experimentId: experiment.id });
@@ -554,6 +690,8 @@ export async function startExperimentFollowupImpl(args: {
   }
 
   return enqueueIfNeeded({
+    orgId: args.orgId,
+    baseline: ctx.baseline,
     experiment: { ...experiment, status: "followup", followup_run_id: newRun.id },
     run: newRun,
     summary,
@@ -599,6 +737,33 @@ export async function finalizeExperimentFollowupImpl(args: {
   if (!snapshot || snapshot.condition_hash !== ctx.baseline.condition_hash) {
     return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
   }
+  // Follow-up snapshot 자체 무결성 (hash 필드만 유지되고 내용이 바뀐 경우 차단)
+  if (
+    snapshot.snapshot_version !== "1" ||
+    snapshot.experiment_id !== experiment.id ||
+    snapshot.org_id !== experiment.org_id ||
+    snapshot.business_id !== experiment.business_id ||
+    snapshot.question_set_id !== ctx.baseline.question_set_id
+  ) {
+    return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+  }
+  const recomputedFollowupHash = await computeConditionHash({
+    question_set_id: snapshot.question_set_id,
+    questions: snapshot.questions,
+    selected_providers: [...snapshot.planned.selected_providers],
+    provider_models: snapshot.planned.provider_models,
+    repetitions: snapshot.planned.repetitions,
+    search_context_size: snapshot.planned.search_context_size,
+    store: snapshot.planned.store,
+    parsing_context: snapshot.parsing_context,
+  });
+  if (
+    recomputedFollowupHash !== snapshot.condition_hash ||
+    recomputedFollowupHash !== ctx.baseline.condition_hash
+  ) {
+    return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+  }
+
   const summaryRes = summaryFromSnapshot(snapshot);
   if (!summaryRes.ok) return { ok: false, error: summaryRes.error };
   const plannedModel = summaryRes.summary.model;
@@ -614,12 +779,27 @@ export async function finalizeExperimentFollowupImpl(args: {
   if (run.status !== "completed" || !run.started_at || !run.completed_at) {
     return { ok: false, error: "FOLLOWUP_RUN_NOT_COMPLETED" };
   }
+  // 인과성: Follow-up 측정은 변경 적용 시점 이후에 시작돼야 한다.
+  const runStartedMs = Date.parse(run.started_at);
+  const interventionMs = Date.parse(experiment.intervention_at ?? "");
+  if (!Number.isFinite(runStartedMs) || !Number.isFinite(interventionMs)) {
+    return { ok: false, error: "FOLLOWUP_FINALIZE_MISMATCH" };
+  }
+  if (runStartedMs < interventionMs) {
+    return { ok: false, error: "FOLLOWUP_FINALIZE_MISMATCH" };
+  }
+  const runMaxCost = strictCost(run.max_cost_usd);
+  const runEstimated = strictCost(run.estimated_cost_usd);
+  if (runMaxCost === null || runEstimated === null) {
+    return { ok: false, error: "FOLLOWUP_FINALIZE_MISMATCH" };
+  }
   const runProviders = [...(run.selected_providers ?? [])].sort();
   if (
     runProviders.length !== 1 ||
     runProviders[0] !== "openai" ||
     Number(run.repetitions) !== snapshot.planned.repetitions ||
-    Math.abs(Number(run.max_cost_usd) - snapshot.planned.max_cost_usd) > COST_TOLERANCE_USD ||
+    Math.abs(runMaxCost - snapshot.planned.max_cost_usd) > COST_TOLERANCE_USD ||
+    Math.abs(runEstimated - Number(snapshot.planned.estimated_cost_usd)) > COST_TOLERANCE_USD ||
     Number(run.total_jobs) !== plannedJobs ||
     Number(run.completed_jobs) !== plannedJobs ||
     Number(run.failed_jobs) !== 0
