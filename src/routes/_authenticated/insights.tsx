@@ -13,13 +13,18 @@ import {
 import {
   createExperimentFromInsightAction,
   finalizeExperimentBaseline,
+  finalizeExperimentFollowup,
   previewExperimentBaseline,
+  previewExperimentFollowup,
   recordExperimentActionApplied,
   startExperimentBaseline,
+  startExperimentFollowup,
   type ActionAppliedErrorCode,
   type BaselineErrorCode,
   type BaselinePlanSummary,
   type CreateExperimentErrorCode,
+  type FollowupErrorCode,
+  type FollowupPlanSummary,
 } from "@/lib/experiments.functions";
 
 
