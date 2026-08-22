@@ -25,7 +25,7 @@ function isAuthFailure(error: unknown): boolean {
  * inputValidator가 던지는 고정 코드만 400으로 정규화한다.
  * 정확히 이 두 코드만 대상이며, 다른 Error는 절대 400이 되지 않는다.
  */
-const BAD_REQUEST_CODES = new Set(["INVALID_ORG", "INVALID_ACTION"]);
+const BAD_REQUEST_CODES = new Set(["INVALID_ORG", "INVALID_ACTION", "INVALID_EXPERIMENT"]);
 
 /** 정확히 이 코드만 403. 넓은 prefix 매칭은 하지 않는다. */
 const FORBIDDEN_CODE = "FORBIDDEN";

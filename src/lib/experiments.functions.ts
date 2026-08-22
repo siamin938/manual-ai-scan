@@ -12,6 +12,10 @@ import {
   isUuid,
   type CreateExperimentInput,
   type CreateExperimentResult,
+  type FinalizeExperimentBaselineInput,
+  type FinalizeExperimentBaselineResult,
+  type StartExperimentBaselineInput,
+  type StartExperimentBaselineResult,
 } from "./experiments.helpers";
 
 export type {
@@ -19,7 +23,13 @@ export type {
   CreateExperimentResult,
   CreateExperimentDTO,
   CreateExperimentErrorCode,
+  StartExperimentBaselineInput,
+  StartExperimentBaselineResult,
+  FinalizeExperimentBaselineInput,
+  FinalizeExperimentBaselineResult,
+  ExperimentConditionSnapshotV1,
 } from "./experiments.helpers";
+
 
 export const createExperimentFromInsightAction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

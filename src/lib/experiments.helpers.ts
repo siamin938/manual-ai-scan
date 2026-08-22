@@ -79,9 +79,10 @@ export function isUuid(value: unknown): value is string {
  * HTTP 400 변환은 커스텀 레이어(src/start.ts errorMiddleware)가 담당한다.
  * generated 파일이나 HTTP API에 의존하지 않는다.
  */
-export function badRequest(code: "INVALID_ORG" | "INVALID_ACTION"): Error {
+export function badRequest(code: "INVALID_ORG" | "INVALID_ACTION" | "INVALID_EXPERIMENT"): Error {
   return new Error(code);
 }
+
 
 /* =========================================================================
  * Experiment Baseline v0.1 — 타입 / 순수 helper
