@@ -250,9 +250,10 @@ export const BASELINE_SECONDARY_METRICS = ["top3_rate"] as const;
 
 export function baselineFail(
   error: BaselineErrorCode,
-  summary?: BaselinePlanSummary,
-): { ok: false; error: BaselineErrorCode; summary?: BaselinePlanSummary } {
-  return summary ? { ok: false, error, summary } : { ok: false, error };
+  baseline?: Partial<BaselineRunStateDTO>,
+): { ok: false; error: BaselineErrorCode; baseline?: Partial<BaselineRunStateDTO> } {
+  return baseline ? { ok: false, error, baseline } : { ok: false, error };
+
 }
 
 /**
