@@ -737,6 +737,33 @@ export async function finalizeExperimentFollowupImpl(args: {
   if (!snapshot || snapshot.condition_hash !== ctx.baseline.condition_hash) {
     return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
   }
+  // Follow-up snapshot 자체 무결성 (hash 필드만 유지되고 내용이 바뀐 경우 차단)
+  if (
+    snapshot.snapshot_version !== "1" ||
+    snapshot.experiment_id !== experiment.id ||
+    snapshot.org_id !== experiment.org_id ||
+    snapshot.business_id !== experiment.business_id ||
+    snapshot.question_set_id !== ctx.baseline.question_set_id
+  ) {
+    return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+  }
+  const recomputedFollowupHash = await computeConditionHash({
+    question_set_id: snapshot.question_set_id,
+    questions: snapshot.questions,
+    selected_providers: [...snapshot.planned.selected_providers],
+    provider_models: snapshot.planned.provider_models,
+    repetitions: snapshot.planned.repetitions,
+    search_context_size: snapshot.planned.search_context_size,
+    store: snapshot.planned.store,
+    parsing_context: snapshot.parsing_context,
+  });
+  if (
+    recomputedFollowupHash !== snapshot.condition_hash ||
+    recomputedFollowupHash !== ctx.baseline.condition_hash
+  ) {
+    return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+  }
+
   const summaryRes = summaryFromSnapshot(snapshot);
   if (!summaryRes.ok) return { ok: false, error: summaryRes.error };
   const plannedModel = summaryRes.summary.model;
@@ -752,12 +779,27 @@ export async function finalizeExperimentFollowupImpl(args: {
   if (run.status !== "completed" || !run.started_at || !run.completed_at) {
     return { ok: false, error: "FOLLOWUP_RUN_NOT_COMPLETED" };
   }
+  // 인과성: Follow-up 측정은 변경 적용 시점 이후에 시작돼야 한다.
+  const runStartedMs = Date.parse(run.started_at);
+  const interventionMs = Date.parse(experiment.intervention_at ?? "");
+  if (!Number.isFinite(runStartedMs) || !Number.isFinite(interventionMs)) {
+    return { ok: false, error: "FOLLOWUP_FINALIZE_MISMATCH" };
+  }
+  if (runStartedMs < interventionMs) {
+    return { ok: false, error: "FOLLOWUP_FINALIZE_MISMATCH" };
+  }
+  const runMaxCost = strictCost(run.max_cost_usd);
+  const runEstimated = strictCost(run.estimated_cost_usd);
+  if (runMaxCost === null || runEstimated === null) {
+    return { ok: false, error: "FOLLOWUP_FINALIZE_MISMATCH" };
+  }
   const runProviders = [...(run.selected_providers ?? [])].sort();
   if (
     runProviders.length !== 1 ||
     runProviders[0] !== "openai" ||
     Number(run.repetitions) !== snapshot.planned.repetitions ||
-    Math.abs(Number(run.max_cost_usd) - snapshot.planned.max_cost_usd) > COST_TOLERANCE_USD ||
+    Math.abs(runMaxCost - snapshot.planned.max_cost_usd) > COST_TOLERANCE_USD ||
+    Math.abs(runEstimated - Number(snapshot.planned.estimated_cost_usd)) > COST_TOLERANCE_USD ||
     Number(run.total_jobs) !== plannedJobs ||
     Number(run.completed_jobs) !== plannedJobs ||
     Number(run.failed_jobs) !== 0
