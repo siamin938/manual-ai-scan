@@ -780,9 +780,24 @@ export async function startExperimentBaselineImpl(args: {
 /** 소수점 비용 비교 허용 오차 (numeric 정밀도). */
 const COST_TOLERANCE_USD = 0.005;
 
-function sumCost(rows: { actual_cost_usd: number | string | null }[]): number {
-  return rows.reduce((acc, r) => acc + Number(r.actual_cost_usd ?? 0), 0);
+/** null/비정상/음수 비용은 0으로 간주하지 않고 null을 반환한다. */
+function strictCost(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
 }
+
+function sumStrictCost(rows: { actual_cost_usd: number | string | null }[]): number | null {
+  let total = 0;
+  for (const r of rows) {
+    const n = strictCost(r.actual_cost_usd);
+    if (n === null) return null;
+    total += n;
+  }
+  return total;
+}
+
 
 type FinalizeObserved = {
   provider_models: string[];
@@ -976,6 +991,7 @@ export async function finalizeExperimentBaselineImpl(args: {
     // manual_review_required=true는 차단 사유가 아니다 (valid=true면 통과).
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
+  const jobById = new Map(jobRows.map((j) => [j.id, j]));
   const measurementJobIds = new Set(mRows.map((m) => m.job_id));
   if (
     measurementJobIds.size !== jobIdSet.size ||
@@ -983,6 +999,19 @@ export async function finalizeExperimentBaselineImpl(args: {
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
+  // 각 measurement가 대응 job의 question/provider/model과 정확히 일치해야 한다.
+  for (const m of mRows) {
+    const job = jobById.get(m.job_id);
+    if (
+      !job ||
+      m.question_id !== job.question_id ||
+      m.provider !== job.provider ||
+      (m.provider_model ?? "").trim() !== (job.provider_model ?? "").trim()
+    ) {
+      return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+    }
+  }
+
   const perQuestionMeasurements = new Map<string, number>();
   for (const m of mRows) {
     perQuestionMeasurements.set(
@@ -1007,20 +1036,21 @@ export async function finalizeExperimentBaselineImpl(args: {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
 
-  // F) 비용 무결성 (현재 스키마의 actual_cost_usd 컬럼만 사용)
-  const jobCost = sumCost(jobRows);
-  const measurementCost = sumCost(mRows);
-  const runCost = Number(run.actual_cost_usd ?? 0);
+  // F) 비용 무결성 (actual_cost_usd. null/음수/비정상은 0으로 간주하지 않고 mismatch)
+  const jobCost = sumStrictCost(jobRows);
+  const measurementCost = sumStrictCost(mRows);
+  const runCost = strictCost(run.actual_cost_usd);
+  if (jobCost === null || measurementCost === null || runCost === null) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
   if (
-    !Number.isFinite(jobCost) ||
-    !Number.isFinite(measurementCost) ||
-    !Number.isFinite(runCost) ||
     Math.abs(jobCost - measurementCost) > COST_TOLERANCE_USD ||
     Math.abs(runCost - jobCost) > COST_TOLERANCE_USD ||
     runCost > planned.max_cost_usd + COST_TOLERANCE_USD
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
+
 
   const expectedObserved: Omit<FinalizeObserved, "finalized_at"> = {
     provider_models: providerModels,
