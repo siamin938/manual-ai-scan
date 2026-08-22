@@ -6,6 +6,21 @@ import type { Database } from './types'
 
 
 
+/**
+ * Fixed-shape HTTP errors. `statusCode` lets the app-level errorMiddleware
+ * emit a proper status instead of converting a plain Error to a generic 500.
+ * Never carries token/claim/Supabase/env details.
+ */
+function httpError(statusCode: number, message: string): Error & { statusCode: number } {
+  const err = new Error(message) as Error & { statusCode: number };
+  err.statusCode = statusCode;
+  return err;
+}
+
+function unauthorized(): Error & { statusCode: number } {
+  return httpError(401, 'Unauthorized');
+}
+
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
 }
