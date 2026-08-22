@@ -1036,20 +1036,21 @@ export async function finalizeExperimentBaselineImpl(args: {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
 
-  // F) 비용 무결성 (현재 스키마의 actual_cost_usd 컬럼만 사용)
-  const jobCost = sumCost(jobRows);
-  const measurementCost = sumCost(mRows);
-  const runCost = Number(run.actual_cost_usd ?? 0);
+  // F) 비용 무결성 (actual_cost_usd. null/음수/비정상은 0으로 간주하지 않고 mismatch)
+  const jobCost = sumStrictCost(jobRows);
+  const measurementCost = sumStrictCost(mRows);
+  const runCost = strictCost(run.actual_cost_usd);
+  if (jobCost === null || measurementCost === null || runCost === null) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
   if (
-    !Number.isFinite(jobCost) ||
-    !Number.isFinite(measurementCost) ||
-    !Number.isFinite(runCost) ||
     Math.abs(jobCost - measurementCost) > COST_TOLERANCE_USD ||
     Math.abs(runCost - jobCost) > COST_TOLERANCE_USD ||
     runCost > planned.max_cost_usd + COST_TOLERANCE_USD
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
+
 
   const expectedObserved: Omit<FinalizeObserved, "finalized_at"> = {
     provider_models: providerModels,
