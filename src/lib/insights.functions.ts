@@ -27,7 +27,7 @@ export type ActiveExperimentDTO = {
   baseline_run_status: string | null;
   /** snapshot 미노출. baseline_start_at/baseline_end_at 존재 여부로만 판별. */
   baseline_finalized: boolean;
-  baseline_finalized_at: string | null;
+  
 };
 
 
