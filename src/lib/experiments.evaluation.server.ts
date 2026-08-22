@@ -6,7 +6,9 @@ import {
   ALLOWED_ROLES,
   BASELINE_EXPECTED_QUESTION_COUNT,
   BASELINE_REPETITIONS,
+  buildConditionCanonical,
   computeConditionHash,
+  stableStringify,
   type ExperimentConditionSnapshotV1,
 } from "./experiments.helpers";
 import {
@@ -56,10 +58,26 @@ type ExperimentRow = {
   source_insight_action_id: string | null;
   evaluation_snapshot: unknown;
   evaluated_at: string | null;
+  evaluated_by: string | null;
+  evaluation_version: string | null;
+  evidence_grade: string | null;
+  primary_metric: string | null;
+  baseline_value: number | null;
+  followup_value: number | null;
+  delta_value: number | null;
+  result_classification: string | null;
 };
 
 const EXPERIMENT_COLUMNS =
-  "id, org_id, business_id, status, baseline_run_id, followup_run_id, baseline_condition_snapshot, followup_condition_snapshot, baseline_start_at, baseline_end_at, followup_start_at, followup_end_at, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot, source_insight_action_id, evaluation_snapshot, evaluated_at";
+  "id, org_id, business_id, status, baseline_run_id, followup_run_id, baseline_condition_snapshot, followup_condition_snapshot, baseline_start_at, baseline_end_at, followup_start_at, followup_end_at, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot, source_insight_action_id, evaluation_snapshot, evaluated_at, evaluated_by, evaluation_version, evidence_grade, primary_metric, baseline_value, followup_value, delta_value, result_classification";
+
+/** 두 ISO 문자열이 같은 instant인지(문자열 포맷 차이 허용, parse 실패는 불일치). */
+function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const ma = Date.parse(a);
+  const mb = Date.parse(b);
+  return Number.isFinite(ma) && Number.isFinite(mb) && ma === mb;
+}
 
 type RunRow = {
   id: string;
@@ -111,28 +129,31 @@ async function recomputeHash(snap: ExperimentConditionSnapshotV1): Promise<strin
   });
 }
 
-/** 두 snapshot의 실행 조건이 완전히 동일한지 확인 (질문 ID/조건 포함). */
+/**
+ * 두 snapshot의 실행 조건이 완전히 동일한지 확인.
+ * condition_hash canonicalization(buildConditionCanonical + stableStringify)을 재사용하므로
+ * object key 순서/배열 순서 차이로 false mismatch가 발생하지 않는다.
+ */
+function conditionCanonicalString(snap: ExperimentConditionSnapshotV1): string {
+  return stableStringify(
+    buildConditionCanonical({
+      question_set_id: snap.question_set_id,
+      questions: snap.questions,
+      selected_providers: [...snap.planned.selected_providers],
+      provider_models: snap.planned.provider_models,
+      repetitions: snap.planned.repetitions,
+      search_context_size: snap.planned.search_context_size,
+      store: snap.planned.store,
+      parsing_context: snap.parsing_context,
+    }),
+  );
+}
+
 function snapshotsIdentical(
   a: ExperimentConditionSnapshotV1,
   b: ExperimentConditionSnapshotV1,
 ): boolean {
-  if (a.question_set_id !== b.question_set_id) return false;
-  if (a.planned.repetitions !== b.planned.repetitions) return false;
-  if (a.planned.search_context_size !== b.planned.search_context_size) return false;
-  if (a.planned.store !== b.planned.store) return false;
-  if (
-    JSON.stringify([...a.planned.selected_providers].sort()) !==
-    JSON.stringify([...b.planned.selected_providers].sort())
-  ) {
-    return false;
-  }
-  if (JSON.stringify(a.planned.provider_models) !== JSON.stringify(b.planned.provider_models)) {
-    return false;
-  }
-  if (JSON.stringify(a.parsing_context) !== JSON.stringify(b.parsing_context)) return false;
-  const qa = [...a.questions].sort((x, y) => (x.id < y.id ? -1 : 1));
-  const qb = [...b.questions].sort((x, y) => (x.id < y.id ? -1 : 1));
-  return JSON.stringify(qa) === JSON.stringify(qb);
+  return conditionCanonicalString(a) === conditionCanonicalString(b);
 }
 
 async function admin() {
