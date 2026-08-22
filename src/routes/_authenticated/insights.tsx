@@ -466,10 +466,17 @@ function InsightsPage() {
                     <div className="px-6 pb-6">
                       <ExperimentCta
                         action={a}
-                        state={expState[a.id]}
-                        onStart={() => setConfirmAction(a)}
+                        pending={
+                          preview.isPending && preview.variables === a.active_experiment?.id
+                        }
+                        onCreate={() => setConfirmAction(a)}
+                        onBaseline={() => {
+                          const expId = a.active_experiment?.id;
+                          if (expId && !preview.isPending) preview.mutate(expId);
+                        }}
                       />
                     </div>
+
                   </Card>
                 ))}
               </div>
