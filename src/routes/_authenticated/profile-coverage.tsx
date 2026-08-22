@@ -48,7 +48,7 @@ const GRADE_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  covered: "안정 노출",
+  covered: "전회 노출",
   partial: "일부 노출",
   missing: "미노출",
 };
@@ -61,6 +61,9 @@ const INTENT_LABELS: Record<string, string> = {
   informational: "정보 탐색",
   branded: "브랜드",
   service: "서비스",
+  trust: "신뢰/안심",
+  review_quality: "후기 품질",
+  recommendation: "추천",
 };
 
 function pct(v: number | null | undefined): string {
@@ -260,7 +263,7 @@ function ProfileCoveragePage() {
                 <p className="text-2xl font-semibold tabular-nums">{run.question_count}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">안정 노출</p>
+                <p className="text-xs text-muted-foreground">전회 노출</p>
                 <p className="text-2xl font-semibold tabular-nums">{run.covered_question_count}</p>
               </div>
               <div>
