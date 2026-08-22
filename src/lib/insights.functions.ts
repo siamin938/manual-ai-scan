@@ -20,6 +20,13 @@ export type InsightFindingDTO = {
   small_sample: boolean;
 };
 
+export type ActiveExperimentDTO = {
+  id: string;
+  status: string;
+  baseline_run_id: string | null;
+  baseline_run_status: string | null;
+};
+
 export type InsightActionDTO = {
   id: string;
   action_type: string;
@@ -34,7 +41,10 @@ export type InsightActionDTO = {
   status: string;
   primary_finding_id: string;
   source_finding_count: number;
+  /** 진행 중인 Experiment (snapshot 미포함, safe 필드만) */
+  active_experiment: ActiveExperimentDTO | null;
 };
+
 
 export type InsightOverviewDTO = {
   run: {
