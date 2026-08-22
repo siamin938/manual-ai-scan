@@ -201,14 +201,18 @@ export const getInsightOverview = createServerFn({ method: "POST" })
       const { data: exps } = await supabaseAdmin
         .from("experiments")
         .select(
-          "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, source_insight_action_id, created_at",
+          "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_start_at, followup_end_at, source_insight_action_id, created_at",
         )
         .eq("org_id", data.orgId)
         .in("source_insight_action_id", actionIds)
         .in("status", ["draft", "baseline", "action_applied", "followup"])
         .order("created_at", { ascending: false });
 
-      const runIds = [...new Set((exps ?? []).map((e) => e.baseline_run_id).filter(Boolean))] as string[];
+      const runIds = [
+        ...new Set(
+          (exps ?? []).flatMap((e) => [e.baseline_run_id, e.followup_run_id]).filter(Boolean),
+        ),
+      ] as string[];
       const runStatusMap = new Map<string, string>();
       if (runIds.length) {
         const { data: runs } = await supabaseAdmin
@@ -233,6 +237,11 @@ export const getInsightOverview = createServerFn({ method: "POST" })
           baseline_finalized: finalized,
           action_applied: !!e.intervention_at,
           action_applied_at: e.intervention_at,
+          followup_run_id: e.followup_run_id,
+          followup_run_status: e.followup_run_id
+            ? (runStatusMap.get(e.followup_run_id) ?? null)
+            : null,
+          followup_finalized: !!e.followup_start_at && !!e.followup_end_at,
         });
       }
 
