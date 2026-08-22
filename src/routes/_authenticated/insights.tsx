@@ -1237,6 +1237,32 @@ function InsightsPage() {
                           {ppText(evaluationTarget.evaluation.delta.substitutionPp)}
                         </td>
                       </tr>
+                      {(evaluationTarget.evaluation.baseline.positionObservedCount > 0 ||
+                        evaluationTarget.evaluation.followup.positionObservedCount > 0) && (
+                        <tr className="border-t">
+                          <td className="px-3 py-2">
+                            평균 노출 위치
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              (낮아질수록 개선)
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            {evaluationTarget.evaluation.baseline.averagePosition === null
+                              ? "-"
+                              : evaluationTarget.evaluation.baseline.averagePosition.toFixed(1)}
+                          </td>
+                          <td className="px-3 py-2">
+                            {evaluationTarget.evaluation.followup.averagePosition === null
+                              ? "-"
+                              : evaluationTarget.evaluation.followup.averagePosition.toFixed(1)}
+                          </td>
+                          <td className="px-3 py-2">
+                            {evaluationTarget.evaluation.delta.averagePosition === null
+                              ? "-"
+                              : `${evaluationTarget.evaluation.delta.averagePosition > 0 ? "+" : ""}${evaluationTarget.evaluation.delta.averagePosition.toFixed(1)}`}
+                          </td>
+                        </tr>
+                      )}
                       <tr className="border-t">
                         <td className="px-3 py-2">자사 도메인 인용률</td>
                         <td className="px-3 py-2">
