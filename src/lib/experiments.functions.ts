@@ -29,6 +29,22 @@ import type {
   FinalizeExperimentFollowupInput,
   FinalizeExperimentFollowupResult,
 } from "./experiments.helpers";
+import type {
+  PreviewExperimentEvaluationInput,
+  PreviewExperimentEvaluationResult,
+  FinalizeExperimentEvaluationInput,
+  FinalizeExperimentEvaluationResult,
+} from "./experiments.evaluation.helpers";
+
+export type {
+  PreviewExperimentEvaluationInput,
+  PreviewExperimentEvaluationResult,
+  FinalizeExperimentEvaluationInput,
+  FinalizeExperimentEvaluationResult,
+  ExperimentEvaluationDTO,
+  EvaluationErrorCode,
+  EvaluationOutcome,
+} from "./experiments.evaluation.helpers";
 
 export type {
   CreateExperimentInput,
@@ -367,6 +383,48 @@ export const finalizeExperimentFollowup = createServerFn({ method: "POST" })
     if (!context.userId) return { ok: false, error: "FORBIDDEN" };
     const { finalizeExperimentFollowupImpl } = await import("./experiments.followup.server");
     return finalizeExperimentFollowupImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      experimentId: data.experimentId,
+    });
+  });
+
+/* =========================================================================
+ * Evaluation v0.1 — Baseline vs Follow-up 방향성 비교 (통계적 유의성 판정 아님)
+ * ========================================================================= */
+
+/** READ ONLY. 비교 결과 미리보기. Provider/Edge 호출 없음. */
+export const previewExperimentEvaluation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: PreviewExperimentEvaluationInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return { orgId: input.orgId, experimentId: input.experimentId };
+  })
+  .handler(async ({ data, context }): Promise<PreviewExperimentEvaluationResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { previewExperimentEvaluationImpl } = await import("./experiments.evaluation.server");
+    return previewExperimentEvaluationImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      experimentId: data.experimentId,
+    });
+  });
+
+/** 비교 결과 확정(CAS). 서버에서 전부 재계산하며 덮어쓰기하지 않는다. */
+export const finalizeExperimentEvaluation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: FinalizeExperimentEvaluationInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return { orgId: input.orgId, experimentId: input.experimentId };
+  })
+  .handler(async ({ data, context }): Promise<FinalizeExperimentEvaluationResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { finalizeExperimentEvaluationImpl } = await import("./experiments.evaluation.server");
+    return finalizeExperimentEvaluationImpl({
       supabase: context.supabase,
       userId: context.userId,
       orgId: data.orgId,
