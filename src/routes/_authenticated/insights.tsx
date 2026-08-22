@@ -147,6 +147,8 @@ type BaselineCta =
   | { kind: "start"; label: string }
   | { kind: "finalize"; label: string }
   | { kind: "apply"; label: string }
+  | { kind: "followup-start"; label: string }
+  | { kind: "followup-finalize"; label: string }
   | { kind: "disabled"; label: string }
   | { kind: "none" };
 
@@ -155,7 +157,24 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
   if (!exp) return canStartExperiment(a) ? { kind: "create" } : { kind: "none" };
 
   if (exp.status === "action_applied") {
-    return { kind: "disabled", label: "변경 적용 기록 완료" };
+    return { kind: "followup-start", label: "Follow-up 측정 시작" };
+  }
+
+  if (exp.status === "followup") {
+    switch (exp.followup_run_status) {
+      case "draft":
+        return { kind: "followup-start", label: "Follow-up 다시 시작" };
+      case "queued":
+        return { kind: "disabled", label: "Follow-up 대기 중" };
+      case "running":
+        return { kind: "disabled", label: "Follow-up 측정 중" };
+      case "completed":
+        return exp.followup_finalized
+          ? { kind: "disabled", label: "Follow-up 확정 완료" }
+          : { kind: "followup-finalize", label: "Follow-up 확정하기" };
+      default:
+        return { kind: "disabled", label: "Follow-up 확인 필요" };
+    }
   }
 
   if (exp.status === "draft" && !exp.baseline_run_id) {
