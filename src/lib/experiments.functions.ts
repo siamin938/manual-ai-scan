@@ -16,6 +16,8 @@ import {
   type FinalizeExperimentBaselineResult,
   type PreviewExperimentBaselineInput,
   type PreviewExperimentBaselineResult,
+  type RecordActionAppliedInput,
+  type ActionAppliedResult,
   type StartExperimentBaselineInput,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
@@ -35,7 +37,12 @@ export type {
   FinalizeExperimentBaselineInput,
   FinalizeExperimentBaselineResult,
   ExperimentConditionSnapshotV1,
+  RecordActionAppliedInput,
+  ActionAppliedResult,
+  ActionAppliedDTO,
+  ActionAppliedErrorCode,
 } from "./experiments.helpers";
+
 
 
 
