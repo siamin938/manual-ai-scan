@@ -507,6 +507,54 @@ function ProfileCoveragePage() {
           </Card>
         </>
       )}
+
+      {/* 실험 초안 생성 확인 — 측정/비용 발생 없음 */}
+      <Dialog
+        open={!!createTarget}
+        onOpenChange={(o) => {
+          if (!o && !createExperiment.isPending) setCreateTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          {createTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">이 항목으로 실험을 시작할까요?</DialogTitle>
+                <DialogDescription>{createTarget.title}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  {createTarget.question_text ?? "질문 정보 없음"}
+                </p>
+                <Alert>
+                  <AlertDescription className="leading-relaxed">
+                    지금은 실험 초안만 생성합니다. AI 측정이 실행되지 않으므로 비용이 발생하지
+                    않습니다. 실제 측정은 다음 단계의 Baseline 시작 확인에서만 진행됩니다.
+                  </AlertDescription>
+                </Alert>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setCreateTarget(null)}
+                  disabled={createExperiment.isPending}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={() => createExperiment.mutate(createTarget.coverage_item_id)}
+                  disabled={createExperiment.isPending}
+                >
+                  {createExperiment.isPending ? "생성 중..." : "실험 초안 생성"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {flow.dialogs}
     </div>
+
   );
 }
