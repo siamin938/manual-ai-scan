@@ -14,6 +14,8 @@ import {
   type CreateExperimentResult,
   type FinalizeExperimentBaselineInput,
   type FinalizeExperimentBaselineResult,
+  type PreviewExperimentBaselineInput,
+  type PreviewExperimentBaselineResult,
   type StartExperimentBaselineInput,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
@@ -25,10 +27,16 @@ export type {
   CreateExperimentErrorCode,
   StartExperimentBaselineInput,
   StartExperimentBaselineResult,
+  PreviewExperimentBaselineInput,
+  PreviewExperimentBaselineResult,
+  BaselineErrorCode,
+  BaselinePlanSummary,
+  BaselineRunStateDTO,
   FinalizeExperimentBaselineInput,
   FinalizeExperimentBaselineResult,
   ExperimentConditionSnapshotV1,
 } from "./experiments.helpers";
+
 
 
 export const createExperimentFromInsightAction = createServerFn({ method: "POST" })
