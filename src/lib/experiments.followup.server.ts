@@ -333,7 +333,7 @@ async function assertLiveMatchesBaseline(
   const { data: ps, error: psErr } = await supabaseAdmin
     .from("provider_settings")
     .select(
-      "enabled, model_name, search_context_size, paid_account_confirmed, terms_reviewed, automated_benchmark_approved",
+      "enabled, model_name, search_context_size, paid_account_confirmed, terms_reviewed, automated_benchmark_approved, estimated_cost_per_request_usd",
     )
     .eq("org_id", orgId)
     .eq("provider", "openai")
@@ -352,6 +352,22 @@ async function assertLiveMatchesBaseline(
   ) {
     return { ok: false, error: "PROVIDER_NOT_READY" };
   }
+
+  // 현재 live 단가 기준 예상 비용이 실험 비용 한도 이내인지 확인한다.
+  const unitCost = Number(ps.estimated_cost_per_request_usd);
+  const plannedJobs = Number(baseline.planned.planned_jobs);
+  if (!Number.isFinite(unitCost) || unitCost < 0 || !Number.isFinite(plannedJobs) || plannedJobs <= 0) {
+    return { ok: false, error: "PROVIDER_NOT_READY" };
+  }
+  const liveEstimate = unitCost * plannedJobs;
+  if (
+    !Number.isFinite(liveEstimate) ||
+    liveEstimate < 0 ||
+    liveEstimate > Number(baseline.planned.max_cost_usd) + COST_TOLERANCE_USD
+  ) {
+    return { ok: false, error: "FOLLOWUP_COST_LIMIT_EXCEEDED" };
+  }
+
 
   const { data: targetBiz, error: bizErr } = await supabaseAdmin
     .from("businesses")
