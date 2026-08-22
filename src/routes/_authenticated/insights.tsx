@@ -232,6 +232,8 @@ function InsightsPage() {
   const startExperiment = useServerFn(createExperimentFromInsightAction);
   const previewBaseline = useServerFn(previewExperimentBaseline);
   const runBaseline = useServerFn(startExperimentBaseline);
+  const confirmBaseline = useServerFn(finalizeExperimentBaseline);
+
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["insight-overview", activeOrgId],
