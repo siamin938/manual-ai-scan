@@ -265,8 +265,19 @@ function InsightsPage() {
             ) : (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {actions.map((a) => (
-                  <button key={a.id} type="button" onClick={() => setOpenAction(a)} className="text-left">
-                    <Card className="h-full transition-colors hover:border-primary/50">
+                  <Card key={a.id} className="h-full transition-colors hover:border-primary/50">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setOpenAction(a)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setOpenAction(a);
+                        }
+                      }}
+                      className="cursor-pointer text-left"
+                    >
                       <CardHeader className="pb-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant="outline">{ACTION_TYPE_LABELS[a.action_type] ?? a.action_type}</Badge>
@@ -301,10 +312,18 @@ function InsightsPage() {
                           <MetaSmall label="연결된 인사이트" value={`${a.source_finding_count}건`} />
                         </dl>
                       </CardContent>
-                    </Card>
-                  </button>
+                    </div>
+                    <div className="px-6 pb-6">
+                      <ExperimentCta
+                        action={a}
+                        state={expState[a.id]}
+                        onStart={() => setConfirmAction(a)}
+                      />
+                    </div>
+                  </Card>
                 ))}
               </div>
+
             )}
           </section>
         </>
