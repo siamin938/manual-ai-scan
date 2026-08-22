@@ -18,6 +18,22 @@ export type ProfileCoverageItemDTO = {
   repeat_stability: number | null;
 };
 
+export type CoverageGapActionDTO = {
+  question_text: string | null;
+  intent_type: string | null;
+  coverage_status: string;
+  priority_level: "high" | "medium";
+  title: string;
+  rationale: string;
+  profile_fields: string[];
+  validation_plan: string;
+  evidence_grade: string | null;
+  recommendation_mode: "test";
+  measurement_count: number;
+  mentioned_count: number;
+  mention_rate: number;
+};
+
 export type ProfileCoverageOverviewDTO = {
   run: {
     id: string;
@@ -42,6 +58,7 @@ export type ProfileCoverageOverviewDTO = {
     evidence_grade: string | null;
   } | null;
   items: ProfileCoverageItemDTO[];
+  actions: CoverageGapActionDTO[];
 };
 
 export const getProfileCoverageOverview = createServerFn({ method: "POST" })
@@ -73,7 +90,7 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
     if (runErr) throw new Error("RUN_QUERY_FAILED");
-    if (!run) return { run: null, items: [] };
+    if (!run) return { run: null, items: [], actions: [] };
 
     const [businessRes, itemsRes] = await Promise.all([
       supabaseAdmin
@@ -136,6 +153,90 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
           a.mention_rate - b.mention_rate,
       );
 
+    function generateGapActions(
+      coverageItems: ProfileCoverageItemDTO[],
+      evidenceGrade: string | null,
+    ): CoverageGapActionDTO[] {
+      const validationPlan =
+        "공개 페이지/프로필에 해당 정보를 명확히 반영한 뒤 같은 질문 세트와 같은 측정 조건으로 재측정해 노출률, Top 3 노출률, 자사 도메인 인용률의 변화를 비교합니다.";
+
+      const titleByIntent: Record<string, string> = {
+        trust: "신뢰 근거 보강 테스트",
+        review_quality: "후기 근거 구조화 테스트",
+        recommendation: "추천 기준 정보 보강 테스트",
+      };
+
+      const fieldsByIntent: Record<string, string[]> = {
+        trust: [
+          "가격·작업 범위의 명확한 안내",
+          "정비/서비스 절차",
+          "보증·A/S·사후관리 정보",
+          "공식 운영 주체·브랜드 근거",
+        ],
+        review_quality: [
+          "실제 작업 내용이 포함된 구체 후기",
+          "차량/서비스 항목이 명시된 사례",
+          "최근 후기와 작성 시점",
+          "공개적으로 확인 가능한 후기 출처",
+        ],
+        recommendation: [
+          "제공 서비스 범위",
+          "지역·지점 정보",
+          "차종/브랜드 대응 범위",
+          "경쟁 업체와 구분되는 특징",
+          "공식 페이지에서 확인 가능한 근거",
+        ],
+      };
+
+      const defaultTitle = "업체 프로필 정보 보강 테스트";
+      const defaultFields = [
+        "핵심 서비스 범위",
+        "지역·지점 정보",
+        "대상 고객/차종 범위",
+        "차별점",
+        "공식 공개 근거",
+      ];
+
+      const candidates = coverageItems
+        .filter((it) => it.coverage_status === "missing" || it.coverage_status === "partial")
+        .map((it) => {
+          const intent = it.intent_type ?? "";
+          const priorityLevel: "high" | "medium" =
+            it.coverage_status === "missing" ? "high" : "medium";
+          const title = titleByIntent[intent] ?? defaultTitle;
+          const profileFields = fieldsByIntent[intent] ?? defaultFields;
+          const rationale =
+            it.coverage_status === "missing"
+              ? `현재 이 질문은 ${it.measurement_count}회 측정에서 대상 업체가 한 번도 노출되지 않았습니다. 어떤 정보가 노출에 영향을 주는지는 아직 확인되지 않았으므로, 아래 프로필 정보를 보강한 뒤 동일 조건 재측정으로 검증하는 테스트 후보입니다.`
+              : `현재 이 질문은 ${it.measurement_count}회 중 ${it.mentioned_count}회만 대상 업체가 노출되었습니다. 노출이 불안정하게 관찰되어, 아래 프로필 정보를 보강한 뒤 동일 조건 재측정으로 검증하는 테스트 후보입니다.`;
+
+          return {
+            question_text: it.question_text,
+            intent_type: it.intent_type,
+            coverage_status: it.coverage_status,
+            priority_level: priorityLevel,
+            title,
+            rationale,
+            profile_fields: profileFields,
+            validation_plan: validationPlan,
+            evidence_grade: evidenceGrade,
+            recommendation_mode: "test" as const,
+            measurement_count: it.measurement_count,
+            mentioned_count: it.mentioned_count,
+            mention_rate: it.mention_rate,
+          };
+        });
+
+      const priorityOrder: Record<string, number> = { high: 0, medium: 1 };
+      return candidates.sort(
+        (a, b) =>
+          (priorityOrder[a.priority_level] ?? 9) - (priorityOrder[b.priority_level] ?? 9) ||
+          a.mention_rate - b.mention_rate,
+      );
+    }
+
+    const actions = generateGapActions(items, run.evidence_grade);
+
     return {
       run: {
         id: run.id,
@@ -160,5 +261,6 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
         evidence_grade: run.evidence_grade,
       },
       items,
+      actions,
     };
   });
