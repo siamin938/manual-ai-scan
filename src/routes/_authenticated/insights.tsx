@@ -272,10 +272,16 @@ function InsightsPage() {
   const [baselineTarget, setBaselineTarget] = useState<
     { experimentId: string; summary: BaselinePlanSummary } | null
   >(null);
+  const [applyTarget, setApplyTarget] = useState<InsightActionDTO | null>(null);
+  const [applySummary, setApplySummary] = useState("");
+  const [applyNote, setApplyNote] = useState("");
+  const [applyAt, setApplyAt] = useState(nowSeoulLocalInput());
   const startExperiment = useServerFn(createExperimentFromInsightAction);
   const previewBaseline = useServerFn(previewExperimentBaseline);
   const runBaseline = useServerFn(startExperimentBaseline);
   const confirmBaseline = useServerFn(finalizeExperimentBaseline);
+  const recordActionApplied = useServerFn(recordExperimentActionApplied);
+
 
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
