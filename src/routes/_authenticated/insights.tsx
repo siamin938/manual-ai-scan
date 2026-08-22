@@ -14,11 +14,14 @@ import {
   createExperimentFromInsightAction,
   finalizeExperimentBaseline,
   previewExperimentBaseline,
+  recordExperimentActionApplied,
   startExperimentBaseline,
+  type ActionAppliedErrorCode,
   type BaselineErrorCode,
   type BaselinePlanSummary,
   type CreateExperimentErrorCode,
 } from "@/lib/experiments.functions";
+
 
 
 import { Badge } from "@/components/ui/badge";
