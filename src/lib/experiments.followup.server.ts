@@ -435,6 +435,10 @@ async function loadFollowupContext(
 
   const baseline = await requireFinalizedBaseline(experiment);
   if (!baseline.ok) return baseline;
+
+  const applied = requireCompleteActionApplied(experiment, baseline.snapshot);
+  if (!applied.ok) return applied;
+
   return { ok: true, experiment, baseline: baseline.snapshot };
 }
 
