@@ -109,7 +109,7 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
       .select("id, status")
       .eq("org_id", data.orgId)
       .eq("source_insight_action_id", action.id)
-      .in("status", ACTIVE_STATUSES as unknown as string[])
+      .in("status", [...ACTIVE_STATUSES])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
