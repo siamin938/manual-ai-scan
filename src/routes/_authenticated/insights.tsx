@@ -166,6 +166,52 @@ function followupErrorText(code: FollowupErrorCode): string {
   return FOLLOWUP_ERROR_MESSAGES[code] ?? "Follow-up 처리 중 오류가 발생했습니다.";
 }
 
+/** 비교 엔진 오류 코드 → 안전한 한글 문구. */
+const EVALUATION_ERROR_MESSAGES: Record<EvaluationErrorCode, string> = {
+  FORBIDDEN: "결과를 확인할 권한이 없습니다.",
+  EXPERIMENT_NOT_FOUND: "실험 정보를 찾을 수 없습니다.",
+  EVALUATION_INVALID_STATE: "현재 실험 상태에서는 결과를 비교할 수 없습니다.",
+  EVALUATION_BASELINE_NOT_FINALIZED: "Baseline 확정이 완료된 뒤에 비교할 수 있습니다.",
+  EVALUATION_FOLLOWUP_NOT_FINALIZED: "Follow-up 확정이 완료된 뒤에 비교할 수 있습니다.",
+  EVALUATION_CONDITION_MISMATCH:
+    "Baseline과 Follow-up의 측정 조건이 서로 달라 비교할 수 없습니다. 담당자 확인이 필요합니다.",
+  EVALUATION_PARSER_DRIFT:
+    "측정 해석 기준이 달라져 두 시점을 그대로 비교할 수 없습니다. 담당자 확인이 필요합니다.",
+  EVALUATION_DATA_MISMATCH: "측정 데이터가 비교 조건과 일치하지 않습니다. 담당자 확인이 필요합니다.",
+  EVALUATION_PIPELINE_PROVENANCE_MISMATCH:
+    "측정 파이프라인의 실험 조건 고정 여부를 확인할 수 없어 비교를 중단했습니다.",
+  EVALUATION_ALREADY_RECORDED: "이미 확정된 결과가 있습니다.",
+  INTERNAL_ERROR: "결과 비교 중 오류가 발생했습니다.",
+};
+
+function evaluationErrorText(code: EvaluationErrorCode): string {
+  return EVALUATION_ERROR_MESSAGES[code] ?? "결과 비교 중 오류가 발생했습니다.";
+}
+
+const EVALUATION_OUTCOME_LABELS: Record<string, string> = {
+  directional_improvement: "개선 방향성 관찰",
+  directional_decline: "악화 방향성 관찰",
+  no_clear_change: "뚜렷한 변화 없음",
+};
+
+function outcomeLabel(outcome: string): string {
+  return EVALUATION_OUTCOME_LABELS[outcome] ?? "판단 보류";
+}
+
+function pctText(rate: number | null): string {
+  return rate === null ? "-" : `${(rate * 100).toFixed(1)}%`;
+}
+
+function ppText(pp: number | null): string {
+  if (pp === null) return "-";
+  const sign = pp > 0 ? "+" : "";
+  return `${sign}${pp.toFixed(1)}%p`;
+}
+
+function signedText(v: number): string {
+  return `${v > 0 ? "+" : ""}${v}`;
+}
+
 /** datetime-local 기본값: 현재 시각(KST) */
 function nowSeoulLocalInput(): string {
   const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -186,6 +232,8 @@ type BaselineCta =
   | { kind: "apply"; label: string }
   | { kind: "followup-start"; label: string }
   | { kind: "followup-finalize"; label: string }
+  | { kind: "evaluate"; label: string }
+  | { kind: "evaluate-view"; label: string }
   | { kind: "disabled"; label: string }
   | { kind: "none" };
 
@@ -206,9 +254,12 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
       case "running":
         return { kind: "disabled", label: "Follow-up 측정 중" };
       case "completed":
-        return exp.followup_finalized
-          ? { kind: "disabled", label: "Follow-up 확정 완료" }
-          : { kind: "followup-finalize", label: "Follow-up 확정하기" };
+        if (!exp.followup_finalized) {
+          return { kind: "followup-finalize", label: "Follow-up 확정하기" };
+        }
+        return exp.evaluation_recorded
+          ? { kind: "evaluate-view", label: "결과 보기" }
+          : { kind: "evaluate", label: "결과 비교하기" };
       default:
         return { kind: "disabled", label: "Follow-up 확인 필요" };
     }
