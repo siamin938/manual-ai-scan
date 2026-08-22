@@ -156,7 +156,53 @@ function summaryFromSnapshot(
   };
 }
 
-/** Baseline snapshot이 확정(finalize)됐고 scope가 맞는지 검증. */
+/** ISO timestamp 두 개가 같은 instant인지. parse 실패는 false. */
+function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return false;
+  return ta === tb;
+}
+
+/** Action Applied 기록이 완전한지 검증 (자동 보정/덮어쓰기 금지). */
+function requireCompleteActionApplied(
+  experiment: ExperimentRow,
+  baseline: ExperimentConditionSnapshotV1,
+): { ok: true } | { ok: false; error: FollowupErrorCode } {
+  if (!experiment.intervention_at || !experiment.intervention_confirmed_at || !experiment.changed_by) {
+    return { ok: false, error: "ACTION_NOT_APPLIED" };
+  }
+  const snap = experiment.action_application_snapshot;
+  if (!snap || typeof snap !== "object" || Array.isArray(snap)) {
+    return { ok: false, error: "ACTION_NOT_APPLIED" };
+  }
+  const s = snap as Record<string, unknown>;
+  if (s["snapshot_version"] !== "1") return { ok: false, error: "ACTION_NOT_APPLIED" };
+  if (
+    s["experiment_id"] !== experiment.id ||
+    s["org_id"] !== experiment.org_id ||
+    s["business_id"] !== experiment.business_id ||
+    s["baseline_run_id"] !== experiment.baseline_run_id
+  ) {
+    return { ok: false, error: "ACTION_NOT_APPLIED" };
+  }
+  if (s["baseline_condition_hash"] !== baseline.condition_hash) {
+    return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+  }
+  if (
+    !sameInstant(typeof s["applied_at"] === "string" ? s["applied_at"] : null, experiment.intervention_at) ||
+    !sameInstant(
+      typeof s["recorded_at"] === "string" ? s["recorded_at"] : null,
+      experiment.intervention_confirmed_at,
+    )
+  ) {
+    return { ok: false, error: "ACTION_NOT_APPLIED" };
+  }
+  return { ok: true };
+}
+
+/** Baseline snapshot이 확정(finalize)됐고 scope가 맞는지 검증. canonical run도 실제로 READ 한다. */
 async function requireFinalizedBaseline(
   experiment: ExperimentRow,
 ): Promise<
@@ -188,6 +234,39 @@ async function requireFinalizedBaseline(
     parsing_context: snap.parsing_context,
   });
   if (recomputed !== snap.condition_hash) return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+
+  // canonical Baseline Run 실제 재검증 (snapshot만 믿지 않는다)
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: baseRun, error: runErr } = await supabaseAdmin
+    .from("measurement_runs")
+    .select(RUN_COLUMNS)
+    .eq("id", experiment.baseline_run_id)
+    .eq("org_id", experiment.org_id)
+    .maybeSingle();
+  if (runErr) return { ok: false, error: "INTERNAL_ERROR" };
+  if (!baseRun) return { ok: false, error: "BASELINE_NOT_FINALIZED" };
+  const br = baseRun as unknown as RunRow;
+  if (
+    br.org_id !== experiment.org_id ||
+    br.business_id !== experiment.business_id ||
+    br.experiment_id !== experiment.id ||
+    br.question_set_id !== snap.question_set_id ||
+    br.run_type !== "experiment" ||
+    br.phase !== "baseline" ||
+    br.status !== "completed" ||
+    !br.started_at ||
+    !br.completed_at
+  ) {
+    return { ok: false, error: "BASELINE_NOT_FINALIZED" };
+  }
+  if (
+    !sameInstant(br.started_at, experiment.baseline_start_at) ||
+    !sameInstant(br.completed_at, experiment.baseline_end_at) ||
+    !sameInstant(br.started_at, snap.observed.run_started_at) ||
+    !sameInstant(br.completed_at, snap.observed.run_completed_at)
+  ) {
+    return { ok: false, error: "FOLLOWUP_CONDITION_DRIFT" };
+  }
   return { ok: true, snapshot: snap };
 }
 
