@@ -134,6 +134,32 @@ function baselineErrorText(code: BaselineErrorCode): string {
   return BASELINE_ERROR_MESSAGES[code] ?? "Baseline 처리 중 오류가 발생했습니다.";
 }
 
+/** Follow-up 서버 오류 코드 → 안전한 한글 문구. */
+const FOLLOWUP_ERROR_MESSAGES: Record<FollowupErrorCode, string> = {
+  FORBIDDEN: "Follow-up 측정을 진행할 권한이 없습니다.",
+  EXPERIMENT_NOT_FOUND: "실험을 찾을 수 없습니다.",
+  INVALID_EXPERIMENT_STATE: "현재 실험 상태에서는 Follow-up을 진행할 수 없습니다.",
+  ACTION_NOT_APPLIED: "실제 적용한 변경을 먼저 기록해야 Follow-up을 시작할 수 있습니다.",
+  BASELINE_NOT_FINALIZED: "Baseline 확정이 완료된 뒤에 Follow-up을 진행할 수 있습니다.",
+  PROVIDER_NOT_READY: "측정 Provider 설정이 아직 준비되지 않았습니다.",
+  FOLLOWUP_CONDITION_DRIFT:
+    "질문·모델·업체 정보가 Baseline 시점과 달라 동일 조건 비교를 할 수 없습니다. 조건을 원래대로 되돌린 뒤 다시 시도해주세요.",
+  FOLLOWUP_ALREADY_EXISTS: "이미 Follow-up 측정이 존재합니다.",
+  FOLLOWUP_RUN_CREATE_FAILED: "Follow-up 측정 준비 중 오류가 발생했습니다.",
+  FOLLOWUP_LINK_FAILED: "Follow-up 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+  FOLLOWUP_ENQUEUE_FAILED:
+    "Follow-up 준비는 저장되었지만 측정 작업 등록에 실패했습니다. 같은 Follow-up으로 다시 시도할 수 있습니다.",
+  FOLLOWUP_RUN_REQUIRES_REVIEW: "Follow-up 측정 상태 확인이 필요합니다.",
+  FOLLOWUP_RUN_NOT_COMPLETED: "Follow-up 측정이 아직 완료되지 않았습니다.",
+  FOLLOWUP_FINALIZE_MISMATCH:
+    "Follow-up 데이터가 확정 조건과 일치하지 않습니다. 담당자 확인이 필요합니다.",
+  INTERNAL_ERROR: "Follow-up 처리 중 오류가 발생했습니다.",
+};
+
+function followupErrorText(code: FollowupErrorCode): string {
+  return FOLLOWUP_ERROR_MESSAGES[code] ?? "Follow-up 처리 중 오류가 발생했습니다.";
+}
+
 /** datetime-local 기본값: 현재 시각(KST) */
 function nowSeoulLocalInput(): string {
   const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
