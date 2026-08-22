@@ -153,6 +153,10 @@ const FOLLOWUP_ERROR_MESSAGES: Record<FollowupErrorCode, string> = {
   FOLLOWUP_RUN_NOT_COMPLETED: "Follow-up 측정이 아직 완료되지 않았습니다.",
   FOLLOWUP_FINALIZE_MISMATCH:
     "Follow-up 데이터가 확정 조건과 일치하지 않습니다. 담당자 확인이 필요합니다.",
+  FOLLOWUP_COST_LIMIT_EXCEEDED:
+    "현재 단가 기준 예상 비용이 실험 비용 한도를 초과합니다. 비용 설정을 확인해주세요.",
+  FOLLOWUP_START_DISABLED:
+    "현재 측정 파이프라인이 실행 시점의 최신 데이터를 다시 읽기 때문에 Baseline과 완전히 동일한 조건을 보장할 수 없어 Follow-up 시작이 차단되어 있습니다.",
   INTERNAL_ERROR: "Follow-up 처리 중 오류가 발생했습니다.",
 };
 
