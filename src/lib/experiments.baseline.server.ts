@@ -780,9 +780,24 @@ export async function startExperimentBaselineImpl(args: {
 /** 소수점 비용 비교 허용 오차 (numeric 정밀도). */
 const COST_TOLERANCE_USD = 0.005;
 
-function sumCost(rows: { actual_cost_usd: number | string | null }[]): number {
-  return rows.reduce((acc, r) => acc + Number(r.actual_cost_usd ?? 0), 0);
+/** null/비정상/음수 비용은 0으로 간주하지 않고 null을 반환한다. */
+function strictCost(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
 }
+
+function sumStrictCost(rows: { actual_cost_usd: number | string | null }[]): number | null {
+  let total = 0;
+  for (const r of rows) {
+    const n = strictCost(r.actual_cost_usd);
+    if (n === null) return null;
+    total += n;
+  }
+  return total;
+}
+
 
 type FinalizeObserved = {
   provider_models: string[];
