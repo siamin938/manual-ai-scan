@@ -201,67 +201,109 @@ export type Database = {
       experiments: {
         Row: {
           action_type: string
+          baseline_condition_snapshot: Json | null
           baseline_end_at: string | null
           baseline_run_id: string | null
           baseline_start_at: string | null
+          baseline_value: number | null
           business_id: string
+          changed_by: string | null
           confounders: string | null
           created_at: string
           created_by: string | null
+          delta_value: number | null
+          evaluated_at: string | null
+          evaluation_version: string | null
+          evidence_grade: string | null
+          followup_condition_snapshot: Json | null
           followup_end_at: string | null
           followup_run_id: string | null
           followup_start_at: string | null
+          followup_value: number | null
           hypothesis: string
           id: string
           interpretation: string | null
           intervention_at: string | null
+          intervention_confirmed_at: string | null
           intervention_description: string | null
+          intervention_evidence: Json | null
           name: string
           org_id: string
+          primary_metric: string | null
+          result_classification: string | null
+          source_insight_action_id: string | null
           status: Database["public"]["Enums"]["experiment_status"]
           updated_at: string
         }
         Insert: {
           action_type: string
+          baseline_condition_snapshot?: Json | null
           baseline_end_at?: string | null
           baseline_run_id?: string | null
           baseline_start_at?: string | null
+          baseline_value?: number | null
           business_id: string
+          changed_by?: string | null
           confounders?: string | null
           created_at?: string
           created_by?: string | null
+          delta_value?: number | null
+          evaluated_at?: string | null
+          evaluation_version?: string | null
+          evidence_grade?: string | null
+          followup_condition_snapshot?: Json | null
           followup_end_at?: string | null
           followup_run_id?: string | null
           followup_start_at?: string | null
+          followup_value?: number | null
           hypothesis: string
           id?: string
           interpretation?: string | null
           intervention_at?: string | null
+          intervention_confirmed_at?: string | null
           intervention_description?: string | null
+          intervention_evidence?: Json | null
           name: string
           org_id: string
+          primary_metric?: string | null
+          result_classification?: string | null
+          source_insight_action_id?: string | null
           status?: Database["public"]["Enums"]["experiment_status"]
           updated_at?: string
         }
         Update: {
           action_type?: string
+          baseline_condition_snapshot?: Json | null
           baseline_end_at?: string | null
           baseline_run_id?: string | null
           baseline_start_at?: string | null
+          baseline_value?: number | null
           business_id?: string
+          changed_by?: string | null
           confounders?: string | null
           created_at?: string
           created_by?: string | null
+          delta_value?: number | null
+          evaluated_at?: string | null
+          evaluation_version?: string | null
+          evidence_grade?: string | null
+          followup_condition_snapshot?: Json | null
           followup_end_at?: string | null
           followup_run_id?: string | null
           followup_start_at?: string | null
+          followup_value?: number | null
           hypothesis?: string
           id?: string
           interpretation?: string | null
           intervention_at?: string | null
+          intervention_confirmed_at?: string | null
           intervention_description?: string | null
+          intervention_evidence?: Json | null
           name?: string
           org_id?: string
+          primary_metric?: string | null
+          result_classification?: string | null
+          source_insight_action_id?: string | null
           status?: Database["public"]["Enums"]["experiment_status"]
           updated_at?: string
         }
@@ -293,6 +335,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "experiments_source_insight_action_fkey"
+            columns: ["source_insight_action_id", "org_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "insight_actions"
+            referencedColumns: ["id", "org_id", "business_id"]
           },
         ]
       }
