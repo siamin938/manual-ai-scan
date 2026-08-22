@@ -494,14 +494,20 @@ function InsightsPage() {
                       <ExperimentCta
                         action={a}
                         pending={
-                          preview.isPending && preview.variables === a.active_experiment?.id
+                          (preview.isPending && preview.variables === a.active_experiment?.id) ||
+                          (finalize.isPending && finalize.variables === a.active_experiment?.id)
                         }
                         onCreate={() => setConfirmAction(a)}
                         onBaseline={() => {
                           const expId = a.active_experiment?.id;
                           if (expId && !preview.isPending) preview.mutate(expId);
                         }}
+                        onFinalize={() => {
+                          const expId = a.active_experiment?.id;
+                          if (expId && !finalize.isPending) finalize.mutate(expId);
+                        }}
                       />
+
                     </div>
 
                   </Card>
