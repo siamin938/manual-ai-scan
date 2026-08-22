@@ -27,8 +27,12 @@ export type ActiveExperimentDTO = {
   baseline_run_status: string | null;
   /** snapshot 미노출. baseline_start_at/baseline_end_at 존재 여부로만 판별. */
   baseline_finalized: boolean;
-  
+  /** 실제 변경 적용 기록 여부 (snapshot 미노출) */
+  action_applied: boolean;
+  /** 사용자에게 노출 가능한 실제 적용 시각 */
+  action_applied_at: string | null;
 };
+
 
 
 export type InsightActionDTO = {
