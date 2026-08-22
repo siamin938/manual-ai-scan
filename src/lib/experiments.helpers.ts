@@ -204,8 +204,15 @@ export type ExperimentConditionSnapshotV1 = {
   experiment_id: string;
   org_id: string;
   business_id: string;
-  source_insight_action_id: string;
+  /**
+   * 하위호환: 기존 snapshot에는 source_type이 없다. 없으면 'insight_action'으로 간주한다.
+   * condition_hash 계산 입력에는 절대 포함하지 않는다(기존 저장 hash 보존).
+   */
+  source_type?: "insight_action" | "profile_coverage_item";
+  source_insight_action_id: string | null;
+  source_profile_coverage_item_id?: string | null;
   reference_source_run_id: string;
+
   question_set_id: string;
   questions: SnapshotQuestion[];
   planned: {
