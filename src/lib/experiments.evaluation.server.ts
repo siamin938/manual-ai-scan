@@ -731,6 +731,86 @@ function buildSnapshot(c: ComputedEvaluation, evaluatedAt: string, evaluatedBy: 
   };
 }
 
+
+/** 숫자 무결성: 유한값 / 확률 0..1 / 음수 아닌 정수 count */
+function snapshotNumbersLegal(s: Record<string, unknown>): boolean {
+  const phases = ["baseline_metrics", "followup_metrics"] as const;
+  for (const key of phases) {
+    const m = s[key];
+    if (!m || typeof m !== "object" || Array.isArray(m)) return false;
+    const rec = m as Record<string, unknown>;
+    for (const [k, v] of Object.entries(rec)) {
+      if (v === null) continue;
+      if (typeof v !== "number" || !Number.isFinite(v)) return false;
+      if (k.endsWith("_rate") && (v < 0 || v > 1)) return false;
+      if (k.endsWith("_count") && (v < 0 || !Number.isInteger(v))) return false;
+    }
+  }
+  const deltas = s["deltas"];
+  if (!deltas || typeof deltas !== "object" || Array.isArray(deltas)) return false;
+  for (const [k, v] of Object.entries(deltas as Record<string, unknown>)) {
+    if (v === null || k === "average_position_note") continue;
+    if (typeof v !== "number" || !Number.isFinite(v)) return false;
+  }
+  return true;
+}
+
+/**
+ * 이미 확정된 evaluation_snapshot이 "현재 DB 데이터로 재계산한 결과"와
+ * 완전히 동일한 canonical 결과인지 검증한다. 값이 다르면 idempotent success 금지.
+ * 비교는 buildSnapshot() 출력 전체를 stableStringify로 대조하므로
+ * IDs / sample / quality / metrics / deltas / question_results / outcome / rule / caution을 모두 포함한다.
+ */
+function validateStoredEvaluation(
+  c: ComputedEvaluation,
+  stored: unknown,
+): { ok: true; evaluatedAt: string } | { ok: false; error: EvaluationErrorCode } {
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
+    return { ok: false, error: "EVALUATION_ALREADY_RECORDED" };
+  }
+  const st = stored as Record<string, unknown>;
+  const storedAt = typeof st["evaluated_at"] === "string" ? (st["evaluated_at"] as string) : null;
+  const storedBy = typeof st["evaluated_by"] === "string" ? (st["evaluated_by"] as string) : null;
+
+  if (
+    st["snapshot_version"] !== "1" ||
+    st["evaluation_version"] !== EVALUATION_VERSION ||
+    !storedAt ||
+    !storedBy ||
+    !sameInstant(storedAt, c.experiment.evaluated_at) ||
+    storedBy !== c.experiment.evaluated_by
+  ) {
+    return { ok: false, error: "EVALUATION_ALREADY_RECORDED" };
+  }
+  if (!snapshotNumbersLegal(st)) return { ok: false, error: "EVALUATION_DATA_MISMATCH" };
+
+  // 저장된 evaluated_at/by를 그대로 사용해 기대 snapshot을 재구성하고 canonical 대조
+  const expected = buildSnapshot(c, storedAt, storedBy);
+  if (stableStringify(expected) !== stableStringify(st)) {
+    return { ok: false, error: "EVALUATION_ALREADY_RECORDED" };
+  }
+  return { ok: true, evaluatedAt: storedAt };
+}
+
+/** 확정 후 summary 컬럼이 expected와 일치하는지 확인 (postcondition). */
+function summaryColumnsMatch(c: ComputedEvaluation, row: ExperimentRow): boolean {
+  const b = c.baselineMetrics.inclusionRate;
+  const f = c.followupMetrics.inclusionRate;
+  const expectedDelta = b === null || f === null ? null : f - b;
+  const num = (v: number | null) => (v === null ? null : Number(v));
+  const eq = (a: number | null, x: number | null) =>
+    a === null || x === null ? a === x : Math.abs(a - x) < 1e-9;
+  return (
+    row.evaluation_version === EVALUATION_VERSION &&
+    row.evidence_grade === EVALUATION_EVIDENCE_GRADE &&
+    row.primary_metric === EVALUATION_PRIMARY_METRIC &&
+    row.result_classification === outcomeToResultClassification(c.outcome) &&
+    eq(num(row.baseline_value), b) &&
+    eq(num(row.followup_value), f) &&
+    eq(num(row.delta_value), expectedDelta)
+  );
+}
+
 export async function previewExperimentEvaluationImpl(args: {
   supabase: UserClient;
   userId: string;
@@ -763,23 +843,14 @@ export async function finalizeExperimentEvaluationImpl(args: {
   if (!computed.ok) return { ok: false, error: computed.error };
   const c = computed.result;
 
-  // 이미 평가된 경우: 동일 canonical 결과면 idempotent success, 아니면 차단(덮어쓰기 금지)
-  const stored = c.experiment.evaluation_snapshot;
-  if (stored) {
-    if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
-      return { ok: false, error: "EVALUATION_ALREADY_RECORDED" };
+  // 이미 평가된 경우: 재계산 결과와 완전히 같을 때만 idempotent success (덮어쓰기 금지)
+  if (c.experiment.evaluation_snapshot) {
+    const check = validateStoredEvaluation(c, c.experiment.evaluation_snapshot);
+    if (!check.ok) return { ok: false, error: check.error };
+    if (!summaryColumnsMatch(c, c.experiment)) {
+      return { ok: false, error: "EVALUATION_DATA_MISMATCH" };
     }
-    const s = stored as Record<string, unknown>;
-    if (
-      s["experiment_id"] !== c.experiment.id ||
-      s["baseline_run_id"] !== c.baselineRun.id ||
-      s["followup_run_id"] !== c.followupRun.id ||
-      s["condition_hash"] !== c.baselineSnapshot.condition_hash ||
-      s["primary_outcome"] !== c.outcome
-    ) {
-      return { ok: false, error: "EVALUATION_ALREADY_RECORDED" };
-    }
-    return { ok: true, evaluation: toDTO(c, true, c.experiment.evaluated_at) };
+    return { ok: true, evaluation: toDTO(c, true, check.evaluatedAt) };
   }
 
   const evaluatedAt = new Date().toISOString();
@@ -804,39 +875,32 @@ export async function finalizeExperimentEvaluationImpl(args: {
     })
     .eq("id", c.experiment.id)
     .eq("org_id", c.experiment.org_id)
+    .eq("status", "followup")
     .eq("baseline_run_id", c.baselineRun.id)
     .eq("followup_run_id", c.followupRun.id)
+    .eq("baseline_start_at", c.experiment.baseline_start_at as string)
+    .eq("baseline_end_at", c.experiment.baseline_end_at as string)
+    .eq("followup_start_at", c.experiment.followup_start_at as string)
+    .eq("followup_end_at", c.experiment.followup_end_at as string)
     .is("evaluation_snapshot", null)
-    .select("id, evaluated_at")
+    .is("evaluated_at", null)
+    .is("evaluated_by", null)
+    .select("id")
     .maybeSingle();
 
   if (updErr) {
     console.error("[evaluation] finalize update failed");
     return { ok: false, error: "INTERNAL_ERROR" };
   }
-  if (!updated) {
-    // CAS 실패: 상태 reload 후 postcondition 확인
-    const reload = await computeEvaluation({
-      orgId: args.orgId,
-      experimentId: args.experimentId,
-    });
-    if (!reload.ok) return { ok: false, error: reload.error };
-    const s = reload.result.experiment.evaluation_snapshot as Record<string, unknown> | null;
-    if (
-      s &&
-      s["experiment_id"] === c.experiment.id &&
-      s["baseline_run_id"] === c.baselineRun.id &&
-      s["followup_run_id"] === c.followupRun.id &&
-      s["condition_hash"] === c.baselineSnapshot.condition_hash &&
-      s["primary_outcome"] === reload.result.outcome
-    ) {
-      return {
-        ok: true,
-        evaluation: toDTO(reload.result, true, reload.result.experiment.evaluated_at),
-      };
-    }
-    return { ok: false, error: "EVALUATION_ALREADY_RECORDED" };
-  }
 
-  return { ok: true, evaluation: toDTO(c, true, updated.evaluated_at ?? evaluatedAt) };
+  // 성공/CAS 실패 모두 row를 다시 읽어 동일한 validator로 postcondition을 확인한다.
+  const reload = await computeEvaluation({ orgId: args.orgId, experimentId: args.experimentId });
+  if (!reload.ok) return { ok: false, error: reload.error };
+  const r = reload.result;
+  const check = validateStoredEvaluation(r, r.experiment.evaluation_snapshot);
+  if (!check.ok) return { ok: false, error: updated ? "EVALUATION_DATA_MISMATCH" : check.error };
+  if (!summaryColumnsMatch(r, r.experiment)) {
+    return { ok: false, error: "EVALUATION_DATA_MISMATCH" };
+  }
+  return { ok: true, evaluation: toDTO(r, true, check.evaluatedAt) };
 }
