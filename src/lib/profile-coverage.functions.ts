@@ -90,7 +90,7 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
     if (runErr) throw new Error("RUN_QUERY_FAILED");
-    if (!run) return { run: null, items: [] };
+    if (!run) return { run: null, items: [], actions: [] };
 
     const [businessRes, itemsRes] = await Promise.all([
       supabaseAdmin
