@@ -445,8 +445,54 @@ function InsightsPage() {
     },
   });
 
+  // 5단계-A: Follow-up READ ONLY preview (비용 발생 없음)
+  const previewFollowup = useMutation({
+    mutationFn: (experimentId: string) =>
+      previewFollowupFn({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result, experimentId) => {
+      if (result.ok) setFollowupTarget({ experimentId, summary: result.summary });
+      else toast.error(followupErrorText(result.error));
+    },
+    onError: () => toast.error("Follow-up 정보를 불러오지 못했습니다."),
+  });
 
+  // 5단계-B: 확인 Dialog의 최종 버튼에서만 실제 Follow-up 측정 실행
+  const startFollowup = useMutation({
+    mutationFn: (experimentId: string) =>
+      runFollowupFn({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        setFollowupTarget(null);
+        toast.success(
+          result.followup.runStatus === "running"
+            ? "Follow-up 측정이 진행 중입니다."
+            : "Follow-up 측정이 시작되었습니다.",
+        );
+      } else {
+        toast.error(followupErrorText(result.error));
+      }
+      void refetch();
+    },
+    onError: () => {
+      toast.error("Follow-up 측정 시작 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
 
+  // 5단계-C: Follow-up 확정 (추가 측정/비용 없음)
+  const finalizeFollowup = useMutation({
+    mutationFn: (experimentId: string) =>
+      confirmFollowupFn({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) toast.success("Follow-up이 확정되었습니다.");
+      else toast.error(followupErrorText(result.error));
+      void refetch();
+    },
+    onError: () => {
+      toast.error("Follow-up 확정 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
 
 
   const run = data?.run ?? null;
