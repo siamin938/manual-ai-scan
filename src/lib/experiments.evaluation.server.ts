@@ -345,6 +345,12 @@ async function computeEvaluation(args: {
   if (!expData) return { ok: false, error: "EXPERIMENT_NOT_FOUND" };
   const experiment = expData as unknown as ExperimentRow;
 
+  // --- 실험 상태: Follow-up finalize까지 끝난 canonical 상태만 허용 ---
+  // (evaluation 기록 후에도 별도 status enum으로 전이하지 않으므로 'followup' 유지가 정상)
+  if (experiment.status !== "followup") {
+    return { ok: false, error: "EVALUATION_INVALID_STATE" };
+  }
+
   // --- Baseline 확정 여부 ---
   const baselineSnapshot = asSnapshot(experiment.baseline_condition_snapshot);
   if (
@@ -396,6 +402,15 @@ async function computeEvaluation(args: {
   if (actionRecord["baseline_condition_hash"] !== baselineSnapshot.condition_hash) {
     return { ok: false, error: "EVALUATION_CONDITION_MISMATCH" };
   }
+  // Action Applied 감사정보 strict 검증 (자동 보정/overwrite 없음)
+  if (
+    !sameInstant(actionRecord["applied_at"] as string | null, experiment.intervention_at) ||
+    !sameInstant(actionRecord["recorded_at"] as string | null, experiment.intervention_confirmed_at) ||
+    actionRecord["recorded_by"] !== experiment.changed_by ||
+    actionRecord["source_insight_action_id"] !== experiment.source_insight_action_id
+  ) {
+    return { ok: false, error: "EVALUATION_INVALID_STATE" };
+  }
 
   // --- 조건 동일성 ---
   if (baselineSnapshot.condition_hash !== followupSnapshot.condition_hash) {
@@ -440,6 +455,24 @@ async function computeEvaluation(args: {
     ) {
       return { ok: false, error: "EVALUATION_DATA_MISMATCH" };
     }
+  }
+
+  // --- finalized 시각 provenance: experiment 컬럼 / snapshot.observed / run 실제 시각이 같은 instant ---
+  if (
+    !sameInstant(experiment.baseline_start_at, baselineRun.started_at) ||
+    !sameInstant(experiment.baseline_end_at, baselineRun.completed_at) ||
+    !sameInstant(baselineSnapshot.observed?.run_started_at ?? null, baselineRun.started_at) ||
+    !sameInstant(baselineSnapshot.observed?.run_completed_at ?? null, baselineRun.completed_at)
+  ) {
+    return { ok: false, error: "EVALUATION_BASELINE_NOT_FINALIZED" };
+  }
+  if (
+    !sameInstant(experiment.followup_start_at, followupRun.started_at) ||
+    !sameInstant(experiment.followup_end_at, followupRun.completed_at) ||
+    !sameInstant(followupSnapshot.observed?.run_started_at ?? null, followupRun.started_at) ||
+    !sameInstant(followupSnapshot.observed?.run_completed_at ?? null, followupRun.completed_at)
+  ) {
+    return { ok: false, error: "EVALUATION_FOLLOWUP_NOT_FINALIZED" };
   }
 
   // --- 인과 순서: Follow-up 측정은 변경 적용 이후 ---
