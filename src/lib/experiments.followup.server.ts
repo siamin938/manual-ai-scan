@@ -27,14 +27,99 @@ type UserClient = SupabaseClient<Database>;
 const COST_TOLERANCE_USD = 0.005;
 
 /**
- * Follow-up 실제 실행 게이트.
- * 현재 원격 Edge pipeline(enqueue-run / process-measurement-job) 소스를 이 저장소에서
- * READ 할 수 없고, measurement_jobs에는 question_id / provider_model만 pin되고
- * prompt_text·parser(업체/경쟁사 alias, 도메인)는 처리 시점에 live DB에서 다시 읽히므로
- * "시작 직전 precheck"만으로는 Baseline과의 exact reproducibility를 보장할 수 없다.
- * pipeline이 job/snapshot pin을 사용하도록 확인/보강되기 전까지 실제 시작을 차단한다.
+ * Emergency kill switch (server-only, client 제어 불가).
+ * 기본값은 "시작 가능"이며, 운영자가 서버 환경변수로만 차단할 수 있다.
  */
-const FOLLOWUP_START_ENABLED = false;
+function followupStartKillSwitchOn(): boolean {
+  const v = (process.env["FOLLOWUP_START_KILL_SWITCH"] ?? "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "on";
+}
+
+/** enqueue-run이 실험 snapshot 모드로 작업을 만들었는지 DB evidence로 확인. */
+const EXECUTION_MODE_PINNED = "experiment_snapshot_v1";
+
+async function verifyRunEnqueueProvenance(args: {
+  orgId: string;
+  runId: string;
+  experimentId: string;
+  phase: "baseline" | "followup";
+  conditionHash: string;
+}): Promise<{ ok: true } | { ok: false; error: FollowupErrorCode }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("system_events")
+    .select("metadata, created_at")
+    .eq("org_id", args.orgId)
+    .eq("run_id", args.runId)
+    .eq("event_type", "run_enqueued")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) return { ok: false, error: "INTERNAL_ERROR" };
+  const meta = (data?.[0]?.metadata ?? null) as Record<string, unknown> | null;
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) {
+    return { ok: false, error: "FOLLOWUP_PIPELINE_PROVENANCE_MISMATCH" };
+  }
+  if (
+    meta["execution_mode"] !== EXECUTION_MODE_PINNED ||
+    meta["condition_hash"] !== args.conditionHash ||
+    meta["experiment_id"] !== args.experimentId ||
+    meta["experiment_phase"] !== args.phase
+  ) {
+    return { ok: false, error: "FOLLOWUP_PIPELINE_PROVENANCE_MISMATCH" };
+  }
+  return { ok: true };
+}
+
+/**
+ * 실제 Provider에 전달된 요청(request_payload_redacted)이 pinned snapshot과 동일한지 검증한다.
+ * raw response는 읽지 않으며, 어떤 내부 값도 client로 반환하지 않는다.
+ */
+async function verifyProviderPayloadsMatchSnapshot(args: {
+  orgId: string;
+  runId: string;
+  snapshot: ExperimentConditionSnapshotV1;
+  jobs: { id: string; question_id: string }[];
+}): Promise<{ ok: true } | { ok: false; error: FollowupErrorCode }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const jobIds = args.jobs.map((j) => j.id);
+  const { data, error } = await supabaseAdmin
+    .from("provider_payloads")
+    .select("job_id, request_payload_redacted")
+    .eq("org_id", args.orgId)
+    .in("job_id", jobIds);
+  if (error) return { ok: false, error: "INTERNAL_ERROR" };
+  const rows = data ?? [];
+  if (rows.length !== jobIds.length) {
+    return { ok: false, error: "FOLLOWUP_PIPELINE_PROVENANCE_MISMATCH" };
+  }
+  const byJob = new Map(rows.map((r) => [r.job_id, r.request_payload_redacted]));
+  const questionById = new Map(args.snapshot.questions.map((q) => [q.id, q]));
+  const plannedModel = (args.snapshot.planned.provider_models?.["openai"] ?? "").trim();
+  const plannedContext = String(args.snapshot.planned.search_context_size).trim();
+
+  for (const job of args.jobs) {
+    const raw = byJob.get(job.id);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return { ok: false, error: "FOLLOWUP_PIPELINE_PROVENANCE_MISMATCH" };
+    }
+    const p = raw as Record<string, unknown>;
+    const q = questionById.get(job.question_id);
+    if (!q) return { ok: false, error: "FOLLOWUP_PIPELINE_PROVENANCE_MISMATCH" };
+    if (
+      String(p["model"] ?? "").trim() !== plannedModel ||
+      String(p["search_context_size"] ?? "").trim() !== plannedContext ||
+      p["store"] !== false ||
+      String(p["query"] ?? "") !== q.prompt_text ||
+      String(p["language"] ?? "") !== q.language ||
+      String(p["country"] ?? "") !== q.country_code ||
+      String(p["region"] ?? "") !== (q.region ?? "") ||
+      String(p["city"] ?? "") !== (q.city ?? "")
+    ) {
+      return { ok: false, error: "FOLLOWUP_PIPELINE_PROVENANCE_MISMATCH" };
+    }
+  }
+  return { ok: true };
+}
 
 const RUN_COLUMNS =
   "id, org_id, business_id, experiment_id, question_set_id, run_type, phase, status, selected_providers, repetitions, max_cost_usd, estimated_cost_usd, actual_cost_usd, total_jobs, completed_jobs, failed_jobs, started_at, completed_at";
@@ -521,7 +606,18 @@ async function enqueueIfNeeded(args: {
     summary,
   };
 
+  const provenanceArgs = {
+    orgId: args.orgId,
+    runId: run.id,
+    experimentId: experiment.id,
+    phase: "followup" as const,
+    conditionHash: args.baseline.condition_hash,
+  };
+
   if (run.status === "queued" || run.status === "running" || run.status === "completed") {
+    // 이미 enqueue된 run: 삭제/재생성하지 않고 provenance evidence만 확인한다.
+    const prov = await verifyRunEnqueueProvenance(provenanceArgs);
+    if (!prov.ok) return followupFail(prov.error, base) as StartExperimentFollowupResult;
     return { ok: true, followup: base };
   }
   if (run.status !== "draft") {
@@ -545,6 +641,17 @@ async function enqueueIfNeeded(args: {
     .eq("org_id", experiment.org_id)
     .maybeSingle();
 
+  // enqueue 이후 runtime provenance 확인. 불일치 시 성공으로 반환하지 않는다.
+  // (이미 enqueue된 run/jobs는 임의 삭제·재생성하지 않고 담당자 확인 대상으로 남긴다.)
+  const prov = await verifyRunEnqueueProvenance(provenanceArgs);
+  if (!prov.ok) {
+    console.error("[followup] enqueue provenance mismatch", { runId: run.id });
+    return followupFail(prov.error, {
+      ...base,
+      runStatus: refreshed?.status ?? run.status,
+    }) as StartExperimentFollowupResult;
+  }
+
   return { ok: true, followup: { ...base, runStatus: refreshed?.status ?? run.status } };
 }
 
@@ -561,8 +668,8 @@ export async function startExperimentFollowupImpl(args: {
   if (!ctx.ok) return followupFail(ctx.error) as StartExperimentFollowupResult;
   const experiment = ctx.experiment;
 
-  // 파이프라인 재현성 보장 전까지 실제 시작(Run 생성/enqueue) 차단
-  if (!FOLLOWUP_START_ENABLED) {
+  // 서버 전용 emergency kill switch (기본값: 시작 가능)
+  if (followupStartKillSwitchOn()) {
     return followupFail("FOLLOWUP_START_DISABLED") as StartExperimentFollowupResult;
   }
 
@@ -849,6 +956,25 @@ export async function finalizeExperimentFollowupImpl(args: {
     }
   }
   const jobById = new Map(jobRows.map((j) => [j.id, j]));
+
+  // Runtime provenance: enqueue-run이 snapshot mode로 작업을 생성했는지 DB evidence 확인
+  const finalizeProv = await verifyRunEnqueueProvenance({
+    orgId: args.orgId,
+    runId: run.id,
+    experimentId: experiment.id,
+    phase: "followup",
+    conditionHash: snapshot.condition_hash,
+  });
+  if (!finalizeProv.ok) return { ok: false, error: finalizeProv.error };
+
+  // 실제 Provider 요청이 pinned 조건과 동일했는지 확인 (raw response는 읽지 않음)
+  const payloadProv = await verifyProviderPayloadsMatchSnapshot({
+    orgId: args.orgId,
+    runId: run.id,
+    snapshot,
+    jobs: jobRows.map((j) => ({ id: j.id, question_id: j.question_id })),
+  });
+  if (!payloadProv.ok) return { ok: false, error: payloadProv.error };
 
   const { data: measurements, error: mErr } = await supabaseAdmin
     .from("measurements")
