@@ -986,6 +986,64 @@ function InsightsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Follow-up 실행 확인 — 여기서만 실제 재측정 비용이 발생할 수 있다 */}
+      <Dialog
+        open={!!followupTarget}
+        onOpenChange={(o) => {
+          if (!o && !startFollowup.isPending) setFollowupTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          {followupTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">Follow-up 측정을 시작할까요?</DialogTitle>
+                <DialogDescription>Baseline과 동일한 조건으로 재측정합니다.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <MetaSmall label="질문 수" value={`${followupTarget.summary.questionCount}개`} />
+                  <MetaSmall label="반복 횟수" value={`${followupTarget.summary.repetitions}회`} />
+                  <MetaSmall label="총 측정" value={`${followupTarget.summary.plannedJobs}회`} />
+                  <MetaSmall label="Provider" value="OpenAI" />
+                  <MetaSmall label="모델" value={followupTarget.summary.model} />
+                  <MetaSmall
+                    label="예상 비용"
+                    value={`$${followupTarget.summary.estimatedCostUsd.toFixed(2)}`}
+                  />
+                  <MetaSmall
+                    label="최대 비용 한도"
+                    value={`$${followupTarget.summary.maxCostUsd.toFixed(2)}`}
+                  />
+                </dl>
+                <Alert>
+                  <AlertDescription className="leading-relaxed">
+                    질문·모델·업체 정보가 Baseline 시점과 동일한 것을 확인했습니다. 아래
+                    &apos;Follow-up 측정 시작&apos;을 누르면 실제 OpenAI 측정 작업이 등록되며 API 비용이
+                    발생할 수 있습니다.
+                  </AlertDescription>
+                </Alert>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setFollowupTarget(null)}
+                  disabled={startFollowup.isPending}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={() => startFollowup.mutate(followupTarget.experimentId)}
+                  disabled={startFollowup.isPending}
+                >
+                  {startFollowup.isPending ? "시작 중..." : "Follow-up 측정 시작"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
