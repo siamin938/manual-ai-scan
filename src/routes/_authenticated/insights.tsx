@@ -13,8 +13,10 @@ import {
 import {
   createExperimentFromInsightAction,
   finalizeExperimentBaseline,
+  finalizeExperimentEvaluation,
   finalizeExperimentFollowup,
   previewExperimentBaseline,
+  previewExperimentEvaluation,
   previewExperimentFollowup,
   recordExperimentActionApplied,
   startExperimentBaseline,
@@ -23,6 +25,8 @@ import {
   type BaselineErrorCode,
   type BaselinePlanSummary,
   type CreateExperimentErrorCode,
+  type EvaluationErrorCode,
+  type ExperimentEvaluationDTO,
   type FollowupErrorCode,
   type FollowupPlanSummary,
 } from "@/lib/experiments.functions";
@@ -386,6 +390,10 @@ function InsightsPage() {
   const [followupTarget, setFollowupTarget] = useState<
     { experimentId: string; summary: FollowupPlanSummary } | null
   >(null);
+  const [evaluationTarget, setEvaluationTarget] = useState<{
+    action: InsightActionDTO;
+    evaluation: ExperimentEvaluationDTO;
+  } | null>(null);
   const startExperiment = useServerFn(createExperimentFromInsightAction);
   const previewBaseline = useServerFn(previewExperimentBaseline);
   const runBaseline = useServerFn(startExperimentBaseline);
@@ -394,6 +402,8 @@ function InsightsPage() {
   const previewFollowupFn = useServerFn(previewExperimentFollowup);
   const runFollowupFn = useServerFn(startExperimentFollowup);
   const confirmFollowupFn = useServerFn(finalizeExperimentFollowup);
+  const previewEvaluationFn = useServerFn(previewExperimentEvaluation);
+  const confirmEvaluationFn = useServerFn(finalizeExperimentEvaluation);
 
 
 
@@ -551,6 +561,40 @@ function InsightsPage() {
     },
   });
 
+
+  // 6단계-A: 비교 결과 미리보기 (READ ONLY, 추가 측정/비용 없음)
+  const previewEvaluation = useMutation({
+    mutationFn: (action: InsightActionDTO) =>
+      previewEvaluationFn({
+        data: { orgId: activeOrgId as string, experimentId: action.active_experiment!.id },
+      }),
+    onSuccess: (result, action) => {
+      if (result.ok) setEvaluationTarget({ action, evaluation: result.evaluation });
+      else toast.error(evaluationErrorText(result.error));
+    },
+    onError: () => toast.error("결과를 불러오지 못했습니다."),
+  });
+
+  // 6단계-B: 비교 결과 확정 (서버에서 전부 재계산, CAS)
+  const finalizeEvaluation = useMutation({
+    mutationFn: (experimentId: string) =>
+      confirmEvaluationFn({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("실험 결과가 확정되었습니다.");
+        setEvaluationTarget((prev) =>
+          prev ? { action: prev.action, evaluation: result.evaluation } : prev,
+        );
+      } else {
+        toast.error(evaluationErrorText(result.error));
+      }
+      void refetch();
+    },
+    onError: () => {
+      toast.error("결과 확정 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
 
   const run = data?.run ?? null;
   const findings = data?.findings ?? [];
@@ -736,7 +780,10 @@ function InsightsPage() {
                           (previewFollowup.isPending &&
                             previewFollowup.variables === a.active_experiment?.id) ||
                           (finalizeFollowup.isPending &&
-                            finalizeFollowup.variables === a.active_experiment?.id)
+                            finalizeFollowup.variables === a.active_experiment?.id) ||
+                          (previewEvaluation.isPending &&
+                            previewEvaluation.variables?.active_experiment?.id ===
+                              a.active_experiment?.id)
                         }
                         onCreate={() => setConfirmAction(a)}
                         onBaseline={() => {
@@ -761,6 +808,11 @@ function InsightsPage() {
                         onFollowupFinalize={() => {
                           const expId = a.active_experiment?.id;
                           if (expId && !finalizeFollowup.isPending) finalizeFollowup.mutate(expId);
+                        }}
+                        onEvaluate={() => {
+                          if (a.active_experiment && !previewEvaluation.isPending) {
+                            previewEvaluation.mutate(a);
+                          }
                         }}
                       />
 
@@ -1114,6 +1166,7 @@ function ExperimentCta({
   onApply,
   onFollowup,
   onFollowupFinalize,
+  onEvaluate,
 }: {
   action: InsightActionDTO;
   pending: boolean;
@@ -1123,6 +1176,7 @@ function ExperimentCta({
   onApply: () => void;
   onFollowup: () => void;
   onFollowupFinalize: () => void;
+  onEvaluate: () => void;
 }) {
   const cta = baselineCta(action);
 
@@ -1170,6 +1224,21 @@ function ExperimentCta({
   }
 
 
+
+  if (cta.kind === "evaluate") {
+    return (
+      <Button className="w-full" onClick={onEvaluate} disabled={pending}>
+        {pending ? "불러오는 중..." : cta.label}
+      </Button>
+    );
+  }
+  if (cta.kind === "evaluate-view") {
+    return (
+      <Button variant="secondary" className="w-full" onClick={onEvaluate} disabled={pending}>
+        {pending ? "불러오는 중..." : cta.label}
+      </Button>
+    );
+  }
 
   if (cta.kind === "disabled") {
     return (
