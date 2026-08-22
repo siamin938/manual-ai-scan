@@ -56,6 +56,9 @@ type ExperimentRow = {
   changed_by: string | null;
   action_application_snapshot: unknown;
   source_insight_action_id: string | null;
+  source_type: string | null;
+  source_profile_coverage_item_id: string | null;
+
   evaluation_snapshot: unknown;
   evaluated_at: string | null;
   evaluated_by: string | null;
