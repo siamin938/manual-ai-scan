@@ -235,6 +235,8 @@ export type Database = {
           primary_metric: string | null
           result_classification: string | null
           source_insight_action_id: string | null
+          source_profile_coverage_item_id: string | null
+          source_type: string
           status: Database["public"]["Enums"]["experiment_status"]
           updated_at: string
         }
@@ -274,6 +276,8 @@ export type Database = {
           primary_metric?: string | null
           result_classification?: string | null
           source_insight_action_id?: string | null
+          source_profile_coverage_item_id?: string | null
+          source_type?: string
           status?: Database["public"]["Enums"]["experiment_status"]
           updated_at?: string
         }
@@ -313,6 +317,8 @@ export type Database = {
           primary_metric?: string | null
           result_classification?: string | null
           source_insight_action_id?: string | null
+          source_profile_coverage_item_id?: string | null
+          source_type?: string
           status?: Database["public"]["Enums"]["experiment_status"]
           updated_at?: string
         }
@@ -350,6 +356,17 @@ export type Database = {
             columns: ["source_insight_action_id", "org_id", "business_id"]
             isOneToOne: false
             referencedRelation: "insight_actions"
+            referencedColumns: ["id", "org_id", "business_id"]
+          },
+          {
+            foreignKeyName: "experiments_source_profile_coverage_item_fkey"
+            columns: [
+              "source_profile_coverage_item_id",
+              "org_id",
+              "business_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "profile_coverage_items"
             referencedColumns: ["id", "org_id", "business_id"]
           },
         ]
