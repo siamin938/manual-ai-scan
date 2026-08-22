@@ -13,8 +13,10 @@ import {
 import {
   createExperimentFromInsightAction,
   finalizeExperimentBaseline,
+  finalizeExperimentEvaluation,
   finalizeExperimentFollowup,
   previewExperimentBaseline,
+  previewExperimentEvaluation,
   previewExperimentFollowup,
   recordExperimentActionApplied,
   startExperimentBaseline,
@@ -23,6 +25,8 @@ import {
   type BaselineErrorCode,
   type BaselinePlanSummary,
   type CreateExperimentErrorCode,
+  type EvaluationErrorCode,
+  type ExperimentEvaluationDTO,
   type FollowupErrorCode,
   type FollowupPlanSummary,
 } from "@/lib/experiments.functions";
@@ -166,6 +170,52 @@ function followupErrorText(code: FollowupErrorCode): string {
   return FOLLOWUP_ERROR_MESSAGES[code] ?? "Follow-up 처리 중 오류가 발생했습니다.";
 }
 
+/** 비교 엔진 오류 코드 → 안전한 한글 문구. */
+const EVALUATION_ERROR_MESSAGES: Record<EvaluationErrorCode, string> = {
+  FORBIDDEN: "결과를 확인할 권한이 없습니다.",
+  EXPERIMENT_NOT_FOUND: "실험 정보를 찾을 수 없습니다.",
+  EVALUATION_INVALID_STATE: "현재 실험 상태에서는 결과를 비교할 수 없습니다.",
+  EVALUATION_BASELINE_NOT_FINALIZED: "Baseline 확정이 완료된 뒤에 비교할 수 있습니다.",
+  EVALUATION_FOLLOWUP_NOT_FINALIZED: "Follow-up 확정이 완료된 뒤에 비교할 수 있습니다.",
+  EVALUATION_CONDITION_MISMATCH:
+    "Baseline과 Follow-up의 측정 조건이 서로 달라 비교할 수 없습니다. 담당자 확인이 필요합니다.",
+  EVALUATION_PARSER_DRIFT:
+    "측정 해석 기준이 달라져 두 시점을 그대로 비교할 수 없습니다. 담당자 확인이 필요합니다.",
+  EVALUATION_DATA_MISMATCH: "측정 데이터가 비교 조건과 일치하지 않습니다. 담당자 확인이 필요합니다.",
+  EVALUATION_PIPELINE_PROVENANCE_MISMATCH:
+    "측정 파이프라인의 실험 조건 고정 여부를 확인할 수 없어 비교를 중단했습니다.",
+  EVALUATION_ALREADY_RECORDED: "이미 확정된 결과가 있습니다.",
+  INTERNAL_ERROR: "결과 비교 중 오류가 발생했습니다.",
+};
+
+function evaluationErrorText(code: EvaluationErrorCode): string {
+  return EVALUATION_ERROR_MESSAGES[code] ?? "결과 비교 중 오류가 발생했습니다.";
+}
+
+const EVALUATION_OUTCOME_LABELS: Record<string, string> = {
+  directional_improvement: "개선 방향성 관찰",
+  directional_decline: "악화 방향성 관찰",
+  no_clear_change: "뚜렷한 변화 없음",
+};
+
+function outcomeLabel(outcome: string): string {
+  return EVALUATION_OUTCOME_LABELS[outcome] ?? "판단 보류";
+}
+
+function pctText(rate: number | null): string {
+  return rate === null ? "-" : `${(rate * 100).toFixed(1)}%`;
+}
+
+function ppText(pp: number | null): string {
+  if (pp === null) return "-";
+  const sign = pp > 0 ? "+" : "";
+  return `${sign}${pp.toFixed(1)}%p`;
+}
+
+function signedText(v: number): string {
+  return `${v > 0 ? "+" : ""}${v}`;
+}
+
 /** datetime-local 기본값: 현재 시각(KST) */
 function nowSeoulLocalInput(): string {
   const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -186,6 +236,8 @@ type BaselineCta =
   | { kind: "apply"; label: string }
   | { kind: "followup-start"; label: string }
   | { kind: "followup-finalize"; label: string }
+  | { kind: "evaluate"; label: string }
+  | { kind: "evaluate-view"; label: string }
   | { kind: "disabled"; label: string }
   | { kind: "none" };
 
@@ -206,9 +258,12 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
       case "running":
         return { kind: "disabled", label: "Follow-up 측정 중" };
       case "completed":
-        return exp.followup_finalized
-          ? { kind: "disabled", label: "Follow-up 확정 완료" }
-          : { kind: "followup-finalize", label: "Follow-up 확정하기" };
+        if (!exp.followup_finalized) {
+          return { kind: "followup-finalize", label: "Follow-up 확정하기" };
+        }
+        return exp.evaluation_recorded
+          ? { kind: "evaluate-view", label: "결과 보기" }
+          : { kind: "evaluate", label: "결과 비교하기" };
       default:
         return { kind: "disabled", label: "Follow-up 확인 필요" };
     }
@@ -335,6 +390,10 @@ function InsightsPage() {
   const [followupTarget, setFollowupTarget] = useState<
     { experimentId: string; summary: FollowupPlanSummary } | null
   >(null);
+  const [evaluationTarget, setEvaluationTarget] = useState<{
+    action: InsightActionDTO;
+    evaluation: ExperimentEvaluationDTO;
+  } | null>(null);
   const startExperiment = useServerFn(createExperimentFromInsightAction);
   const previewBaseline = useServerFn(previewExperimentBaseline);
   const runBaseline = useServerFn(startExperimentBaseline);
@@ -343,6 +402,8 @@ function InsightsPage() {
   const previewFollowupFn = useServerFn(previewExperimentFollowup);
   const runFollowupFn = useServerFn(startExperimentFollowup);
   const confirmFollowupFn = useServerFn(finalizeExperimentFollowup);
+  const previewEvaluationFn = useServerFn(previewExperimentEvaluation);
+  const confirmEvaluationFn = useServerFn(finalizeExperimentEvaluation);
 
 
 
@@ -500,6 +561,40 @@ function InsightsPage() {
     },
   });
 
+
+  // 6단계-A: 비교 결과 미리보기 (READ ONLY, 추가 측정/비용 없음)
+  const previewEvaluation = useMutation({
+    mutationFn: (action: InsightActionDTO) =>
+      previewEvaluationFn({
+        data: { orgId: activeOrgId as string, experimentId: action.active_experiment!.id },
+      }),
+    onSuccess: (result, action) => {
+      if (result.ok) setEvaluationTarget({ action, evaluation: result.evaluation });
+      else toast.error(evaluationErrorText(result.error));
+    },
+    onError: () => toast.error("결과를 불러오지 못했습니다."),
+  });
+
+  // 6단계-B: 비교 결과 확정 (서버에서 전부 재계산, CAS)
+  const finalizeEvaluation = useMutation({
+    mutationFn: (experimentId: string) =>
+      confirmEvaluationFn({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("실험 결과가 확정되었습니다.");
+        setEvaluationTarget((prev) =>
+          prev ? { action: prev.action, evaluation: result.evaluation } : prev,
+        );
+      } else {
+        toast.error(evaluationErrorText(result.error));
+      }
+      void refetch();
+    },
+    onError: () => {
+      toast.error("결과 확정 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
 
   const run = data?.run ?? null;
   const findings = data?.findings ?? [];
@@ -685,7 +780,10 @@ function InsightsPage() {
                           (previewFollowup.isPending &&
                             previewFollowup.variables === a.active_experiment?.id) ||
                           (finalizeFollowup.isPending &&
-                            finalizeFollowup.variables === a.active_experiment?.id)
+                            finalizeFollowup.variables === a.active_experiment?.id) ||
+                          (previewEvaluation.isPending &&
+                            previewEvaluation.variables?.active_experiment?.id ===
+                              a.active_experiment?.id)
                         }
                         onCreate={() => setConfirmAction(a)}
                         onBaseline={() => {
@@ -710,6 +808,11 @@ function InsightsPage() {
                         onFollowupFinalize={() => {
                           const expId = a.active_experiment?.id;
                           if (expId && !finalizeFollowup.isPending) finalizeFollowup.mutate(expId);
+                        }}
+                        onEvaluate={() => {
+                          if (a.active_experiment && !previewEvaluation.isPending) {
+                            previewEvaluation.mutate(a);
+                          }
                         }}
                       />
 
@@ -1050,6 +1153,188 @@ function InsightsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 실험 결과 비교 v0.1 — 추가 측정/비용 없음, 방향성 비교만 표시 */}
+      <Dialog
+        open={!!evaluationTarget}
+        onOpenChange={(o) => {
+          if (!o && !finalizeEvaluation.isPending) setEvaluationTarget(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          {evaluationTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">실험 결과 비교</DialogTitle>
+                <DialogDescription>{evaluationTarget.action.title}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">
+                    {outcomeLabel(evaluationTarget.evaluation.outcome)}
+                  </Badge>
+                  <Badge variant="outline">증거 등급: 방향성</Badge>
+                  {evaluationTarget.evaluation.recorded && (
+                    <Badge variant="outline">
+                      확정됨 · {formatSeoul(evaluationTarget.evaluation.evaluatedAt)}
+                    </Badge>
+                  )}
+                </div>
+
+                <Alert>
+                  <AlertTitle>해석 주의</AlertTitle>
+                  <AlertDescription>{evaluationTarget.evaluation.caution}</AlertDescription>
+                </Alert>
+
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-muted/50 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">지표</th>
+                        <th className="px-3 py-2 font-medium">변경 전</th>
+                        <th className="px-3 py-2 font-medium">변경 후</th>
+                        <th className="px-3 py-2 font-medium">변화</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">AI 답변 포함률</td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.baseline.inclusionRate)} (
+                          {evaluationTarget.evaluation.baseline.inclusionCount}/
+                          {evaluationTarget.evaluation.baseline.validCount})
+                        </td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.followup.inclusionRate)} (
+                          {evaluationTarget.evaluation.followup.inclusionCount}/
+                          {evaluationTarget.evaluation.followup.validCount})
+                        </td>
+                        <td className="px-3 py-2">
+                          {ppText(evaluationTarget.evaluation.delta.inclusionPp)} (
+                          {signedText(evaluationTarget.evaluation.delta.inclusionCount)}건)
+                        </td>
+                      </tr>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">상위 3순위 노출률</td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.baseline.top3Rate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.followup.top3Rate)}
+                        </td>
+                        <td className="px-3 py-2">{ppText(evaluationTarget.evaluation.delta.top3Pp)}</td>
+                      </tr>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">경쟁사 대체 노출률</td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.baseline.substitutionRate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.followup.substitutionRate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {ppText(evaluationTarget.evaluation.delta.substitutionPp)}
+                        </td>
+                      </tr>
+                      <tr className="border-t">
+                        <td className="px-3 py-2">자사 도메인 인용률</td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.baseline.domainCitedRate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {pctText(evaluationTarget.evaluation.followup.domainCitedRate)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {ppText(evaluationTarget.evaluation.delta.domainCitationPp)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">질문별 변화</p>
+                  <div className="space-y-2">
+                    {evaluationTarget.evaluation.questionResults.map((q) => (
+                      <div key={q.label} className="rounded-md border px-3 py-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">{q.label}</p>
+                            <p className="truncate text-sm">{q.promptSnippet}</p>
+                          </div>
+                          <Badge
+                            variant={
+                              q.direction === "up"
+                                ? "default"
+                                : q.direction === "down"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                          >
+                            {q.direction === "up" ? "증가" : q.direction === "down" ? "감소" : "동일"}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {q.baselineInclusionCount}/{q.baselineValidCount} →{" "}
+                          {q.followupInclusionCount}/{q.followupValidCount} ({ppText(q.deltaPp)})
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                  <div>
+                    <p>변경 적용 시각</p>
+                    <p className="text-foreground">
+                      {formatSeoul(evaluationTarget.evaluation.actionAppliedAt)}
+                    </p>
+                  </div>
+                  <div>
+                    <p>측정 조건</p>
+                    <p className="text-foreground">
+                      {evaluationTarget.evaluation.quality.providerModel} / parser{" "}
+                      {evaluationTarget.evaluation.quality.parserVersion}
+                    </p>
+                  </div>
+                </div>
+
+                {evaluationTarget.evaluation.actualChangeSummary && (
+                  <div className="rounded-md bg-muted/40 px-3 py-2 text-xs">
+                    <p className="text-muted-foreground">실제 적용한 변경</p>
+                    <p className="mt-1 whitespace-pre-wrap text-foreground">
+                      {evaluationTarget.evaluation.actualChangeSummary}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setEvaluationTarget(null)}
+                  disabled={finalizeEvaluation.isPending}
+                >
+                  닫기
+                </Button>
+                {!evaluationTarget.evaluation.recorded && (
+                  <Button
+                    onClick={() =>
+                      finalizeEvaluation.mutate(evaluationTarget.evaluation.experimentId)
+                    }
+                    disabled={finalizeEvaluation.isPending}
+                  >
+                    {finalizeEvaluation.isPending ? "확정 중..." : "결과 확정하기"}
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1063,6 +1348,7 @@ function ExperimentCta({
   onApply,
   onFollowup,
   onFollowupFinalize,
+  onEvaluate,
 }: {
   action: InsightActionDTO;
   pending: boolean;
@@ -1072,6 +1358,7 @@ function ExperimentCta({
   onApply: () => void;
   onFollowup: () => void;
   onFollowupFinalize: () => void;
+  onEvaluate: () => void;
 }) {
   const cta = baselineCta(action);
 
@@ -1119,6 +1406,21 @@ function ExperimentCta({
   }
 
 
+
+  if (cta.kind === "evaluate") {
+    return (
+      <Button className="w-full" onClick={onEvaluate} disabled={pending}>
+        {pending ? "불러오는 중..." : cta.label}
+      </Button>
+    );
+  }
+  if (cta.kind === "evaluate-view") {
+    return (
+      <Button variant="secondary" className="w-full" onClick={onEvaluate} disabled={pending}>
+        {pending ? "불러오는 중..." : cta.label}
+      </Button>
+    );
+  }
 
   if (cta.kind === "disabled") {
     return (

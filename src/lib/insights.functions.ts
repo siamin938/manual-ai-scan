@@ -35,6 +35,12 @@ export type ActiveExperimentDTO = {
   followup_run_status: string | null;
   /** followup_start_at/followup_end_at 존재 여부로만 판별 */
   followup_finalized: boolean;
+  /** 비교 결과 확정 여부 (evaluated_at 존재 여부로만 판별) */
+  evaluation_recorded: boolean;
+  /** 확정된 방향성 결과 라벨 (미확정이면 null) */
+  result_classification: string | null;
+  /** 확정된 증거 등급 (미확정이면 null) */
+  evidence_grade: string | null;
 };
 
 
@@ -201,7 +207,7 @@ export const getInsightOverview = createServerFn({ method: "POST" })
       const { data: exps } = await supabaseAdmin
         .from("experiments")
         .select(
-          "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_start_at, followup_end_at, source_insight_action_id, created_at",
+          "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_start_at, followup_end_at, evaluated_at, result_classification, evidence_grade, source_insight_action_id, created_at",
         )
         .eq("org_id", data.orgId)
         .in("source_insight_action_id", actionIds)
@@ -242,6 +248,9 @@ export const getInsightOverview = createServerFn({ method: "POST" })
             ? (runStatusMap.get(e.followup_run_id) ?? null)
             : null,
           followup_finalized: !!e.followup_start_at && !!e.followup_end_at,
+          evaluation_recorded: !!e.evaluated_at,
+          result_classification: e.evaluated_at ? (e.result_classification ?? null) : null,
+          evidence_grade: e.evaluated_at ? (e.evidence_grade ?? null) : null,
         });
       }
 
