@@ -82,7 +82,7 @@ export async function recordExperimentActionAppliedImpl(args: {
   const { data: experiment, error: expErr } = await supabaseAdmin
     .from("experiments")
     .select(
-      "id, org_id, business_id, status, baseline_run_id, baseline_start_at, baseline_end_at, baseline_condition_snapshot, source_insight_action_id, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot",
+      "id, org_id, business_id, status, baseline_run_id, baseline_start_at, baseline_end_at, baseline_condition_snapshot, source_type, source_insight_action_id, source_profile_coverage_item_id, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot",
     )
     .eq("id", experimentId)
     .eq("org_id", orgId)
@@ -99,7 +99,16 @@ export async function recordExperimentActionAppliedImpl(args: {
   if (alreadyRecorded) return fail("ACTION_APPLY_ALREADY_RECORDED");
 
   if (experiment.status !== "baseline") return fail("ACTION_APPLY_INVALID_STATE");
-  if (!experiment.source_insight_action_id) return fail("ACTION_APPLY_INVALID_STATE");
+
+  const sourceType =
+    experiment.source_type === "profile_coverage_item" ? "profile_coverage_item" : "insight_action";
+  if (sourceType === "insight_action" && !experiment.source_insight_action_id) {
+    return fail("ACTION_APPLY_INVALID_STATE");
+  }
+  if (sourceType === "profile_coverage_item" && !experiment.source_profile_coverage_item_id) {
+    return fail("ACTION_APPLY_INVALID_STATE");
+  }
+
 
   const baselineRunId = experiment.baseline_run_id;
   if (!baselineRunId) return fail("ACTION_APPLY_BASELINE_NOT_FINALIZED");
