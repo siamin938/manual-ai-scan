@@ -403,14 +403,44 @@ async function computeEvaluation(args: {
     return { ok: false, error: "EVALUATION_CONDITION_MISMATCH" };
   }
   // Action Applied 감사정보 strict 검증 (자동 보정/overwrite 없음)
+  const expSourceType =
+    experiment.source_type === "profile_coverage_item" ? "profile_coverage_item" : "insight_action";
   if (
     !sameInstant(actionRecord["applied_at"] as string | null, experiment.intervention_at) ||
     !sameInstant(actionRecord["recorded_at"] as string | null, experiment.intervention_confirmed_at) ||
     actionRecord["recorded_by"] !== experiment.changed_by ||
-    actionRecord["source_insight_action_id"] !== experiment.source_insight_action_id
+    (actionRecord["source_insight_action_id"] ?? null) !==
+      (experiment.source_insight_action_id ?? null)
   ) {
     return { ok: false, error: "EVALUATION_INVALID_STATE" };
   }
+  // source_type 분기 provenance 검증 (기존 snapshot에는 source_type이 없을 수 있다)
+  const recordSourceType =
+    actionRecord["source_type"] === undefined
+      ? "insight_action"
+      : (actionRecord["source_type"] as string);
+  if (recordSourceType !== expSourceType) {
+    return { ok: false, error: "EVALUATION_INVALID_STATE" };
+  }
+  if (expSourceType === "profile_coverage_item") {
+    if (
+      !experiment.source_profile_coverage_item_id ||
+      actionRecord["source_profile_coverage_item_id"] !== experiment.source_profile_coverage_item_id
+    ) {
+      return { ok: false, error: "EVALUATION_INVALID_STATE" };
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: item, error: itemErr } = await supabaseAdmin
+      .from("profile_coverage_items")
+      .select("id, org_id, business_id")
+      .eq("id", experiment.source_profile_coverage_item_id)
+      .eq("org_id", experiment.org_id)
+      .eq("business_id", experiment.business_id)
+      .maybeSingle();
+    if (itemErr) return { ok: false, error: "INTERNAL_ERROR" };
+    if (!item) return { ok: false, error: "EVALUATION_INVALID_STATE" };
+  }
+
 
   // --- 조건 동일성 ---
   if (baselineSnapshot.condition_hash !== followupSnapshot.condition_hash) {
