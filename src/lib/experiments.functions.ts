@@ -35,6 +35,18 @@ import type {
   FinalizeExperimentEvaluationInput,
   FinalizeExperimentEvaluationResult,
 } from "./experiments.evaluation.helpers";
+import type {
+  CreateCoverageExperimentInput,
+  CreateCoverageExperimentResult,
+} from "./profile-coverage.helpers";
+
+export type {
+  CreateCoverageExperimentInput,
+  CreateCoverageExperimentResult,
+  CreateCoverageExperimentDTO,
+  CreateCoverageExperimentErrorCode,
+} from "./profile-coverage.helpers";
+
 
 export type {
   PreviewExperimentEvaluationInput,
