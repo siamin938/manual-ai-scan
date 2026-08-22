@@ -97,3 +97,35 @@ export function coverageExperimentHypothesis(args: {
   const scope = question ? `"${question}" 질문에서` : "해당 질문에서";
   return `${scope} 현재 커버리지 공백(${observed})이 관찰되었다. ${coverageActionFields(args.intent_type).join(", ")} 등 공개 프로필 정보를 보강한 뒤 동일한 질문·Provider·측정 조건으로 재측정하면 노출 지표가 개선 방향으로 변화하는지 검증한다. (인과관계 확정이 아니라 방향성 관찰을 목적으로 한다.)`;
 }
+
+/* =========================================================================
+ * Profile Coverage Experiment Bridge v0.1 — 타입
+ * ========================================================================= */
+
+export type CreateCoverageExperimentInput = {
+  orgId: string;
+  profileCoverageItemId: string;
+};
+
+export type CreateCoverageExperimentErrorCode =
+  | "FORBIDDEN"
+  | "COVERAGE_ITEM_NOT_FOUND"
+  | "COVERAGE_ITEM_SCOPE_MISMATCH"
+  | "COVERAGE_STATUS_NOT_EXPERIMENTABLE"
+  | "COVERAGE_RUN_NOT_USABLE"
+  | "COVERAGE_SOURCE_RUN_NOT_FOUND"
+  | "QUESTION_SCOPE_MISMATCH"
+  | "BUSINESS_SCOPE_MISMATCH"
+  | "EXPERIMENT_ALREADY_ACTIVE"
+  | "EXPERIMENT_CREATE_FAILED"
+  | "INTERNAL_ERROR";
+
+export type CreateCoverageExperimentDTO = {
+  experimentId: string;
+  status: string;
+  name: string;
+};
+
+export type CreateCoverageExperimentResult =
+  | { ok: true; experiment: CreateCoverageExperimentDTO }
+  | { ok: false; error: CreateCoverageExperimentErrorCode; experimentId?: string | null };
