@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { toast } from "sonner";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import {
@@ -8,12 +10,25 @@ import {
   type CoverageGapActionDTO,
   type ProfileCoverageItemDTO,
 } from "@/lib/profile-coverage.functions";
+import {
+  createExperimentFromCoverageItem,
+  type CreateCoverageExperimentErrorCode,
+} from "@/lib/experiments.functions";
+import { useExperimentFlow } from "@/components/experiment-flow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -22,6 +37,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+/** 서버 오류 코드 → 안전한 한글 문구 */
+const COVERAGE_EXPERIMENT_ERROR_MESSAGES: Partial<
+  Record<CreateCoverageExperimentErrorCode, string>
+> = {
+  FORBIDDEN: "실험을 생성할 권한이 없습니다.",
+  COVERAGE_ITEM_NOT_FOUND: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  COVERAGE_ITEM_SCOPE_MISMATCH: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  COVERAGE_STATUS_NOT_EXPERIMENTABLE: "현재 항목은 실험 대상이 아닙니다.",
+  COVERAGE_RUN_NOT_USABLE: "이 분석 결과로는 실험을 시작할 수 없습니다.",
+  COVERAGE_SOURCE_RUN_NOT_FOUND: "기준이 되는 측정 실행을 찾을 수 없습니다.",
+  QUESTION_SCOPE_MISMATCH: "질문 정보를 확인할 수 없습니다.",
+  BUSINESS_SCOPE_MISMATCH: "업체 정보를 확인할 수 없습니다.",
+  EXPERIMENT_ALREADY_ACTIVE: "이미 진행 중인 실험이 있습니다.",
+  EXPERIMENT_CREATE_FAILED: "실험 생성 중 오류가 발생했습니다.",
+  INTERNAL_ERROR: "실험 생성 중 오류가 발생했습니다.",
+};
+
 
 export const Route = createFileRoute("/_authenticated/profile-coverage")({
   head: () => ({
