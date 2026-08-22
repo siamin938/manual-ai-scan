@@ -94,6 +94,11 @@ export type StartExperimentBaselineInput = {
   experimentId: string;
 };
 
+export type PreviewExperimentBaselineInput = {
+  orgId: string;
+  experimentId: string;
+};
+
 export type FinalizeExperimentBaselineInput = {
   orgId: string;
   experimentId: string;
@@ -113,6 +118,10 @@ export type BaselineErrorCode =
   | "BASELINE_ALREADY_EXISTS"
   | "BASELINE_PREPARE_FAILED"
   | "BASELINE_ENQUEUE_NOT_READY"
+  | "BASELINE_RUN_CREATE_FAILED"
+  | "BASELINE_LINK_FAILED"
+  | "BASELINE_ENQUEUE_FAILED"
+  | "BASELINE_RUN_REQUIRES_REVIEW"
   | "BASELINE_RUN_NOT_COMPLETED"
   | "BASELINE_FINALIZE_MISMATCH"
   | "BASELINE_CONDITION_DRIFT"
@@ -132,9 +141,26 @@ export type BaselinePlanSummary = {
   maxCostUsd: number;
 };
 
-export type StartExperimentBaselineResult =
+export type PreviewExperimentBaselineResult =
   | { ok: true; summary: BaselinePlanSummary }
-  | { ok: false; error: StartExperimentBaselineErrorCode; summary?: BaselinePlanSummary };
+  | { ok: false; error: BaselineErrorCode };
+
+/** 클라이언트에 노출 가능한 canonical Baseline 상태. DB internals/snapshot 미포함. */
+export type BaselineRunStateDTO = {
+  experimentId: string;
+  baselineRunId: string;
+  experimentStatus: string;
+  runStatus: string;
+  summary: BaselinePlanSummary;
+};
+
+export type StartExperimentBaselineResult =
+  | { ok: true; baseline: BaselineRunStateDTO }
+  | {
+      ok: false;
+      error: StartExperimentBaselineErrorCode;
+      baseline?: Partial<BaselineRunStateDTO>;
+    };
 
 export type FinalizeExperimentBaselineResult =
   | {
@@ -147,6 +173,7 @@ export type FinalizeExperimentBaselineResult =
       };
     }
   | { ok: false; error: FinalizeExperimentBaselineErrorCode };
+
 
 export type SnapshotQuestion = {
   id: string;
@@ -223,9 +250,10 @@ export const BASELINE_SECONDARY_METRICS = ["top3_rate"] as const;
 
 export function baselineFail(
   error: BaselineErrorCode,
-  summary?: BaselinePlanSummary,
-): { ok: false; error: BaselineErrorCode; summary?: BaselinePlanSummary } {
-  return summary ? { ok: false, error, summary } : { ok: false, error };
+  baseline?: Partial<BaselineRunStateDTO>,
+): { ok: false; error: BaselineErrorCode; baseline?: Partial<BaselineRunStateDTO> } {
+  return baseline ? { ok: false, error, baseline } : { ok: false, error };
+
 }
 
 /**

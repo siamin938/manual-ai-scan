@@ -14,6 +14,8 @@ import {
   type CreateExperimentResult,
   type FinalizeExperimentBaselineInput,
   type FinalizeExperimentBaselineResult,
+  type PreviewExperimentBaselineInput,
+  type PreviewExperimentBaselineResult,
   type StartExperimentBaselineInput,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
@@ -25,10 +27,16 @@ export type {
   CreateExperimentErrorCode,
   StartExperimentBaselineInput,
   StartExperimentBaselineResult,
+  PreviewExperimentBaselineInput,
+  PreviewExperimentBaselineResult,
+  BaselineErrorCode,
+  BaselinePlanSummary,
+  BaselineRunStateDTO,
   FinalizeExperimentBaselineInput,
   FinalizeExperimentBaselineResult,
   ExperimentConditionSnapshotV1,
 } from "./experiments.helpers";
+
 
 
 export const createExperimentFromInsightAction = createServerFn({ method: "POST" })
@@ -193,9 +201,28 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
     };
   });
 
+/** READ ONLY. 비용 확인 Dialog용 safe summary만 반환한다. */
+export const previewExperimentBaseline = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: PreviewExperimentBaselineInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return { orgId: input.orgId, experimentId: input.experimentId };
+  })
+  .handler(async ({ data, context }): Promise<PreviewExperimentBaselineResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { previewExperimentBaselineImpl } = await import("./experiments.baseline.server");
+    return previewExperimentBaselineImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      experimentId: data.experimentId,
+    });
+  });
+
 /**
- * Baseline 준비. 현재는 검증 + snapshot plan 생성까지만 수행하고
- * 실제 enqueue/DB write 없이 BASELINE_ENQUEUE_NOT_READY로 정지한다. UI 호출 없음.
+ * Baseline 실행 준비 + enqueue. 실제 OpenAI 측정 비용이 발생할 수 있는 경로이므로
+ * UI에서 확인 Dialog의 최종 버튼에서만 호출한다.
  */
 export const startExperimentBaseline = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -214,6 +241,7 @@ export const startExperimentBaseline = createServerFn({ method: "POST" })
       experimentId: data.experimentId,
     });
   });
+
 
 /** Baseline 완료 후 실제 조건 검증 + observed 기록. Provider 호출 없음. UI 호출 없음. */
 export const finalizeExperimentBaseline = createServerFn({ method: "POST" })

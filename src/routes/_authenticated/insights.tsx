@@ -12,8 +12,13 @@ import {
 } from "@/lib/insights.functions";
 import {
   createExperimentFromInsightAction,
+  previewExperimentBaseline,
+  startExperimentBaseline,
+  type BaselineErrorCode,
+  type BaselinePlanSummary,
   type CreateExperimentErrorCode,
 } from "@/lib/experiments.functions";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,13 +80,64 @@ const EXPERIMENT_ERROR_MESSAGES: Record<CreateExperimentErrorCode, string> = {
   INTERNAL_ERROR: "실험 생성 중 오류가 발생했습니다.",
 };
 
-type ExperimentState = { experimentId: string; label: "실험 생성됨" | "실험 준비 중" };
+/** Baseline 서버 오류 코드 → 안전한 한글 문구. raw DB/Edge error는 노출하지 않는다. */
+const BASELINE_ERROR_MESSAGES: Partial<Record<BaselineErrorCode, string>> = {
+  FORBIDDEN: "Baseline 측정을 시작할 권한이 없습니다.",
+  EXPERIMENT_NOT_FOUND: "실험을 찾을 수 없습니다.",
+  INVALID_EXPERIMENT_STATE: "현재 실험 상태에서는 Baseline을 시작할 수 없습니다.",
+  PROVIDER_NOT_READY: "측정 Provider 설정이 아직 준비되지 않았습니다.",
+  QUESTION_SET_CHANGED: "질문 구성이 변경되어 Baseline 조건을 확정할 수 없습니다.",
+  NON_PUBLIC_QUESTION: "공개(public) 질문만 자동 측정할 수 있습니다.",
+  RUN_COST_CAP_EXCEEDED: "예상 비용이 최대 비용 한도를 초과합니다.",
+  BASELINE_RUN_CREATE_FAILED: "Baseline 측정 준비 중 오류가 발생했습니다.",
+  BASELINE_LINK_FAILED: "Baseline 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+  BASELINE_ENQUEUE_FAILED:
+    "Baseline 실행 준비는 저장되었지만 측정 작업 등록에 실패했습니다. 같은 Baseline으로 다시 시도할 수 있습니다.",
+  BASELINE_RUN_REQUIRES_REVIEW: "Baseline 측정 상태 확인이 필요합니다.",
+  BASELINE_CONDITION_DRIFT: "저장된 Baseline 조건과 현재 조건이 일치하지 않습니다.",
+  BASELINE_FINALIZE_MISMATCH: "Baseline 데이터 상태를 확인해주세요.",
+};
+
+function baselineErrorText(code: BaselineErrorCode): string {
+  return BASELINE_ERROR_MESSAGES[code] ?? "Baseline 처리 중 오류가 발생했습니다.";
+}
+
+type BaselineCta =
+  | { kind: "create" }
+  | { kind: "start"; label: string }
+  | { kind: "disabled"; label: string }
+  | { kind: "none" };
+
+function baselineCta(a: InsightActionDTO): BaselineCta {
+  const exp = a.active_experiment;
+  if (!exp) return canStartExperiment(a) ? { kind: "create" } : { kind: "none" };
+
+  if (exp.status === "draft" && !exp.baseline_run_id) {
+    return { kind: "start", label: "Baseline 시작하기" };
+  }
+  if (exp.status === "baseline" && exp.baseline_run_id) {
+    switch (exp.baseline_run_status) {
+      case "draft":
+        return { kind: "start", label: "Baseline 다시 시작" };
+      case "queued":
+        return { kind: "disabled", label: "Baseline 대기 중" };
+      case "running":
+        return { kind: "disabled", label: "Baseline 측정 중" };
+      case "completed":
+        return { kind: "disabled", label: "Baseline 측정 완료" };
+      default:
+        return { kind: "disabled", label: "Baseline 확인 필요" };
+    }
+  }
+  return { kind: "disabled", label: "Baseline 확인 필요" };
+}
 
 const FINDING_TYPE_LABELS: Record<string, string> = {
   visibility_gap: "노출 공백",
   competitor_substitution: "경쟁업체 대체",
   question_sensitivity: "질문 민감도",
 };
+
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
   visibility_gap_test: "노출 공백 테스트",
@@ -162,42 +218,75 @@ function InsightsPage() {
   const [openFinding, setOpenFinding] = useState<InsightFindingDTO | null>(null);
   const [openAction, setOpenAction] = useState<InsightActionDTO | null>(null);
   const [confirmAction, setConfirmAction] = useState<InsightActionDTO | null>(null);
-  const [expState, setExpState] = useState<Record<string, ExperimentState>>({});
+  const [baselineTarget, setBaselineTarget] = useState<
+    { experimentId: string; summary: BaselinePlanSummary } | null
+  >(null);
   const startExperiment = useServerFn(createExperimentFromInsightAction);
-
-  const createExperiment = useMutation({
-    // 클라이언트는 orgId와 insightActionId만 전달한다. 그 외 값은 서버가 결정한다.
-    mutationFn: (actionId: string) =>
-      startExperiment({ data: { orgId: activeOrgId as string, insightActionId: actionId } }),
-    onSuccess: (result, actionId) => {
-      if (result.ok) {
-        setExpState((prev) => ({
-          ...prev,
-          [actionId]: { experimentId: result.experiment.experimentId, label: "실험 생성됨" },
-        }));
-        toast.success("실험 초안이 생성되었습니다.");
-      } else {
-        if (result.error === "EXPERIMENT_ALREADY_ACTIVE" && result.experimentId) {
-          setExpState((prev) => ({
-            ...prev,
-            [actionId]: { experimentId: result.experimentId as string, label: "실험 준비 중" },
-          }));
-        }
-        toast.error(EXPERIMENT_ERROR_MESSAGES[result.error] ?? "실험 생성 중 오류가 발생했습니다.");
-      }
-      setConfirmAction(null);
-    },
-    onError: () => {
-      toast.error("실험 생성 중 오류가 발생했습니다.");
-      setConfirmAction(null);
-    },
-  });
+  const previewBaseline = useServerFn(previewExperimentBaseline);
+  const runBaseline = useServerFn(startExperimentBaseline);
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["insight-overview", activeOrgId],
     enabled: !!activeOrgId,
     queryFn: () => fetchOverview({ data: { orgId: activeOrgId as string } }),
   });
+
+  const createExperiment = useMutation({
+    // 클라이언트는 orgId와 insightActionId만 전달한다. 그 외 값은 서버가 결정한다.
+    mutationFn: (actionId: string) =>
+      startExperiment({ data: { orgId: activeOrgId as string, insightActionId: actionId } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("실험 초안이 생성되었습니다.");
+      } else {
+        toast.error(EXPERIMENT_ERROR_MESSAGES[result.error] ?? "실험 생성 중 오류가 발생했습니다.");
+      }
+      // 생성 성공/이미 존재 모두 server truth로 동기화
+      void refetch();
+      setConfirmAction(null);
+    },
+    onError: () => {
+      toast.error("실험 생성 중 오류가 발생했습니다.");
+      void refetch();
+      setConfirmAction(null);
+    },
+  });
+
+  // 1단계: READ ONLY preview (비용 발생 없음)
+  const preview = useMutation({
+    mutationFn: (experimentId: string) =>
+      previewBaseline({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result, experimentId) => {
+      if (result.ok) setBaselineTarget({ experimentId, summary: result.summary });
+      else toast.error(baselineErrorText(result.error));
+    },
+    onError: () => toast.error("Baseline 정보를 불러오지 못했습니다."),
+  });
+
+  // 2단계: 확인 Dialog의 최종 버튼에서만 실제 실행
+  const start = useMutation({
+    mutationFn: (experimentId: string) =>
+      runBaseline({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        setBaselineTarget(null);
+        toast.success(
+          result.baseline.runStatus === "running"
+            ? "Baseline 측정이 진행 중입니다."
+            : "Baseline 측정이 시작되었습니다.",
+        );
+      } else {
+        toast.error(baselineErrorText(result.error));
+      }
+      void refetch();
+    },
+    onError: () => {
+      toast.error("Baseline 측정 시작 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
+
+
 
   const run = data?.run ?? null;
   const findings = data?.findings ?? [];
@@ -377,10 +466,17 @@ function InsightsPage() {
                     <div className="px-6 pb-6">
                       <ExperimentCta
                         action={a}
-                        state={expState[a.id]}
-                        onStart={() => setConfirmAction(a)}
+                        pending={
+                          preview.isPending && preview.variables === a.active_experiment?.id
+                        }
+                        onCreate={() => setConfirmAction(a)}
+                        onBaseline={() => {
+                          const expId = a.active_experiment?.id;
+                          if (expId && !preview.isPending) preview.mutate(expId);
+                        }}
                       />
                     </div>
+
                   </Card>
                 ))}
               </div>
@@ -504,39 +600,109 @@ function InsightsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Baseline 실행 확인 — 여기서만 실제 측정 비용이 발생할 수 있다 */}
+      <Dialog
+        open={!!baselineTarget}
+        onOpenChange={(o) => {
+          if (!o && !start.isPending) setBaselineTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          {baselineTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">Baseline 측정을 시작할까요?</DialogTitle>
+                <DialogDescription>OpenAI Web Search API 벤치마크</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <MetaSmall label="질문 수" value={`${baselineTarget.summary.questionCount}개`} />
+                  <MetaSmall label="반복 횟수" value={`${baselineTarget.summary.repetitions}회`} />
+                  <MetaSmall label="총 측정" value={`${baselineTarget.summary.plannedJobs}회`} />
+                  <MetaSmall label="Provider" value="OpenAI" />
+                  <MetaSmall label="모델" value={baselineTarget.summary.model} />
+                  <MetaSmall
+                    label="예상 비용"
+                    value={`$${baselineTarget.summary.estimatedCostUsd.toFixed(2)}`}
+                  />
+                  <MetaSmall
+                    label="최대 비용 한도"
+                    value={`$${baselineTarget.summary.maxCostUsd.toFixed(2)}`}
+                  />
+                </dl>
+                <Alert>
+                  <AlertDescription className="leading-relaxed">
+                    아래 &apos;Baseline 측정 시작&apos;을 누르면 실제 OpenAI 측정 작업이 등록되며 API
+                    비용이 발생할 수 있습니다. 최대 비용 한도는 이 실행 기준 $
+                    {baselineTarget.summary.maxCostUsd.toFixed(2)}입니다.
+                  </AlertDescription>
+                </Alert>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setBaselineTarget(null)}
+                  disabled={start.isPending}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={() => start.mutate(baselineTarget.experimentId)}
+                  disabled={start.isPending}
+                >
+                  {start.isPending ? "시작 중..." : "Baseline 측정 시작"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function ExperimentCta({
   action,
-  state,
-  onStart,
+  pending,
+  onCreate,
+  onBaseline,
 }: {
   action: InsightActionDTO;
-  state: ExperimentState | undefined;
-  onStart: () => void;
+  pending: boolean;
+  onCreate: () => void;
+  onBaseline: () => void;
 }) {
-  if (state) {
+  const cta = baselineCta(action);
+
+  if (cta.kind === "create") {
     return (
-      <Button variant="secondary" className="w-full" disabled>
-        {state.label}
+      <Button className="w-full" onClick={onCreate}>
+        실험 시작하기
       </Button>
     );
   }
-  if (!canStartExperiment(action)) {
+  if (cta.kind === "start") {
     return (
-      <Button variant="outline" className="w-full" disabled>
-        실험 대상이 아닙니다
+      <Button className="w-full" onClick={onBaseline} disabled={pending}>
+        {pending ? "불러오는 중..." : cta.label}
+      </Button>
+    );
+  }
+  if (cta.kind === "disabled") {
+    return (
+      <Button variant="secondary" className="w-full" disabled>
+        {cta.label}
       </Button>
     );
   }
   return (
-    <Button className="w-full" onClick={onStart}>
-      실험 시작하기
+    <Button variant="outline" className="w-full" disabled>
+      실험 대상이 아닙니다
     </Button>
   );
 }
+
 
 function Meta({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
   return (

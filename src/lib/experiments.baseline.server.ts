@@ -1,6 +1,6 @@
 // 서버 전용 Baseline 준비/검증 로직.
 // 이 파일은 브라우저 번들로 나가지 않는다(*.server.ts import 차단).
-// 이번 단계에서는 enqueue-run 호출, measurement_runs INSERT, experiments UPDATE(prepare 경로)를 하지 않는다.
+// Experiment write는 service_role 서버 경로만 사용하고, enqueue는 사용자 JWT로 호출한다.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import {
@@ -16,12 +16,15 @@ import {
   computeConditionHash,
   type BaselineErrorCode,
   type BaselinePlanSummary,
+  type BaselineRunStateDTO,
   type ExperimentConditionSnapshotV1,
   type FinalizeExperimentBaselineResult,
+  type PreviewExperimentBaselineResult,
   type SnapshotBusinessRef,
   type SnapshotQuestion,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
+
 
 type UserClient = SupabaseClient<Database>;
 
@@ -308,9 +311,287 @@ export async function prepareBaselineSnapshotData(args: {
   };
 }
 
+/* =========================================================================
+ * Baseline 실제 실행 흐름 (canonical pointer + CAS + enqueue retry)
+ * ========================================================================= */
+
+type CanonicalRunRow = {
+  id: string;
+  org_id: string;
+  business_id: string;
+  experiment_id: string | null;
+  question_set_id: string;
+  run_type: string;
+  phase: string;
+  status: string;
+  selected_providers: string[];
+  repetitions: number;
+  max_cost_usd: number;
+  estimated_cost_usd: number;
+  total_jobs: number;
+  completed_jobs: number;
+  failed_jobs: number;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+const CANONICAL_RUN_COLUMNS =
+  "id, org_id, business_id, experiment_id, question_set_id, run_type, phase, status, selected_providers, repetitions, max_cost_usd, estimated_cost_usd, total_jobs, completed_jobs, failed_jobs, started_at, completed_at";
+
+/** 저장된 snapshot에서 client-safe summary만 추출 + planned 무결성 확인. */
+function summaryFromSnapshot(
+  snapshot: ExperimentConditionSnapshotV1 | null,
+): { ok: true; summary: BaselinePlanSummary } | { ok: false; error: BaselineErrorCode } {
+  if (!snapshot || snapshot.snapshot_version !== "1") {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  const planned = snapshot.planned;
+  const model = (planned?.provider_models?.["openai"] ?? "").trim();
+  if (
+    !planned ||
+    planned.selected_providers?.length !== 1 ||
+    planned.selected_providers[0] !== "openai" ||
+    !model ||
+    planned.repetitions !== BASELINE_REPETITIONS ||
+    planned.max_cost_usd !== BASELINE_MAX_COST_USD ||
+    planned.store !== false ||
+    !Number.isFinite(Number(planned.estimated_cost_usd)) ||
+    !Number.isFinite(Number(planned.planned_jobs))
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  return {
+    ok: true,
+    summary: {
+      questionCount: snapshot.questions?.length ?? 0,
+      provider: "openai",
+      model,
+      repetitions: planned.repetitions,
+      plannedJobs: planned.planned_jobs,
+      estimatedCostUsd: Number(planned.estimated_cost_usd),
+      maxCostUsd: planned.max_cost_usd,
+    },
+  };
+}
+
+/** 저장된 snapshot의 scope + condition_hash 재검증 (덮어쓰기 금지). */
+async function validateStoredSnapshot(
+  snapshot: ExperimentConditionSnapshotV1 | null,
+  experiment: { id: string; org_id: string; business_id: string },
+): Promise<{ ok: true; summary: BaselinePlanSummary } | { ok: false; error: BaselineErrorCode }> {
+  const summary = summaryFromSnapshot(snapshot);
+  if (!summary.ok) return summary;
+  const snap = snapshot as ExperimentConditionSnapshotV1;
+  if (
+    snap.experiment_id !== experiment.id ||
+    snap.org_id !== experiment.org_id ||
+    snap.business_id !== experiment.business_id
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  const recomputed = await computeConditionHash({
+    question_set_id: snap.question_set_id,
+    questions: snap.questions,
+    selected_providers: [...snap.planned.selected_providers],
+    provider_models: snap.planned.provider_models,
+    repetitions: snap.planned.repetitions,
+    search_context_size: snap.planned.search_context_size,
+    store: snap.planned.store,
+    parsing_context: snap.parsing_context,
+  });
+  if (recomputed !== snap.condition_hash) {
+    return { ok: false, error: "BASELINE_CONDITION_DRIFT" };
+  }
+  return summary;
+}
+
+type ExperimentRow = {
+  id: string;
+  org_id: string;
+  business_id: string;
+  name: string;
+  status: string;
+  baseline_run_id: string | null;
+  baseline_condition_snapshot: unknown;
+  source_insight_action_id: string | null;
+};
+
+async function loadExperimentRow(
+  orgId: string,
+  experimentId: string,
+): Promise<{ ok: true; experiment: ExperimentRow } | { ok: false; error: BaselineErrorCode }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("experiments")
+    .select(
+      "id, org_id, business_id, name, status, baseline_run_id, baseline_condition_snapshot, source_insight_action_id",
+    )
+    .eq("id", experimentId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) return { ok: false, error: "INTERNAL_ERROR" };
+  if (!data) return { ok: false, error: "EXPERIMENT_NOT_FOUND" };
+  return { ok: true, experiment: data as unknown as ExperimentRow };
+}
+
 /**
- * Baseline 준비. 이번 단계에서는 어떤 write도, enqueue-run 호출도 하지 않고
- * 검증 + plan 구성 후 BASELINE_ENQUEUE_NOT_READY로 정지한다.
+ * canonical Baseline run 상태 로더.
+ * experiments.baseline_run_id만 canonical로 신뢰한다.
+ */
+export async function loadCanonicalBaselineState(args: {
+  orgId: string;
+  experimentId: string;
+}): Promise<
+  | { ok: true; experiment: ExperimentRow; run: CanonicalRunRow; summary: BaselinePlanSummary }
+  | { ok: false; error: BaselineErrorCode }
+> {
+  const loaded = await loadExperimentRow(args.orgId, args.experimentId);
+  if (!loaded.ok) return loaded;
+  const experiment = loaded.experiment;
+  if (!experiment.baseline_run_id) return { ok: false, error: "INVALID_EXPERIMENT_STATE" };
+
+  const snapshot = experiment.baseline_condition_snapshot as ExperimentConditionSnapshotV1 | null;
+  const validated = await validateStoredSnapshot(snapshot, experiment);
+  if (!validated.ok) return validated;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: run, error: runErr } = await supabaseAdmin
+    .from("measurement_runs")
+    .select(CANONICAL_RUN_COLUMNS)
+    .eq("id", experiment.baseline_run_id)
+    .eq("org_id", args.orgId)
+    .maybeSingle();
+  if (runErr) return { ok: false, error: "INTERNAL_ERROR" };
+  if (!run) return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+
+  const r = run as unknown as CanonicalRunRow;
+  if (
+    r.org_id !== experiment.org_id ||
+    r.business_id !== experiment.business_id ||
+    r.experiment_id !== experiment.id ||
+    r.run_type !== "experiment" ||
+    r.phase !== "baseline"
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+
+  return { ok: true, experiment, run: r, summary: validated.summary };
+}
+
+/**
+ * READ ONLY preview. 비용 확인 Dialog용 safe summary만 반환한다.
+ * snapshot/parsing_context/aliases/domains/raw response는 절대 반환하지 않는다.
+ */
+export async function previewExperimentBaselineImpl(args: {
+  supabase: UserClient;
+  userId: string;
+  orgId: string;
+  experimentId: string;
+}): Promise<PreviewExperimentBaselineResult> {
+  const role = await hasStaffRole(args.supabase, args.orgId, args.userId);
+  if (!role.ok) return { ok: false, error: role.error };
+
+  const loaded = await loadExperimentRow(args.orgId, args.experimentId);
+  if (!loaded.ok) return { ok: false, error: loaded.error };
+  const experiment = loaded.experiment;
+
+  // 1) 신규 draft — 현재 live 조건으로 plan summary 계산
+  if (experiment.status === "draft" && !experiment.baseline_run_id) {
+    const prepared = await prepareBaselineSnapshotData({
+      orgId: args.orgId,
+      experimentId: args.experimentId,
+    });
+    if (!prepared.ok) return { ok: false, error: prepared.error };
+    return { ok: true, summary: prepared.plan.summary };
+  }
+
+  // 2) 기존 baseline — 저장된 snapshot의 summary만 반환 (snapshot 변경 금지)
+  if (experiment.status === "baseline" && experiment.baseline_run_id) {
+    const state = await loadCanonicalBaselineState({
+      orgId: args.orgId,
+      experimentId: args.experimentId,
+    });
+    if (!state.ok) return { ok: false, error: state.error };
+
+    // Provider safety gate가 지금 꺼져 있으면 재시도 자체를 차단한다.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ps, error: psErr } = await supabaseAdmin
+      .from("provider_settings")
+      .select("enabled, paid_account_confirmed, terms_reviewed, automated_benchmark_approved")
+      .eq("org_id", args.orgId)
+      .eq("provider", "openai")
+      .maybeSingle();
+    if (psErr) return { ok: false, error: "INTERNAL_ERROR" };
+    if (
+      !ps ||
+      !ps.enabled ||
+      !ps.paid_account_confirmed ||
+      !ps.terms_reviewed ||
+      !ps.automated_benchmark_approved
+    ) {
+      return { ok: false, error: "PROVIDER_NOT_READY" };
+    }
+
+    return { ok: true, summary: state.summary };
+  }
+
+  return { ok: false, error: "INVALID_EXPERIMENT_STATE" };
+}
+
+/** canonical run 상태별 enqueue 처리. draft만 enqueue-run을 호출한다. */
+async function enqueueIfNeeded(args: {
+  supabase: UserClient;
+  experiment: ExperimentRow;
+  run: CanonicalRunRow;
+  summary: BaselinePlanSummary;
+}): Promise<StartExperimentBaselineResult> {
+  const { experiment, run, summary } = args;
+  const base: BaselineRunStateDTO = {
+    experimentId: experiment.id,
+    baselineRunId: run.id,
+    experimentStatus: experiment.status,
+    runStatus: run.status,
+    summary,
+  };
+
+  if (run.status === "queued" || run.status === "running" || run.status === "completed") {
+    return { ok: true, baseline: base };
+  }
+
+  if (run.status !== "draft") {
+    // partial / failed / cancelled — 자동 새 Run 생성 금지
+    return baselineFail("BASELINE_RUN_REQUIRES_REVIEW", base) as StartExperimentBaselineResult;
+  }
+
+  // draft — 사용자 JWT로 enqueue-run 호출 (service_role key 미전달)
+  try {
+    const { error } = await args.supabase.functions.invoke("enqueue-run", {
+      body: { runId: run.id },
+    });
+    if (error) {
+      console.error("[baseline] enqueue failed", { runId: run.id, experimentId: experiment.id });
+      return baselineFail("BASELINE_ENQUEUE_FAILED", base) as StartExperimentBaselineResult;
+    }
+  } catch {
+    console.error("[baseline] enqueue threw", { runId: run.id, experimentId: experiment.id });
+    return baselineFail("BASELINE_ENQUEUE_FAILED", base) as StartExperimentBaselineResult;
+  }
+
+  // enqueue 성공 후 실제 상태를 다시 읽는다. baseline_start_at은 여기서 기록하지 않는다.
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: refreshed } = await supabaseAdmin
+    .from("measurement_runs")
+    .select("status")
+    .eq("id", run.id)
+    .eq("org_id", experiment.org_id)
+    .maybeSingle();
+
+  return { ok: true, baseline: { ...base, runStatus: refreshed?.status ?? run.status } };
+}
+
+/**
+ * Baseline 실행 준비 + enqueue.
+ * 브라우저 입력은 orgId + experimentId만. 나머지는 서버 상수/snapshot에서 결정한다.
  */
 export async function startExperimentBaselineImpl(args: {
   supabase: UserClient;
@@ -318,19 +599,132 @@ export async function startExperimentBaselineImpl(args: {
   orgId: string;
   experimentId: string;
 }): Promise<StartExperimentBaselineResult> {
+  // A. 권한
   const role = await hasStaffRole(args.supabase, args.orgId, args.userId);
   if (!role.ok) return baselineFail(role.error) as StartExperimentBaselineResult;
 
+  // B. 현재 Experiment 상태
+  const loaded = await loadExperimentRow(args.orgId, args.experimentId);
+  if (!loaded.ok) return baselineFail(loaded.error) as StartExperimentBaselineResult;
+  const experiment = loaded.experiment;
+
+  // 기존 canonical Baseline 재사용 경로 (새 Run 생성 금지)
+  if (experiment.status === "baseline" && experiment.baseline_run_id) {
+    const state = await loadCanonicalBaselineState({
+      orgId: args.orgId,
+      experimentId: args.experimentId,
+    });
+    if (!state.ok) return baselineFail(state.error) as StartExperimentBaselineResult;
+    return enqueueIfNeeded({
+      supabase: args.supabase,
+      experiment: state.experiment,
+      run: state.run,
+      summary: state.summary,
+    });
+  }
+
+  // 비정상 조합 포함, 신규 준비는 draft + baseline_run_id NULL만 허용
+  if (experiment.status !== "draft" || experiment.baseline_run_id) {
+    return baselineFail("INVALID_EXPERIMENT_STATE") as StartExperimentBaselineResult;
+  }
+
+  // C. 신규 Baseline plan
   const prepared = await prepareBaselineSnapshotData({
     orgId: args.orgId,
     experimentId: args.experimentId,
   });
   if (!prepared.ok) return baselineFail(prepared.error) as StartExperimentBaselineResult;
+  const { snapshot, summary } = prepared.plan;
 
-  // 실행 차단: measurement_runs INSERT / experiments UPDATE / enqueue-run 호출 없음.
-  // snapshot 전체는 클라이언트로 반환하지 않는다.
-  return { ok: false, error: "BASELINE_ENQUEUE_NOT_READY", summary: prepared.plan.summary };
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // D. measurement_runs INSERT (draft) — 값은 snapshot/서버 상수에서만
+  const { data: createdRun, error: runInsErr } = await supabaseAdmin
+    .from("measurement_runs")
+    .insert({
+      org_id: snapshot.org_id,
+      business_id: snapshot.business_id,
+      question_set_id: snapshot.question_set_id,
+      experiment_id: experiment.id,
+      name: `${experiment.name} · Baseline`,
+      run_type: "experiment",
+      phase: "baseline",
+      status: "draft",
+      selected_providers: ["openai"],
+      repetitions: BASELINE_REPETITIONS,
+      max_cost_usd: BASELINE_MAX_COST_USD,
+      estimated_cost_usd: summary.estimatedCostUsd,
+      total_jobs: 0,
+      completed_jobs: 0,
+      failed_jobs: 0,
+      created_by: args.userId,
+      scheduled_at: new Date().toISOString(),
+    })
+    .select(CANONICAL_RUN_COLUMNS)
+    .maybeSingle();
+  if (runInsErr || !createdRun) {
+    console.error("[baseline] run insert failed", { experimentId: experiment.id });
+    return baselineFail("BASELINE_RUN_CREATE_FAILED") as StartExperimentBaselineResult;
+  }
+  const newRun = createdRun as unknown as CanonicalRunRow;
+
+  // E. Experiment canonical pointer CAS
+  const { data: linked, error: linkErr } = await supabaseAdmin
+    .from("experiments")
+    .update({
+      status: "baseline",
+      baseline_run_id: newRun.id,
+      baseline_condition_snapshot: snapshot as unknown as never,
+      baseline_start_at: null,
+      baseline_end_at: null,
+      primary_metric: BASELINE_PRIMARY_METRIC,
+    })
+    .eq("id", experiment.id)
+    .eq("org_id", args.orgId)
+    .eq("status", "draft")
+    .is("baseline_run_id", null)
+    .select("id, status, baseline_run_id");
+
+  const linkedRow = !linkErr && linked && linked.length === 1 ? linked[0] : null;
+
+  if (!linkedRow) {
+    // CAS 실패 — 방금 만든 run은 canonical이 아니므로 취소 처리
+    const { error: cancelErr } = await supabaseAdmin
+      .from("measurement_runs")
+      .update({ status: "cancelled", completed_at: new Date().toISOString() })
+      .eq("id", newRun.id)
+      .eq("org_id", args.orgId)
+      .eq("status", "draft");
+    if (cancelErr) {
+      console.error("[baseline] orphan run candidate", { runId: newRun.id });
+    }
+
+    // 경쟁에서 졌다면 기존 canonical 상태를 idempotent하게 반환
+    const state = await loadCanonicalBaselineState({
+      orgId: args.orgId,
+      experimentId: args.experimentId,
+    });
+    if (state.ok) {
+      return enqueueIfNeeded({
+        supabase: args.supabase,
+        experiment: state.experiment,
+        run: state.run,
+        summary: state.summary,
+      });
+    }
+    console.error("[baseline] pointer link failed", { experimentId: experiment.id });
+    return baselineFail("BASELINE_LINK_FAILED") as StartExperimentBaselineResult;
+  }
+
+  // F. CAS 성공 후에만 enqueue
+  return enqueueIfNeeded({
+    supabase: args.supabase,
+    experiment: { ...experiment, status: "baseline", baseline_run_id: newRun.id },
+    run: newRun,
+    summary,
+  });
 }
+
 
 /** Baseline 완료 후 실제 실행 조건을 검증하고 observed만 기록한다. Provider 호출 없음. */
 export async function finalizeExperimentBaselineImpl(args: {
