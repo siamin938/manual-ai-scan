@@ -218,36 +218,74 @@ function InsightsPage() {
   const [openFinding, setOpenFinding] = useState<InsightFindingDTO | null>(null);
   const [openAction, setOpenAction] = useState<InsightActionDTO | null>(null);
   const [confirmAction, setConfirmAction] = useState<InsightActionDTO | null>(null);
-  const [expState, setExpState] = useState<Record<string, ExperimentState>>({});
+  const [baselineTarget, setBaselineTarget] = useState<
+    { experimentId: string; summary: BaselinePlanSummary } | null
+  >(null);
   const startExperiment = useServerFn(createExperimentFromInsightAction);
+  const previewBaseline = useServerFn(previewExperimentBaseline);
+  const runBaseline = useServerFn(startExperimentBaseline);
+
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ["insight-overview", activeOrgId],
+    enabled: !!activeOrgId,
+    queryFn: () => fetchOverview({ data: { orgId: activeOrgId as string } }),
+  });
 
   const createExperiment = useMutation({
     // 클라이언트는 orgId와 insightActionId만 전달한다. 그 외 값은 서버가 결정한다.
     mutationFn: (actionId: string) =>
       startExperiment({ data: { orgId: activeOrgId as string, insightActionId: actionId } }),
-    onSuccess: (result, actionId) => {
+    onSuccess: (result) => {
       if (result.ok) {
-        setExpState((prev) => ({
-          ...prev,
-          [actionId]: { experimentId: result.experiment.experimentId, label: "실험 생성됨" },
-        }));
         toast.success("실험 초안이 생성되었습니다.");
       } else {
-        if (result.error === "EXPERIMENT_ALREADY_ACTIVE" && result.experimentId) {
-          setExpState((prev) => ({
-            ...prev,
-            [actionId]: { experimentId: result.experimentId as string, label: "실험 준비 중" },
-          }));
-        }
         toast.error(EXPERIMENT_ERROR_MESSAGES[result.error] ?? "실험 생성 중 오류가 발생했습니다.");
       }
+      // 생성 성공/이미 존재 모두 server truth로 동기화
+      void refetch();
       setConfirmAction(null);
     },
     onError: () => {
       toast.error("실험 생성 중 오류가 발생했습니다.");
+      void refetch();
       setConfirmAction(null);
     },
   });
+
+  // 1단계: READ ONLY preview (비용 발생 없음)
+  const preview = useMutation({
+    mutationFn: (experimentId: string) =>
+      previewBaseline({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result, experimentId) => {
+      if (result.ok) setBaselineTarget({ experimentId, summary: result.summary });
+      else toast.error(baselineErrorText(result.error));
+    },
+    onError: () => toast.error("Baseline 정보를 불러오지 못했습니다."),
+  });
+
+  // 2단계: 확인 Dialog의 최종 버튼에서만 실제 실행
+  const start = useMutation({
+    mutationFn: (experimentId: string) =>
+      runBaseline({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        setBaselineTarget(null);
+        toast.success(
+          result.baseline.runStatus === "running"
+            ? "Baseline 측정이 진행 중입니다."
+            : "Baseline 측정이 시작되었습니다.",
+        );
+      } else {
+        toast.error(baselineErrorText(result.error));
+      }
+      void refetch();
+    },
+    onError: () => {
+      toast.error("Baseline 측정 시작 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
+
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["insight-overview", activeOrgId],
