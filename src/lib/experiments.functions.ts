@@ -52,7 +52,7 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
     const { data: action, error: actErr } = await supabaseAdmin
       .from("insight_actions")
       .select(
-        "id, org_id, business_id, engine_run_id, action_type, title, rationale, recommended_action, validation_plan, recommendation_mode, evidence_grade, priority_score, primary_finding_id, source_finding_ids, status",
+        "id, org_id, business_id, engine_run_id, action_type, title, rationale, recommended_action, recommendation_mode, primary_finding_id, status",
       )
       .eq("id", data.insightActionId)
       .eq("org_id", data.orgId)
@@ -92,14 +92,13 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
     // 5) Engine Run 무결성 (동일 org + 동일 business)
     const { data: engineRun, error: runErr } = await supabaseAdmin
       .from("insight_engine_runs")
-      .select("id, org_id, business_id")
+      .select("id")
       .eq("id", action.engine_run_id)
+      .eq("org_id", action.org_id)
+      .eq("business_id", action.business_id)
       .maybeSingle();
     if (runErr) return fail("INTERNAL_ERROR");
     if (!engineRun) return fail("ENGINE_RUN_SCOPE_MISMATCH");
-    if (engineRun.org_id !== data.orgId || engineRun.business_id !== action.business_id) {
-      return fail("ENGINE_RUN_SCOPE_MISMATCH");
-    }
 
     // 6) Primary Finding 4중 scope 검증 (우회 진행 금지)
     let metricHint: string | null = null;

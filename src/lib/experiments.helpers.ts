@@ -1,5 +1,3 @@
-import { setResponseStatus } from "@tanstack/react-start/server";
-
 export type CreateExperimentInput = {
   orgId: string;
   insightActionId: string;
@@ -77,12 +75,10 @@ export function isUuid(value: unknown): value is string {
 }
 
 /**
- * 잘못된 입력은 generic 500이 아니라 고정된 400 Bad Request.
- * (인증 미들웨어의 401 처리와 동일한 방식: setResponseStatus + statusCode 마커)
+ * 잘못된 입력은 고정 코드만 담은 일반 Error로 던진다.
+ * HTTP 400 변환은 커스텀 레이어(src/start.ts errorMiddleware)가 담당한다.
+ * generated 파일이나 HTTP API에 의존하지 않는다.
  */
-export function badRequest(code: "INVALID_ORG" | "INVALID_ACTION"): Error & { statusCode: number } {
-  setResponseStatus(400);
-  const err = new Error(code) as Error & { statusCode: number };
-  err.statusCode = 400;
-  return err;
+export function badRequest(code: "INVALID_ORG" | "INVALID_ACTION"): Error {
+  return new Error(code);
 }
