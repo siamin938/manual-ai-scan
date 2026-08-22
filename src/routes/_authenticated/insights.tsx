@@ -600,39 +600,109 @@ function InsightsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Baseline 실행 확인 — 여기서만 실제 측정 비용이 발생할 수 있다 */}
+      <Dialog
+        open={!!baselineTarget}
+        onOpenChange={(o) => {
+          if (!o && !start.isPending) setBaselineTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          {baselineTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">Baseline 측정을 시작할까요?</DialogTitle>
+                <DialogDescription>OpenAI Web Search API 벤치마크</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <MetaSmall label="질문 수" value={`${baselineTarget.summary.questionCount}개`} />
+                  <MetaSmall label="반복 횟수" value={`${baselineTarget.summary.repetitions}회`} />
+                  <MetaSmall label="총 측정" value={`${baselineTarget.summary.plannedJobs}회`} />
+                  <MetaSmall label="Provider" value="OpenAI" />
+                  <MetaSmall label="모델" value={baselineTarget.summary.model} />
+                  <MetaSmall
+                    label="예상 비용"
+                    value={`$${baselineTarget.summary.estimatedCostUsd.toFixed(2)}`}
+                  />
+                  <MetaSmall
+                    label="최대 비용 한도"
+                    value={`$${baselineTarget.summary.maxCostUsd.toFixed(2)}`}
+                  />
+                </dl>
+                <Alert>
+                  <AlertDescription className="leading-relaxed">
+                    아래 &apos;Baseline 측정 시작&apos;을 누르면 실제 OpenAI 측정 작업이 등록되며 API
+                    비용이 발생할 수 있습니다. 최대 비용 한도는 이 실행 기준 $
+                    {baselineTarget.summary.maxCostUsd.toFixed(2)}입니다.
+                  </AlertDescription>
+                </Alert>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setBaselineTarget(null)}
+                  disabled={start.isPending}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={() => start.mutate(baselineTarget.experimentId)}
+                  disabled={start.isPending}
+                >
+                  {start.isPending ? "시작 중..." : "Baseline 측정 시작"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function ExperimentCta({
   action,
-  state,
-  onStart,
+  pending,
+  onCreate,
+  onBaseline,
 }: {
   action: InsightActionDTO;
-  state: ExperimentState | undefined;
-  onStart: () => void;
+  pending: boolean;
+  onCreate: () => void;
+  onBaseline: () => void;
 }) {
-  if (state) {
+  const cta = baselineCta(action);
+
+  if (cta.kind === "create") {
     return (
-      <Button variant="secondary" className="w-full" disabled>
-        {state.label}
+      <Button className="w-full" onClick={onCreate}>
+        실험 시작하기
       </Button>
     );
   }
-  if (!canStartExperiment(action)) {
+  if (cta.kind === "start") {
     return (
-      <Button variant="outline" className="w-full" disabled>
-        실험 대상이 아닙니다
+      <Button className="w-full" onClick={onBaseline} disabled={pending}>
+        {pending ? "불러오는 중..." : cta.label}
+      </Button>
+    );
+  }
+  if (cta.kind === "disabled") {
+    return (
+      <Button variant="secondary" className="w-full" disabled>
+        {cta.label}
       </Button>
     );
   }
   return (
-    <Button className="w-full" onClick={onStart}>
-      실험 시작하기
+    <Button variant="outline" className="w-full" disabled>
+      실험 대상이 아닙니다
     </Button>
   );
 }
+
 
 function Meta({ label, value, sub }: { label: string; value: string; sub?: string | undefined }) {
   return (
