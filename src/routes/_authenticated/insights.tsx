@@ -94,9 +94,11 @@ const BASELINE_ERROR_MESSAGES: Partial<Record<BaselineErrorCode, string>> = {
   BASELINE_ENQUEUE_FAILED:
     "Baseline 실행 준비는 저장되었지만 측정 작업 등록에 실패했습니다. 같은 Baseline으로 다시 시도할 수 있습니다.",
   BASELINE_RUN_REQUIRES_REVIEW: "Baseline 측정 상태 확인이 필요합니다.",
+  BASELINE_RUN_NOT_COMPLETED: "Baseline 측정이 아직 완료되지 않았습니다.",
   BASELINE_CONDITION_DRIFT: "저장된 Baseline 조건과 현재 조건이 일치하지 않습니다.",
-  BASELINE_FINALIZE_MISMATCH: "Baseline 데이터 상태를 확인해주세요.",
+  BASELINE_FINALIZE_MISMATCH: "Baseline 데이터가 확정 조건과 일치하지 않습니다. 담당자 확인이 필요합니다.",
 };
+
 
 function baselineErrorText(code: BaselineErrorCode): string {
   return BASELINE_ERROR_MESSAGES[code] ?? "Baseline 처리 중 오류가 발생했습니다.";
