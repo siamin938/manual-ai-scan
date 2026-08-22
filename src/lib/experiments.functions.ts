@@ -21,6 +21,14 @@ import {
   type StartExperimentBaselineInput,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
+import type {
+  PreviewExperimentFollowupInput,
+  PreviewExperimentFollowupResult,
+  StartExperimentFollowupInput,
+  StartExperimentFollowupResult,
+  FinalizeExperimentFollowupInput,
+  FinalizeExperimentFollowupResult,
+} from "./experiments.helpers";
 
 export type {
   CreateExperimentInput,
@@ -41,6 +49,15 @@ export type {
   ActionAppliedResult,
   ActionAppliedDTO,
   ActionAppliedErrorCode,
+  PreviewExperimentFollowupInput,
+  PreviewExperimentFollowupResult,
+  StartExperimentFollowupInput,
+  StartExperimentFollowupResult,
+  FinalizeExperimentFollowupInput,
+  FinalizeExperimentFollowupResult,
+  FollowupErrorCode,
+  FollowupPlanSummary,
+  FollowupRunStateDTO,
 } from "./experiments.helpers";
 
 
@@ -293,5 +310,66 @@ export const recordExperimentActionApplied = createServerFn({ method: "POST" })
       supabase: context.supabase,
       userId: context.userId,
       input: data,
+    });
+  });
+
+/* =========================================================================
+ * Follow-up v0.1 — Baseline과 동일한 pinned 조건으로만 재측정한다.
+ * ========================================================================= */
+
+/** READ ONLY. 비용 확인 Dialog용 safe summary만 반환한다. */
+export const previewExperimentFollowup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: PreviewExperimentFollowupInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return { orgId: input.orgId, experimentId: input.experimentId };
+  })
+  .handler(async ({ data, context }): Promise<PreviewExperimentFollowupResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { previewExperimentFollowupImpl } = await import("./experiments.followup.server");
+    return previewExperimentFollowupImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      experimentId: data.experimentId,
+    });
+  });
+
+/** Follow-up Run 생성 + enqueue. 실제 측정 비용이 발생할 수 있다. */
+export const startExperimentFollowup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: StartExperimentFollowupInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return { orgId: input.orgId, experimentId: input.experimentId };
+  })
+  .handler(async ({ data, context }): Promise<StartExperimentFollowupResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { startExperimentFollowupImpl } = await import("./experiments.followup.server");
+    return startExperimentFollowupImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      experimentId: data.experimentId,
+    });
+  });
+
+/** Follow-up 완료 후 observed 기록. Provider 호출 없음. */
+export const finalizeExperimentFollowup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: FinalizeExperimentFollowupInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return { orgId: input.orgId, experimentId: input.experimentId };
+  })
+  .handler(async ({ data, context }): Promise<FinalizeExperimentFollowupResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { finalizeExperimentFollowupImpl } = await import("./experiments.followup.server");
+    return finalizeExperimentFollowupImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      experimentId: data.experimentId,
     });
   });

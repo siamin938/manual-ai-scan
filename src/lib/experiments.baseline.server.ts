@@ -542,7 +542,7 @@ export async function previewExperimentBaselineImpl(args: {
  * 사용자 요청의 Bearer JWT를 명시적으로 전달해 enqueue-run Edge Function을 호출한다.
  * service_role key는 절대 전달하지 않으며, 로그에 secret/raw body를 노출하지 않는다.
  */
-async function invokeEnqueueRunWithUserJwt(
+export async function invokeEnqueueRunWithUserJwt(
   runId: string,
 ): Promise<{ ok: true } | { ok: false; status: number | null; code: string | null }> {
   const [{ getRequest }, env] = await Promise.all([

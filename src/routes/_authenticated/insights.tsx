@@ -13,13 +13,18 @@ import {
 import {
   createExperimentFromInsightAction,
   finalizeExperimentBaseline,
+  finalizeExperimentFollowup,
   previewExperimentBaseline,
+  previewExperimentFollowup,
   recordExperimentActionApplied,
   startExperimentBaseline,
+  startExperimentFollowup,
   type ActionAppliedErrorCode,
   type BaselineErrorCode,
   type BaselinePlanSummary,
   type CreateExperimentErrorCode,
+  type FollowupErrorCode,
+  type FollowupPlanSummary,
 } from "@/lib/experiments.functions";
 
 
@@ -129,6 +134,32 @@ function baselineErrorText(code: BaselineErrorCode): string {
   return BASELINE_ERROR_MESSAGES[code] ?? "Baseline 처리 중 오류가 발생했습니다.";
 }
 
+/** Follow-up 서버 오류 코드 → 안전한 한글 문구. */
+const FOLLOWUP_ERROR_MESSAGES: Record<FollowupErrorCode, string> = {
+  FORBIDDEN: "Follow-up 측정을 진행할 권한이 없습니다.",
+  EXPERIMENT_NOT_FOUND: "실험을 찾을 수 없습니다.",
+  INVALID_EXPERIMENT_STATE: "현재 실험 상태에서는 Follow-up을 진행할 수 없습니다.",
+  ACTION_NOT_APPLIED: "실제 적용한 변경을 먼저 기록해야 Follow-up을 시작할 수 있습니다.",
+  BASELINE_NOT_FINALIZED: "Baseline 확정이 완료된 뒤에 Follow-up을 진행할 수 있습니다.",
+  PROVIDER_NOT_READY: "측정 Provider 설정이 아직 준비되지 않았습니다.",
+  FOLLOWUP_CONDITION_DRIFT:
+    "질문·모델·업체 정보가 Baseline 시점과 달라 동일 조건 비교를 할 수 없습니다. 조건을 원래대로 되돌린 뒤 다시 시도해주세요.",
+  FOLLOWUP_ALREADY_EXISTS: "이미 Follow-up 측정이 존재합니다.",
+  FOLLOWUP_RUN_CREATE_FAILED: "Follow-up 측정 준비 중 오류가 발생했습니다.",
+  FOLLOWUP_LINK_FAILED: "Follow-up 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+  FOLLOWUP_ENQUEUE_FAILED:
+    "Follow-up 준비는 저장되었지만 측정 작업 등록에 실패했습니다. 같은 Follow-up으로 다시 시도할 수 있습니다.",
+  FOLLOWUP_RUN_REQUIRES_REVIEW: "Follow-up 측정 상태 확인이 필요합니다.",
+  FOLLOWUP_RUN_NOT_COMPLETED: "Follow-up 측정이 아직 완료되지 않았습니다.",
+  FOLLOWUP_FINALIZE_MISMATCH:
+    "Follow-up 데이터가 확정 조건과 일치하지 않습니다. 담당자 확인이 필요합니다.",
+  INTERNAL_ERROR: "Follow-up 처리 중 오류가 발생했습니다.",
+};
+
+function followupErrorText(code: FollowupErrorCode): string {
+  return FOLLOWUP_ERROR_MESSAGES[code] ?? "Follow-up 처리 중 오류가 발생했습니다.";
+}
+
 /** datetime-local 기본값: 현재 시각(KST) */
 function nowSeoulLocalInput(): string {
   const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -147,6 +178,8 @@ type BaselineCta =
   | { kind: "start"; label: string }
   | { kind: "finalize"; label: string }
   | { kind: "apply"; label: string }
+  | { kind: "followup-start"; label: string }
+  | { kind: "followup-finalize"; label: string }
   | { kind: "disabled"; label: string }
   | { kind: "none" };
 
@@ -155,7 +188,24 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
   if (!exp) return canStartExperiment(a) ? { kind: "create" } : { kind: "none" };
 
   if (exp.status === "action_applied") {
-    return { kind: "disabled", label: "변경 적용 기록 완료" };
+    return { kind: "followup-start", label: "Follow-up 측정 시작" };
+  }
+
+  if (exp.status === "followup") {
+    switch (exp.followup_run_status) {
+      case "draft":
+        return { kind: "followup-start", label: "Follow-up 다시 시작" };
+      case "queued":
+        return { kind: "disabled", label: "Follow-up 대기 중" };
+      case "running":
+        return { kind: "disabled", label: "Follow-up 측정 중" };
+      case "completed":
+        return exp.followup_finalized
+          ? { kind: "disabled", label: "Follow-up 확정 완료" }
+          : { kind: "followup-finalize", label: "Follow-up 확정하기" };
+      default:
+        return { kind: "disabled", label: "Follow-up 확인 필요" };
+    }
   }
 
   if (exp.status === "draft" && !exp.baseline_run_id) {
@@ -276,11 +326,17 @@ function InsightsPage() {
   const [applySummary, setApplySummary] = useState("");
   const [applyNote, setApplyNote] = useState("");
   const [applyAt, setApplyAt] = useState(nowSeoulLocalInput());
+  const [followupTarget, setFollowupTarget] = useState<
+    { experimentId: string; summary: FollowupPlanSummary } | null
+  >(null);
   const startExperiment = useServerFn(createExperimentFromInsightAction);
   const previewBaseline = useServerFn(previewExperimentBaseline);
   const runBaseline = useServerFn(startExperimentBaseline);
   const confirmBaseline = useServerFn(finalizeExperimentBaseline);
   const recordActionApplied = useServerFn(recordExperimentActionApplied);
+  const previewFollowupFn = useServerFn(previewExperimentFollowup);
+  const runFollowupFn = useServerFn(startExperimentFollowup);
+  const confirmFollowupFn = useServerFn(finalizeExperimentFollowup);
 
 
 
@@ -389,8 +445,54 @@ function InsightsPage() {
     },
   });
 
+  // 5단계-A: Follow-up READ ONLY preview (비용 발생 없음)
+  const previewFollowup = useMutation({
+    mutationFn: (experimentId: string) =>
+      previewFollowupFn({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result, experimentId) => {
+      if (result.ok) setFollowupTarget({ experimentId, summary: result.summary });
+      else toast.error(followupErrorText(result.error));
+    },
+    onError: () => toast.error("Follow-up 정보를 불러오지 못했습니다."),
+  });
 
+  // 5단계-B: 확인 Dialog의 최종 버튼에서만 실제 Follow-up 측정 실행
+  const startFollowup = useMutation({
+    mutationFn: (experimentId: string) =>
+      runFollowupFn({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        setFollowupTarget(null);
+        toast.success(
+          result.followup.runStatus === "running"
+            ? "Follow-up 측정이 진행 중입니다."
+            : "Follow-up 측정이 시작되었습니다.",
+        );
+      } else {
+        toast.error(followupErrorText(result.error));
+      }
+      void refetch();
+    },
+    onError: () => {
+      toast.error("Follow-up 측정 시작 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
 
+  // 5단계-C: Follow-up 확정 (추가 측정/비용 없음)
+  const finalizeFollowup = useMutation({
+    mutationFn: (experimentId: string) =>
+      confirmFollowupFn({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) toast.success("Follow-up이 확정되었습니다.");
+      else toast.error(followupErrorText(result.error));
+      void refetch();
+    },
+    onError: () => {
+      toast.error("Follow-up 확정 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
 
 
   const run = data?.run ?? null;
@@ -573,7 +675,11 @@ function InsightsPage() {
                         action={a}
                         pending={
                           (preview.isPending && preview.variables === a.active_experiment?.id) ||
-                          (finalize.isPending && finalize.variables === a.active_experiment?.id)
+                          (finalize.isPending && finalize.variables === a.active_experiment?.id) ||
+                          (previewFollowup.isPending &&
+                            previewFollowup.variables === a.active_experiment?.id) ||
+                          (finalizeFollowup.isPending &&
+                            finalizeFollowup.variables === a.active_experiment?.id)
                         }
                         onCreate={() => setConfirmAction(a)}
                         onBaseline={() => {
@@ -590,6 +696,14 @@ function InsightsPage() {
                           setApplyNote("");
                           setApplyAt(nowSeoulLocalInput());
                           setApplyTarget(a);
+                        }}
+                        onFollowup={() => {
+                          const expId = a.active_experiment?.id;
+                          if (expId && !previewFollowup.isPending) previewFollowup.mutate(expId);
+                        }}
+                        onFollowupFinalize={() => {
+                          const expId = a.active_experiment?.id;
+                          if (expId && !finalizeFollowup.isPending) finalizeFollowup.mutate(expId);
                         }}
                       />
 
@@ -872,6 +986,64 @@ function InsightsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Follow-up 실행 확인 — 여기서만 실제 재측정 비용이 발생할 수 있다 */}
+      <Dialog
+        open={!!followupTarget}
+        onOpenChange={(o) => {
+          if (!o && !startFollowup.isPending) setFollowupTarget(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          {followupTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">Follow-up 측정을 시작할까요?</DialogTitle>
+                <DialogDescription>Baseline과 동일한 조건으로 재측정합니다.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <MetaSmall label="질문 수" value={`${followupTarget.summary.questionCount}개`} />
+                  <MetaSmall label="반복 횟수" value={`${followupTarget.summary.repetitions}회`} />
+                  <MetaSmall label="총 측정" value={`${followupTarget.summary.plannedJobs}회`} />
+                  <MetaSmall label="Provider" value="OpenAI" />
+                  <MetaSmall label="모델" value={followupTarget.summary.model} />
+                  <MetaSmall
+                    label="예상 비용"
+                    value={`$${followupTarget.summary.estimatedCostUsd.toFixed(2)}`}
+                  />
+                  <MetaSmall
+                    label="최대 비용 한도"
+                    value={`$${followupTarget.summary.maxCostUsd.toFixed(2)}`}
+                  />
+                </dl>
+                <Alert>
+                  <AlertDescription className="leading-relaxed">
+                    질문·모델·업체 정보가 Baseline 시점과 동일한 것을 확인했습니다. 아래
+                    &apos;Follow-up 측정 시작&apos;을 누르면 실제 OpenAI 측정 작업이 등록되며 API 비용이
+                    발생할 수 있습니다.
+                  </AlertDescription>
+                </Alert>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setFollowupTarget(null)}
+                  disabled={startFollowup.isPending}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={() => startFollowup.mutate(followupTarget.experimentId)}
+                  disabled={startFollowup.isPending}
+                >
+                  {startFollowup.isPending ? "시작 중..." : "Follow-up 측정 시작"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -883,6 +1055,8 @@ function ExperimentCta({
   onBaseline,
   onFinalize,
   onApply,
+  onFollowup,
+  onFollowupFinalize,
 }: {
   action: InsightActionDTO;
   pending: boolean;
@@ -890,6 +1064,8 @@ function ExperimentCta({
   onBaseline: () => void;
   onFinalize: () => void;
   onApply: () => void;
+  onFollowup: () => void;
+  onFollowupFinalize: () => void;
 }) {
   const cta = baselineCta(action);
 
@@ -916,16 +1092,26 @@ function ExperimentCta({
   }
   if (cta.kind === "apply") {
     return (
-      <div className="space-y-2">
-        <Button className="w-full" onClick={onApply} disabled={pending}>
-          {cta.label}
-        </Button>
-        <Button variant="outline" className="w-full" disabled>
-          Follow-up 준비 필요
-        </Button>
-      </div>
+      <Button className="w-full" onClick={onApply} disabled={pending}>
+        {cta.label}
+      </Button>
     );
   }
+  if (cta.kind === "followup-start") {
+    return (
+      <Button className="w-full" onClick={onFollowup} disabled={pending}>
+        {pending ? "불러오는 중..." : cta.label}
+      </Button>
+    );
+  }
+  if (cta.kind === "followup-finalize") {
+    return (
+      <Button className="w-full" onClick={onFollowupFinalize} disabled={pending}>
+        {pending ? "확정 중..." : cta.label}
+      </Button>
+    );
+  }
+
 
 
   if (cta.kind === "disabled") {

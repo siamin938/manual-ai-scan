@@ -417,3 +417,70 @@ export const ACTION_NOTE_MAX = 2000;
 /** 브라우저 clock skew 허용치 (5분) */
 export const ACTION_APPLY_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
+
+/* =========================================================================
+ * Experiment Follow-up v0.1 — 타입 / 상수
+ * Baseline과 동일한 pinned 조건으로만 재측정한다. 조건이 달라지면 실행하지 않는다.
+ * ========================================================================= */
+
+export type PreviewExperimentFollowupInput = { orgId: string; experimentId: string };
+export type StartExperimentFollowupInput = { orgId: string; experimentId: string };
+export type FinalizeExperimentFollowupInput = { orgId: string; experimentId: string };
+
+export type FollowupErrorCode =
+  | "FORBIDDEN"
+  | "EXPERIMENT_NOT_FOUND"
+  | "INVALID_EXPERIMENT_STATE"
+  | "ACTION_NOT_APPLIED"
+  | "BASELINE_NOT_FINALIZED"
+  | "PROVIDER_NOT_READY"
+  | "FOLLOWUP_CONDITION_DRIFT"
+  | "FOLLOWUP_ALREADY_EXISTS"
+  | "FOLLOWUP_RUN_CREATE_FAILED"
+  | "FOLLOWUP_LINK_FAILED"
+  | "FOLLOWUP_ENQUEUE_FAILED"
+  | "FOLLOWUP_RUN_REQUIRES_REVIEW"
+  | "FOLLOWUP_RUN_NOT_COMPLETED"
+  | "FOLLOWUP_FINALIZE_MISMATCH"
+  | "INTERNAL_ERROR";
+
+/** 클라이언트 노출 가능한 Follow-up 실행 계획 요약 (snapshot 미노출) */
+export type FollowupPlanSummary = BaselinePlanSummary;
+
+export type PreviewExperimentFollowupResult =
+  | { ok: true; summary: FollowupPlanSummary }
+  | { ok: false; error: FollowupErrorCode };
+
+export type FollowupRunStateDTO = {
+  experimentId: string;
+  followupRunId: string;
+  experimentStatus: string;
+  runStatus: string;
+  summary: FollowupPlanSummary;
+};
+
+export type StartExperimentFollowupResult =
+  | { ok: true; followup: FollowupRunStateDTO }
+  | { ok: false; error: FollowupErrorCode; followup?: Partial<FollowupRunStateDTO> };
+
+export type FinalizeExperimentFollowupResult =
+  | {
+      ok: true;
+      observed: {
+        measurementCount: number;
+        validMeasurementCount: number;
+        parserVersions: string[];
+        providerModels: string[];
+      };
+    }
+  | { ok: false; error: FollowupErrorCode };
+
+/** Follow-up snapshot은 Baseline과 동일한 v1 구조를 사용한다. */
+export type ExperimentFollowupSnapshotV1 = ExperimentConditionSnapshotV1;
+
+export function followupFail(
+  error: FollowupErrorCode,
+  followup?: Partial<FollowupRunStateDTO>,
+): { ok: false; error: FollowupErrorCode; followup?: Partial<FollowupRunStateDTO> } {
+  return followup ? { ok: false, error, followup } : { ok: false, error };
+}
