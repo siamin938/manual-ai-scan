@@ -1,57 +1,36 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  ACTIVE_STATUSES,
+  ALLOWED_ROLES,
+  EXPERIMENTABLE_ACTION_STATUSES,
+  EXPERIMENTABLE_MODES,
+  badRequest,
+  buildHypothesis,
+  buildName,
+  fail,
+  isUuid,
+  type CreateExperimentInput,
+  type CreateExperimentResult,
+} from "./experiments.helpers";
 
-export type CreateExperimentInput = {
-  orgId: string;
-  insightActionId: string;
-};
-
-export type CreateExperimentResultDTO = {
-  experimentId: string;
-  status: string;
-  name: string;
-  businessId: string;
-  sourceInsightActionId: string;
-};
-
-/** 아직 종료되지 않은(진행 중) 실험 상태 */
-const ACTIVE_STATUSES = ["draft", "baseline", "action_applied", "followup"] as const;
-
-/** Experiment 생성 권한이 있는 조직 역할 */
-const ALLOWED_ROLES = ["owner", "admin", "analyst"] as const;
-
-function clean(text: string | null | undefined): string {
-  return (text ?? "").replace(/\s+/g, " ").trim();
-}
-
-/** 결정적(재현 가능) 가설 템플릿. AI 호출 없음, 인과 확정 표현 없음. */
-export function buildHypothesis(action: {
-  recommended_action: string;
-  rationale: string;
-  title: string;
-  metric_hint?: string | null;
-}): string {
-  const act = clean(action.recommended_action) || clean(action.title);
-  const observed = clean(action.metric_hint) || clean(action.rationale) || clean(action.title);
-  return `${act}을(를) 적용한 뒤 동일한 질문·Provider·측정 조건으로 재측정하면, 현재 관찰된 "${observed}" 지표가 개선 방향으로 변화하는지 검증한다. (인과관계 확정이 아니라 방향성 관찰을 목적으로 한다.)`;
-}
-
-function buildName(title: string): string {
-  const base = clean(title) || "인사이트 기반 실험";
-  return `실험: ${base.slice(0, 120)}`;
-}
+export type {
+  CreateExperimentInput,
+  CreateExperimentResult,
+  CreateExperimentDTO,
+  CreateExperimentErrorCode,
+} from "./experiments.helpers";
 
 export const createExperimentFromInsightAction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: CreateExperimentInput) => {
-    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!input?.orgId || !uuid.test(input.orgId)) throw new Error("INVALID_ORG");
-    if (!input?.insightActionId || !uuid.test(input.insightActionId)) throw new Error("INVALID_ACTION");
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.insightActionId)) throw badRequest("INVALID_ACTION");
     return { orgId: input.orgId, insightActionId: input.insightActionId };
   })
-  .handler(async ({ data, context }): Promise<CreateExperimentResultDTO> => {
-    // 1) 인증: requireSupabaseAuth가 없으면 401. userId 없으면 UNAUTHORIZED.
-    if (!context.userId) throw new Error("UNAUTHORIZED");
+  .handler(async ({ data, context }): Promise<CreateExperimentResult> => {
+    // 1) 인증: requireSupabaseAuth가 401을 담당. 방어적 확인만 수행.
+    if (!context.userId) return fail("FORBIDDEN");
 
     // 2) 조직 역할 검증 (사용자 권한 클라이언트, RLS 적용)
     const { data: membership, error: memErr } = await context.supabase
@@ -60,9 +39,10 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
       .eq("org_id", data.orgId)
       .eq("user_id", context.userId)
       .maybeSingle();
-    if (memErr) throw new Error("FORBIDDEN");
-    if (!membership || !ALLOWED_ROLES.includes(membership.role as (typeof ALLOWED_ROLES)[number])) {
-      throw new Error("FORBIDDEN");
+    if (memErr) return fail("INTERNAL_ERROR"); // DB 실패를 FORBIDDEN으로 위장하지 않음
+    if (!membership) return fail("FORBIDDEN");
+    if (!ALLOWED_ROLES.includes(membership.role as (typeof ALLOWED_ROLES)[number])) {
+      return fail("FORBIDDEN");
     }
 
     // 검증 통과 후에만 service_role 사용 (서버 전용, 응답/로그에 노출 금지)
@@ -77,10 +57,26 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
       .eq("id", data.insightActionId)
       .eq("org_id", data.orgId)
       .maybeSingle();
-    if (actErr) throw new Error("INSIGHT_ACTION_NOT_FOUND");
-    if (!action) throw new Error("INSIGHT_ACTION_NOT_FOUND");
+    if (actErr) return fail("INTERNAL_ERROR");
+    if (!action) return fail("INSIGHT_ACTION_NOT_FOUND");
     if (action.org_id !== data.orgId || !action.business_id || !action.engine_run_id) {
-      throw new Error("ACTION_SCOPE_MISMATCH");
+      return fail("ACTION_SCOPE_MISMATCH");
+    }
+
+    // 3-1) 실험 가능한 mode / status만 허용
+    if (
+      !EXPERIMENTABLE_MODES.includes(
+        action.recommendation_mode as (typeof EXPERIMENTABLE_MODES)[number],
+      )
+    ) {
+      return fail("ACTION_MODE_NOT_EXPERIMENTABLE");
+    }
+    if (
+      !EXPERIMENTABLE_ACTION_STATUSES.includes(
+        action.status as (typeof EXPERIMENTABLE_ACTION_STATUSES)[number],
+      )
+    ) {
+      return fail("ACTION_STATUS_NOT_EXPERIMENTABLE");
     }
 
     // 4) Business 무결성 (클라이언트 값 미신뢰, Action의 business_id 사용)
@@ -90,7 +86,8 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
       .eq("id", action.business_id)
       .eq("org_id", data.orgId)
       .maybeSingle();
-    if (bizErr || !business) throw new Error("BUSINESS_SCOPE_MISMATCH");
+    if (bizErr) return fail("INTERNAL_ERROR");
+    if (!business) return fail("BUSINESS_SCOPE_MISMATCH");
 
     // 5) Engine Run 무결성 (동일 org + 동일 business)
     const { data: engineRun, error: runErr } = await supabaseAdmin
@@ -98,39 +95,40 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
       .select("id, org_id, business_id")
       .eq("id", action.engine_run_id)
       .maybeSingle();
-    if (runErr || !engineRun) throw new Error("ENGINE_RUN_SCOPE_MISMATCH");
+    if (runErr) return fail("INTERNAL_ERROR");
+    if (!engineRun) return fail("ENGINE_RUN_SCOPE_MISMATCH");
     if (engineRun.org_id !== data.orgId || engineRun.business_id !== action.business_id) {
-      throw new Error("ENGINE_RUN_SCOPE_MISMATCH");
+      return fail("ENGINE_RUN_SCOPE_MISMATCH");
     }
 
-    // 6) 중복 active Experiment 방지 (completed/cancelled는 재실험 허용)
+    // 6) Primary Finding 4중 scope 검증 (우회 진행 금지)
+    let metricHint: string | null = null;
+    if (action.primary_finding_id) {
+      const { data: finding, error: findErr } = await supabaseAdmin
+        .from("insight_findings")
+        .select("id, title, metric_name")
+        .eq("id", action.primary_finding_id)
+        .eq("org_id", action.org_id)
+        .eq("business_id", action.business_id)
+        .eq("engine_run_id", action.engine_run_id)
+        .maybeSingle();
+      if (findErr) return fail("INTERNAL_ERROR");
+      if (!finding) return fail("PRIMARY_FINDING_SCOPE_MISMATCH");
+      metricHint = finding.title ?? finding.metric_name ?? null;
+    }
+
+    // 7) 사전 active Experiment 조회 (UX 최적화). DB 실패는 "없음"으로 간주하지 않음.
     const { data: existing, error: existErr } = await supabaseAdmin
       .from("experiments")
-      .select("id, status")
-      .eq("org_id", data.orgId)
+      .select("id")
+      .eq("org_id", action.org_id)
       .eq("source_insight_action_id", action.id)
       .in("status", [...ACTIVE_STATUSES])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (existErr) throw new Error("EXPERIMENT_CREATE_FAILED");
-    if (existing) {
-      const err = new Error("EXPERIMENT_ALREADY_ACTIVE") as Error & { experimentId?: string };
-      err.experimentId = existing.id;
-      throw err;
-    }
-
-    // 7) primary finding에서 지표 힌트 확보 (가설 템플릿 입력용)
-    let metricHint: string | null = null;
-    if (action.primary_finding_id) {
-      const { data: finding } = await supabaseAdmin
-        .from("insight_findings")
-        .select("title, metric_name")
-        .eq("id", action.primary_finding_id)
-        .eq("org_id", data.orgId)
-        .maybeSingle();
-      metricHint = finding?.title ?? finding?.metric_name ?? null;
-    }
+    if (existErr) return fail("INTERNAL_ERROR");
+    if (existing) return fail("EXPERIMENT_ALREADY_ACTIVE", existing.id);
 
     // 8) INSERT — snapshot/평가 컬럼은 모두 NULL 유지
     const { data: inserted, error: insErr } = await supabaseAdmin
@@ -153,13 +151,35 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
       .select("id, status, name, business_id, source_insight_action_id")
       .maybeSingle();
 
-    if (insErr || !inserted) throw new Error("EXPERIMENT_CREATE_FAILED");
+    if (insErr) {
+      // 최종 중복 보장은 partial UNIQUE index. 오류 메시지 문자열에 의존하지 않고
+      // 23505인 경우에만 동일 조건의 active Experiment를 재조회한다.
+      if (insErr.code === "23505") {
+        const { data: raced, error: raceErr } = await supabaseAdmin
+          .from("experiments")
+          .select("id")
+          .eq("org_id", action.org_id)
+          .eq("source_insight_action_id", action.id)
+          .in("status", [...ACTIVE_STATUSES])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (raceErr) return fail("INTERNAL_ERROR");
+        if (raced) return fail("EXPERIMENT_ALREADY_ACTIVE", raced.id);
+        return fail("EXPERIMENT_CREATE_FAILED");
+      }
+      return fail("EXPERIMENT_CREATE_FAILED");
+    }
+    if (!inserted) return fail("EXPERIMENT_CREATE_FAILED");
 
     return {
-      experimentId: inserted.id,
-      status: inserted.status,
-      name: inserted.name,
-      businessId: inserted.business_id,
-      sourceInsightActionId: inserted.source_insight_action_id ?? action.id,
+      ok: true,
+      experiment: {
+        experimentId: inserted.id,
+        status: inserted.status,
+        name: inserted.name,
+        businessId: inserted.business_id,
+        sourceInsightActionId: inserted.source_insight_action_id ?? action.id,
+      },
     };
   });
