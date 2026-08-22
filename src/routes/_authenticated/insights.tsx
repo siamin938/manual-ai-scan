@@ -105,6 +105,7 @@ function baselineErrorText(code: BaselineErrorCode): string {
 type BaselineCta =
   | { kind: "create" }
   | { kind: "start"; label: string }
+  | { kind: "finalize"; label: string }
   | { kind: "disabled"; label: string }
   | { kind: "none" };
 
@@ -124,13 +125,16 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
       case "running":
         return { kind: "disabled", label: "Baseline 측정 중" };
       case "completed":
-        return { kind: "disabled", label: "Baseline 측정 완료" };
+        return exp.baseline_finalized
+          ? { kind: "disabled", label: "Baseline 확정 완료" }
+          : { kind: "finalize", label: "Baseline 확정하기" };
       default:
         return { kind: "disabled", label: "Baseline 확인 필요" };
     }
   }
   return { kind: "disabled", label: "Baseline 확인 필요" };
 }
+
 
 const FINDING_TYPE_LABELS: Record<string, string> = {
   visibility_gap: "노출 공백",
