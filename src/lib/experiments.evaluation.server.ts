@@ -496,7 +496,7 @@ async function computeEvaluation(args: {
     questionResults,
   });
 
-  const summaryRaw = actionRecord["change_summary"] ?? actionRecord["summary"];
+  const summaryRaw = actionRecord["actual_change_summary"];
   const actualChangeSummary =
     typeof summaryRaw === "string" && summaryRaw.trim() ? summaryRaw.trim().slice(0, 2000) : null;
 
