@@ -18,6 +18,22 @@ export type ProfileCoverageItemDTO = {
   repeat_stability: number | null;
 };
 
+export type CoverageGapActionDTO = {
+  question_text: string | null;
+  intent_type: string | null;
+  coverage_status: string;
+  priority_level: "high" | "medium";
+  title: string;
+  rationale: string;
+  profile_fields: string[];
+  validation_plan: string;
+  evidence_grade: string | null;
+  recommendation_mode: "test";
+  measurement_count: number;
+  mentioned_count: number;
+  mention_rate: number;
+};
+
 export type ProfileCoverageOverviewDTO = {
   run: {
     id: string;
@@ -42,6 +58,7 @@ export type ProfileCoverageOverviewDTO = {
     evidence_grade: string | null;
   } | null;
   items: ProfileCoverageItemDTO[];
+  actions: CoverageGapActionDTO[];
 };
 
 export const getProfileCoverageOverview = createServerFn({ method: "POST" })
