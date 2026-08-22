@@ -94,9 +94,15 @@ function priorityBadge(level: string) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function ActionCard({ action }: { action: CoverageGapActionDTO }) {
+function ActionCard({
+  action,
+  cta,
+}: {
+  action: CoverageGapActionDTO;
+  cta: React.ReactNode;
+}) {
   return (
-    <Card>
+    <Card className="flex flex-col">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center gap-2">
           {priorityBadge(action.priority_level)}
@@ -105,7 +111,7 @@ function ActionCard({ action }: { action: CoverageGapActionDTO }) {
         <CardTitle className="text-base">{action.title}</CardTitle>
         <p className="text-sm text-muted-foreground">{action.question_text ?? "질문 정보 없음"}</p>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="flex flex-1 flex-col space-y-3 text-sm">
         <div>
           <p className="text-xs text-muted-foreground">관찰 근거</p>
           <p className="tabular-nums">
@@ -131,10 +137,28 @@ function ActionCard({ action }: { action: CoverageGapActionDTO }) {
             {action.evidence_grade ? (GRADE_LABELS[action.evidence_grade] ?? "기타") : "-"}
           </Badge>
         </div>
+        {action.active_experiment && (
+          <p className="text-xs text-muted-foreground">
+            실험 상태: {EXPERIMENT_STATUS_LABELS[action.active_experiment.status] ?? "진행 중"}
+            {action.active_experiment.evaluation_recorded &&
+            action.active_experiment.result_classification
+              ? ` · 결과 ${action.active_experiment.result_classification}`
+              : ""}
+          </p>
+        )}
+        <div className="mt-auto pt-1">{cta}</div>
       </CardContent>
     </Card>
   );
 }
+
+const EXPERIMENT_STATUS_LABELS: Record<string, string> = {
+  draft: "초안",
+  baseline: "Baseline",
+  action_applied: "변경 적용됨",
+  followup: "Follow-up",
+};
+
 
 function MetricCard({
   title,
