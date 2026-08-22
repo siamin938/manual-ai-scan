@@ -12,12 +12,14 @@ import {
 } from "@/lib/insights.functions";
 import {
   createExperimentFromInsightAction,
+  finalizeExperimentBaseline,
   previewExperimentBaseline,
   startExperimentBaseline,
   type BaselineErrorCode,
   type BaselinePlanSummary,
   type CreateExperimentErrorCode,
 } from "@/lib/experiments.functions";
+
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,9 +96,11 @@ const BASELINE_ERROR_MESSAGES: Partial<Record<BaselineErrorCode, string>> = {
   BASELINE_ENQUEUE_FAILED:
     "Baseline 실행 준비는 저장되었지만 측정 작업 등록에 실패했습니다. 같은 Baseline으로 다시 시도할 수 있습니다.",
   BASELINE_RUN_REQUIRES_REVIEW: "Baseline 측정 상태 확인이 필요합니다.",
+  BASELINE_RUN_NOT_COMPLETED: "Baseline 측정이 아직 완료되지 않았습니다.",
   BASELINE_CONDITION_DRIFT: "저장된 Baseline 조건과 현재 조건이 일치하지 않습니다.",
-  BASELINE_FINALIZE_MISMATCH: "Baseline 데이터 상태를 확인해주세요.",
+  BASELINE_FINALIZE_MISMATCH: "Baseline 데이터가 확정 조건과 일치하지 않습니다. 담당자 확인이 필요합니다.",
 };
+
 
 function baselineErrorText(code: BaselineErrorCode): string {
   return BASELINE_ERROR_MESSAGES[code] ?? "Baseline 처리 중 오류가 발생했습니다.";
@@ -105,6 +109,7 @@ function baselineErrorText(code: BaselineErrorCode): string {
 type BaselineCta =
   | { kind: "create" }
   | { kind: "start"; label: string }
+  | { kind: "finalize"; label: string }
   | { kind: "disabled"; label: string }
   | { kind: "none" };
 
@@ -124,13 +129,16 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
       case "running":
         return { kind: "disabled", label: "Baseline 측정 중" };
       case "completed":
-        return { kind: "disabled", label: "Baseline 측정 완료" };
+        return exp.baseline_finalized
+          ? { kind: "disabled", label: "Baseline 확정 완료" }
+          : { kind: "finalize", label: "Baseline 확정하기" };
       default:
         return { kind: "disabled", label: "Baseline 확인 필요" };
     }
   }
   return { kind: "disabled", label: "Baseline 확인 필요" };
 }
+
 
 const FINDING_TYPE_LABELS: Record<string, string> = {
   visibility_gap: "노출 공백",
@@ -224,6 +232,8 @@ function InsightsPage() {
   const startExperiment = useServerFn(createExperimentFromInsightAction);
   const previewBaseline = useServerFn(previewExperimentBaseline);
   const runBaseline = useServerFn(startExperimentBaseline);
+  const confirmBaseline = useServerFn(finalizeExperimentBaseline);
+
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["insight-overview", activeOrgId],
@@ -285,6 +295,23 @@ function InsightsPage() {
       void refetch();
     },
   });
+
+  // 3단계: Baseline 확정 (추가 측정/비용 없음). 사용자의 명시적 클릭에서만 호출.
+  const finalize = useMutation({
+    mutationFn: (experimentId: string) =>
+      confirmBaseline({ data: { orgId: activeOrgId as string, experimentId } }),
+    onSuccess: (result) => {
+      if (result.ok) toast.success("Baseline이 확정되었습니다.");
+      else toast.error(baselineErrorText(result.error));
+      void refetch();
+    },
+    onError: () => {
+      toast.error("Baseline 확정 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
+
+
 
 
 
@@ -467,14 +494,20 @@ function InsightsPage() {
                       <ExperimentCta
                         action={a}
                         pending={
-                          preview.isPending && preview.variables === a.active_experiment?.id
+                          (preview.isPending && preview.variables === a.active_experiment?.id) ||
+                          (finalize.isPending && finalize.variables === a.active_experiment?.id)
                         }
                         onCreate={() => setConfirmAction(a)}
                         onBaseline={() => {
                           const expId = a.active_experiment?.id;
                           if (expId && !preview.isPending) preview.mutate(expId);
                         }}
+                        onFinalize={() => {
+                          const expId = a.active_experiment?.id;
+                          if (expId && !finalize.isPending) finalize.mutate(expId);
+                        }}
                       />
+
                     </div>
 
                   </Card>
@@ -667,11 +700,13 @@ function ExperimentCta({
   pending,
   onCreate,
   onBaseline,
+  onFinalize,
 }: {
   action: InsightActionDTO;
   pending: boolean;
   onCreate: () => void;
   onBaseline: () => void;
+  onFinalize: () => void;
 }) {
   const cta = baselineCta(action);
 
@@ -689,6 +724,14 @@ function ExperimentCta({
       </Button>
     );
   }
+  if (cta.kind === "finalize") {
+    return (
+      <Button className="w-full" onClick={onFinalize} disabled={pending}>
+        {pending ? "확정 중..." : cta.label}
+      </Button>
+    );
+  }
+
   if (cta.kind === "disabled") {
     return (
       <Button variant="secondary" className="w-full" disabled>

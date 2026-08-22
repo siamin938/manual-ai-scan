@@ -25,7 +25,11 @@ export type ActiveExperimentDTO = {
   status: string;
   baseline_run_id: string | null;
   baseline_run_status: string | null;
+  /** snapshot 미노출. baseline_start_at/baseline_end_at 존재 여부로만 판별. */
+  baseline_finalized: boolean;
+  baseline_finalized_at: string | null;
 };
+
 
 export type InsightActionDTO = {
   id: string;
@@ -188,7 +192,9 @@ export const getInsightOverview = createServerFn({ method: "POST" })
     if (actionIds.length) {
       const { data: exps } = await supabaseAdmin
         .from("experiments")
-        .select("id, status, baseline_run_id, source_insight_action_id, created_at")
+        .select(
+          "id, status, baseline_run_id, baseline_start_at, baseline_end_at, source_insight_action_id, created_at",
+        )
         .eq("org_id", data.orgId)
         .in("source_insight_action_id", actionIds)
         .in("status", ["draft", "baseline", "action_applied", "followup"])
@@ -208,6 +214,7 @@ export const getInsightOverview = createServerFn({ method: "POST" })
       for (const e of exps ?? []) {
         const key = e.source_insight_action_id;
         if (!key || expByAction.has(key)) continue; // 방어적으로 최신 1개만
+        const finalized = !!e.baseline_start_at && !!e.baseline_end_at;
         expByAction.set(key, {
           id: e.id,
           status: e.status,
@@ -215,9 +222,12 @@ export const getInsightOverview = createServerFn({ method: "POST" })
           baseline_run_status: e.baseline_run_id
             ? (runStatusMap.get(e.baseline_run_id) ?? null)
             : null,
+          baseline_finalized: finalized,
+          baseline_finalized_at: finalized ? e.baseline_end_at : null,
         });
       }
     }
+
 
     const actions: InsightActionDTO[] = rawActions.map((a) => ({
       id: a.id,

@@ -777,6 +777,23 @@ export async function startExperimentBaselineImpl(args: {
 }
 
 
+/** 소수점 비용 비교 허용 오차 (numeric 정밀도). */
+const COST_TOLERANCE_USD = 0.005;
+
+function sumCost(rows: { actual_cost_usd: number | string | null }[]): number {
+  return rows.reduce((acc, r) => acc + Number(r.actual_cost_usd ?? 0), 0);
+}
+
+type FinalizeObserved = {
+  provider_models: string[];
+  parser_versions: string[];
+  measurement_count: number;
+  valid_measurement_count: number;
+  run_started_at: string;
+  run_completed_at: string;
+  finalized_at: string;
+};
+
 /** Baseline 완료 후 실제 실행 조건을 검증하고 observed만 기록한다. Provider 호출 없음. */
 export async function finalizeExperimentBaselineImpl(args: {
   supabase: UserClient;
@@ -789,15 +806,20 @@ export async function finalizeExperimentBaselineImpl(args: {
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  const EXPERIMENT_COLUMNS =
+    "id, org_id, business_id, status, baseline_run_id, baseline_condition_snapshot, baseline_start_at, baseline_end_at";
+
   const { data: experiment, error: expErr } = await supabaseAdmin
     .from("experiments")
-    .select("id, org_id, business_id, baseline_run_id, baseline_condition_snapshot")
+    .select(EXPERIMENT_COLUMNS)
     .eq("id", args.experimentId)
     .eq("org_id", args.orgId)
     .maybeSingle();
   if (expErr) return { ok: false, error: "INTERNAL_ERROR" };
   if (!experiment) return { ok: false, error: "EXPERIMENT_NOT_FOUND" };
-  if (!experiment.baseline_run_id) return { ok: false, error: "INVALID_EXPERIMENT_STATE" };
+  if (experiment.status !== "baseline" || !experiment.baseline_run_id) {
+    return { ok: false, error: "INVALID_EXPERIMENT_STATE" };
+  }
 
   const snapshot = experiment.baseline_condition_snapshot as unknown as
     | ExperimentConditionSnapshotV1
@@ -824,7 +846,9 @@ export async function finalizeExperimentBaselineImpl(args: {
     planned.planned_jobs !== BASELINE_EXPECTED_QUESTION_COUNT * BASELINE_REPETITIONS ||
     planned.max_cost_usd !== BASELINE_MAX_COST_USD ||
     planned.store !== false ||
-    !plannedModel
+    !plannedModel ||
+    !Number.isFinite(Number(planned.estimated_cost_usd)) ||
+    (snapshot.questions?.length ?? 0) !== BASELINE_EXPECTED_QUESTION_COUNT
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
@@ -844,12 +868,14 @@ export async function finalizeExperimentBaselineImpl(args: {
     return { ok: false, error: "BASELINE_CONDITION_DRIFT" };
   }
 
+  // C) canonical run 검증
   const { data: run, error: runErr } = await supabaseAdmin
     .from("measurement_runs")
     .select(
-      "id, org_id, business_id, run_type, phase, status, experiment_id, question_set_id, started_at, completed_at",
+      "id, org_id, business_id, run_type, phase, status, experiment_id, question_set_id, selected_providers, repetitions, max_cost_usd, estimated_cost_usd, actual_cost_usd, total_jobs, completed_jobs, failed_jobs, started_at, completed_at",
     )
     .eq("id", experiment.baseline_run_id)
+    .eq("org_id", args.orgId)
     .maybeSingle();
   if (runErr) return { ok: false, error: "INTERNAL_ERROR" };
   if (!run) return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
@@ -864,18 +890,32 @@ export async function finalizeExperimentBaselineImpl(args: {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
   if (run.status !== "completed") return { ok: false, error: "BASELINE_RUN_NOT_COMPLETED" };
-  // E) 실제 측정 기간이 확정되어야 finalize 가능
   if (!run.started_at || !run.completed_at) {
-    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+    return { ok: false, error: "BASELINE_RUN_NOT_COMPLETED" };
   }
 
   const plannedJobs = planned.planned_jobs;
+  const runProviders = [...(run.selected_providers ?? [])].sort();
+  if (
+    runProviders.length !== 1 ||
+    runProviders[0] !== "openai" ||
+    Number(run.repetitions) !== planned.repetitions ||
+    Math.abs(Number(run.max_cost_usd) - planned.max_cost_usd) > COST_TOLERANCE_USD ||
+    Math.abs(Number(run.estimated_cost_usd) - Number(planned.estimated_cost_usd)) >
+      COST_TOLERANCE_USD ||
+    Number(run.total_jobs) !== plannedJobs ||
+    Number(run.completed_jobs) !== plannedJobs ||
+    Number(run.failed_jobs) !== 0
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+
   const snapshotQuestionIds = [...snapshot.questions.map((q) => q.id)].sort();
 
-  // C) measurement_jobs 검증
+  // D) measurement_jobs 검증
   const { data: jobs, error: jobErr } = await supabaseAdmin
     .from("measurement_jobs")
-    .select("id, question_id, provider, provider_model, status, repetition_no")
+    .select("id, question_id, provider, provider_model, status, repetition_no, actual_cost_usd")
     .eq("org_id", args.orgId)
     .eq("run_id", run.id);
   if (jobErr) return { ok: false, error: "INTERNAL_ERROR" };
@@ -907,19 +947,18 @@ export async function finalizeExperimentBaselineImpl(args: {
   const expectedReps = Array.from({ length: planned.repetitions }, (_, i) => i + 1);
   for (const reps of repsByQuestion.values()) {
     const sorted = [...reps].sort((a, b) => a - b);
-    if (
-      sorted.length !== expectedReps.length ||
-      sorted.some((n, i) => n !== expectedReps[i])
-    ) {
+    if (sorted.length !== expectedReps.length || sorted.some((n, i) => n !== expectedReps[i])) {
       return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
     }
   }
   const jobIdSet = new Set(jobRows.map((j) => j.id));
 
-  // D) measurements 검증
+  // E) measurements 검증 (job과 1:1)
   const { data: measurements, error: mErr } = await supabaseAdmin
     .from("measurements")
-    .select("id, job_id, question_id, provider, provider_model, valid, parser_version")
+    .select(
+      "id, job_id, question_id, provider, provider_model, valid, parser_version, actual_cost_usd",
+    )
     .eq("org_id", args.orgId)
     .eq("run_id", run.id);
   if (mErr) return { ok: false, error: "INTERNAL_ERROR" };
@@ -930,9 +969,11 @@ export async function finalizeExperimentBaselineImpl(args: {
       (m) =>
         m.provider !== "openai" ||
         (m.provider_model ?? "").trim() !== plannedModel ||
-        m.valid !== true,
+        m.valid !== true ||
+        !(m.parser_version ?? "").trim(),
     )
   ) {
+    // manual_review_required=true는 차단 사유가 아니다 (valid=true면 통과).
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
   const measurementJobIds = new Set(mRows.map((m) => m.job_id));
@@ -957,41 +998,147 @@ export async function finalizeExperimentBaselineImpl(args: {
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
-  const parserVersions = [...new Set(mRows.map((m) => m.parser_version))].sort();
-  if (parserVersions.length !== 1) return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  const parserVersions = [...new Set(mRows.map((m) => (m.parser_version ?? "").trim()))].sort();
+  if (parserVersions.length !== 1 || !parserVersions[0]) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  const providerModels = [...new Set(mRows.map((m) => (m.provider_model ?? "").trim()))].sort();
+  if (providerModels.length !== 1 || providerModels[0] !== plannedModel) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
 
+  // F) 비용 무결성 (현재 스키마의 actual_cost_usd 컬럼만 사용)
+  const jobCost = sumCost(jobRows);
+  const measurementCost = sumCost(mRows);
+  const runCost = Number(run.actual_cost_usd ?? 0);
+  if (
+    !Number.isFinite(jobCost) ||
+    !Number.isFinite(measurementCost) ||
+    !Number.isFinite(runCost) ||
+    Math.abs(jobCost - measurementCost) > COST_TOLERANCE_USD ||
+    Math.abs(runCost - jobCost) > COST_TOLERANCE_USD ||
+    runCost > planned.max_cost_usd + COST_TOLERANCE_USD
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
 
-
-  const providerModels = [...new Set(mRows.map((m) => m.provider_model))].sort();
-  const observed = {
+  const expectedObserved: Omit<FinalizeObserved, "finalized_at"> = {
     provider_models: providerModels,
     parser_versions: parserVersions,
     measurement_count: mRows.length,
     valid_measurement_count: mRows.filter((m) => m.valid).length,
     run_started_at: run.started_at,
     run_completed_at: run.completed_at,
-    finalized_at: new Date().toISOString(),
   };
 
-  // structured/planned/parsing_context/condition_hash는 그대로 유지하고 observed만 갱신
-  const { error: updErr } = await supabaseAdmin
-    .from("experiments")
-    .update({
-      baseline_condition_snapshot: { ...snapshot, observed } as unknown as never,
-      baseline_start_at: run.started_at,
-      baseline_end_at: run.completed_at,
-    })
-    .eq("id", experiment.id)
-    .eq("org_id", args.orgId);
-  if (updErr) return { ok: false, error: "INTERNAL_ERROR" };
+  const observedMatches = (candidate: ExperimentConditionSnapshotV1 | null): boolean => {
+    const o = candidate?.observed;
+    if (!o?.finalized_at) return false;
+    const models = [...(o.provider_models ?? [])].sort();
+    const parsers = [...(o.parser_versions ?? [])].sort();
+    return (
+      models.length === expectedObserved.provider_models.length &&
+      models.every((v, i) => v === expectedObserved.provider_models[i]) &&
+      parsers.length === expectedObserved.parser_versions.length &&
+      parsers.every((v, i) => v === expectedObserved.parser_versions[i]) &&
+      o.measurement_count === expectedObserved.measurement_count &&
+      o.valid_measurement_count === expectedObserved.valid_measurement_count &&
+      o.run_started_at === expectedObserved.run_started_at &&
+      o.run_completed_at === expectedObserved.run_completed_at
+    );
+  };
 
-  return {
+  const timesMatch = (row: { baseline_start_at: string | null; baseline_end_at: string | null }) =>
+    row.baseline_start_at === run.started_at && row.baseline_end_at === run.completed_at;
+
+  const success: FinalizeExperimentBaselineResult = {
     ok: true,
     observed: {
-      measurementCount: observed.measurement_count,
-      validMeasurementCount: observed.valid_measurement_count,
+      measurementCount: expectedObserved.measurement_count,
+      validMeasurementCount: expectedObserved.valid_measurement_count,
       parserVersions,
       providerModels,
     },
   };
+
+  // G) 이미 finalize된 경우 — 덮어쓰지 않고 검증 후 그대로 성공 반환 (idempotent)
+  if (snapshot.observed?.finalized_at) {
+    if (observedMatches(snapshot) && timesMatch(experiment)) return success;
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  if (experiment.baseline_start_at || experiment.baseline_end_at) {
+    // 부분 상태 — 자동 보정하지 않는다.
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+
+  // H) CAS write — observed만 채우고 나머지 snapshot 필드는 그대로 보존
+  const finalizedSnapshot: ExperimentConditionSnapshotV1 = {
+    ...snapshot,
+    observed: { ...expectedObserved, finalized_at: new Date().toISOString() },
+  };
+
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from("experiments")
+    .update({
+      baseline_condition_snapshot: finalizedSnapshot as unknown as never,
+      baseline_start_at: run.started_at,
+      baseline_end_at: run.completed_at,
+    })
+    .eq("id", experiment.id)
+    .eq("org_id", args.orgId)
+    .eq("status", "baseline")
+    .eq("baseline_run_id", run.id)
+    .is("baseline_start_at", null)
+    .is("baseline_end_at", null)
+    .select("id");
+  if (updErr) return { ok: false, error: "INTERNAL_ERROR" };
+
+  if (!updated || updated.length !== 1) {
+    // 동시 finalize 경쟁에서 졌을 수 있다 — 재조회 후 정상 상태면 성공.
+    const { data: reloaded, error: reErr } = await supabaseAdmin
+      .from("experiments")
+      .select(EXPERIMENT_COLUMNS)
+      .eq("id", experiment.id)
+      .eq("org_id", args.orgId)
+      .maybeSingle();
+    if (reErr) return { ok: false, error: "INTERNAL_ERROR" };
+    if (!reloaded) return { ok: false, error: "EXPERIMENT_NOT_FOUND" };
+    const reSnap = reloaded.baseline_condition_snapshot as unknown as
+      | ExperimentConditionSnapshotV1
+      | null;
+    if (
+      reloaded.status === "baseline" &&
+      reloaded.baseline_run_id === run.id &&
+      observedMatches(reSnap) &&
+      timesMatch(reloaded)
+    ) {
+      return success;
+    }
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+
+  // I) postcondition 재검증
+  const { data: after, error: afterErr } = await supabaseAdmin
+    .from("experiments")
+    .select(EXPERIMENT_COLUMNS)
+    .eq("id", experiment.id)
+    .eq("org_id", args.orgId)
+    .maybeSingle();
+  if (afterErr) return { ok: false, error: "INTERNAL_ERROR" };
+  const afterSnap = after?.baseline_condition_snapshot as unknown as
+    | ExperimentConditionSnapshotV1
+    | null;
+  if (
+    !after ||
+    after.status !== "baseline" ||
+    after.baseline_run_id !== run.id ||
+    !timesMatch(after) ||
+    !observedMatches(afterSnap) ||
+    afterSnap?.condition_hash !== snapshot.condition_hash
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+
+  return success;
 }
+
