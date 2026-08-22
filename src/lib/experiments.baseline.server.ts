@@ -1,6 +1,6 @@
 // 서버 전용 Baseline 준비/검증 로직.
 // 이 파일은 브라우저 번들로 나가지 않는다(*.server.ts import 차단).
-// 이번 단계에서는 enqueue-run 호출, measurement_runs INSERT, experiments UPDATE(prepare 경로)를 하지 않는다.
+// Experiment write는 service_role 서버 경로만 사용하고, enqueue는 사용자 JWT로 호출한다.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import {
@@ -16,12 +16,15 @@ import {
   computeConditionHash,
   type BaselineErrorCode,
   type BaselinePlanSummary,
+  type BaselineRunStateDTO,
   type ExperimentConditionSnapshotV1,
   type FinalizeExperimentBaselineResult,
+  type PreviewExperimentBaselineResult,
   type SnapshotBusinessRef,
   type SnapshotQuestion,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
+
 
 type UserClient = SupabaseClient<Database>;
 
