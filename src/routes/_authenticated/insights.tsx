@@ -584,7 +584,15 @@ function InsightsPage() {
                           const expId = a.active_experiment?.id;
                           if (expId && !finalize.isPending) finalize.mutate(expId);
                         }}
+                        onApply={() => {
+                          if (applyRecord.isPending) return;
+                          setApplySummary("");
+                          setApplyNote("");
+                          setApplyAt(nowSeoulLocalInput());
+                          setApplyTarget(a);
+                        }}
                       />
+
 
                     </div>
 
