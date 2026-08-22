@@ -487,6 +487,9 @@ async function computeEvaluation(args: {
   }
 
   // --- pinned pipeline provenance 재확인 ---
+  // NOTE: 여기서는 run_enqueued system_event만 재검증한다.
+  // provider_payloads 대조는 Follow-up finalize(verifyProviderPayloadsMatchSnapshot)에서
+  // 이미 수행되며, evaluation은 Follow-up finalize 이후에만 가능하므로 중복 구현하지 않는다.
   const [baseProv, followProv] = await Promise.all([
     verifyRunProvenance({
       orgId: args.orgId,
