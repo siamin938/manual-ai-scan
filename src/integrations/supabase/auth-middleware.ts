@@ -7,21 +7,19 @@ import type { Database } from './types'
 
 
 /**
- * Fixed-shape HTTP failures. A thrown Response is returned verbatim by the
- * server runtime, and the `statusCode` marker keeps the app-level
- * errorMiddleware from rewriting it into a generic 500 HTML page.
+ * Fixed-shape HTTP failures. `setResponseStatus` pins the real HTTP status and
+ * the `statusCode` marker keeps the app-level errorMiddleware from rewriting
+ * the failure into a generic 500 HTML page.
  * Body text is fixed: never token, claim, Supabase or env details.
  */
-function httpError(statusCode: number, message: string): Response {
-  const res = new Response(message, {
-    status: statusCode,
-    headers: { 'content-type': 'text/plain; charset=utf-8' },
-  });
-  (res as Response & { statusCode?: number }).statusCode = statusCode;
-  return res;
+function httpError(statusCode: number, message: string): Error & { statusCode: number } {
+  setResponseStatus(statusCode);
+  const err = new Error(message) as Error & { statusCode: number };
+  err.statusCode = statusCode;
+  return err;
 }
 
-function unauthorized(): Response {
+function unauthorized(): Error & { statusCode: number } {
   return httpError(401, 'Unauthorized');
 }
 
