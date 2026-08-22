@@ -53,7 +53,7 @@ export type InsightOverviewDTO = {
   actions: InsightActionDTO[];
 };
 
-const GRADE_ORDER = ["directional", "supported", "strong", "confirmed"];
+const GRADE_ORDER = ["insufficient", "directional", "supported", "strong"];
 
 function lowestGrade(values: string[]): string | null {
   if (values.length === 0) return null;

@@ -27,6 +27,9 @@ function isAuthFailure(error: unknown): boolean {
  */
 const BAD_REQUEST_CODES = new Set(["INVALID_ORG", "INVALID_ACTION"]);
 
+/** 정확히 이 코드만 403. 넓은 prefix 매칭은 하지 않는다. */
+const FORBIDDEN_CODE = "FORBIDDEN";
+
 function badRequestCode(error: unknown): string | null {
   if (!(error instanceof Error)) return null;
   return BAD_REQUEST_CODES.has(error.message) ? error.message : null;
@@ -46,6 +49,11 @@ const normalizeServerFnErrors = createMiddleware({ type: "function" }).server(
         console.error("[auth] request rejected:", (error as Error).message);
         setResponseStatus(401);
         throw fixedError(401, "Unauthorized");
+      }
+
+      if (error instanceof Error && error.message === FORBIDDEN_CODE) {
+        setResponseStatus(403);
+        throw fixedError(403, "FORBIDDEN");
       }
 
       const code = badRequestCode(error);
