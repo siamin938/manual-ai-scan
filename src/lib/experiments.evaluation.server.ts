@@ -135,10 +135,6 @@ function snapshotsIdentical(
   return JSON.stringify(qa) === JSON.stringify(qb);
 }
 
-type Admin = Awaited<
-  ReturnType<typeof import("@/integrations/supabase/client.server")["getAdmin"]>
->;
-
 async function admin() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin;
