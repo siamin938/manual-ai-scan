@@ -12,6 +12,10 @@ import {
   isUuid,
   type CreateExperimentInput,
   type CreateExperimentResult,
+  type FinalizeExperimentBaselineInput,
+  type FinalizeExperimentBaselineResult,
+  type StartExperimentBaselineInput,
+  type StartExperimentBaselineResult,
 } from "./experiments.helpers";
 
 export type {
@@ -19,7 +23,13 @@ export type {
   CreateExperimentResult,
   CreateExperimentDTO,
   CreateExperimentErrorCode,
+  StartExperimentBaselineInput,
+  StartExperimentBaselineResult,
+  FinalizeExperimentBaselineInput,
+  FinalizeExperimentBaselineResult,
+  ExperimentConditionSnapshotV1,
 } from "./experiments.helpers";
+
 
 export const createExperimentFromInsightAction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -181,4 +191,45 @@ export const createExperimentFromInsightAction = createServerFn({ method: "POST"
         sourceInsightActionId: inserted.source_insight_action_id ?? action.id,
       },
     };
+  });
+
+/**
+ * Baseline 준비. 현재는 검증 + snapshot plan 생성까지만 수행하고
+ * 실제 enqueue/DB write 없이 BASELINE_ENQUEUE_NOT_READY로 정지한다. UI 호출 없음.
+ */
+export const startExperimentBaseline = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: StartExperimentBaselineInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return { orgId: input.orgId, experimentId: input.experimentId };
+  })
+  .handler(async ({ data, context }): Promise<StartExperimentBaselineResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { startExperimentBaselineImpl } = await import("./experiments.baseline.server");
+    return startExperimentBaselineImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      experimentId: data.experimentId,
+    });
+  });
+
+/** Baseline 완료 후 실제 조건 검증 + observed 기록. Provider 호출 없음. UI 호출 없음. */
+export const finalizeExperimentBaseline = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: FinalizeExperimentBaselineInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return { orgId: input.orgId, experimentId: input.experimentId };
+  })
+  .handler(async ({ data, context }): Promise<FinalizeExperimentBaselineResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { finalizeExperimentBaselineImpl } = await import("./experiments.baseline.server");
+    return finalizeExperimentBaselineImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      orgId: data.orgId,
+      experimentId: data.experimentId,
+    });
   });
