@@ -1,0 +1,1 @@
+UPDATE public.organizations SET daily_request_limit = 20, monthly_budget_usd = 2.00 WHERE id = (SELECT org_id FROM public.experiments WHERE id = 'ac689395-0c73-470c-a631-5ff6a076a13d');
