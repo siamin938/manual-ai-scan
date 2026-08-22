@@ -332,6 +332,22 @@ function ProfileCoveragePage() {
             </CardContent>
           </Card>
 
+          {/* 우선 보완 영역 */}
+          {actions.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold">우선 보완 영역</h2>
+              <p className="text-sm text-muted-foreground">
+                현재 커버리지 공백을 바탕으로 만든 테스트 후보입니다. 아래 정보가 노출의 원인이라고
+                확인된 것은 아니며, 변경 후 재측정으로 검증해야 합니다.
+              </p>
+              <div className="grid gap-4 md:grid-cols-2">
+                {actions.map((action, idx) => (
+                  <ActionCard key={`${action.title}-${idx}`} action={action} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* E. 질문별 상세 */}
           <Card>
             <CardHeader className="pb-2">
