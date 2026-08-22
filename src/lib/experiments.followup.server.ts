@@ -676,7 +676,13 @@ export async function startExperimentFollowupImpl(args: {
     if (reloaded.ok && reloaded.experiment.followup_run_id) {
       const run = await loadCanonicalFollowupRun(reloaded.experiment);
       if (run.ok) {
-        return enqueueIfNeeded({ experiment: reloaded.experiment, run: run.run, summary });
+        return enqueueIfNeeded({
+          orgId: args.orgId,
+          baseline: ctx.baseline,
+          experiment: reloaded.experiment,
+          run: run.run,
+          summary,
+        });
       }
     }
     console.error("[followup] pointer link failed", { experimentId: experiment.id });
@@ -684,6 +690,8 @@ export async function startExperimentFollowupImpl(args: {
   }
 
   return enqueueIfNeeded({
+    orgId: args.orgId,
+    baseline: ctx.baseline,
     experiment: { ...experiment, status: "followup", followup_run_id: newRun.id },
     run: newRun,
     summary,
