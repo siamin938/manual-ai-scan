@@ -423,9 +423,19 @@ function ProfileCoveragePage() {
                 확인된 것은 아니며, 변경 후 재측정으로 검증해야 합니다.
               </p>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {actions.map((action, idx) => (
-                  <ActionCard key={`${action.title}-${idx}`} action={action} />
+                {actions.map((action) => (
+                  <ActionCard
+                    key={action.coverage_item_id}
+                    action={action}
+                    cta={flow.renderCta({
+                      experiment: action.active_experiment,
+                      title: action.title,
+                      recommendedAction: action.profile_fields.join(", "),
+                      onCreate: () => setCreateTarget(action),
+                    })}
+                  />
                 ))}
+
               </div>
             </section>
           )}
