@@ -957,6 +957,25 @@ export async function finalizeExperimentFollowupImpl(args: {
   }
   const jobById = new Map(jobRows.map((j) => [j.id, j]));
 
+  // Runtime provenance: enqueue-run이 snapshot mode로 작업을 생성했는지 DB evidence 확인
+  const finalizeProv = await verifyRunEnqueueProvenance({
+    orgId: args.orgId,
+    runId: run.id,
+    experimentId: experiment.id,
+    phase: "followup",
+    conditionHash: snapshot.condition_hash,
+  });
+  if (!finalizeProv.ok) return { ok: false, error: finalizeProv.error };
+
+  // 실제 Provider 요청이 pinned 조건과 동일했는지 확인 (raw response는 읽지 않음)
+  const payloadProv = await verifyProviderPayloadsMatchSnapshot({
+    orgId: args.orgId,
+    runId: run.id,
+    snapshot,
+    jobs: jobRows.map((j) => ({ id: j.id, question_id: j.question_id })),
+  });
+  if (!payloadProv.ok) return { ok: false, error: payloadProv.error };
+
   const { data: measurements, error: mErr } = await supabaseAdmin
     .from("measurements")
     .select(
