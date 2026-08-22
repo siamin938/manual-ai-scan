@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import {
@@ -9,6 +10,10 @@ import {
   type InsightActionDTO,
   type InsightFindingDTO,
 } from "@/lib/insights.functions";
+import {
+  createExperimentFromInsightAction,
+  type CreateExperimentErrorCode,
+} from "@/lib/experiments.functions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +24,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -46,6 +52,30 @@ const GRADE_LABELS: Record<string, string> = {
   strong: "강한 근거",
   confirmed: "확인됨",
 };
+
+/** 실험 시작이 가능한 Action 조건 (서버 함수와 동일 기준, UI는 사전 안내용) */
+const EXPERIMENTABLE_STATUSES = ["proposed", "accepted"];
+
+function canStartExperiment(a: InsightActionDTO): boolean {
+  return a.recommendation_mode === "test" && EXPERIMENTABLE_STATUSES.includes(a.status);
+}
+
+/** 서버 오류 코드 → 사용자 문구. 내부 구조/DB 오류는 노출하지 않는다. */
+const EXPERIMENT_ERROR_MESSAGES: Record<CreateExperimentErrorCode, string> = {
+  FORBIDDEN: "실험을 생성할 권한이 없습니다.",
+  INSIGHT_ACTION_NOT_FOUND: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  ACTION_SCOPE_MISMATCH: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  ACTION_MODE_NOT_EXPERIMENTABLE: "현재 추천은 실험 대상이 아닙니다.",
+  ACTION_STATUS_NOT_EXPERIMENTABLE: "현재 상태에서는 새 실험을 시작할 수 없습니다.",
+  BUSINESS_SCOPE_MISMATCH: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  ENGINE_RUN_SCOPE_MISMATCH: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  PRIMARY_FINDING_SCOPE_MISMATCH: "실험을 준비할 수 없습니다. 데이터 상태를 확인해주세요.",
+  EXPERIMENT_ALREADY_ACTIVE: "이미 진행 중인 실험이 있습니다.",
+  EXPERIMENT_CREATE_FAILED: "실험 생성 중 오류가 발생했습니다.",
+  INTERNAL_ERROR: "실험 생성 중 오류가 발생했습니다.",
+};
+
+type ExperimentState = { experimentId: string; label: "실험 생성됨" | "실험 준비 중" };
 
 const FINDING_TYPE_LABELS: Record<string, string> = {
   visibility_gap: "노출 공백",
@@ -131,6 +161,37 @@ function InsightsPage() {
   const fetchOverview = useServerFn(getInsightOverview);
   const [openFinding, setOpenFinding] = useState<InsightFindingDTO | null>(null);
   const [openAction, setOpenAction] = useState<InsightActionDTO | null>(null);
+  const [confirmAction, setConfirmAction] = useState<InsightActionDTO | null>(null);
+  const [expState, setExpState] = useState<Record<string, ExperimentState>>({});
+  const startExperiment = useServerFn(createExperimentFromInsightAction);
+
+  const createExperiment = useMutation({
+    // 클라이언트는 orgId와 insightActionId만 전달한다. 그 외 값은 서버가 결정한다.
+    mutationFn: (actionId: string) =>
+      startExperiment({ data: { orgId: activeOrgId as string, insightActionId: actionId } }),
+    onSuccess: (result, actionId) => {
+      if (result.ok) {
+        setExpState((prev) => ({
+          ...prev,
+          [actionId]: { experimentId: result.experiment.experimentId, label: "실험 생성됨" },
+        }));
+        toast.success("실험 초안이 생성되었습니다.");
+      } else {
+        if (result.error === "EXPERIMENT_ALREADY_ACTIVE" && result.experimentId) {
+          setExpState((prev) => ({
+            ...prev,
+            [actionId]: { experimentId: result.experimentId as string, label: "실험 준비 중" },
+          }));
+        }
+        toast.error(EXPERIMENT_ERROR_MESSAGES[result.error] ?? "실험 생성 중 오류가 발생했습니다.");
+      }
+      setConfirmAction(null);
+    },
+    onError: () => {
+      toast.error("실험 생성 중 오류가 발생했습니다.");
+      setConfirmAction(null);
+    },
+  });
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["insight-overview", activeOrgId],
@@ -393,7 +454,87 @@ function InsightsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={!!confirmAction}
+        onOpenChange={(o) => {
+          if (!o && !createExperiment.isPending) setConfirmAction(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          {confirmAction && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">실험 초안을 만들까요?</DialogTitle>
+                <DialogDescription>
+                  {ACTION_TYPE_LABELS[confirmAction.action_type] ?? confirmAction.action_type}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <Meta label="실험 제목" value={confirmAction.title} />
+                <Meta label="추천 행동" value={confirmAction.recommended_action} />
+                <Meta label="근거 수준" value={gradeLabel(confirmAction.evidence_grade)} />
+                <Meta
+                  label="우선순위"
+                  value={`${fmtNum(confirmAction.priority_score)} (${priorityLabel(confirmAction.priority_score)})`}
+                />
+                <Alert>
+                  <AlertDescription className="leading-relaxed">
+                    지금은 실험 초안만 생성됩니다. 측정 비용은 아직 발생하지 않습니다. Baseline 측정은 다음
+                    단계에서 별도로 시작합니다.
+                  </AlertDescription>
+                </Alert>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmAction(null)}
+                  disabled={createExperiment.isPending}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={() => createExperiment.mutate(confirmAction.id)}
+                  disabled={createExperiment.isPending}
+                >
+                  {createExperiment.isPending ? "생성 중..." : "실험 초안 만들기"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function ExperimentCta({
+  action,
+  state,
+  onStart,
+}: {
+  action: InsightActionDTO;
+  state: ExperimentState | undefined;
+  onStart: () => void;
+}) {
+  if (state) {
+    return (
+      <Button variant="secondary" className="w-full" disabled>
+        {state.label}
+      </Button>
+    );
+  }
+  if (!canStartExperiment(action)) {
+    return (
+      <Button variant="outline" className="w-full" disabled>
+        실험 대상이 아닙니다
+      </Button>
+    );
+  }
+  return (
+    <Button className="w-full" onClick={onStart}>
+      실험 시작하기
+    </Button>
   );
 }
 
