@@ -14,11 +14,14 @@ import {
   createExperimentFromInsightAction,
   finalizeExperimentBaseline,
   previewExperimentBaseline,
+  recordExperimentActionApplied,
   startExperimentBaseline,
+  type ActionAppliedErrorCode,
   type BaselineErrorCode,
   type BaselinePlanSummary,
   type CreateExperimentErrorCode,
 } from "@/lib/experiments.functions";
+
 
 
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +38,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
 
 export const Route = createFileRoute("/_authenticated/insights")({
   head: () => ({
@@ -102,20 +109,54 @@ const BASELINE_ERROR_MESSAGES: Partial<Record<BaselineErrorCode, string>> = {
 };
 
 
+/** Action Applied 서버 오류 코드 → 안전한 한글 문구. raw DB error 노출 금지. */
+const ACTION_APPLY_ERROR_MESSAGES: Record<ActionAppliedErrorCode, string> = {
+  FORBIDDEN: "변경 적용을 기록할 권한이 없습니다.",
+  ACTION_APPLY_INVALID_STATE: "현재 실험 상태에서는 변경 적용을 기록할 수 없습니다.",
+  ACTION_APPLY_INVALID_INPUT: "입력한 내용을 다시 확인해주세요. (변경 내용은 10자 이상 2000자 이하)",
+  ACTION_APPLY_BASELINE_NOT_FINALIZED: "Baseline 확정이 완료된 뒤에 기록할 수 있습니다.",
+  ACTION_APPLY_TIME_INVALID: "적용 시각이 올바르지 않습니다. Baseline 종료 이후이면서 미래가 아닌 시각을 입력해주세요.",
+  ACTION_APPLY_ALREADY_RECORDED: "이미 변경 적용이 기록되어 있습니다. 기록은 덮어쓸 수 없습니다.",
+  ACTION_APPLY_FAILED: "변경 적용 기록 중 오류가 발생했습니다.",
+  INTERNAL_ERROR: "변경 적용 기록 중 오류가 발생했습니다.",
+};
+
+function actionApplyErrorText(code: ActionAppliedErrorCode): string {
+  return ACTION_APPLY_ERROR_MESSAGES[code] ?? "변경 적용 기록 중 오류가 발생했습니다.";
+}
+
 function baselineErrorText(code: BaselineErrorCode): string {
   return BASELINE_ERROR_MESSAGES[code] ?? "Baseline 처리 중 오류가 발생했습니다.";
+}
+
+/** datetime-local 기본값: 현재 시각(KST) */
+function nowSeoulLocalInput(): string {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 16);
+}
+
+/** datetime-local(KST 기준 입력) → ISO(UTC) */
+function seoulLocalInputToIso(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const ms = Date.parse(`${value}:00+09:00`);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
 
 type BaselineCta =
   | { kind: "create" }
   | { kind: "start"; label: string }
   | { kind: "finalize"; label: string }
+  | { kind: "apply"; label: string }
   | { kind: "disabled"; label: string }
   | { kind: "none" };
 
 function baselineCta(a: InsightActionDTO): BaselineCta {
   const exp = a.active_experiment;
   if (!exp) return canStartExperiment(a) ? { kind: "create" } : { kind: "none" };
+
+  if (exp.status === "action_applied") {
+    return { kind: "disabled", label: "변경 적용 기록 완료" };
+  }
 
   if (exp.status === "draft" && !exp.baseline_run_id) {
     return { kind: "start", label: "Baseline 시작하기" };
@@ -129,15 +170,17 @@ function baselineCta(a: InsightActionDTO): BaselineCta {
       case "running":
         return { kind: "disabled", label: "Baseline 측정 중" };
       case "completed":
-        return exp.baseline_finalized
-          ? { kind: "disabled", label: "Baseline 확정 완료" }
-          : { kind: "finalize", label: "Baseline 확정하기" };
+        if (!exp.baseline_finalized) return { kind: "finalize", label: "Baseline 확정하기" };
+        return exp.action_applied
+          ? { kind: "disabled", label: "변경 적용 기록 완료" }
+          : { kind: "apply", label: "변경 내용 기록하기" };
       default:
         return { kind: "disabled", label: "Baseline 확인 필요" };
     }
   }
   return { kind: "disabled", label: "Baseline 확인 필요" };
 }
+
 
 
 const FINDING_TYPE_LABELS: Record<string, string> = {
@@ -229,10 +272,16 @@ function InsightsPage() {
   const [baselineTarget, setBaselineTarget] = useState<
     { experimentId: string; summary: BaselinePlanSummary } | null
   >(null);
+  const [applyTarget, setApplyTarget] = useState<InsightActionDTO | null>(null);
+  const [applySummary, setApplySummary] = useState("");
+  const [applyNote, setApplyNote] = useState("");
+  const [applyAt, setApplyAt] = useState(nowSeoulLocalInput());
   const startExperiment = useServerFn(createExperimentFromInsightAction);
   const previewBaseline = useServerFn(previewExperimentBaseline);
   const runBaseline = useServerFn(startExperimentBaseline);
   const confirmBaseline = useServerFn(finalizeExperimentBaseline);
+  const recordActionApplied = useServerFn(recordExperimentActionApplied);
+
 
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
@@ -307,6 +356,35 @@ function InsightsPage() {
     },
     onError: () => {
       toast.error("Baseline 확정 중 오류가 발생했습니다.");
+      void refetch();
+    },
+  });
+
+  // 4단계: 실제 적용한 변경 기록 (측정/비용 없음). 서버가 최종 검증한다.
+  const applyRecord = useMutation({
+    mutationFn: (vars: { experimentId: string; appliedAt: string }) =>
+      recordActionApplied({
+        data: {
+          orgId: activeOrgId as string,
+          experimentId: vars.experimentId,
+          actualChangeSummary: applySummary,
+          evidenceNote: applyNote.trim() ? applyNote : null,
+          appliedAt: vars.appliedAt,
+        },
+      }),
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("변경 적용 기록이 저장되었습니다.");
+        setApplyTarget(null);
+        setApplySummary("");
+        setApplyNote("");
+      } else {
+        toast.error(actionApplyErrorText(result.error));
+      }
+      void refetch();
+    },
+    onError: () => {
+      toast.error("변경 적용 기록 중 오류가 발생했습니다.");
       void refetch();
     },
   });
@@ -506,7 +584,15 @@ function InsightsPage() {
                           const expId = a.active_experiment?.id;
                           if (expId && !finalize.isPending) finalize.mutate(expId);
                         }}
+                        onApply={() => {
+                          if (applyRecord.isPending) return;
+                          setApplySummary("");
+                          setApplyNote("");
+                          setApplyAt(nowSeoulLocalInput());
+                          setApplyTarget(a);
+                        }}
                       />
+
 
                     </div>
 
@@ -691,6 +777,101 @@ function InsightsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 실제 적용한 변경 기록 — 추가 측정/비용 없음 */}
+      <Dialog
+        open={!!applyTarget}
+        onOpenChange={(o) => {
+          if (!o && !applyRecord.isPending) setApplyTarget(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          {applyTarget && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="leading-snug">실제 적용한 변경을 기록할까요?</DialogTitle>
+                <DialogDescription>
+                  {ACTION_TYPE_LABELS[applyTarget.action_type] ?? applyTarget.action_type}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 text-sm">
+                <Block title="추천 액션 (참고용)" body={applyTarget.recommended_action} />
+                <Alert>
+                  <AlertDescription className="leading-relaxed">
+                    추천 내용을 그대로 복사하는 것이 아니라, 실제로 적용을 완료한 변경만 기록하세요. 이 기록 이후의
+                    Follow-up 측정과 비교에 사용됩니다.
+                  </AlertDescription>
+                </Alert>
+                <div className="space-y-1.5">
+                  <Label htmlFor="apply-summary">실제로 적용한 변경 내용 (필수)</Label>
+                  <Textarea
+                    id="apply-summary"
+                    rows={5}
+                    maxLength={2000}
+                    value={applySummary}
+                    onChange={(e) => setApplySummary(e.target.value)}
+                    placeholder="예) 홈페이지 정비 서비스 페이지에 지역·차종·정비 항목을 명시하고 후기 3건을 추가했습니다."
+                  />
+                  <p className="text-xs text-muted-foreground">10자 이상 2000자 이하</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="apply-note">확인 메모 / 근거 (선택)</Label>
+                  <Textarea
+                    id="apply-note"
+                    rows={3}
+                    maxLength={2000}
+                    value={applyNote}
+                    onChange={(e) => setApplyNote(e.target.value)}
+                    placeholder="예) 변경 페이지 URL, 확인한 담당자, 배포 시각 등"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="apply-at">실제 적용 시각 (KST)</Label>
+                  <Input
+                    id="apply-at"
+                    type="datetime-local"
+                    value={applyAt}
+                    onChange={(e) => setApplyAt(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Baseline 측정 종료 이후이면서 미래가 아닌 시각이어야 합니다.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setApplyTarget(null)}
+                  disabled={applyRecord.isPending}
+                >
+                  취소
+                </Button>
+                <Button
+                  onClick={() => {
+                    const expId = applyTarget.active_experiment?.id;
+                    const iso = seoulLocalInputToIso(applyAt);
+                    if (!expId) return;
+                    if (!iso) {
+                      toast.error("적용 시각이 올바르지 않습니다.");
+                      return;
+                    }
+                    if (applySummary.trim().length < 10) {
+                      toast.error("실제로 적용한 변경 내용을 10자 이상 입력해주세요.");
+                      return;
+                    }
+                    if (!applyRecord.isPending) {
+                      applyRecord.mutate({ experimentId: expId, appliedAt: iso });
+                    }
+                  }}
+                  disabled={applyRecord.isPending}
+                >
+                  {applyRecord.isPending ? "기록 중..." : "변경 적용 기록"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -701,12 +882,14 @@ function ExperimentCta({
   onCreate,
   onBaseline,
   onFinalize,
+  onApply,
 }: {
   action: InsightActionDTO;
   pending: boolean;
   onCreate: () => void;
   onBaseline: () => void;
   onFinalize: () => void;
+  onApply: () => void;
 }) {
   const cta = baselineCta(action);
 
@@ -731,6 +914,19 @@ function ExperimentCta({
       </Button>
     );
   }
+  if (cta.kind === "apply") {
+    return (
+      <div className="space-y-2">
+        <Button className="w-full" onClick={onApply} disabled={pending}>
+          {cta.label}
+        </Button>
+        <Button variant="outline" className="w-full" disabled>
+          Follow-up 준비 필요
+        </Button>
+      </div>
+    );
+  }
+
 
   if (cta.kind === "disabled") {
     return (

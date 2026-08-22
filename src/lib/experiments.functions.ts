@@ -16,6 +16,8 @@ import {
   type FinalizeExperimentBaselineResult,
   type PreviewExperimentBaselineInput,
   type PreviewExperimentBaselineResult,
+  type RecordActionAppliedInput,
+  type ActionAppliedResult,
   type StartExperimentBaselineInput,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
@@ -35,7 +37,12 @@ export type {
   FinalizeExperimentBaselineInput,
   FinalizeExperimentBaselineResult,
   ExperimentConditionSnapshotV1,
+  RecordActionAppliedInput,
+  ActionAppliedResult,
+  ActionAppliedDTO,
+  ActionAppliedErrorCode,
 } from "./experiments.helpers";
+
 
 
 
@@ -259,5 +266,32 @@ export const finalizeExperimentBaseline = createServerFn({ method: "POST" })
       userId: context.userId,
       orgId: data.orgId,
       experimentId: data.experimentId,
+    });
+  });
+
+/**
+ * "실제로 적용 완료한 변경"을 기록한다(Follow-up 비교 기준).
+ * 추가 측정/Run 생성/enqueue/Provider 호출 없음. 사용자의 명시적 클릭에서만 호출.
+ */
+export const recordExperimentActionApplied = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: RecordActionAppliedInput) => {
+    if (!isUuid(input?.orgId)) throw badRequest("INVALID_ORG");
+    if (!isUuid(input?.experimentId)) throw badRequest("INVALID_EXPERIMENT");
+    return {
+      orgId: input.orgId,
+      experimentId: input.experimentId,
+      actualChangeSummary: typeof input.actualChangeSummary === "string" ? input.actualChangeSummary : "",
+      evidenceNote: typeof input.evidenceNote === "string" ? input.evidenceNote : null,
+      appliedAt: typeof input.appliedAt === "string" ? input.appliedAt : "",
+    };
+  })
+  .handler(async ({ data, context }): Promise<ActionAppliedResult> => {
+    if (!context.userId) return { ok: false, error: "FORBIDDEN" };
+    const { recordExperimentActionAppliedImpl } = await import("./experiments.action.server");
+    return recordExperimentActionAppliedImpl({
+      supabase: context.supabase,
+      userId: context.userId,
+      input: data,
     });
   });

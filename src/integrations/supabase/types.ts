@@ -200,6 +200,7 @@ export type Database = {
       }
       experiments: {
         Row: {
+          action_application_snapshot: Json | null
           action_type: string
           baseline_condition_snapshot: Json | null
           baseline_end_at: string | null
@@ -236,6 +237,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          action_application_snapshot?: Json | null
           action_type: string
           baseline_condition_snapshot?: Json | null
           baseline_end_at?: string | null
@@ -272,6 +274,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          action_application_snapshot?: Json | null
           action_type?: string
           baseline_condition_snapshot?: Json | null
           baseline_end_at?: string | null

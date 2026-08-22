@@ -374,3 +374,46 @@ export function assertBaselineConditionMatch(
   const result = compareConditionSnapshots(baselineHash, followupHash);
   if (!result.match) throw new Error(result.error);
 }
+
+
+/* =========================================================================
+ * Experiment Action Applied v1 — 타입 / 상수
+ * (추천 액션이 아니라 "실제로 적용 완료한 변경"의 audit record)
+ * ========================================================================= */
+
+export type RecordActionAppliedInput = {
+  orgId: string;
+  experimentId: string;
+  actualChangeSummary: string;
+  evidenceNote?: string | null;
+  /** 사용자가 입력한 실제 적용 시각 (ISO) */
+  appliedAt: string;
+};
+
+export type ActionAppliedErrorCode =
+  | "FORBIDDEN"
+  | "ACTION_APPLY_INVALID_STATE"
+  | "ACTION_APPLY_INVALID_INPUT"
+  | "ACTION_APPLY_BASELINE_NOT_FINALIZED"
+  | "ACTION_APPLY_TIME_INVALID"
+  | "ACTION_APPLY_ALREADY_RECORDED"
+  | "ACTION_APPLY_FAILED"
+  | "INTERNAL_ERROR";
+
+/** 클라이언트 노출 가능한 최소 정보. snapshot 전체는 반환하지 않는다. */
+export type ActionAppliedDTO = {
+  experimentId: string;
+  status: string;
+  actionAppliedAt: string;
+};
+
+export type ActionAppliedResult =
+  | { ok: true; experiment: ActionAppliedDTO }
+  | { ok: false; error: ActionAppliedErrorCode };
+
+export const ACTION_SUMMARY_MIN = 10;
+export const ACTION_SUMMARY_MAX = 2000;
+export const ACTION_NOTE_MAX = 2000;
+/** 브라우저 clock skew 허용치 (5분) */
+export const ACTION_APPLY_CLOCK_SKEW_MS = 5 * 60 * 1000;
+
