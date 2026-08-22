@@ -196,6 +196,31 @@ function ProfileCoveragePage() {
   const items: ProfileCoverageItemDTO[] = data?.items ?? [];
   const actions: CoverageGapActionDTO[] = data?.actions ?? [];
 
+  // Experiment 단계 실행 흐름 (비용은 Baseline/Follow-up 최종 확인 버튼에서만 발생)
+  const flow = useExperimentFlow(activeOrgId ?? null, () => void refetch());
+  const createExperimentFn = useServerFn(createExperimentFromCoverageItem);
+  const [createTarget, setCreateTarget] = useState<CoverageGapActionDTO | null>(null);
+
+  const createExperiment = useMutation({
+    // 클라이언트는 orgId와 coverage item id만 전달한다. 나머지는 서버가 계보로 결정한다.
+    mutationFn: (coverageItemId: string) =>
+      createExperimentFn({
+        data: { orgId: activeOrgId as string, profileCoverageItemId: coverageItemId },
+      }),
+    onSuccess: (result) => {
+      if (result.ok) toast.success("실험 초안이 생성되었습니다.");
+      else toast.error(COVERAGE_EXPERIMENT_ERROR_MESSAGES[result.error] ?? "실험 생성 중 오류가 발생했습니다.");
+      setCreateTarget(null);
+      void refetch();
+    },
+    onError: () => {
+      toast.error("실험 생성 중 오류가 발생했습니다.");
+      setCreateTarget(null);
+      void refetch();
+    },
+  });
+
+
   return (
     <div className="space-y-6">
       <header className="space-y-1">
