@@ -16,6 +16,7 @@ import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authentic
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
+import { Route as AuthenticatedProfileCoverageRouteImport } from './routes/_authenticated/profile-coverage'
 import { Route as AuthenticatedQuestionsRouteImport } from './routes/_authenticated/questions'
 import { Route as AuthenticatedReportsManualRouteImport } from './routes/_authenticated/reports.manual'
 import { Route as AuthenticatedRunsIndexRouteImport } from './routes/_authenticated/runs.index'
@@ -56,6 +57,12 @@ const AuthenticatedManualChecksRoute =
     path: '/manual-checks',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedProfileCoverageRoute =
+  AuthenticatedProfileCoverageRouteImport.update({
+    id: '/profile-coverage',
+    path: '/profile-coverage',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedQuestionsRoute = AuthenticatedQuestionsRouteImport.update({
   id: '/questions',
   path: '/questions',
@@ -85,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
+  '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
   '/runs/$runId': typeof AuthenticatedRunsRunIdRoute
@@ -97,6 +105,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
+  '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
   '/runs/$runId': typeof AuthenticatedRunsRunIdRoute
@@ -111,6 +120,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
+  '/_authenticated/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/_authenticated/questions': typeof AuthenticatedQuestionsRoute
   '/_authenticated/reports/manual': typeof AuthenticatedReportsManualRoute
   '/_authenticated/runs/$runId': typeof AuthenticatedRunsRunIdRoute
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/insights'
     | '/manual-checks'
+    | '/profile-coverage'
     | '/questions'
     | '/reports/manual'
     | '/runs/$runId'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/insights'
     | '/manual-checks'
+    | '/profile-coverage'
     | '/questions'
     | '/reports/manual'
     | '/runs/$runId'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/insights'
     | '/_authenticated/manual-checks'
+    | '/_authenticated/profile-coverage'
     | '/_authenticated/questions'
     | '/_authenticated/reports/manual'
     | '/_authenticated/runs/$runId'
@@ -213,6 +226,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedManualChecksRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/profile-coverage': {
+      id: '/_authenticated/profile-coverage'
+      path: '/profile-coverage'
+      fullPath: '/profile-coverage'
+      preLoaderRoute: typeof AuthenticatedProfileCoverageRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/questions': {
       id: '/_authenticated/questions'
       path: '/questions'
@@ -249,6 +269,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
+  AuthenticatedProfileCoverageRoute: typeof AuthenticatedProfileCoverageRoute
   AuthenticatedQuestionsRoute: typeof AuthenticatedQuestionsRoute
   AuthenticatedReportsManualRoute: typeof AuthenticatedReportsManualRoute
   AuthenticatedRunsRunIdRoute: typeof AuthenticatedRunsRunIdRoute
@@ -260,6 +281,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
+  AuthenticatedProfileCoverageRoute: AuthenticatedProfileCoverageRoute,
   AuthenticatedQuestionsRoute: AuthenticatedQuestionsRoute,
   AuthenticatedReportsManualRoute: AuthenticatedReportsManualRoute,
   AuthenticatedRunsRunIdRoute: AuthenticatedRunsRunIdRoute,

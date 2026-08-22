@@ -1284,6 +1284,176 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_coverage_items: {
+        Row: {
+          average_position: number | null
+          best_position: number | null
+          business_id: string
+          coverage_run_id: string
+          coverage_status: string
+          created_at: string
+          domain_citation_rate: number
+          domain_cited_count: number
+          id: string
+          manual_review_count: number
+          measurement_count: number
+          mention_rate: number
+          mentioned_count: number
+          metrics: Json
+          org_id: string
+          question_id: string
+          top3_count: number
+          top3_rate: number
+        }
+        Insert: {
+          average_position?: number | null
+          best_position?: number | null
+          business_id: string
+          coverage_run_id: string
+          coverage_status: string
+          created_at?: string
+          domain_citation_rate?: number
+          domain_cited_count?: number
+          id?: string
+          manual_review_count?: number
+          measurement_count?: number
+          mention_rate?: number
+          mentioned_count?: number
+          metrics?: Json
+          org_id: string
+          question_id: string
+          top3_count?: number
+          top3_rate?: number
+        }
+        Update: {
+          average_position?: number | null
+          best_position?: number | null
+          business_id?: string
+          coverage_run_id?: string
+          coverage_status?: string
+          created_at?: string
+          domain_citation_rate?: number
+          domain_cited_count?: number
+          id?: string
+          manual_review_count?: number
+          measurement_count?: number
+          mention_rate?: number
+          mentioned_count?: number
+          metrics?: Json
+          org_id?: string
+          question_id?: string
+          top3_count?: number
+          top3_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_coverage_items_coverage_run_id_fkey"
+            columns: ["coverage_run_id"]
+            isOneToOne: false
+            referencedRelation: "profile_coverage_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profile_coverage_runs: {
+        Row: {
+          analysis_scope: Json
+          business_id: string
+          client_domain_citation_rate: number | null
+          completed_at: string | null
+          coverage_score: number | null
+          covered_question_count: number
+          created_at: string
+          eligible_measurement_count: number
+          engine_version: string
+          evidence_grade: string | null
+          excluded_measurement_count: number
+          id: string
+          input_fingerprint: string
+          input_measurement_count: number
+          manual_review_count: number
+          manual_review_rate: number | null
+          measurement_coverage_rate: number | null
+          missing_question_count: number
+          org_id: string
+          partial_question_count: number
+          question_count: number
+          question_coverage_rate: number | null
+          repeat_stability_rate: number | null
+          requested_by: string | null
+          required_parser_version: string
+          source_run_id: string
+          started_at: string
+          status: string
+          top3_coverage_rate: number | null
+          updated_at: string
+        }
+        Insert: {
+          analysis_scope?: Json
+          business_id: string
+          client_domain_citation_rate?: number | null
+          completed_at?: string | null
+          coverage_score?: number | null
+          covered_question_count?: number
+          created_at?: string
+          eligible_measurement_count?: number
+          engine_version?: string
+          evidence_grade?: string | null
+          excluded_measurement_count?: number
+          id?: string
+          input_fingerprint: string
+          input_measurement_count?: number
+          manual_review_count?: number
+          manual_review_rate?: number | null
+          measurement_coverage_rate?: number | null
+          missing_question_count?: number
+          org_id: string
+          partial_question_count?: number
+          question_count?: number
+          question_coverage_rate?: number | null
+          repeat_stability_rate?: number | null
+          requested_by?: string | null
+          required_parser_version?: string
+          source_run_id: string
+          started_at?: string
+          status?: string
+          top3_coverage_rate?: number | null
+          updated_at?: string
+        }
+        Update: {
+          analysis_scope?: Json
+          business_id?: string
+          client_domain_citation_rate?: number | null
+          completed_at?: string | null
+          coverage_score?: number | null
+          covered_question_count?: number
+          created_at?: string
+          eligible_measurement_count?: number
+          engine_version?: string
+          evidence_grade?: string | null
+          excluded_measurement_count?: number
+          id?: string
+          input_fingerprint?: string
+          input_measurement_count?: number
+          manual_review_count?: number
+          manual_review_rate?: number | null
+          measurement_coverage_rate?: number | null
+          missing_question_count?: number
+          org_id?: string
+          partial_question_count?: number
+          question_count?: number
+          question_coverage_rate?: number | null
+          repeat_stability_rate?: number | null
+          requested_by?: string | null
+          required_parser_version?: string
+          source_run_id?: string
+          started_at?: string
+          status?: string
+          top3_coverage_rate?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

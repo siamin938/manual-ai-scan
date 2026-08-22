@@ -29,6 +29,7 @@ const NAV = [
   { to: "/questions", label: "질문 관리" },
   { to: "/manual-checks", label: "수동 UI 점검" },
   { to: "/runs", label: "자동 측정" },
+  { to: "/profile-coverage", label: "프로필 커버리지" },
   { to: "/insights", label: "AI 인사이트" },
   { to: "/reports/manual", label: "고객 보고서" },
 
