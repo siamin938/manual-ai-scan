@@ -991,6 +991,7 @@ export async function finalizeExperimentBaselineImpl(args: {
     // manual_review_required=true는 차단 사유가 아니다 (valid=true면 통과).
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
+  const jobById = new Map(jobRows.map((j) => [j.id, j]));
   const measurementJobIds = new Set(mRows.map((m) => m.job_id));
   if (
     measurementJobIds.size !== jobIdSet.size ||
@@ -998,6 +999,19 @@ export async function finalizeExperimentBaselineImpl(args: {
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
+  // 각 measurement가 대응 job의 question/provider/model과 정확히 일치해야 한다.
+  for (const m of mRows) {
+    const job = jobById.get(m.job_id);
+    if (
+      !job ||
+      m.question_id !== job.question_id ||
+      m.provider !== job.provider ||
+      (m.provider_model ?? "").trim() !== (job.provider_model ?? "").trim()
+    ) {
+      return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+    }
+  }
+
   const perQuestionMeasurements = new Map<string, number>();
   for (const m of mRows) {
     perQuestionMeasurements.set(
