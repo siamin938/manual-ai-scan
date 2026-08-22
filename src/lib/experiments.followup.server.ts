@@ -606,7 +606,18 @@ async function enqueueIfNeeded(args: {
     summary,
   };
 
+  const provenanceArgs = {
+    orgId: args.orgId,
+    runId: run.id,
+    experimentId: experiment.id,
+    phase: "followup" as const,
+    conditionHash: args.baseline.condition_hash,
+  };
+
   if (run.status === "queued" || run.status === "running" || run.status === "completed") {
+    // 이미 enqueue된 run: 삭제/재생성하지 않고 provenance evidence만 확인한다.
+    const prov = await verifyRunEnqueueProvenance(provenanceArgs);
+    if (!prov.ok) return followupFail(prov.error, base) as StartExperimentFollowupResult;
     return { ok: true, followup: base };
   }
   if (run.status !== "draft") {
@@ -630,6 +641,17 @@ async function enqueueIfNeeded(args: {
     .eq("org_id", experiment.org_id)
     .maybeSingle();
 
+  // enqueue 이후 runtime provenance 확인. 불일치 시 성공으로 반환하지 않는다.
+  // (이미 enqueue된 run/jobs는 임의 삭제·재생성하지 않고 담당자 확인 대상으로 남긴다.)
+  const prov = await verifyRunEnqueueProvenance(provenanceArgs);
+  if (!prov.ok) {
+    console.error("[followup] enqueue provenance mismatch", { runId: run.id });
+    return followupFail(prov.error, {
+      ...base,
+      runStatus: refreshed?.status ?? run.status,
+    }) as StartExperimentFollowupResult;
+  }
+
   return { ok: true, followup: { ...base, runStatus: refreshed?.status ?? run.status } };
 }
 
@@ -646,8 +668,8 @@ export async function startExperimentFollowupImpl(args: {
   if (!ctx.ok) return followupFail(ctx.error) as StartExperimentFollowupResult;
   const experiment = ctx.experiment;
 
-  // 파이프라인 재현성 보장 전까지 실제 시작(Run 생성/enqueue) 차단
-  if (!FOLLOWUP_START_ENABLED) {
+  // 서버 전용 emergency kill switch (기본값: 시작 가능)
+  if (followupStartKillSwitchOn()) {
     return followupFail("FOLLOWUP_START_DISABLED") as StartExperimentFollowupResult;
   }
 
