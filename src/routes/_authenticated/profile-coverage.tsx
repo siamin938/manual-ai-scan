@@ -170,6 +170,7 @@ function ProfileCoveragePage() {
 
   const run = data?.run ?? null;
   const items: ProfileCoverageItemDTO[] = data?.items ?? [];
+  const actions: CoverageGapActionDTO[] = data?.actions ?? [];
 
   return (
     <div className="space-y-6">
