@@ -76,51 +76,104 @@ source_type='profile_coverage_item' => source_profile_coverage_item_id NOT NULL 
 
 즉 이번 migration은 **순수 additive**이며 기존 Insight Experiment 흐름을 전혀 바꾸지 않습니다.
 
-## 4. Migration SQL 초안 (실행하지 않음)
+## 4. 최종 Migration SQL (Supabase SQL Editor 붙여넣기용, 실행 금지)
+
+멱등 설계: 모든 DDL을 존재 검사로 감쌌으므로 재실행해도 실패하지 않습니다.
 
 ```sql
 begin;
 
--- (A) 복합 FK 타겟 확보
-alter table public.profile_coverage_items
-  add constraint profile_coverage_items_id_org_business_key
-  unique (id, org_id, business_id);
+-- ============================================================
+-- (A) 복합 FK 타겟 확보: profile_coverage_items (id, org_id, business_id)
+-- ============================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.profile_coverage_items'::regclass
+       and conname  = 'profile_coverage_items_id_org_business_key'
+  ) then
+    alter table public.profile_coverage_items
+      add constraint profile_coverage_items_id_org_business_key
+      unique (id, org_id, business_id);
+  end if;
+end $$;
 
--- (B) 소스 계보 컬럼
+-- ============================================================
+-- (B) experiments 소스 계보 컬럼 (additive)
+-- ============================================================
 alter table public.experiments
-  add column if not exists source_type text not null default 'insight_action',
   add column if not exists source_profile_coverage_item_id uuid;
 
+alter table public.experiments
+  add column if not exists source_type text;
+
+-- default / not null은 backfill 이후에 확정 (기존 행 안전)
 update public.experiments
    set source_type = 'insight_action'
- where source_insight_action_id is not null
-   and source_type is distinct from 'insight_action';
-
--- (C) 허용값 + 정확히 하나의 소스
-alter table public.experiments
-  add constraint experiments_source_type_check
-  check (source_type in ('insight_action', 'profile_coverage_item'));
+ where source_type is null;
 
 alter table public.experiments
-  add constraint experiments_single_source_check
-  check (
-    (source_type = 'insight_action'
-      and source_insight_action_id is not null
-      and source_profile_coverage_item_id is null)
-    or
-    (source_type = 'profile_coverage_item'
-      and source_profile_coverage_item_id is not null
-      and source_insight_action_id is null)
-  );
+  alter column source_type set default 'insight_action';
 
--- (D) 복합 FK (org/business 교차 차단)
 alter table public.experiments
-  add constraint experiments_source_profile_coverage_item_fkey
-  foreign key (source_profile_coverage_item_id, org_id, business_id)
-  references public.profile_coverage_items (id, org_id, business_id)
-  on update restrict on delete restrict;
+  alter column source_type set not null;
 
--- (E) 인덱스
+-- ============================================================
+-- (C) CHECK: 허용값 + 정확히 하나의 소스
+-- ============================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.experiments'::regclass
+       and conname  = 'experiments_source_type_check'
+  ) then
+    alter table public.experiments
+      add constraint experiments_source_type_check
+      check (source_type in ('insight_action', 'profile_coverage_item'));
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.experiments'::regclass
+       and conname  = 'experiments_single_source_check'
+  ) then
+    alter table public.experiments
+      add constraint experiments_single_source_check
+      check (
+        (source_type = 'insight_action'
+          and source_insight_action_id is not null
+          and source_profile_coverage_item_id is null)
+        or
+        (source_type = 'profile_coverage_item'
+          and source_profile_coverage_item_id is not null
+          and source_insight_action_id is null)
+      );
+  end if;
+end $$;
+
+-- ============================================================
+-- (D) 복합 FK (org/business 교차 오염 차단)
+-- ============================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.experiments'::regclass
+       and conname  = 'experiments_source_profile_coverage_item_fkey'
+  ) then
+    alter table public.experiments
+      add constraint experiments_source_profile_coverage_item_fkey
+      foreign key (source_profile_coverage_item_id, org_id, business_id)
+      references public.profile_coverage_items (id, org_id, business_id)
+      on update restrict on delete restrict;
+  end if;
+end $$;
+
+-- ============================================================
+-- (E) 인덱스 (조회 + active 중복 방지)
+-- ============================================================
 create index if not exists experiments_source_pci_idx
   on public.experiments (source_profile_coverage_item_id)
   where source_profile_coverage_item_id is not null;
@@ -130,48 +183,57 @@ create unique index if not exists experiments_active_source_pci_uidx
   where source_profile_coverage_item_id is not null
     and status in ('draft','baseline','action_applied','followup');
 
--- (F) provenance 불변 트리거 확장 (기존 로직 보존 + 신규 컬럼)
+-- ============================================================
+-- (F) provenance 불변 함수: 기존 규칙 100% 보존 + 신규 소스 보호
+--     (create or replace는 기존 EXECUTE ACL을 그대로 유지)
+-- ============================================================
 create or replace function public.enforce_experiment_provenance_immutable()
 returns trigger
 language plpgsql
 set search_path to 'public'
-as $$
-begin
-  if old.source_type is distinct from new.source_type then
-    raise exception 'Experiment source_type is immutable';
-  end if;
+as $function$
+BEGIN
+  -- [기존 규칙 원문 보존]
+  IF OLD.source_insight_action_id IS NOT NULL THEN
+    IF NEW.source_insight_action_id IS DISTINCT FROM OLD.source_insight_action_id
+       OR NEW.org_id IS DISTINCT FROM OLD.org_id
+       OR NEW.business_id IS DISTINCT FROM OLD.business_id THEN
+      RAISE EXCEPTION 'Experiment provenance (source_insight_action_id, org_id, business_id) is immutable once linked to an insight action';
+    END IF;
+  ELSIF NEW.source_insight_action_id IS NOT NULL THEN
+    IF NEW.org_id IS DISTINCT FROM OLD.org_id
+       OR NEW.business_id IS DISTINCT FROM OLD.business_id THEN
+      RAISE EXCEPTION 'Cannot change org_id or business_id while linking an experiment to an insight action';
+    END IF;
+  END IF;
 
-  if old.source_profile_coverage_item_id is not null
-     and new.source_profile_coverage_item_id is distinct from old.source_profile_coverage_item_id then
-    raise exception 'Experiment source_profile_coverage_item_id is immutable';
-  end if;
+  -- [신규] source_type 불변
+  IF NEW.source_type IS DISTINCT FROM OLD.source_type THEN
+    RAISE EXCEPTION 'Experiment source_type is immutable';
+  END IF;
 
-  if old.source_insight_action_id is not null then
-    if new.source_insight_action_id is distinct from old.source_insight_action_id
-       or new.org_id is distinct from old.org_id
-       or new.business_id is distinct from old.business_id then
-      raise exception 'Experiment provenance (source_insight_action_id, org_id, business_id) is immutable once linked to an insight action';
-    end if;
-  elsif new.source_insight_action_id is not null then
-    if new.org_id is distinct from old.org_id
-       or new.business_id is distinct from old.business_id then
-      raise exception 'Cannot change org_id or business_id while linking an experiment to an insight action';
-    end if;
-  end if;
+  -- [신규] coverage item 계보 불변
+  IF OLD.source_profile_coverage_item_id IS NOT NULL THEN
+    IF NEW.source_profile_coverage_item_id IS DISTINCT FROM OLD.source_profile_coverage_item_id
+       OR NEW.org_id IS DISTINCT FROM OLD.org_id
+       OR NEW.business_id IS DISTINCT FROM OLD.business_id THEN
+      RAISE EXCEPTION 'Experiment provenance (source_profile_coverage_item_id, org_id, business_id) is immutable once linked to a coverage item';
+    END IF;
+  ELSIF NEW.source_profile_coverage_item_id IS NOT NULL THEN
+    IF NEW.org_id IS DISTINCT FROM OLD.org_id
+       OR NEW.business_id IS DISTINCT FROM OLD.business_id THEN
+      RAISE EXCEPTION 'Cannot change org_id or business_id while linking an experiment to a coverage item';
+    END IF;
+  END IF;
 
-  if old.source_profile_coverage_item_id is not null
-     and (new.org_id is distinct from old.org_id
-          or new.business_id is distinct from old.business_id) then
-    raise exception 'Experiment org/business is immutable once linked to a coverage item';
-  end if;
+  RETURN NEW;
+END;
+$function$;
 
-  return new;
-end;
-$$;
-
--- (G) 트리거 컬럼 목록 확장 (필수)
--- 현재: BEFORE UPDATE OF source_insight_action_id, org_id, business_id
--- 신규 컬럼만 바뀌는 UPDATE에서는 트리거가 아예 발화하지 않으므로 재생성 필요.
+-- ============================================================
+-- (G) 트리거 컬럼 목록 재생성 (신규 컬럼 UPDATE에서도 발화하도록)
+--     현재: BEFORE UPDATE OF source_insight_action_id, org_id, business_id
+-- ============================================================
 drop trigger if exists trg_experiments_provenance_immutable on public.experiments;
 create trigger trg_experiments_provenance_immutable
   before update of source_insight_action_id, org_id, business_id,
@@ -186,14 +248,39 @@ commit;
 
 주의 2: `create or replace function`은 기존 ACL(anon/authenticated EXECUTE revoke 상태)을 그대로 보존하므로 보안 하드닝은 유지됩니다.
 
+주의 3: 앱 코드는 아직 수정하지 않습니다. 신규 컬럼은 nullable/default 기반이라 기존 insert/select 경로는 그대로 동작합니다.
 
-## 5. 검증 쿼리 (migration 후 READ ONLY)
+## 5. 검증 쿼리 (migration 후 READ ONLY, 3개)
 
 ```sql
+-- 1) 기존 실험 데이터 보존 확인 (source_type='insight_action', coverage id NULL, status=baseline)
 select id, status, source_type, source_insight_action_id, source_profile_coverage_item_id
-  from public.experiments;
+  from public.experiments
+ order by created_at;
+
+-- 2) 제약조건 적용 확인 (4건이 모두 보여야 함)
+select conname, pg_get_constraintdef(oid)
+  from pg_constraint
+ where conrelid in ('public.experiments'::regclass, 'public.profile_coverage_items'::regclass)
+   and conname in (
+     'profile_coverage_items_id_org_business_key',
+     'experiments_source_type_check',
+     'experiments_single_source_check',
+     'experiments_source_profile_coverage_item_fkey'
+   )
+ order by conname;
+
+-- 3) 인덱스 + 트리거 컬럼 목록 확인
+select indexname, indexdef
+  from pg_indexes
+ where schemaname='public' and tablename='experiments'
+ order by indexname;
+
+select tgname, pg_get_triggerdef(oid)
+  from pg_trigger
+ where tgrelid='public.experiments'::regclass and not tgisinternal;
 ```
-기존 1건이 `source_type='insight_action'`, coverage id NULL, status=`baseline` 유지인지 확인.
+
 
 ## 6. 이번 단계 이후 (별도 승인 필요)
 
