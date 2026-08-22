@@ -13,6 +13,12 @@ import {
   type ActionAppliedResult,
   type RecordActionAppliedInput,
 } from "./experiments.helpers";
+import {
+  COVERAGE_EXPERIMENT_ACTION_TYPE,
+  coverageActionFields,
+  coverageActionTitle,
+} from "./profile-coverage.helpers";
+
 
 type UserClient = SupabaseClient<Database>;
 
