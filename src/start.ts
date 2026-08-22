@@ -1,4 +1,5 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
+import { setResponseStatus } from "@tanstack/react-start/server";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "./integrations/supabase/auth-attacher";
@@ -31,33 +32,54 @@ function badRequestCode(error: unknown): string | null {
   return BAD_REQUEST_CODES.has(error.message) ? error.message : null;
 }
 
-function textResponse(status: number, body: string): Response {
-  return new Response(body, {
-    status,
-    headers: { "content-type": "text/plain; charset=utf-8" },
-  });
+/**
+ * 서버 함수 오류 정규화. 모든 서버 함수 호출을 감싸므로
+ * generated auth middleware가 던지는 오류도 여기서 잡힌다.
+ * 상세 사유는 서버 로그에만 남기고, 클라이언트에는 고정 문자열만 던진다.
+ */
+const normalizeServerFnErrors = createMiddleware({ type: "function" }).server(
+  async ({ next }) => {
+    try {
+      return await next();
+    } catch (error) {
+      if (isAuthFailure(error)) {
+        console.error("[auth] request rejected:", (error as Error).message);
+        setResponseStatus(401);
+        throw fixedError(401, "Unauthorized");
+      }
+
+      const code = badRequestCode(error);
+      if (code) {
+        setResponseStatus(400);
+        throw fixedError(400, code);
+      }
+
+      if (error != null && typeof error === "object" && "statusCode" in error) {
+        throw error;
+      }
+
+      // 환경변수 누락 등: 상세 내용은 서버 로그에만, 클라이언트는 일반 500.
+      console.error(error);
+      setResponseStatus(500);
+      throw fixedError(500, "Internal Server Error");
+    }
+  },
+);
+
+function fixedError(statusCode: number, message: string): Error & { statusCode: number } {
+  const err = new Error(message) as Error & { statusCode: number };
+  err.statusCode = statusCode;
+  return err;
 }
 
 const errorMiddleware = createMiddleware().server(async ({ next }) => {
   try {
     return await next();
   } catch (error) {
-    if (isAuthFailure(error)) {
-      // 서버 로그에만 상세 사유를 남긴다.
-      console.error("[auth] request rejected:", (error as Error).message);
-      return textResponse(401, "Unauthorized");
-    }
-
-    const code = badRequestCode(error);
-    if (code) {
-      return textResponse(400, code);
-    }
-
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;
     }
 
-    // 환경변수 누락 등 나머지 오류: 상세 내용은 서버 로그에만, 클라이언트는 일반 500.
     console.error(error);
     return new Response(renderErrorPage(), {
       status: 500,
@@ -75,5 +97,5 @@ const csrfMiddleware = createCsrfMiddleware({
 
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware, csrfMiddleware],
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [normalizeServerFnErrors, attachSupabaseAuth],
 }));
