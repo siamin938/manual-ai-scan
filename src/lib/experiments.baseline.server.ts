@@ -361,9 +361,49 @@ export async function finalizeExperimentBaselineImpl(args: {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
 
+  // A) snapshot scope / 구조 검증
+  if (
+    snapshot.experiment_id !== experiment.id ||
+    snapshot.org_id !== experiment.org_id ||
+    snapshot.business_id !== experiment.business_id
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  const planned = snapshot.planned;
+  const plannedProviders = [...(planned?.selected_providers ?? [])];
+  const plannedModel = (planned?.provider_models?.["openai"] ?? "").trim();
+  if (
+    plannedProviders.length !== 1 ||
+    plannedProviders[0] !== "openai" ||
+    planned.repetitions !== BASELINE_REPETITIONS ||
+    planned.planned_jobs !== BASELINE_EXPECTED_QUESTION_COUNT * BASELINE_REPETITIONS ||
+    planned.max_cost_usd !== BASELINE_MAX_COST_USD ||
+    planned.store !== false ||
+    !plannedModel
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+
+  // B) condition_hash 자체 재검증 (snapshot 내용으로 재계산)
+  const recomputedHash = await computeConditionHash({
+    question_set_id: snapshot.question_set_id,
+    questions: snapshot.questions,
+    selected_providers: plannedProviders,
+    provider_models: planned.provider_models,
+    repetitions: planned.repetitions,
+    search_context_size: planned.search_context_size,
+    store: planned.store,
+    parsing_context: snapshot.parsing_context,
+  });
+  if (recomputedHash !== snapshot.condition_hash) {
+    return { ok: false, error: "BASELINE_CONDITION_DRIFT" };
+  }
+
   const { data: run, error: runErr } = await supabaseAdmin
     .from("measurement_runs")
-    .select("id, org_id, business_id, run_type, phase, status, experiment_id, started_at, completed_at")
+    .select(
+      "id, org_id, business_id, run_type, phase, status, experiment_id, question_set_id, started_at, completed_at",
+    )
     .eq("id", experiment.baseline_run_id)
     .maybeSingle();
   if (runErr) return { ok: false, error: "INTERNAL_ERROR" };
@@ -373,41 +413,68 @@ export async function finalizeExperimentBaselineImpl(args: {
     run.business_id !== experiment.business_id ||
     run.run_type !== "experiment" ||
     run.phase !== "baseline" ||
-    run.experiment_id !== experiment.id
+    run.experiment_id !== experiment.id ||
+    run.question_set_id !== snapshot.question_set_id
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
   if (run.status !== "completed") return { ok: false, error: "BASELINE_RUN_NOT_COMPLETED" };
+  // E) 실제 측정 기간이 확정되어야 finalize 가능
+  if (!run.started_at || !run.completed_at) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
 
-  const plannedModel = snapshot.planned.provider_models["openai"];
-  const plannedJobs = snapshot.planned.planned_jobs;
+  const plannedJobs = planned.planned_jobs;
   const snapshotQuestionIds = [...snapshot.questions.map((q) => q.id)].sort();
 
+  // C) measurement_jobs 검증
   const { data: jobs, error: jobErr } = await supabaseAdmin
     .from("measurement_jobs")
-    .select("id, question_id, provider, provider_model")
+    .select("id, question_id, provider, provider_model, status, repetition_no")
     .eq("org_id", args.orgId)
     .eq("run_id", run.id);
   if (jobErr) return { ok: false, error: "INTERNAL_ERROR" };
   const jobRows = jobs ?? [];
   if (jobRows.length !== plannedJobs) return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
-  if (jobRows.some((j) => j.provider !== "openai" || j.provider_model !== plannedModel)) {
-    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
-  }
-  const perQuestion = new Map<string, number>();
-  for (const j of jobRows) perQuestion.set(j.question_id, (perQuestion.get(j.question_id) ?? 0) + 1);
-  const jobQuestionIds = [...perQuestion.keys()].sort();
   if (
-    jobQuestionIds.length !== snapshotQuestionIds.length ||
-    jobQuestionIds.some((id, i) => id !== snapshotQuestionIds[i]) ||
-    [...perQuestion.values()].some((count) => count !== snapshot.planned.repetitions)
+    jobRows.some(
+      (j) =>
+        j.provider !== "openai" ||
+        (j.provider_model ?? "").trim() !== plannedModel ||
+        j.status !== "completed",
+    )
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
+  const repsByQuestion = new Map<string, number[]>();
+  for (const j of jobRows) {
+    const list = repsByQuestion.get(j.question_id) ?? [];
+    list.push(Number(j.repetition_no));
+    repsByQuestion.set(j.question_id, list);
+  }
+  const jobQuestionIds = [...repsByQuestion.keys()].sort();
+  if (
+    jobQuestionIds.length !== snapshotQuestionIds.length ||
+    jobQuestionIds.some((id, i) => id !== snapshotQuestionIds[i])
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  const expectedReps = Array.from({ length: planned.repetitions }, (_, i) => i + 1);
+  for (const reps of repsByQuestion.values()) {
+    const sorted = [...reps].sort((a, b) => a - b);
+    if (
+      sorted.length !== expectedReps.length ||
+      sorted.some((n, i) => n !== expectedReps[i])
+    ) {
+      return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+    }
+  }
+  const jobIdSet = new Set(jobRows.map((j) => j.id));
 
+  // D) measurements 검증
   const { data: measurements, error: mErr } = await supabaseAdmin
     .from("measurements")
-    .select("id, provider, provider_model, valid, parser_version")
+    .select("id, job_id, question_id, provider, provider_model, valid, parser_version")
     .eq("org_id", args.orgId)
     .eq("run_id", run.id);
   if (mErr) return { ok: false, error: "INTERNAL_ERROR" };
@@ -415,13 +482,40 @@ export async function finalizeExperimentBaselineImpl(args: {
   if (mRows.length !== plannedJobs) return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   if (
     mRows.some(
-      (m) => m.provider !== "openai" || m.provider_model !== plannedModel || m.valid !== true,
+      (m) =>
+        m.provider !== "openai" ||
+        (m.provider_model ?? "").trim() !== plannedModel ||
+        m.valid !== true,
     )
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  const measurementJobIds = new Set(mRows.map((m) => m.job_id));
+  if (
+    measurementJobIds.size !== jobIdSet.size ||
+    [...measurementJobIds].some((id) => !jobIdSet.has(id))
+  ) {
+    return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+  }
+  const perQuestionMeasurements = new Map<string, number>();
+  for (const m of mRows) {
+    perQuestionMeasurements.set(
+      m.question_id,
+      (perQuestionMeasurements.get(m.question_id) ?? 0) + 1,
+    );
+  }
+  const measurementQuestionIds = [...perQuestionMeasurements.keys()].sort();
+  if (
+    measurementQuestionIds.length !== snapshotQuestionIds.length ||
+    measurementQuestionIds.some((id, i) => id !== snapshotQuestionIds[i]) ||
+    [...perQuestionMeasurements.values()].some((c) => c !== planned.repetitions)
   ) {
     return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
   }
   const parserVersions = [...new Set(mRows.map((m) => m.parser_version))].sort();
   if (parserVersions.length !== 1) return { ok: false, error: "BASELINE_FINALIZE_MISMATCH" };
+
+
 
   const providerModels = [...new Set(mRows.map((m) => m.provider_model))].sort();
   const observed = {
