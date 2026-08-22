@@ -506,6 +506,8 @@ export async function previewExperimentFollowupImpl(args: {
 /* ============================ Start (측정 비용 발생) ============================ */
 
 async function enqueueIfNeeded(args: {
+  orgId: string;
+  baseline: ExperimentConditionSnapshotV1;
   experiment: ExperimentRow;
   run: RunRow;
   summary: FollowupPlanSummary;
@@ -525,6 +527,10 @@ async function enqueueIfNeeded(args: {
   if (run.status !== "draft") {
     return followupFail("FOLLOWUP_RUN_REQUIRES_REVIEW", base) as StartExperimentFollowupResult;
   }
+
+  // draft 재시도 경로에서도 실제 enqueue 직전에 live 조건을 반드시 다시 검증한다.
+  const live = await assertLiveMatchesBaseline(args.orgId, args.baseline);
+  if (!live.ok) return followupFail(live.error, base) as StartExperimentFollowupResult;
 
   const enqueued = await invokeEnqueueRunWithUserJwt(run.id);
   if (!enqueued.ok) {
@@ -555,6 +561,11 @@ export async function startExperimentFollowupImpl(args: {
   if (!ctx.ok) return followupFail(ctx.error) as StartExperimentFollowupResult;
   const experiment = ctx.experiment;
 
+  // 파이프라인 재현성 보장 전까지 실제 시작(Run 생성/enqueue) 차단
+  if (!FOLLOWUP_START_ENABLED) {
+    return followupFail("FOLLOWUP_START_DISABLED") as StartExperimentFollowupResult;
+  }
+
   // 기존 canonical Follow-up 재사용 (새 Run 생성 금지)
   if (experiment.followup_run_id) {
     const stored = experiment.followup_condition_snapshot as ExperimentConditionSnapshotV1 | null;
@@ -565,7 +576,13 @@ export async function startExperimentFollowupImpl(args: {
     if (!summary.ok) return followupFail(summary.error) as StartExperimentFollowupResult;
     const run = await loadCanonicalFollowupRun(experiment);
     if (!run.ok) return followupFail(run.error) as StartExperimentFollowupResult;
-    return enqueueIfNeeded({ experiment, run: run.run, summary: summary.summary });
+    return enqueueIfNeeded({
+      orgId: args.orgId,
+      baseline: ctx.baseline,
+      experiment,
+      run: run.run,
+      summary: summary.summary,
+    });
   }
 
   if (experiment.status !== "action_applied") {
@@ -575,6 +592,7 @@ export async function startExperimentFollowupImpl(args: {
   // 현재 조건이 Baseline과 동일할 때만 실행
   const live = await assertLiveMatchesBaseline(args.orgId, ctx.baseline);
   if (!live.ok) return followupFail(live.error) as StartExperimentFollowupResult;
+
 
   const summaryRes = summaryFromSnapshot(ctx.baseline);
   if (!summaryRes.ok) return followupFail(summaryRes.error) as StartExperimentFollowupResult;
