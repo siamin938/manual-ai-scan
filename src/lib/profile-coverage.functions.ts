@@ -1,5 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  COVERAGE_VALIDATION_PLAN,
+  coverageActionFields,
+  coverageActionPriority,
+  coverageActionRationale,
+  coverageActionTitle,
+} from "./profile-coverage.helpers";
+import type { ActiveExperimentDTO } from "./insights.functions";
 
 export type ProfileCoverageItemDTO = {
   id: string;
@@ -19,6 +27,8 @@ export type ProfileCoverageItemDTO = {
 };
 
 export type CoverageGapActionDTO = {
+  /** safe reference: 실험 생성 시 서버로 전달하는 유일한 식별자 */
+  coverage_item_id: string;
   question_text: string | null;
   intent_type: string | null;
   coverage_status: string;
@@ -32,6 +42,8 @@ export type CoverageGapActionDTO = {
   measurement_count: number;
   mentioned_count: number;
   mention_rate: number;
+  /** 진행 중인 Experiment (snapshot 미포함, safe 필드만) */
+  active_experiment: ActiveExperimentDTO | null;
 };
 
 export type ProfileCoverageOverviewDTO = {
@@ -60,6 +72,7 @@ export type ProfileCoverageOverviewDTO = {
   items: ProfileCoverageItemDTO[];
   actions: CoverageGapActionDTO[];
 };
+
 
 export const getProfileCoverageOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
