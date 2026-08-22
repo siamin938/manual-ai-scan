@@ -157,6 +157,9 @@ export async function prepareBaselineSnapshotData(args: {
   if (questions.length !== BASELINE_EXPECTED_QUESTION_COUNT) {
     return { ok: false, error: "QUESTION_SET_CHANGED" };
   }
+  if (questions.some((q) => !Number.isFinite(q.weight))) {
+    return { ok: false, error: "QUESTION_SET_CHANGED" };
+  }
   if (questions.some((q) => q.data_class !== "public")) {
     return { ok: false, error: "NON_PUBLIC_QUESTION" };
   }
@@ -183,12 +186,27 @@ export async function prepareBaselineSnapshotData(args: {
     return { ok: false, error: "PROVIDER_NOT_READY" };
   }
 
+  const modelName = String(providerSettings.model_name).trim();
+  const searchContextSize = String(providerSettings.search_context_size).trim();
+  const costPerRequest = Number(providerSettings.estimated_cost_per_request_usd);
+  if (!modelName) return { ok: false, error: "PROVIDER_NOT_READY" };
+  if (
+    !ALLOWED_SEARCH_CONTEXT_SIZES.includes(
+      searchContextSize as (typeof ALLOWED_SEARCH_CONTEXT_SIZES)[number],
+    )
+  ) {
+    return { ok: false, error: "PROVIDER_NOT_READY" };
+  }
+  if (!Number.isFinite(costPerRequest) || costPerRequest < 0) {
+    return { ok: false, error: "PROVIDER_NOT_READY" };
+  }
+
   const plannedJobs = questions.length * BASELINE_SELECTED_PROVIDERS.length * BASELINE_REPETITIONS;
-  const estimatedCostUsd =
-    Math.round(Number(providerSettings.estimated_cost_per_request_usd) * plannedJobs * 1e6) / 1e6;
+  const estimatedCostUsd = Math.round(costPerRequest * plannedJobs * 1e6) / 1e6;
   if (estimatedCostUsd > BASELINE_MAX_COST_USD) {
     return { ok: false, error: "RUN_COST_CAP_EXCEEDED" };
   }
+
 
   // 5) parsing_context (Provider 전송용 아님 — 로컬 parser 재현성 전용)
   const { data: targetBiz, error: bizErr } = await supabaseAdmin
