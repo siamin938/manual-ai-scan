@@ -80,11 +80,58 @@ const EXPERIMENT_ERROR_MESSAGES: Record<CreateExperimentErrorCode, string> = {
   INTERNAL_ERROR: "실험 생성 중 오류가 발생했습니다.",
 };
 
-type ExperimentState = { experimentId: string; label: "실험 생성됨" | "실험 준비 중" };
+/** Baseline 서버 오류 코드 → 안전한 한글 문구. raw DB/Edge error는 노출하지 않는다. */
+const BASELINE_ERROR_MESSAGES: Partial<Record<BaselineErrorCode, string>> = {
+  FORBIDDEN: "Baseline 측정을 시작할 권한이 없습니다.",
+  EXPERIMENT_NOT_FOUND: "실험을 찾을 수 없습니다.",
+  INVALID_EXPERIMENT_STATE: "현재 실험 상태에서는 Baseline을 시작할 수 없습니다.",
+  PROVIDER_NOT_READY: "측정 Provider 설정이 아직 준비되지 않았습니다.",
+  QUESTION_SET_CHANGED: "질문 구성이 변경되어 Baseline 조건을 확정할 수 없습니다.",
+  NON_PUBLIC_QUESTION: "공개(public) 질문만 자동 측정할 수 있습니다.",
+  RUN_COST_CAP_EXCEEDED: "예상 비용이 최대 비용 한도를 초과합니다.",
+  BASELINE_RUN_CREATE_FAILED: "Baseline 측정 준비 중 오류가 발생했습니다.",
+  BASELINE_LINK_FAILED: "Baseline 연결 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+  BASELINE_ENQUEUE_FAILED:
+    "Baseline 실행 준비는 저장되었지만 측정 작업 등록에 실패했습니다. 같은 Baseline으로 다시 시도할 수 있습니다.",
+  BASELINE_RUN_REQUIRES_REVIEW: "Baseline 측정 상태 확인이 필요합니다.",
+  BASELINE_CONDITION_DRIFT: "저장된 Baseline 조건과 현재 조건이 일치하지 않습니다.",
+  BASELINE_FINALIZE_MISMATCH: "Baseline 데이터 상태를 확인해주세요.",
+};
 
-const FINDING_TYPE_LABELS: Record<string, string> = {
-  visibility_gap: "노출 공백",
-  competitor_substitution: "경쟁업체 대체",
+function baselineErrorText(code: BaselineErrorCode): string {
+  return BASELINE_ERROR_MESSAGES[code] ?? "Baseline 처리 중 오류가 발생했습니다.";
+}
+
+type BaselineCta =
+  | { kind: "create" }
+  | { kind: "start"; label: string }
+  | { kind: "disabled"; label: string }
+  | { kind: "none" };
+
+function baselineCta(a: InsightActionDTO): BaselineCta {
+  const exp = a.active_experiment;
+  if (!exp) return canStartExperiment(a) ? { kind: "create" } : { kind: "none" };
+
+  if (exp.status === "draft" && !exp.baseline_run_id) {
+    return { kind: "start", label: "Baseline 시작하기" };
+  }
+  if (exp.status === "baseline" && exp.baseline_run_id) {
+    switch (exp.baseline_run_status) {
+      case "draft":
+        return { kind: "start", label: "Baseline 다시 시작" };
+      case "queued":
+        return { kind: "disabled", label: "Baseline 대기 중" };
+      case "running":
+        return { kind: "disabled", label: "Baseline 측정 중" };
+      case "completed":
+        return { kind: "disabled", label: "Baseline 측정 완료" };
+      default:
+        return { kind: "disabled", label: "Baseline 확인 필요" };
+    }
+  }
+  return { kind: "disabled", label: "Baseline 확인 필요" };
+}
+
   question_sensitivity: "질문 민감도",
 };
 
