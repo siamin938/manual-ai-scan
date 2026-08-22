@@ -11,6 +11,7 @@ import {
   BASELINE_REPETITIONS,
   BASELINE_SECONDARY_METRICS,
   BASELINE_SELECTED_PROVIDERS,
+  ALLOWED_SEARCH_CONTEXT_SIZES,
   baselineFail,
   computeConditionHash,
   type BaselineErrorCode,
@@ -242,7 +243,7 @@ export async function prepareBaselineSnapshotData(args: {
   }
 
   const parsingContext = { target: toBusinessRef(targetBiz), competitors };
-  const providerModels = { openai: providerSettings.model_name };
+  const providerModels = { openai: modelName };
 
   const conditionHash = await computeConditionHash({
     question_set_id: questionSet.id,
@@ -250,7 +251,7 @@ export async function prepareBaselineSnapshotData(args: {
     selected_providers: BASELINE_SELECTED_PROVIDERS,
     provider_models: providerModels,
     repetitions: BASELINE_REPETITIONS,
-    search_context_size: providerSettings.search_context_size,
+    search_context_size: searchContextSize,
     store: false,
     parsing_context: parsingContext,
   });
@@ -269,7 +270,7 @@ export async function prepareBaselineSnapshotData(args: {
       selected_providers: ["openai"],
       provider_models: providerModels,
       repetitions: BASELINE_REPETITIONS,
-      search_context_size: providerSettings.search_context_size,
+      search_context_size: searchContextSize,
       store: false,
       planned_jobs: plannedJobs,
       estimated_cost_usd: estimatedCostUsd,
@@ -297,7 +298,7 @@ export async function prepareBaselineSnapshotData(args: {
       summary: {
         questionCount: questions.length,
         provider: "openai",
-        model: providerSettings.model_name,
+        model: modelName,
         repetitions: BASELINE_REPETITIONS,
         plannedJobs,
         estimatedCostUsd,
