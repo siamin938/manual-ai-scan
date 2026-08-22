@@ -997,6 +997,8 @@ function ExperimentCta({
   onBaseline,
   onFinalize,
   onApply,
+  onFollowup,
+  onFollowupFinalize,
 }: {
   action: InsightActionDTO;
   pending: boolean;
@@ -1004,6 +1006,8 @@ function ExperimentCta({
   onBaseline: () => void;
   onFinalize: () => void;
   onApply: () => void;
+  onFollowup: () => void;
+  onFollowupFinalize: () => void;
 }) {
   const cta = baselineCta(action);
 
@@ -1030,16 +1034,26 @@ function ExperimentCta({
   }
   if (cta.kind === "apply") {
     return (
-      <div className="space-y-2">
-        <Button className="w-full" onClick={onApply} disabled={pending}>
-          {cta.label}
-        </Button>
-        <Button variant="outline" className="w-full" disabled>
-          Follow-up 준비 필요
-        </Button>
-      </div>
+      <Button className="w-full" onClick={onApply} disabled={pending}>
+        {cta.label}
+      </Button>
     );
   }
+  if (cta.kind === "followup-start") {
+    return (
+      <Button className="w-full" onClick={onFollowup} disabled={pending}>
+        {pending ? "불러오는 중..." : cta.label}
+      </Button>
+    );
+  }
+  if (cta.kind === "followup-finalize") {
+    return (
+      <Button className="w-full" onClick={onFollowupFinalize} disabled={pending}>
+        {pending ? "확정 중..." : cta.label}
+      </Button>
+    );
+  }
+
 
 
   if (cta.kind === "disabled") {
