@@ -675,7 +675,11 @@ function InsightsPage() {
                         action={a}
                         pending={
                           (preview.isPending && preview.variables === a.active_experiment?.id) ||
-                          (finalize.isPending && finalize.variables === a.active_experiment?.id)
+                          (finalize.isPending && finalize.variables === a.active_experiment?.id) ||
+                          (previewFollowup.isPending &&
+                            previewFollowup.variables === a.active_experiment?.id) ||
+                          (finalizeFollowup.isPending &&
+                            finalizeFollowup.variables === a.active_experiment?.id)
                         }
                         onCreate={() => setConfirmAction(a)}
                         onBaseline={() => {
@@ -692,6 +696,14 @@ function InsightsPage() {
                           setApplyNote("");
                           setApplyAt(nowSeoulLocalInput());
                           setApplyTarget(a);
+                        }}
+                        onFollowup={() => {
+                          const expId = a.active_experiment?.id;
+                          if (expId && !previewFollowup.isPending) previewFollowup.mutate(expId);
+                        }}
+                        onFollowupFinalize={() => {
+                          const expId = a.active_experiment?.id;
+                          if (expId && !finalizeFollowup.isPending) finalizeFollowup.mutate(expId);
                         }}
                       />
 
