@@ -326,11 +326,17 @@ function InsightsPage() {
   const [applySummary, setApplySummary] = useState("");
   const [applyNote, setApplyNote] = useState("");
   const [applyAt, setApplyAt] = useState(nowSeoulLocalInput());
+  const [followupTarget, setFollowupTarget] = useState<
+    { experimentId: string; summary: FollowupPlanSummary } | null
+  >(null);
   const startExperiment = useServerFn(createExperimentFromInsightAction);
   const previewBaseline = useServerFn(previewExperimentBaseline);
   const runBaseline = useServerFn(startExperimentBaseline);
   const confirmBaseline = useServerFn(finalizeExperimentBaseline);
   const recordActionApplied = useServerFn(recordExperimentActionApplied);
+  const previewFollowupFn = useServerFn(previewExperimentFollowup);
+  const runFollowupFn = useServerFn(startExperimentFollowup);
+  const confirmFollowupFn = useServerFn(finalizeExperimentFollowup);
 
 
 
