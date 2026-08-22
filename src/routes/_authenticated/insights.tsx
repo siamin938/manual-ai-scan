@@ -700,11 +700,13 @@ function ExperimentCta({
   pending,
   onCreate,
   onBaseline,
+  onFinalize,
 }: {
   action: InsightActionDTO;
   pending: boolean;
   onCreate: () => void;
   onBaseline: () => void;
+  onFinalize: () => void;
 }) {
   const cta = baselineCta(action);
 
@@ -722,6 +724,14 @@ function ExperimentCta({
       </Button>
     );
   }
+  if (cta.kind === "finalize") {
+    return (
+      <Button className="w-full" onClick={onFinalize} disabled={pending}>
+        {pending ? "확정 중..." : cta.label}
+      </Button>
+    );
+  }
+
   if (cta.kind === "disabled") {
     return (
       <Button variant="secondary" className="w-full" disabled>
