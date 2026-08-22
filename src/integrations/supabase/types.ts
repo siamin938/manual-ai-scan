@@ -214,6 +214,8 @@ export type Database = {
           created_by: string | null
           delta_value: number | null
           evaluated_at: string | null
+          evaluated_by: string | null
+          evaluation_snapshot: Json | null
           evaluation_version: string | null
           evidence_grade: string | null
           followup_condition_snapshot: Json | null
@@ -251,6 +253,8 @@ export type Database = {
           created_by?: string | null
           delta_value?: number | null
           evaluated_at?: string | null
+          evaluated_by?: string | null
+          evaluation_snapshot?: Json | null
           evaluation_version?: string | null
           evidence_grade?: string | null
           followup_condition_snapshot?: Json | null
@@ -288,6 +292,8 @@ export type Database = {
           created_by?: string | null
           delta_value?: number | null
           evaluated_at?: string | null
+          evaluated_by?: string | null
+          evaluation_snapshot?: Json | null
           evaluation_version?: string | null
           evidence_grade?: string | null
           followup_condition_snapshot?: Json | null
