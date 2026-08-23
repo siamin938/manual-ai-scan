@@ -15,6 +15,8 @@ import {
   type CreateCoverageExperimentErrorCode,
 } from "@/lib/experiments.functions";
 import { useExperimentFlow } from "@/components/experiment-flow";
+import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -218,16 +220,22 @@ function MetricCard({
 function ProfileCoveragePage() {
   const { activeOrgId } = useOrg();
   const fetchOverview = useServerFn(getProfileCoverageOverview);
+  const businessSel = useClientBusinessSelection(activeOrgId);
+  const selectedBusinessId = businessSel.selectedBusinessId;
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["profile-coverage", activeOrgId],
-    enabled: !!activeOrgId,
-    queryFn: () => fetchOverview({ data: { orgId: activeOrgId as string } }),
+    queryKey: ["profile-coverage", activeOrgId, selectedBusinessId],
+    enabled: !!activeOrgId && !!selectedBusinessId,
+    queryFn: () =>
+      fetchOverview({
+        data: { orgId: activeOrgId as string, businessId: selectedBusinessId as string },
+      }),
   });
 
   const run = data?.run ?? null;
   const items: ProfileCoverageItemDTO[] = data?.items ?? [];
   const actions: CoverageGapActionDTO[] = data?.actions ?? [];
+
 
   // Experiment 단계 실행 흐름 (비용은 Baseline/Follow-up 최종 확인 버튼에서만 발생)
   const flow = useExperimentFlow(activeOrgId ?? null, () => void refetch());
@@ -254,19 +262,42 @@ function ProfileCoveragePage() {
   });
 
 
+  const hasBusinesses = businessSel.options.length > 0;
+
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight">프로필 커버리지</h1>
-        <p className="text-sm text-muted-foreground">
-          AI 질문 영역에서 대상 업체가 얼마나 넓고 안정적으로 노출되는지 보여줍니다.
-        </p>
-        {run?.business_name && (
-          <p className="text-sm text-foreground">분석 대상 업체: {run.business_name}</p>
-        )}
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold tracking-tight">프로필 커버리지</h1>
+          <p className="text-sm text-muted-foreground">
+            AI 질문 영역에서 대상 업체가 얼마나 넓고 안정적으로 노출되는지 보여줍니다.
+          </p>
+          {run?.business_name && (
+            <p className="text-sm text-foreground">분석 대상 업체: {run.business_name}</p>
+          )}
+        </div>
+        <BusinessSelector
+          options={businessSel.options}
+          value={selectedBusinessId}
+          isLoading={businessSel.isLoading}
+          isError={businessSel.isError}
+          onChange={(id) => {
+            // 업체 전환 시 이전 업체의 다이얼로그가 남지 않도록 닫는다.
+            setCreateTarget(null);
+            businessSel.select(id);
+          }}
+        />
       </header>
 
-      {isLoading && (
+      {!businessSel.isLoading && !businessSel.isError && !hasBusinesses && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            등록된 대상 업체가 없습니다. 업체 관리에서 대상 업체를 등록해 주세요.
+          </CardContent>
+        </Card>
+      )}
+
+      {hasBusinesses && isLoading && (
         <div className="grid gap-4 md:grid-cols-3">
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
@@ -286,16 +317,19 @@ function ProfileCoveragePage() {
         </Alert>
       )}
 
-      {!isLoading && !isError && !run && (
+      {hasBusinesses && !isLoading && !isError && !run && (
         <Card>
           <CardContent className="space-y-3 py-12 text-center">
-            <p className="text-sm text-muted-foreground">아직 생성된 프로필 커버리지 분석이 없습니다.</p>
+            <p className="text-sm text-muted-foreground">
+              선택한 업체의 프로필 커버리지 분석이 아직 없습니다.
+            </p>
             <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
               다시 시도
             </Button>
           </CardContent>
         </Card>
       )}
+
 
       {run && (
         <>

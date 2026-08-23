@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useOrg } from "@/lib/org";
+import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { formatSeoul } from "@/lib/format";
 import {
   getInsightOverview,
@@ -407,11 +408,32 @@ function InsightsPage() {
 
 
 
+  const businessSel = useClientBusinessSelection(activeOrgId);
+  const selectedBusinessId = businessSel.selectedBusinessId;
+
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["insight-overview", activeOrgId],
-    enabled: !!activeOrgId,
-    queryFn: () => fetchOverview({ data: { orgId: activeOrgId as string } }),
+    queryKey: ["insight-overview", activeOrgId, selectedBusinessId],
+    enabled: !!activeOrgId && !!selectedBusinessId,
+    queryFn: () =>
+      fetchOverview({
+        data: { orgId: activeOrgId as string, businessId: selectedBusinessId as string },
+      }),
   });
+
+  // 업체 전환 시 이전 업체 컨텍스트의 다이얼로그/입력 상태를 모두 초기화한다.
+  const handleBusinessChange = (id: string) => {
+    setOpenFinding(null);
+    setOpenAction(null);
+    setConfirmAction(null);
+    setBaselineTarget(null);
+    setApplyTarget(null);
+    setApplySummary("");
+    setApplyNote("");
+    setFollowupTarget(null);
+    setEvaluationTarget(null);
+    businessSel.select(id);
+  };
+
 
   const createExperiment = useMutation({
     // 클라이언트는 orgId와 insightActionId만 전달한다. 그 외 값은 서버가 결정한다.
@@ -601,13 +623,24 @@ function InsightsPage() {
   const actions = data?.actions ?? [];
   const topPriority = Math.max(0, ...findings.map((f) => f.priority_score), ...actions.map((a) => a.priority_score));
 
+  const hasBusinesses = businessSel.options.length > 0;
+
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">AI 인사이트</h1>
-        <p className="text-sm text-muted-foreground">
-          AI 검색 측정 데이터를 분석해 현재 노출 문제와 우선적으로 테스트해야 할 행동을 보여줍니다.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">AI 인사이트</h1>
+          <p className="text-sm text-muted-foreground">
+            AI 검색 측정 데이터를 분석해 현재 노출 문제와 우선적으로 테스트해야 할 행동을 보여줍니다.
+          </p>
+        </div>
+        <BusinessSelector
+          options={businessSel.options}
+          value={selectedBusinessId}
+          isLoading={businessSel.isLoading}
+          isError={businessSel.isError}
+          onChange={handleBusinessChange}
+        />
       </header>
 
       {run?.business_name && (
@@ -617,7 +650,13 @@ function InsightsPage() {
         </div>
       )}
 
-      {isLoading || (isFetching && !data) ? (
+      {!businessSel.isLoading && !businessSel.isError && !hasBusinesses ? (
+        <Card>
+          <CardContent className="py-16 text-center text-sm text-muted-foreground">
+            등록된 대상 업체가 없습니다. 업체 관리에서 대상 업체를 등록해 주세요.
+          </CardContent>
+        </Card>
+      ) : isLoading || (isFetching && !data) ? (
         <LoadingState />
       ) : isError ? (
         <Alert variant="destructive">
@@ -631,10 +670,11 @@ function InsightsPage() {
       ) : !run ? (
         <Card>
           <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            아직 생성된 AI 인사이트가 없습니다.
+            선택한 업체의 AI 인사이트가 아직 없습니다.
           </CardContent>
         </Card>
       ) : (
+
         <>
           {data?.evidence_grade === "directional" && (
             <Alert>

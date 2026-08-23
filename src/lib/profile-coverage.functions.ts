@@ -82,9 +82,11 @@ export type ProfileCoverageOverviewDTO = {
 
 export const getProfileCoverageOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { orgId: string }) => {
+  .inputValidator((input: { orgId: string; businessId: string }) => {
     if (!input?.orgId || typeof input.orgId !== "string") throw new Error("INVALID_ORG");
-    return { orgId: input.orgId };
+    if (!input?.businessId || typeof input.businessId !== "string")
+      throw new Error("INVALID_BUSINESS");
+    return { orgId: input.orgId, businessId: input.businessId };
   })
   .handler(async ({ data, context }): Promise<ProfileCoverageOverviewDTO> => {
     const { data: membership, error: memErr } = await context.supabase
@@ -98,34 +100,42 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // 클라이언트가 보낸 businessId는 신뢰하지 않는다. org 범위의 활성 대상 업체만 허용.
+    const { data: business, error: bizErr } = await supabaseAdmin
+      .from("businesses")
+      .select("id, name")
+      .eq("id", data.businessId)
+      .eq("org_id", data.orgId)
+      .eq("is_client_business", true)
+      .eq("active", true)
+      .maybeSingle();
+    if (bizErr) throw new Error("BUSINESS_CHECK_FAILED");
+    if (!business) throw new Error("BUSINESS_NOT_AVAILABLE");
+
     const { data: run, error: runErr } = await supabaseAdmin
       .from("profile_coverage_runs")
       .select(
         "id, business_id, engine_version, completed_at, input_measurement_count, eligible_measurement_count, excluded_measurement_count, question_count, covered_question_count, partial_question_count, missing_question_count, question_coverage_rate, measurement_coverage_rate, top3_coverage_rate, repeat_stability_rate, client_domain_citation_rate, client_first_party_citation_rate, first_party_classifier_version, coverage_score, manual_review_count, manual_review_rate, evidence_grade",
       )
       .eq("org_id", data.orgId)
+      .eq("business_id", data.businessId)
       .eq("status", "completed")
       .order("completed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (runErr) throw new Error("RUN_QUERY_FAILED");
+    // 선택 업체에 결과가 없으면 다른 업체 run으로 fallback하지 않는다.
     if (!run) return { run: null, items: [], actions: [] };
 
-    const [businessRes, itemsRes] = await Promise.all([
-      supabaseAdmin
-        .from("businesses")
-        .select("name")
-        .eq("id", run.business_id)
-        .eq("org_id", data.orgId)
-        .maybeSingle(),
-      supabaseAdmin
-        .from("profile_coverage_items")
-        .select(
-          "id, question_id, coverage_status, measurement_count, mentioned_count, mention_rate, top3_count, top3_rate, domain_citation_rate, first_party_cited_count, first_party_citation_rate, first_party_classifier_version, manual_review_count, best_position, average_position, metrics",
-        )
-        .eq("org_id", data.orgId)
-        .eq("coverage_run_id", run.id),
-    ]);
+
+    const itemsRes = await supabaseAdmin
+      .from("profile_coverage_items")
+      .select(
+        "id, question_id, coverage_status, measurement_count, mentioned_count, mention_rate, top3_count, top3_rate, domain_citation_rate, first_party_cited_count, first_party_citation_rate, first_party_classifier_version, manual_review_count, best_position, average_position, metrics",
+      )
+      .eq("org_id", data.orgId)
+      .eq("coverage_run_id", run.id);
+
 
     const rawItems = itemsRes.data ?? [];
     const questionIds = [...new Set(rawItems.map((i) => i.question_id).filter(Boolean))] as string[];
@@ -187,6 +197,7 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
           "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_start_at, followup_end_at, evaluated_at, result_classification, evidence_grade, source_profile_coverage_item_id, created_at",
         )
         .eq("org_id", data.orgId)
+        .eq("business_id", data.businessId)
         .eq("source_type", "profile_coverage_item")
         .in(
           "source_profile_coverage_item_id",
@@ -271,7 +282,7 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
         id: run.id,
         engine_version: run.engine_version,
         completed_at: run.completed_at,
-        business_name: businessRes.data?.name ?? null,
+        business_name: business.name,
         input_measurement_count: run.input_measurement_count,
         eligible_measurement_count: run.eligible_measurement_count,
         excluded_measurement_count: run.excluded_measurement_count,
