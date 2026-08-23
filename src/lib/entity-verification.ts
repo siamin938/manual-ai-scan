@@ -186,9 +186,12 @@ function compact(text: string): string {
 
 export function isSentenceLike(displayName: string): boolean {
   const text = normalize(displayName);
-  if (text.length < SENTENCE_MIN_LENGTH) return text.includes("?");
+  if (text.includes("?")) return true;
+  if (SENTENCE_ENDING_RE.test(text)) return true;
+  if (text.length < SENTENCE_MIN_LENGTH) return false;
   return SENTENCE_MARKERS.some((marker) => text.includes(marker));
 }
+
 
 export function isHeadingLike(displayName: string): boolean {
   const c = compact(displayName);
