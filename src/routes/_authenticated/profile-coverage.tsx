@@ -218,16 +218,22 @@ function MetricCard({
 function ProfileCoveragePage() {
   const { activeOrgId } = useOrg();
   const fetchOverview = useServerFn(getProfileCoverageOverview);
+  const businessSel = useClientBusinessSelection(activeOrgId);
+  const selectedBusinessId = businessSel.selectedBusinessId;
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["profile-coverage", activeOrgId],
-    enabled: !!activeOrgId,
-    queryFn: () => fetchOverview({ data: { orgId: activeOrgId as string } }),
+    queryKey: ["profile-coverage", activeOrgId, selectedBusinessId],
+    enabled: !!activeOrgId && !!selectedBusinessId,
+    queryFn: () =>
+      fetchOverview({
+        data: { orgId: activeOrgId as string, businessId: selectedBusinessId as string },
+      }),
   });
 
   const run = data?.run ?? null;
   const items: ProfileCoverageItemDTO[] = data?.items ?? [];
   const actions: CoverageGapActionDTO[] = data?.actions ?? [];
+
 
   // Experiment 단계 실행 흐름 (비용은 Baseline/Follow-up 최종 확인 버튼에서만 발생)
   const flow = useExperimentFlow(activeOrgId ?? null, () => void refetch());
