@@ -15,7 +15,7 @@
  * - reasonCodes are internal only and must not be surfaced to the browser.
  */
 
-export const ENTITY_VERIFIER_VERSION = "0.1.0";
+export const ENTITY_VERIFIER_VERSION = "0.1.1";
 
 export type VerificationStatus =
   | "confirmed_business"
@@ -108,7 +108,11 @@ const NETWORK_SUFFIXES = [
   "딜러망",
 ];
 
-/** Strong proper-shop descriptors (intrinsic business evidence). */
+/**
+ * Strong proper-shop descriptors (intrinsic business evidence).
+ * v0.1.1: generic service words (튜닝) and non-identity qualifiers (전문점)
+ * removed — they describe a service, not a proper shop identity.
+ */
 const STRONG_DESCRIPTORS = [
   "모터스",
   "모터",
@@ -126,16 +130,44 @@ const STRONG_DESCRIPTORS = [
   "카케어",
   "오토",
   "auto",
-  "튜닝",
   "바디샵",
   "공임나라",
-  "전문점",
   "협력점",
   "상사",
 ];
 
-/** Branch / store markers. */
-const BRANCH_SUFFIXES = ["본점", "지점", "직영점", "분점", "협력점", "전문점", "대리점"];
+/** Branch / store markers (v0.1.1: 전문점 is not a branch marker). */
+const BRANCH_SUFFIXES = ["본점", "지점", "직영점", "분점", "협력점", "대리점"];
+
+/** Predicate / interrogative sentence endings (grammar, not vocabulary). */
+const SENTENCE_ENDING_RE =
+  /(나요|가요|까요|습니까|습니다|입니다|합니다|됩니다|는지|은지|는가|은가|인가|이라면|라면)[\s.?!*)\]:_"'`~-]*$/;
+
+/** Enumeration separators for service / attribute / checklist listings. */
+const ENUMERATION_SEPARATOR_RE = /[·ㆍ・,、/]/;
+const ENUMERATION_CONJUNCTION_RE = /(^|\s)(및|또는|등)(\s|$)/;
+
+/** Label / arrow style explanatory constructs. */
+const LABEL_CONSTRUCT_RE = /[:：]|→|=>/;
+
+/** Quantified plural shop expressions: 2~3곳, 몇 곳, 여러 곳 ... */
+const QUANTIFIED_PLACES_RE = /(\d+\s*[~\-–]\s*\d+\s*곳|\d+\s*곳|(몇|여러|두세|서너)\s*곳)/;
+
+/** Clause particles that mark a descriptive sentence fragment. */
+const CLAUSE_PARTICLES = ["에서", "에게", "으로", "에는", "까지", "부터", "와", "과", "을", "를", "이나", "거나"];
+
+const OFFICIAL_MARKERS = ["공식", "지정", "인증"];
+const SERVICE_CATEGORY_WORDS = [
+  "정비사업소",
+  "사업소",
+  "정비소",
+  "정비센터",
+  "서비스센터",
+  "서비스",
+  "정비",
+  "협력업체",
+];
+
 
 const NON_BUSINESS_ORIGINAL_KINDS = new Set([
   "advice",
@@ -154,9 +186,12 @@ function compact(text: string): string {
 
 export function isSentenceLike(displayName: string): boolean {
   const text = normalize(displayName);
-  if (text.length < SENTENCE_MIN_LENGTH) return text.includes("?");
+  if (text.includes("?")) return true;
+  if (SENTENCE_ENDING_RE.test(text)) return true;
+  if (text.length < SENTENCE_MIN_LENGTH) return false;
   return SENTENCE_MARKERS.some((marker) => text.includes(marker));
 }
+
 
 export function isHeadingLike(displayName: string): boolean {
   const c = compact(displayName);
@@ -165,9 +200,14 @@ export function isHeadingLike(displayName: string): boolean {
   return HEADING_SUFFIXES.some((suffix) => c === suffix || c.endsWith(suffix));
 }
 
+/** Category-only store suffixes: describe what is sold, not a branch identity. */
+const CATEGORY_STORE_SUFFIXES = ["전문점", "취급점", "판매점", "대행점"];
+
 export function hasBranchMarker(displayName: string): boolean {
   const c = compact(displayName);
+  if (CATEGORY_STORE_SUFFIXES.some((s) => c.endsWith(s))) return false;
   if (BRANCH_SUFFIXES.some((s) => c.endsWith(s))) return true;
+
   // "서비스센터 + 고유 지점명" (brand service center with a branch identifier)
   if (c.includes("서비스센터") && tokenCount(displayName) >= 3) return true;
   // generic "XX점" store marker, but not a single-syllable artifact
@@ -188,7 +228,66 @@ export function isGenericNetworkName(displayName: string): boolean {
   return !hasBranchMarker(displayName);
 }
 
+/**
+ * Structural negative detector: the candidate reads as an explanation,
+ * condition or checklist item rather than a proper shop name.
+ * Grammar-driven only — no brand / phrase blacklists.
+ */
+export function isDescriptiveCriteriaLike(displayName: string): boolean {
+  const text = normalize(displayName);
+  const c = compact(text);
+  if (c.length === 0) return false;
+
+  // label / arrow style explanatory construct ("성격: ...", "A → B")
+  if (LABEL_CONSTRUCT_RE.test(text)) return true;
+
+  // quantified plural shop expressions ("2~3곳", "몇 곳")
+  if (QUANTIFIED_PLACES_RE.test(text)) return true;
+
+  // condition / classification clauses
+  if (c.endsWith("경우") || c.endsWith("할때") || c.endsWith("일때")) return true;
+  if (c.includes("할때") || c.includes("인경우") || c.includes("는경우")) return true;
+  if (c.includes("계열") || c.includes("위주") || c.includes("종류별") || c.includes("유형별")) return true;
+
+  // multi-token clause carrying grammatical particles (subject/object/adverbial)
+  const tokens = text.split(" ");
+  if (tokens.length >= 3) {
+    const hasParticleToken = tokens.some((token, index) => {
+      if (index === tokens.length - 1) return false;
+      const t = token.replace(/[*_"'`~()[\]]/g, "");
+      return t.length >= 3 && CLAUSE_PARTICLES.some((p) => t.endsWith(p));
+    });
+    if (hasParticleToken) return true;
+  }
+  return false;
+}
+
+/**
+ * Structural negative detector: enumeration of services / attributes /
+ * checklist items rather than a single business identity.
+ */
+export function isServiceOrCriteriaEnumeration(displayName: string): boolean {
+  const text = normalize(displayName);
+  if (text.length === 0) return false;
+  if (ENUMERATION_SEPARATOR_RE.test(text)) return true;
+  if (ENUMERATION_CONJUNCTION_RE.test(text)) return true;
+  return false;
+}
+
+/**
+ * "official + generic service category" with no concrete branch identity,
+ * e.g. an official maintenance-shop category rather than a named shop.
+ */
+export function isGenericOfficialServiceCategory(displayName: string): boolean {
+  const c = compact(displayName);
+  if (c.length === 0) return false;
+  if (!OFFICIAL_MARKERS.some((m) => c.includes(m))) return false;
+  if (!SERVICE_CATEGORY_WORDS.some((w) => c.includes(w))) return false;
+  return !hasBranchMarker(displayName);
+}
+
 function tokenCount(displayName: string): number {
+
   const text = normalize(displayName);
   return text.length === 0 ? 0 : text.split(" ").length;
 }
@@ -260,6 +359,22 @@ export function verifyEntityMention(input: EntityVerificationInput): EntityVerif
   if (isGenericNetworkName(name)) {
     return result("rejected_non_business", "brand_network", false, "high", ["GENERIC_NETWORK"]);
   }
+  if (isServiceOrCriteriaEnumeration(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "SERVICE_ENUMERATION",
+    ]);
+  }
+  if (isDescriptiveCriteriaLike(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "DESCRIPTIVE_CRITERIA",
+    ]);
+  }
+  if (isGenericOfficialServiceCategory(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "GENERIC_OFFICIAL_CATEGORY",
+    ]);
+  }
+
   if (isHeadingLike(name)) {
     return result("rejected_non_business", "generic_category", false, "high", [
       "HEADING_CRITERIA_PHRASE",
