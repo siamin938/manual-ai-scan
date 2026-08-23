@@ -15,6 +15,7 @@ export type ReportBusinessDTO = {
   region: string | null;
   city: string | null;
   websiteUrl: string | null;
+  hasOfficialDomain: boolean;
 };
 
 export type ReportCoverageGapDTO = {
