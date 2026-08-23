@@ -856,6 +856,80 @@ export type Database = {
           },
         ]
       }
+      measurement_entity_verifications: {
+        Row: {
+          business_id: string
+          confidence: string
+          created_at: string
+          id: string
+          measurement_id: string
+          measurement_mention_id: string
+          org_id: string
+          reason_codes: string[]
+          verification_status: string
+          verified_count_as_business: boolean
+          verified_entity_kind: string
+          verifier_version: string
+        }
+        Insert: {
+          business_id: string
+          confidence: string
+          created_at?: string
+          id?: string
+          measurement_id: string
+          measurement_mention_id: string
+          org_id: string
+          reason_codes?: string[]
+          verification_status: string
+          verified_count_as_business?: boolean
+          verified_entity_kind: string
+          verifier_version: string
+        }
+        Update: {
+          business_id?: string
+          confidence?: string
+          created_at?: string
+          id?: string
+          measurement_id?: string
+          measurement_mention_id?: string
+          org_id?: string
+          reason_codes?: string[]
+          verification_status?: string
+          verified_count_as_business?: boolean
+          verified_entity_kind?: string
+          verifier_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_entity_verifications_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_verifications_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_verifications_measurement_mention_id_fkey"
+            columns: ["measurement_mention_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_mentions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_verifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_first_party_summaries: {
         Row: {
           business_id: string
