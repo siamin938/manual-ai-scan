@@ -63,6 +63,69 @@ export type Database = {
           },
         ]
       }
+      business_first_party_sources: {
+        Row: {
+          active: boolean
+          business_id: string
+          canonical_url: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          match_mode: string
+          normalized_host: string | null
+          org_id: string
+          resource_key: string | null
+          source_type: string
+          updated_at: string
+          verification_status: string
+        }
+        Insert: {
+          active?: boolean
+          business_id: string
+          canonical_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          match_mode: string
+          normalized_host?: string | null
+          org_id: string
+          resource_key?: string | null
+          source_type: string
+          updated_at?: string
+          verification_status?: string
+        }
+        Update: {
+          active?: boolean
+          business_id?: string
+          canonical_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          match_mode?: string
+          normalized_host?: string | null
+          org_id?: string
+          resource_key?: string | null
+          source_type?: string
+          updated_at?: string
+          verification_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_first_party_sources_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_first_party_sources_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       businesses: {
         Row: {
           active: boolean
@@ -1080,6 +1143,80 @@ export type Database = {
             columns: ["question_set_id"]
             isOneToOne: false
             referencedRelation: "question_sets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      measurement_source_classifications: {
+        Row: {
+          business_id: string
+          classification: string
+          classified_at: string
+          classifier_version: string
+          confidence: string
+          created_at: string
+          id: string
+          match_method: string | null
+          matched_first_party_source_id: string | null
+          measurement_source_id: string
+          org_id: string
+          source_type: string | null
+        }
+        Insert: {
+          business_id: string
+          classification: string
+          classified_at?: string
+          classifier_version: string
+          confidence?: string
+          created_at?: string
+          id?: string
+          match_method?: string | null
+          matched_first_party_source_id?: string | null
+          measurement_source_id: string
+          org_id: string
+          source_type?: string | null
+        }
+        Update: {
+          business_id?: string
+          classification?: string
+          classified_at?: string
+          classifier_version?: string
+          confidence?: string
+          created_at?: string
+          id?: string
+          match_method?: string | null
+          matched_first_party_source_id?: string | null
+          measurement_source_id?: string
+          org_id?: string
+          source_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_source_classifica_matched_first_party_source_i_fkey"
+            columns: ["matched_first_party_source_id"]
+            isOneToOne: false
+            referencedRelation: "business_first_party_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_source_classifications_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_source_classifications_measurement_source_id_fkey"
+            columns: ["measurement_source_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_source_classifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
