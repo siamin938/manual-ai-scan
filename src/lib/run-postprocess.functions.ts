@@ -180,7 +180,7 @@ export const runPostprocess = createServerFn({ method: "POST" })
 
     // 3f) insights
     try {
-      const { error } = await context.supabase.functions.invoke("compute-insights", {
+      const { error } = await context.supabase.functions.invoke("compute-insights-v021", {
         body: { run_id: data.runId, dry_run: false },
       });
       if (error) return fail(steps, "insights", "INSIGHTS_FAILED");
