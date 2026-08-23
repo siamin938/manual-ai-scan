@@ -78,6 +78,19 @@ function QuestionsPage() {
   const [openSet, setOpenSet] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_Q });
+  // --- AI 질문 추천 v0.1 상태 ---
+  const [openConfirmAi, setOpenConfirmAi] = useState(false);
+  const [aiCount, setAiCount] = useState("10");
+  const [openReview, setOpenReview] = useState(false);
+  const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
+  const [aiMeta, setAiMeta] = useState<{ model: string | null; estimatedCostUsd: number | null }>({
+    model: null,
+    estimatedCostUsd: null,
+  });
+  const [targetSetMode, setTargetSetMode] = useState<"existing" | "new">("new");
+  const [targetSetId, setTargetSetId] = useState("");
+  const [newSetName, setNewSetName] = useState("");
+
 
   const { data: businesses = [] } = useQuery({
     queryKey: ["client-businesses-min", activeOrgId],
