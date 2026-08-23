@@ -643,16 +643,20 @@ function JobDetail({
             ) : null}
           </div>
 
-          <div>
-            <p className="mb-1 text-xs font-semibold">감지된 업체 ({mentions.length})</p>
-            {mentions.length === 0 ? (
-              <p className="text-xs text-muted-foreground">감지된 업체가 없습니다.</p>
-            ) : (
-              <ul className="space-y-1 text-xs">
-                {mentions
-                  .slice()
-                  .sort((a, b) => a.position - b.position)
-                  .map((m) => (
+          {(() => {
+            const confirmed = mentions
+              .filter((m) => isConfirmedBusinessMention(m, targetBusinessId))
+              .slice()
+              .sort((a, b) => a.position - b.position);
+            return (
+              <div>
+                <p className="mb-1 text-xs font-semibold">감지된 업체 ({confirmed.length})</p>
+                {confirmed.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">확정된 업체가 없습니다.</p>
+                ) : (
+                  <ul className="space-y-1 text-xs">
+                    {confirmed.map((m) => (
+
                     <li key={m.id} className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{m.position}위 {m.display_name}</span>
                       {m.matched_business_id === targetBusinessId && targetBusinessId ? (
