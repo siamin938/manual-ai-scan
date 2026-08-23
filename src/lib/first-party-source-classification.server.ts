@@ -174,7 +174,7 @@ export async function backfillFirstPartySourceClassifications(args: {
       await classifyAndPersistBusinessSources({
         orgId: args.orgId,
         businessId,
-        batchSize: args.batchSize,
+        ...(args.batchSize === undefined ? {} : { batchSize: args.batchSize }),
       }),
     );
   }
