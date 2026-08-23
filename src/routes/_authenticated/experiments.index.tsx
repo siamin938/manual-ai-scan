@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/_authenticated/experiments")({
+export const Route = createFileRoute("/_authenticated/experiments/")({
   head: () => ({
     meta: [
       { title: "실험 관리 · AI Visibility Lab" },
