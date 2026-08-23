@@ -150,7 +150,7 @@ export const getCustomerReport = createServerFn({ method: "POST" })
 
     const { data: bizRows, error: bizErr } = await supabaseAdmin
       .from("businesses")
-      .select("id, name, category, region, city, website_url")
+      .select("id, name, category, region, city, website_url, official_domains")
       .eq("org_id", data.orgId)
       .eq("is_client_business", true)
       .eq("active", true)
@@ -164,6 +164,7 @@ export const getCustomerReport = createServerFn({ method: "POST" })
       region: b.region ?? null,
       city: b.city ?? null,
       websiteUrl: b.website_url ?? null,
+      hasOfficialDomain: Array.isArray(b.official_domains) && b.official_domains.length > 0,
     }));
 
     const business = data.businessId
