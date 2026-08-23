@@ -651,7 +651,11 @@ function QuestionsPage() {
 
           <p className="text-xs text-muted-foreground">
             {aiMeta.model ? `모델 ${aiMeta.model} · ` : ""}후보 {candidates.length}개
-            {aiMeta.estimatedCostUsd !== null ? ` · 예상 비용 $${aiMeta.estimatedCostUsd.toFixed(4)}` : ""}
+            {aiMeta.costStatus === "unpriced" && aiMeta.usage
+              ? ` · 비용 미확정 · 입력 ${aiMeta.usage.inputTokens ?? 0}토큰 · 출력 ${aiMeta.usage.outputTokens ?? 0}토큰`
+              : aiMeta.estimatedCostUsd !== null
+                ? ` · 설정상 요청당 상한 추정 $${aiMeta.estimatedCostUsd.toFixed(4)}`
+                : ""}
           </p>
 
           <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
