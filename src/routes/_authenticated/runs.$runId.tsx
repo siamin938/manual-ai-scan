@@ -11,6 +11,10 @@ import {
   type MentionFact,
 } from "@/lib/mention-business-filter";
 import { runPostprocess } from "@/lib/run-postprocess.functions";
+import {
+  ENTITY_VERIFIER_VERSION,
+  isVerifiedBusinessMention,
+} from "@/lib/entity-verification";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +76,27 @@ type Mention = MentionFact & {
 };
 
 
+type VerificationRow = {
+  measurement_mention_id: string;
+  verifier_version: string;
+  verification_status: string;
+  verified_count_as_business: boolean;
+};
+
+/**
+ * `measurement_entity_verifications` is applied by a separate Supabase migration
+ * and is not in the generated Database types yet. Read-only access through a
+ * narrowly typed loose view; reason codes are never selected.
+ */
+type LooseSelect = {
+  select: (columns: string) => LooseSelect;
+  eq: (column: string, value: unknown) => LooseSelect;
+  in: (column: string, values: readonly unknown[]) => LooseSelect;
+  then: <T>(
+    onfulfilled: (value: { data: VerificationRow[] | null; error: unknown }) => T,
+  ) => Promise<T>;
+};
+
 type Source = {
   id: string;
   measurement_id: string;
@@ -126,6 +151,7 @@ function RunDetailPage() {
       const mIds = measurementList.map((m) => m.id);
 
       let mentions: Mention[] = [];
+      const verifications = new Map<string, VerificationRow>();
       let sources: Source[] = [];
       if (mIds.length > 0) {
         const [mn, sr] = await Promise.all([
@@ -143,6 +169,20 @@ function RunDetailPage() {
         ]);
         mentions = (mn.data ?? []) as Mention[];
         sources = (sr.data ?? []) as Source[];
+
+        const mentionIds = mentions.map((m) => m.id);
+        if (mentionIds.length > 0) {
+          const { data: vRows } = await (
+            supabase as unknown as { from: (t: string) => LooseSelect }
+          )
+            .from("measurement_entity_verifications")
+            .select(
+              "measurement_mention_id, verifier_version, verification_status, verified_count_as_business",
+            )
+            .eq("verifier_version", ENTITY_VERIFIER_VERSION)
+            .in("measurement_mention_id", mentionIds);
+          for (const v of vRows ?? []) verifications.set(v.measurement_mention_id, v);
+        }
       }
 
       const ids = Array.from(new Set((jobs.data ?? []).map((j) => j.question_id)));
@@ -181,6 +221,7 @@ function RunDetailPage() {
         jobs: jobs.data ?? [],
         measurements: measurementList,
         mentions,
+        verifications,
         sources,
         overall: overall.data,
         byProvider: byProvider.data ?? [],
@@ -263,8 +304,16 @@ function RunDetailPage() {
 
   const validMeasurementCount =
     data.overall?.valid_n ?? data.measurements.filter((m) => m.valid).length;
+  const verifierApplied = data.verifications.size > 0;
+  const displayMentions = verifierApplied
+    ? data.mentions.filter(
+        (m) =>
+          (data.targetBusinessId && m.matched_business_id === data.targetBusinessId) ||
+          isVerifiedBusinessMention(data.verifications.get(m.id)),
+      )
+    : data.mentions;
   const shareRows = aggregateBusinessShare({
-    mentions: data.mentions,
+    mentions: displayMentions,
     targetBusinessId: data.targetBusinessId,
     validMeasurementCount: Number(validMeasurementCount ?? 0),
   });
@@ -435,7 +484,7 @@ function RunDetailPage() {
                                 job={j}
                                 prompt={data.prompts.get(j.question_id) ?? j.question_id}
                                 measurement={m ?? null}
-                                mentions={data.mentions.filter((x) => x.measurement_id === m?.id)}
+                                mentions={displayMentions.filter((x) => x.measurement_id === m?.id)}
                                 sources={data.sources.filter((x) => x.measurement_id === m?.id)}
                                 targetBusinessId={data.targetBusinessId}
                               />

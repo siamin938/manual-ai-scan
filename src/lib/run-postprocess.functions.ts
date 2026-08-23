@@ -73,6 +73,8 @@ export const runPostprocess = createServerFn({ method: "POST" })
 
     const businessId = run.business_id as string;
     const counts: PostprocessCounts = {
+      entityVerified: 0,
+      entityNeedsReview: 0,
       classifiedSources: 0,
       firstPartySources: 0,
       summarizedMeasurements: 0,
@@ -89,6 +91,21 @@ export const runPostprocess = createServerFn({ method: "POST" })
       return fail(steps, "reparse", "REPARSE_FAILED");
     }
     steps.reparse = "ok";
+
+    // 3a-2) entity verification (pure verifier over stored mention metadata)
+    try {
+      const { verifyAndPersistBusinessEntities } = await import("./entity-verification.server");
+      const summary = await verifyAndPersistBusinessEntities({
+        orgId: data.orgId,
+        businessId,
+        runId: data.runId,
+      });
+      counts.entityVerified = summary.confirmedBusinessCount;
+      counts.entityNeedsReview = summary.needsReviewCount;
+    } catch {
+      return fail(steps, "entityVerification", "ENTITY_VERIFICATION_FAILED");
+    }
+    steps.entityVerification = "ok";
 
     // 3b) first-party source classification
     try {

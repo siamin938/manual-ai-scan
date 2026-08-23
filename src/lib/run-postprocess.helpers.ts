@@ -9,6 +9,7 @@ export type PostprocessStepState = "pending" | "ok" | "failed" | "skipped";
 
 export type PostprocessSteps = {
   reparse: PostprocessStepState;
+  entityVerification: PostprocessStepState;
   sourceClassification: PostprocessStepState;
   measurementSummary: PostprocessStepState;
   profileCoverage: PostprocessStepState;
@@ -17,6 +18,8 @@ export type PostprocessSteps = {
 };
 
 export type PostprocessCounts = {
+  entityVerified: number;
+  entityNeedsReview: number;
   classifiedSources: number;
   firstPartySources: number;
   summarizedMeasurements: number;
@@ -33,6 +36,7 @@ export type RunPostprocessResultDTO = {
 
 export const POSTPROCESS_STEP_ORDER: (keyof PostprocessSteps)[] = [
   "reparse",
+  "entityVerification",
   "sourceClassification",
   "measurementSummary",
   "profileCoverage",
@@ -43,6 +47,7 @@ export const POSTPROCESS_STEP_ORDER: (keyof PostprocessSteps)[] = [
 export function initialSteps(): PostprocessSteps {
   return {
     reparse: "pending",
+    entityVerification: "pending",
     sourceClassification: "pending",
     measurementSummary: "pending",
     profileCoverage: "pending",
@@ -75,6 +80,7 @@ const SAFE_ERROR_CODES = new Set([
   "RUN_NOT_FOUND",
   "RUN_NOT_ELIGIBLE",
   "REPARSE_FAILED",
+  "ENTITY_VERIFICATION_FAILED",
   "SOURCE_CLASSIFICATION_FAILED",
   "MEASUREMENT_SUMMARY_FAILED",
   "PROFILE_COVERAGE_FAILED",
