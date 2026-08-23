@@ -94,8 +94,15 @@ function QuestionsPage() {
   const [aiCount, setAiCount] = useState("10");
   const [openReview, setOpenReview] = useState(false);
   const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
-  const [aiMeta, setAiMeta] = useState<{ model: string | null; estimatedCostUsd: number | null }>({
+  const [aiMeta, setAiMeta] = useState<{
+    model: string | null;
+    costStatus: string | null;
+    usage: { inputTokens?: number; outputTokens?: number } | null;
+    estimatedCostUsd: number | null;
+  }>({
     model: null,
+    costStatus: null,
+    usage: null,
     estimatedCostUsd: null,
   });
   const [targetSetMode, setTargetSetMode] = useState<"existing" | "new">("new");
@@ -222,6 +229,8 @@ function QuestionsPage() {
       return data as {
         suggestions?: unknown;
         model?: string;
+        costStatus?: string;
+        usage?: { inputTokens?: number; outputTokens?: number };
         estimatedCostUsd?: number;
         error?: string;
       };
@@ -239,6 +248,14 @@ function QuestionsPage() {
       setCandidates(list);
       setAiMeta({
         model: typeof data?.model === "string" ? data.model : null,
+        costStatus: typeof data?.costStatus === "string" ? data.costStatus : null,
+        usage:
+          data?.usage && typeof data.usage === "object"
+            ? {
+                ...(typeof data.usage.inputTokens === "number" ? { inputTokens: data.usage.inputTokens } : {}),
+                ...(typeof data.usage.outputTokens === "number" ? { outputTokens: data.usage.outputTokens } : {}),
+              }
+            : null,
         estimatedCostUsd: typeof data?.estimatedCostUsd === "number" ? data.estimatedCostUsd : null,
       });
       setTargetSetMode(setId ? "existing" : "new");
@@ -634,7 +651,11 @@ function QuestionsPage() {
 
           <p className="text-xs text-muted-foreground">
             {aiMeta.model ? `모델 ${aiMeta.model} · ` : ""}후보 {candidates.length}개
-            {aiMeta.estimatedCostUsd !== null ? ` · 예상 비용 $${aiMeta.estimatedCostUsd.toFixed(4)}` : ""}
+            {aiMeta.costStatus === "unpriced" && aiMeta.usage
+              ? ` · 비용 미확정 · 입력 ${aiMeta.usage.inputTokens ?? 0}토큰 · 출력 ${aiMeta.usage.outputTokens ?? 0}토큰`
+              : aiMeta.estimatedCostUsd !== null
+                ? ` · 설정상 요청당 상한 추정 $${aiMeta.estimatedCostUsd.toFixed(4)}`
+                : ""}
           </p>
 
           <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
