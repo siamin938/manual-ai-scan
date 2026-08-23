@@ -109,7 +109,7 @@ function stageLabel(e: ReportExperimentDTO): string {
   return "초안";
 }
 
-type HeadlineBlock = { label: string; value: string; sub?: string };
+type HeadlineBlock = { label: string; value: string; sub?: string | undefined };
 
 function buildHeadline(
   coverage: ReportCoverageDTO | null,
