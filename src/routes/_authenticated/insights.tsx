@@ -407,11 +407,32 @@ function InsightsPage() {
 
 
 
+  const businessSel = useClientBusinessSelection(activeOrgId);
+  const selectedBusinessId = businessSel.selectedBusinessId;
+
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["insight-overview", activeOrgId],
-    enabled: !!activeOrgId,
-    queryFn: () => fetchOverview({ data: { orgId: activeOrgId as string } }),
+    queryKey: ["insight-overview", activeOrgId, selectedBusinessId],
+    enabled: !!activeOrgId && !!selectedBusinessId,
+    queryFn: () =>
+      fetchOverview({
+        data: { orgId: activeOrgId as string, businessId: selectedBusinessId as string },
+      }),
   });
+
+  // 업체 전환 시 이전 업체 컨텍스트의 다이얼로그/입력 상태를 모두 초기화한다.
+  const handleBusinessChange = (id: string) => {
+    setOpenFinding(null);
+    setOpenAction(null);
+    setConfirmAction(null);
+    setBaselineTarget(null);
+    setApplyTarget(null);
+    setApplySummary("");
+    setApplyNote("");
+    setFollowupTarget(null);
+    setEvaluationTarget(null);
+    businessSel.select(id);
+  };
+
 
   const createExperiment = useMutation({
     // 클라이언트는 orgId와 insightActionId만 전달한다. 그 외 값은 서버가 결정한다.
