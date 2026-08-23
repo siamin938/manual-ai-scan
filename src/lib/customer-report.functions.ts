@@ -188,7 +188,7 @@ export const getCustomerReport = createServerFn({ method: "POST" })
     const { data: covRun } = await supabaseAdmin
       .from("profile_coverage_runs")
       .select(
-        "id, completed_at, question_count, covered_question_count, partial_question_count, missing_question_count, question_coverage_rate, measurement_coverage_rate, top3_coverage_rate, client_domain_citation_rate, coverage_score, evidence_grade",
+        "id, completed_at, question_count, covered_question_count, partial_question_count, missing_question_count, question_coverage_rate, measurement_coverage_rate, top3_coverage_rate, client_domain_citation_rate, client_first_party_citation_rate, first_party_classifier_version, coverage_score, evidence_grade",
       )
       .eq("org_id", data.orgId)
       .eq("business_id", business.id)
