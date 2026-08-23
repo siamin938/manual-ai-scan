@@ -30,6 +30,7 @@ const NAV = [
   { to: "/manual-checks", label: "수동 UI 점검" },
   { to: "/runs", label: "자동 측정" },
   { to: "/profile-coverage", label: "프로필 커버리지" },
+  { to: "/experiments", label: "실험 관리" },
   { to: "/insights", label: "AI 인사이트" },
   { to: "/reports/manual", label: "고객 보고서" },
 
