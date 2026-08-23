@@ -94,8 +94,15 @@ function QuestionsPage() {
   const [aiCount, setAiCount] = useState("10");
   const [openReview, setOpenReview] = useState(false);
   const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
-  const [aiMeta, setAiMeta] = useState<{ model: string | null; estimatedCostUsd: number | null }>({
+  const [aiMeta, setAiMeta] = useState<{
+    model: string | null;
+    costStatus: string | null;
+    usage: { inputTokens?: number; outputTokens?: number } | null;
+    estimatedCostUsd: number | null;
+  }>({
     model: null,
+    costStatus: null,
+    usage: null,
     estimatedCostUsd: null,
   });
   const [targetSetMode, setTargetSetMode] = useState<"existing" | "new">("new");
