@@ -83,12 +83,26 @@ function pct(value: number | null | undefined, digits = 1): string {
 }
 
 function stageLabel(e: ReportExperimentDTO): string {
+  const b = e.baseline;
+  const f = e.followup;
   if (e.evaluatedAt || e.status === "completed") return "완료";
-  if (e.followup.finalized) return "결과 비교 대기";
-  if (e.followup.runId) return "Follow-up 측정 중";
+
+  if (f.runId) {
+    if (f.runStatus === "completed" && !f.finalized) return "Follow-up 확정 필요";
+    if (f.runStatus === "draft") return "Follow-up 준비";
+    if (f.runStatus === "queued" || f.runStatus === "running") return "Follow-up 측정 중";
+    return "Follow-up 측정 중";
+  }
+  if (f.finalized) return "결과 비교 대기";
   if (e.interventionAt) return "Follow-up 대기";
-  if (e.baseline.finalized) return "변경 적용 대기";
-  if (e.baseline.runId) return "Baseline 측정 중";
+
+  if (b.runId) {
+    if (b.runStatus === "completed" && !b.finalized) return "Baseline 확정 필요";
+    if (b.runStatus === "draft") return "Baseline 준비";
+    if (b.runStatus === "queued" || b.runStatus === "running") return "Baseline 측정 중";
+    return "Baseline 측정 중";
+  }
+  if (b.finalized) return "변경 적용 대기";
   return "초안";
 }
 
