@@ -226,6 +226,7 @@ export const getInsightOverview = createServerFn({ method: "POST" })
           "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_start_at, followup_end_at, evaluated_at, result_classification, evidence_grade, source_insight_action_id, created_at",
         )
         .eq("org_id", data.orgId)
+        .eq("business_id", data.businessId)
         .eq("source_type", "insight_action")
         .in("source_insight_action_id", actionIds)
 
@@ -302,7 +303,7 @@ export const getInsightOverview = createServerFn({ method: "POST" })
         eligible_measurement_count: run.eligible_measurement_count,
         excluded_measurement_count: run.excluded_measurement_count,
         finding_count: run.finding_count,
-        business_name: businessRes.data?.name ?? null,
+        business_name: business.name,
       },
       evidence_grade: lowestGrade([
         ...findings.map((f) => f.evidence_grade),
