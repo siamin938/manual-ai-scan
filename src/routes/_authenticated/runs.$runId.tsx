@@ -194,6 +194,43 @@ function RunDetailPage() {
     },
   });
 
+  // ── 완료된 일반 Run 자동 후처리 (측정/Provider 호출 없음) ──────────────
+  const queryClient = useQueryClient();
+  const postprocessFn = useServerFn(runPostprocess);
+  const startedRef = useRef<string | null>(null);
+
+  const postprocess = useMutation({
+    mutationKey: ["run-postprocess", activeOrgId, runId],
+    mutationFn: async () => postprocessFn({ data: { orgId: activeOrgId!, runId } }),
+    onSuccess: async (res) => {
+      if (!res?.ok) return;
+      await queryClient.invalidateQueries({ queryKey: ["run-detail", runId, activeOrgId] });
+      await queryClient.invalidateQueries({ queryKey: ["profile-coverage"] });
+      await queryClient.invalidateQueries({ queryKey: ["insight-overview"] });
+    },
+  });
+
+  const runRow = data?.run;
+  const postprocessEligible =
+    !!activeOrgId &&
+    !!runRow &&
+    runRow.run_type === "audit" &&
+    runRow.phase === "standalone" &&
+    (runRow.status === "completed" || runRow.status === "partial");
+
+  const startPostprocess = postprocess.mutate;
+  useEffect(() => {
+    if (!postprocessEligible) return;
+    const key = `${activeOrgId}:${runId}`;
+    if (startedRef.current === key) return;
+    startedRef.current = key;
+    startPostprocess();
+  }, [postprocessEligible, activeOrgId, runId, startPostprocess]);
+
+  const postprocessFailed = postprocess.isError || postprocess.data?.ok === false;
+  const postprocessDone = postprocess.data?.ok === true;
+
+
   if (isLoading) {
     return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
   }
