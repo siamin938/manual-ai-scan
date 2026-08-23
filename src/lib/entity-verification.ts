@@ -108,7 +108,11 @@ const NETWORK_SUFFIXES = [
   "딜러망",
 ];
 
-/** Strong proper-shop descriptors (intrinsic business evidence). */
+/**
+ * Strong proper-shop descriptors (intrinsic business evidence).
+ * v0.1.1: generic service words (튜닝) and non-identity qualifiers (전문점)
+ * removed — they describe a service, not a proper shop identity.
+ */
 const STRONG_DESCRIPTORS = [
   "모터스",
   "모터",
@@ -126,16 +130,44 @@ const STRONG_DESCRIPTORS = [
   "카케어",
   "오토",
   "auto",
-  "튜닝",
   "바디샵",
   "공임나라",
-  "전문점",
   "협력점",
   "상사",
 ];
 
-/** Branch / store markers. */
-const BRANCH_SUFFIXES = ["본점", "지점", "직영점", "분점", "협력점", "전문점", "대리점"];
+/** Branch / store markers (v0.1.1: 전문점 is not a branch marker). */
+const BRANCH_SUFFIXES = ["본점", "지점", "직영점", "분점", "협력점", "대리점"];
+
+/** Predicate / interrogative sentence endings (grammar, not vocabulary). */
+const SENTENCE_ENDING_RE =
+  /(나요|가요|까요|습니까|습니다|입니다|합니다|됩니다|는지|은지|는가|은가|인가|이라면|라면)[\s.?!*)\]:_"'`~-]*$/;
+
+/** Enumeration separators for service / attribute / checklist listings. */
+const ENUMERATION_SEPARATOR_RE = /[·ㆍ・,、/]/;
+const ENUMERATION_CONJUNCTION_RE = /(^|\s)(및|또는|등)(\s|$)/;
+
+/** Label / arrow style explanatory constructs. */
+const LABEL_CONSTRUCT_RE = /[:：]|→|=>/;
+
+/** Quantified plural shop expressions: 2~3곳, 몇 곳, 여러 곳 ... */
+const QUANTIFIED_PLACES_RE = /(\d+\s*[~\-–]\s*\d+\s*곳|\d+\s*곳|(몇|여러|두세|서너)\s*곳)/;
+
+/** Clause particles that mark a descriptive sentence fragment. */
+const CLAUSE_PARTICLES = ["에서", "에게", "으로", "에는", "까지", "부터", "와", "과", "을", "를", "이나", "거나"];
+
+const OFFICIAL_MARKERS = ["공식", "지정", "인증"];
+const SERVICE_CATEGORY_WORDS = [
+  "정비사업소",
+  "사업소",
+  "정비소",
+  "정비센터",
+  "서비스센터",
+  "서비스",
+  "정비",
+  "협력업체",
+];
+
 
 const NON_BUSINESS_ORIGINAL_KINDS = new Set([
   "advice",
