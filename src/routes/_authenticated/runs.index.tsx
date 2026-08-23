@@ -208,7 +208,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const [businessId, setBusinessId] = useState("");
   const [questionSetId, setQuestionSetId] = useState("");
   const [repetitions, setRepetitions] = useState("2");
-  const [maxCost, setMaxCost] = useState("1.00");
+  const [maxCost, setMaxCost] = useState("0.50");
   const [submitting, setSubmitting] = useState(false);
   const [draftRunId, setDraftRunId] = useState<string | null>(null);
 
