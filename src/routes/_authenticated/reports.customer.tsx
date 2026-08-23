@@ -59,6 +59,8 @@ const SOURCE_LABELS: Record<string, string> = {
 const OUTCOME_LABELS: Record<string, string> = {
   directional_improvement: "개선 방향성 관찰",
   directional_decline: "악화 방향성 관찰",
+  improved_signal: "개선 방향성 관찰",
+  worsened_signal: "악화 방향성 관찰",
   no_clear_change: "뚜렷한 변화 없음",
 };
 
