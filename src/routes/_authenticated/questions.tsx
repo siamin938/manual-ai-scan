@@ -365,6 +365,10 @@ function QuestionsPage() {
               <Button variant="outline" disabled={!businessId} onClick={() => setOpenSet(true)}>
                 질문 세트 추가
               </Button>
+              <Button variant="outline" disabled={!businessId} onClick={() => setOpenConfirmAi(true)}>
+                AI 질문 추천
+              </Button>
+
               <Button
                 disabled={!setId}
                 onClick={() => {
