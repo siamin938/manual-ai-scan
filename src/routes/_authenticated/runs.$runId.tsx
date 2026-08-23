@@ -62,16 +62,15 @@ const CONFIDENCE_LABELS: Record<string, string> = {
 
 const TERMINAL = new Set(["completed", "partial", "failed", "cancelled"]);
 
-type Mention = {
+type Mention = MentionFact & {
   id: string;
-  measurement_id: string;
-  matched_business_id: string | null;
-  display_name: string;
   matched_alias: string | null;
   position: number;
   explicit_rank: boolean;
   confidence: string;
+  resolution_confidence: string | null;
 };
+
 
 type Source = {
   id: string;
