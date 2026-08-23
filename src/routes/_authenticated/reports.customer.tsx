@@ -147,6 +147,9 @@ function CustomerReportPage() {
   }
 
   const { business, coverage, insight, experiments } = data;
+  const headline = buildHeadline(coverage, insight, experiments);
+
+
 
   return (
     <div className="print-page print-report space-y-6">
