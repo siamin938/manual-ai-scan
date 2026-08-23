@@ -14,11 +14,11 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authenticated/businesses'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedExperimentsRouteImport } from './routes/_authenticated/experiments'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
 import { Route as AuthenticatedProfileCoverageRouteImport } from './routes/_authenticated/profile-coverage'
 import { Route as AuthenticatedQuestionsRouteImport } from './routes/_authenticated/questions'
+import { Route as AuthenticatedExperimentsIndexRouteImport } from './routes/_authenticated/experiments.index'
 import { Route as AuthenticatedExperimentsExperimentIdRouteImport } from './routes/_authenticated/experiments.$experimentId'
 import { Route as AuthenticatedReportsManualRouteImport } from './routes/_authenticated/reports.manual'
 import { Route as AuthenticatedRunsIndexRouteImport } from './routes/_authenticated/runs.index'
@@ -48,12 +48,6 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedExperimentsRoute =
-  AuthenticatedExperimentsRouteImport.update({
-    id: '/experiments',
-    path: '/experiments',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
@@ -76,11 +70,17 @@ const AuthenticatedQuestionsRoute = AuthenticatedQuestionsRouteImport.update({
   path: '/questions',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedExperimentsIndexRoute =
+  AuthenticatedExperimentsIndexRouteImport.update({
+    id: '/experiments/',
+    path: '/experiments/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedExperimentsExperimentIdRoute =
   AuthenticatedExperimentsExperimentIdRouteImport.update({
-    id: '/$experimentId',
-    path: '/$experimentId',
-    getParentRoute: () => AuthenticatedExperimentsRoute,
+    id: '/experiments/$experimentId',
+    path: '/experiments/$experimentId',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedReportsManualRoute =
   AuthenticatedReportsManualRouteImport.update({
@@ -104,7 +104,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/experiments': typeof AuthenticatedExperimentsRouteWithChildren
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
@@ -112,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
   '/runs/$runId': typeof AuthenticatedRunsRunIdRoute
+  '/experiments/': typeof AuthenticatedExperimentsIndexRoute
   '/runs/': typeof AuthenticatedRunsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -119,7 +119,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/experiments': typeof AuthenticatedExperimentsRouteWithChildren
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
@@ -127,6 +126,7 @@ export interface FileRoutesByTo {
   '/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
   '/runs/$runId': typeof AuthenticatedRunsRunIdRoute
+  '/experiments': typeof AuthenticatedExperimentsIndexRoute
   '/runs': typeof AuthenticatedRunsIndexRoute
 }
 export interface FileRoutesById {
@@ -136,7 +136,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/businesses': typeof AuthenticatedBusinessesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/experiments': typeof AuthenticatedExperimentsRouteWithChildren
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
   '/_authenticated/profile-coverage': typeof AuthenticatedProfileCoverageRoute
@@ -144,6 +143,7 @@ export interface FileRoutesById {
   '/_authenticated/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
   '/_authenticated/reports/manual': typeof AuthenticatedReportsManualRoute
   '/_authenticated/runs/$runId': typeof AuthenticatedRunsRunIdRoute
+  '/_authenticated/experiments/': typeof AuthenticatedExperimentsIndexRoute
   '/_authenticated/runs/': typeof AuthenticatedRunsIndexRoute
 }
 export interface FileRouteTypes {
@@ -153,7 +153,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/businesses'
     | '/dashboard'
-    | '/experiments'
     | '/insights'
     | '/manual-checks'
     | '/profile-coverage'
@@ -161,6 +160,7 @@ export interface FileRouteTypes {
     | '/experiments/$experimentId'
     | '/reports/manual'
     | '/runs/$runId'
+    | '/experiments/'
     | '/runs/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -168,7 +168,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/businesses'
     | '/dashboard'
-    | '/experiments'
     | '/insights'
     | '/manual-checks'
     | '/profile-coverage'
@@ -176,6 +175,7 @@ export interface FileRouteTypes {
     | '/experiments/$experimentId'
     | '/reports/manual'
     | '/runs/$runId'
+    | '/experiments'
     | '/runs'
   id:
     | '__root__'
@@ -184,7 +184,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/businesses'
     | '/_authenticated/dashboard'
-    | '/_authenticated/experiments'
     | '/_authenticated/insights'
     | '/_authenticated/manual-checks'
     | '/_authenticated/profile-coverage'
@@ -192,6 +191,7 @@ export interface FileRouteTypes {
     | '/_authenticated/experiments/$experimentId'
     | '/_authenticated/reports/manual'
     | '/_authenticated/runs/$runId'
+    | '/_authenticated/experiments/'
     | '/_authenticated/runs/'
   fileRoutesById: FileRoutesById
 }
@@ -238,13 +238,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/experiments': {
-      id: '/_authenticated/experiments'
-      path: '/experiments'
-      fullPath: '/experiments'
-      preLoaderRoute: typeof AuthenticatedExperimentsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/insights': {
       id: '/_authenticated/insights'
       path: '/insights'
@@ -273,12 +266,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedQuestionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/experiments/': {
+      id: '/_authenticated/experiments/'
+      path: '/experiments'
+      fullPath: '/experiments/'
+      preLoaderRoute: typeof AuthenticatedExperimentsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/experiments/$experimentId': {
       id: '/_authenticated/experiments/$experimentId'
-      path: '/$experimentId'
+      path: '/experiments/$experimentId'
       fullPath: '/experiments/$experimentId'
       preLoaderRoute: typeof AuthenticatedExperimentsExperimentIdRouteImport
-      parentRoute: typeof AuthenticatedExperimentsRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reports/manual': {
       id: '/_authenticated/reports/manual'
@@ -304,44 +304,32 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedExperimentsRouteChildren {
-  AuthenticatedExperimentsExperimentIdRoute: typeof AuthenticatedExperimentsExperimentIdRoute
-}
-
-const AuthenticatedExperimentsRouteChildren: AuthenticatedExperimentsRouteChildren =
-  {
-    AuthenticatedExperimentsExperimentIdRoute:
-      AuthenticatedExperimentsExperimentIdRoute,
-  }
-
-const AuthenticatedExperimentsRouteWithChildren =
-  AuthenticatedExperimentsRoute._addFileChildren(
-    AuthenticatedExperimentsRouteChildren,
-  )
-
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedBusinessesRoute: typeof AuthenticatedBusinessesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedExperimentsRoute: typeof AuthenticatedExperimentsRouteWithChildren
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
   AuthenticatedProfileCoverageRoute: typeof AuthenticatedProfileCoverageRoute
   AuthenticatedQuestionsRoute: typeof AuthenticatedQuestionsRoute
+  AuthenticatedExperimentsExperimentIdRoute: typeof AuthenticatedExperimentsExperimentIdRoute
   AuthenticatedReportsManualRoute: typeof AuthenticatedReportsManualRoute
   AuthenticatedRunsRunIdRoute: typeof AuthenticatedRunsRunIdRoute
+  AuthenticatedExperimentsIndexRoute: typeof AuthenticatedExperimentsIndexRoute
   AuthenticatedRunsIndexRoute: typeof AuthenticatedRunsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBusinessesRoute: AuthenticatedBusinessesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedExperimentsRoute: AuthenticatedExperimentsRouteWithChildren,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
   AuthenticatedProfileCoverageRoute: AuthenticatedProfileCoverageRoute,
   AuthenticatedQuestionsRoute: AuthenticatedQuestionsRoute,
+  AuthenticatedExperimentsExperimentIdRoute:
+    AuthenticatedExperimentsExperimentIdRoute,
   AuthenticatedReportsManualRoute: AuthenticatedReportsManualRoute,
   AuthenticatedRunsRunIdRoute: AuthenticatedRunsRunIdRoute,
+  AuthenticatedExperimentsIndexRoute: AuthenticatedExperimentsIndexRoute,
   AuthenticatedRunsIndexRoute: AuthenticatedRunsIndexRoute,
 }
 
