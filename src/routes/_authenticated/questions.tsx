@@ -252,8 +252,8 @@ function QuestionsPage() {
         usage:
           data?.usage && typeof data.usage === "object"
             ? {
-                inputTokens: typeof data.usage.inputTokens === "number" ? data.usage.inputTokens : undefined,
-                outputTokens: typeof data.usage.outputTokens === "number" ? data.usage.outputTokens : undefined,
+                ...(typeof data.usage.inputTokens === "number" ? { inputTokens: data.usage.inputTokens } : {}),
+                ...(typeof data.usage.outputTokens === "number" ? { outputTokens: data.usage.outputTokens } : {}),
               }
             : null,
         estimatedCostUsd: typeof data?.estimatedCostUsd === "number" ? data.estimatedCostUsd : null,
