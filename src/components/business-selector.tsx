@@ -68,7 +68,7 @@ export function BusinessSelector({
   return (
     <div className="flex items-center gap-2">
       <span className="text-xs text-muted-foreground">대상 업체</span>
-      <Select value={value ?? undefined} onValueChange={onChange}>
+      <Select {...(value ? { value } : {})} onValueChange={onChange}>
         <SelectTrigger className="w-56">
           <SelectValue placeholder="대상 업체 선택" />
         </SelectTrigger>
