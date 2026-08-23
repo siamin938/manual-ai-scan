@@ -261,6 +261,15 @@ function RunDetailPage() {
     return entries.map(([k, v]) => `${CONFIDENCE_LABELS[k] ?? k} ${v}건`).join(" · ");
   })();
 
+  const validMeasurementCount =
+    data.overall?.valid_n ?? data.measurements.filter((m) => m.valid).length;
+  const shareRows = aggregateBusinessShare({
+    mentions: data.mentions,
+    targetBusinessId: data.targetBusinessId,
+    validMeasurementCount: Number(validMeasurementCount ?? 0),
+  });
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
