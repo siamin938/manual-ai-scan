@@ -491,14 +491,16 @@ function RunDetailPage() {
         </CardContent>
       </Card>
 
-      {/* 언급 업체 비교 */}
+      {/* 자동 발견 경쟁업체 · 언급 업체 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">경쟁업체 · 언급 업체 비교</CardTitle>
+          <CardTitle className="text-base">자동 발견 경쟁업체 · 언급 업체</CardTitle>
         </CardHeader>
         <CardContent>
-          {data.share.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">언급된 업체가 없습니다.</p>
+          {shareRows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              확정된 특정 업체 언급이 없습니다. 자동 분석 후처리가 끝나면 다시 표시됩니다.
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -511,8 +513,8 @@ function RunDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.share.map((s, i) => (
-                    <TableRow key={`${s.matched_business_id ?? s.display_name}-${i}`}>
+                  {shareRows.map((s) => (
+                    <TableRow key={s.key}>
                       <TableCell className="text-sm">
                         <span className="font-medium">{s.display_name}</span>
                         {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
@@ -521,13 +523,18 @@ function RunDetailPage() {
                           <Badge variant="secondary" className="ml-2">
                             등록 경쟁업체
                           </Badge>
-                        ) : null}
+                        ) : (
+                          <Badge variant="outline" className="ml-2">
+                            자동 발견
+                          </Badge>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right">{s.mention_count ?? 0}</TableCell>
-                      <TableCell className="text-right">{s.response_count ?? 0}</TableCell>
+                      <TableCell className="text-right">{s.mention_count}</TableCell>
+                      <TableCell className="text-right">{s.response_count}</TableCell>
                       <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
                     </TableRow>
                   ))}
+
                 </TableBody>
               </Table>
             </div>
