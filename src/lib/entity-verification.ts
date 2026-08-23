@@ -354,6 +354,22 @@ export function verifyEntityMention(input: EntityVerificationInput): EntityVerif
   if (isGenericNetworkName(name)) {
     return result("rejected_non_business", "brand_network", false, "high", ["GENERIC_NETWORK"]);
   }
+  if (isServiceOrCriteriaEnumeration(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "SERVICE_ENUMERATION",
+    ]);
+  }
+  if (isDescriptiveCriteriaLike(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "DESCRIPTIVE_CRITERIA",
+    ]);
+  }
+  if (isGenericOfficialServiceCategory(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "GENERIC_OFFICIAL_CATEGORY",
+    ]);
+  }
+
   if (isHeadingLike(name)) {
     return result("rejected_non_business", "generic_category", false, "high", [
       "HEADING_CRITERIA_PHRASE",
