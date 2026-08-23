@@ -82,9 +82,11 @@ export type ProfileCoverageOverviewDTO = {
 
 export const getProfileCoverageOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { orgId: string }) => {
+  .inputValidator((input: { orgId: string; businessId: string }) => {
     if (!input?.orgId || typeof input.orgId !== "string") throw new Error("INVALID_ORG");
-    return { orgId: input.orgId };
+    if (!input?.businessId || typeof input.businessId !== "string")
+      throw new Error("INVALID_BUSINESS");
+    return { orgId: input.orgId, businessId: input.businessId };
   })
   .handler(async ({ data, context }): Promise<ProfileCoverageOverviewDTO> => {
     const { data: membership, error: memErr } = await context.supabase
@@ -98,18 +100,33 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // 클라이언트가 보낸 businessId는 신뢰하지 않는다. org 범위의 활성 대상 업체만 허용.
+    const { data: business, error: bizErr } = await supabaseAdmin
+      .from("businesses")
+      .select("id, name")
+      .eq("id", data.businessId)
+      .eq("org_id", data.orgId)
+      .eq("is_client_business", true)
+      .eq("active", true)
+      .maybeSingle();
+    if (bizErr) throw new Error("BUSINESS_CHECK_FAILED");
+    if (!business) throw new Error("BUSINESS_NOT_AVAILABLE");
+
     const { data: run, error: runErr } = await supabaseAdmin
       .from("profile_coverage_runs")
       .select(
         "id, business_id, engine_version, completed_at, input_measurement_count, eligible_measurement_count, excluded_measurement_count, question_count, covered_question_count, partial_question_count, missing_question_count, question_coverage_rate, measurement_coverage_rate, top3_coverage_rate, repeat_stability_rate, client_domain_citation_rate, client_first_party_citation_rate, first_party_classifier_version, coverage_score, manual_review_count, manual_review_rate, evidence_grade",
       )
       .eq("org_id", data.orgId)
+      .eq("business_id", data.businessId)
       .eq("status", "completed")
       .order("completed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (runErr) throw new Error("RUN_QUERY_FAILED");
+    // 선택 업체에 결과가 없으면 다른 업체 run으로 fallback하지 않는다.
     if (!run) return { run: null, items: [], actions: [] };
+
 
     const [businessRes, itemsRes] = await Promise.all([
       supabaseAdmin
