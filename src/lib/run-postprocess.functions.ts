@@ -180,14 +180,32 @@ export const runPostprocess = createServerFn({ method: "POST" })
 
     // 3f) insights
     try {
-      const { error } = await context.supabase.functions.invoke("compute-insights-v021", {
-        body: { run_id: data.runId, dry_run: false },
-      });
-      if (error) return fail(steps, "insights", "INSIGHTS_FAILED");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: existingInsightRun, error: existingError } = await supabaseAdmin
+        .from("insight_engine_runs")
+        .select("id")
+        .eq("org_id", data.orgId)
+        .eq("business_id", businessId)
+        .eq("source_run_id", data.runId)
+        .eq("engine_version", "0.2.1")
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) return fail(steps, "insights", "INSIGHTS_FAILED");
+
+      if (!existingInsightRun) {
+        const { error } = await context.supabase.functions.invoke("compute-insights-v021", {
+          body: { run_id: data.runId, dry_run: false },
+        });
+        if (error) return fail(steps, "insights", "INSIGHTS_FAILED");
+      }
     } catch {
       return fail(steps, "insights", "INSIGHTS_FAILED");
     }
     steps.insights = "ok";
+
 
     return { ok: true, status: "completed", steps, counts };
   });
