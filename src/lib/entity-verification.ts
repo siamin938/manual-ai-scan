@@ -200,9 +200,14 @@ export function isHeadingLike(displayName: string): boolean {
   return HEADING_SUFFIXES.some((suffix) => c === suffix || c.endsWith(suffix));
 }
 
+/** Category-only store suffixes: describe what is sold, not a branch identity. */
+const CATEGORY_STORE_SUFFIXES = ["전문점", "취급점", "판매점", "대행점"];
+
 export function hasBranchMarker(displayName: string): boolean {
   const c = compact(displayName);
+  if (CATEGORY_STORE_SUFFIXES.some((s) => c.endsWith(s))) return false;
   if (BRANCH_SUFFIXES.some((s) => c.endsWith(s))) return true;
+
   // "서비스센터 + 고유 지점명" (brand service center with a branch identifier)
   if (c.includes("서비스센터") && tokenCount(displayName) >= 3) return true;
   // generic "XX점" store marker, but not a single-syllable artifact
