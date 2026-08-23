@@ -187,7 +187,7 @@ export const runPostprocess = createServerFn({ method: "POST" })
         .eq("org_id", data.orgId)
         .eq("business_id", businessId)
         .eq("source_run_id", data.runId)
-        .eq("engine_version", "0.2.1")
+        .eq("engine_version", "0.2.2")
         .eq("status", "completed")
         .order("created_at", { ascending: false })
         .limit(1)
@@ -196,7 +196,7 @@ export const runPostprocess = createServerFn({ method: "POST" })
       if (existingError) return fail(steps, "insights", "INSIGHTS_FAILED");
 
       if (!existingInsightRun) {
-        const { error } = await context.supabase.functions.invoke("compute-insights-v021", {
+        const { error } = await context.supabase.functions.invoke("compute-insights-v022", {
           body: { run_id: data.runId, dry_run: false },
         });
         if (error) return fail(steps, "insights", "INSIGHTS_FAILED");
