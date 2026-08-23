@@ -59,6 +59,8 @@ const SOURCE_LABELS: Record<string, string> = {
 const OUTCOME_LABELS: Record<string, string> = {
   directional_improvement: "개선 방향성 관찰",
   directional_decline: "악화 방향성 관찰",
+  improved_signal: "개선 방향성 관찰",
+  worsened_signal: "악화 방향성 관찰",
   no_clear_change: "뚜렷한 변화 없음",
 };
 
@@ -81,12 +83,26 @@ function pct(value: number | null | undefined, digits = 1): string {
 }
 
 function stageLabel(e: ReportExperimentDTO): string {
+  const b = e.baseline;
+  const f = e.followup;
   if (e.evaluatedAt || e.status === "completed") return "완료";
-  if (e.followup.finalized) return "결과 비교 대기";
-  if (e.followup.runId) return "Follow-up 측정 중";
+
+  if (f.runId) {
+    if (f.runStatus === "completed" && !f.finalized) return "Follow-up 확정 필요";
+    if (f.runStatus === "draft") return "Follow-up 준비";
+    if (f.runStatus === "queued" || f.runStatus === "running") return "Follow-up 측정 중";
+    return "Follow-up 측정 중";
+  }
+  if (f.finalized) return "결과 비교 대기";
   if (e.interventionAt) return "Follow-up 대기";
-  if (e.baseline.finalized) return "변경 적용 대기";
-  if (e.baseline.runId) return "Baseline 측정 중";
+
+  if (b.runId) {
+    if (b.runStatus === "completed" && !b.finalized) return "Baseline 확정 필요";
+    if (b.runStatus === "draft") return "Baseline 준비";
+    if (b.runStatus === "queued" || b.runStatus === "running") return "Baseline 측정 중";
+    return "Baseline 측정 중";
+  }
+  if (b.finalized) return "변경 적용 대기";
   return "초안";
 }
 
@@ -199,11 +215,22 @@ function CustomerReportPage() {
                     : `${coverage.coverageScore.toFixed(0)}/100`
                 }
               />
-              <Kpi label="질문 커버리지" value={pct(coverage?.questionCoverageRate)} />
+              <Kpi label="노출된 질문 비율" value={pct(coverage?.questionCoverageRate)} />
               <Kpi label="실제 답변 포함률" value={pct(coverage?.measurementCoverageRate)} />
               <Kpi label="Top3 노출률" value={pct(coverage?.top3CoverageRate)} />
-              <Kpi label="자사 도메인 인용률" value={pct(coverage?.clientDomainCitationRate)} />
+              <Kpi
+                label="자사 도메인 인용률"
+                value={
+                  business?.hasOfficialDomain
+                    ? pct(coverage?.clientDomainCitationRate)
+                    : "미등록"
+                }
+              />
             </div>
+            <p className="text-xs text-muted-foreground">
+              노출된 질문 비율은 전체 질문 중 AI 답변에 한 번 이상 업체가 포함된 질문의 비율입니다.
+              공식 도메인이 등록된 경우에만 인용률을 평가합니다.
+            </p>
             {coverage?.completedAt && (
               <p className="text-xs text-muted-foreground">
                 측정 기준 시각(KST): {formatSeoul(coverage.completedAt)}
