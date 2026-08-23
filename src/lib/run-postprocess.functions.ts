@@ -75,6 +75,8 @@ export const runPostprocess = createServerFn({ method: "POST" })
     const counts: PostprocessCounts = {
       entityVerified: 0,
       entityNeedsReview: 0,
+      canonicalMerged: 0,
+      canonicalStandalone: 0,
       classifiedSources: 0,
       firstPartySources: 0,
       summarizedMeasurements: 0,
@@ -106,6 +108,23 @@ export const runPostprocess = createServerFn({ method: "POST" })
       return fail(steps, "entityVerification", "ENTITY_VERIFICATION_FAILED");
     }
     steps.entityVerification = "ok";
+
+    // 3a-3) canonical entity resolution (pure resolver over verified mentions + stored sources)
+    try {
+      const { resolveAndPersistRunCanonicalEntities } = await import(
+        "./entity-canonical-resolver.server"
+      );
+      const summary = await resolveAndPersistRunCanonicalEntities({
+        orgId: data.orgId,
+        businessId,
+        runId: data.runId,
+      });
+      counts.canonicalMerged = summary.mergedCount;
+      counts.canonicalStandalone = summary.standaloneCount;
+    } catch {
+      return fail(steps, "entityCanonicalization", "ENTITY_CANONICALIZATION_FAILED");
+    }
+    steps.entityCanonicalization = "ok";
 
     // 3b) first-party source classification
     try {
