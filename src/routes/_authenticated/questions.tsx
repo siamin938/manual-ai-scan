@@ -229,6 +229,8 @@ function QuestionsPage() {
       return data as {
         suggestions?: unknown;
         model?: string;
+        costStatus?: string;
+        usage?: { inputTokens?: number; outputTokens?: number };
         estimatedCostUsd?: number;
         error?: string;
       };
@@ -246,6 +248,14 @@ function QuestionsPage() {
       setCandidates(list);
       setAiMeta({
         model: typeof data?.model === "string" ? data.model : null,
+        costStatus: typeof data?.costStatus === "string" ? data.costStatus : null,
+        usage:
+          data?.usage && typeof data.usage === "object"
+            ? {
+                inputTokens: typeof data.usage.inputTokens === "number" ? data.usage.inputTokens : undefined,
+                outputTokens: typeof data.usage.outputTokens === "number" ? data.usage.outputTokens : undefined,
+              }
+            : null,
         estimatedCostUsd: typeof data?.estimatedCostUsd === "number" ? data.estimatedCostUsd : null,
       });
       setTargetSetMode(setId ? "existing" : "new");
