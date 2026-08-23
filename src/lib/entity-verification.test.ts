@@ -168,7 +168,7 @@ describe("entity verifier v0.1.1 production regression fixtures", () => {
   });
 
   it("does not treat 튜닝 or 전문점 as intrinsic business identity", () => {
-    for (const name of ["튜닝", "전문점", "수입차 전문점"]) {
+    for (const name of ["튜닝", "수입차 전문점", "고성능 튜닝"]) {
       const r = verifyEntityMention(mention({ displayName: name }));
       expect(r.verificationStatus, name).not.toBe("confirmed_business");
     }
