@@ -1,9 +1,16 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
+import {
+  aggregateBusinessShare,
+  isConfirmedBusinessMention,
+  type MentionFact,
+} from "@/lib/mention-business-filter";
+import { runPostprocess } from "@/lib/run-postprocess.functions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ENGINE_LABEL, RUN_STATUS_LABELS, runStatusVariant } from "./runs.index";
+
 
 export const Route = createFileRoute("/_authenticated/runs/$runId")({
   head: () => ({
@@ -54,16 +62,15 @@ const CONFIDENCE_LABELS: Record<string, string> = {
 
 const TERMINAL = new Set(["completed", "partial", "failed", "cancelled"]);
 
-type Mention = {
+type Mention = MentionFact & {
   id: string;
-  measurement_id: string;
-  matched_business_id: string | null;
-  display_name: string;
   matched_alias: string | null;
   position: number;
   explicit_rank: boolean;
   confidence: string;
+  resolution_confidence: string | null;
 };
+
 
 type Source = {
   id: string;
@@ -86,7 +93,7 @@ function RunDetailPage() {
       return s && TERMINAL.has(s) ? false : 5000;
     },
     queryFn: async () => {
-      const [run, jobs, measurements, overall, byProvider, qMetrics, share] = await Promise.all([
+      const [run, jobs, measurements, overall, byProvider, qMetrics] = await Promise.all([
         supabase
           .from("measurement_runs")
           .select("*")
@@ -109,7 +116,7 @@ function RunDetailPage() {
         supabase.from("run_metrics_overall").select("*").eq("run_id", runId).maybeSingle(),
         supabase.from("run_metrics").select("*").eq("run_id", runId),
         supabase.from("question_metrics").select("*").eq("run_id", runId),
-        supabase.from("run_business_share").select("*").eq("run_id", runId),
+
       ]);
       if (run.error) throw run.error;
       if (jobs.error) throw jobs.error;
@@ -125,7 +132,7 @@ function RunDetailPage() {
           supabase
             .from("measurement_mentions")
             .select(
-              "id, measurement_id, matched_business_id, display_name, matched_alias, position, explicit_rank, confidence",
+              "id, measurement_id, matched_business_id, display_name, matched_alias, position, explicit_rank, confidence, entity_kind, specificity, count_as_confirmed_business, resolution_confidence",
             )
             .in("measurement_id", mIds)
             .order("position", { ascending: true }),
@@ -178,7 +185,6 @@ function RunDetailPage() {
         overall: overall.data,
         byProvider: byProvider.data ?? [],
         questionMetrics: qMetrics.data ?? [],
-        share: share.data ?? [],
         prompts,
         businessName,
         questionCount,
@@ -187,6 +193,43 @@ function RunDetailPage() {
       };
     },
   });
+
+  // ── 완료된 일반 Run 자동 후처리 (측정/Provider 호출 없음) ──────────────
+  const queryClient = useQueryClient();
+  const postprocessFn = useServerFn(runPostprocess);
+  const startedRef = useRef<string | null>(null);
+
+  const postprocess = useMutation({
+    mutationKey: ["run-postprocess", activeOrgId, runId],
+    mutationFn: async () => postprocessFn({ data: { orgId: activeOrgId!, runId } }),
+    onSuccess: async (res) => {
+      if (!res?.ok) return;
+      await queryClient.invalidateQueries({ queryKey: ["run-detail", runId, activeOrgId] });
+      await queryClient.invalidateQueries({ queryKey: ["profile-coverage"] });
+      await queryClient.invalidateQueries({ queryKey: ["insight-overview"] });
+    },
+  });
+
+  const runRow = data?.run;
+  const postprocessEligible =
+    !!activeOrgId &&
+    !!runRow &&
+    runRow.run_type === "audit" &&
+    runRow.phase === "standalone" &&
+    (runRow.status === "completed" || runRow.status === "partial");
+
+  const startPostprocess = postprocess.mutate;
+  useEffect(() => {
+    if (!postprocessEligible) return;
+    const key = `${activeOrgId}:${runId}`;
+    if (startedRef.current === key) return;
+    startedRef.current = key;
+    startPostprocess();
+  }, [postprocessEligible, activeOrgId, runId, startPostprocess]);
+
+  const postprocessFailed = postprocess.isError || postprocess.data?.ok === false;
+  const postprocessDone = postprocess.data?.ok === true;
+
 
   if (isLoading) {
     return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
@@ -218,6 +261,15 @@ function RunDetailPage() {
     return entries.map(([k, v]) => `${CONFIDENCE_LABELS[k] ?? k} ${v}건`).join(" · ");
   })();
 
+  const validMeasurementCount =
+    data.overall?.valid_n ?? data.measurements.filter((m) => m.valid).length;
+  const shareRows = aggregateBusinessShare({
+    mentions: data.mentions,
+    targetBusinessId: data.targetBusinessId,
+    validMeasurementCount: Number(validMeasurementCount ?? 0),
+  });
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -236,6 +288,46 @@ function RunDetailPage() {
           </Button>
         </div>
       </div>
+
+      {/* 자동 분석 후처리 상태 (추가 API 측정 비용 없음) */}
+      {postprocessEligible ? (
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-3 p-4">
+            {postprocessFailed ? (
+              <>
+                <Badge variant="destructive">자동 분석 후처리 확인 필요</Badge>
+                <span className="text-xs text-muted-foreground">
+                  일부 단계가 완료되지 않았습니다. 다시 시도할 수 있습니다.
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto"
+                  disabled={postprocess.isPending}
+                  onClick={() => postprocess.mutate()}
+                >
+                  다시 시도
+                </Button>
+              </>
+            ) : postprocessDone ? (
+              <>
+                <Badge variant="secondary">자동 분석 준비 완료</Badge>
+                <span className="text-xs text-muted-foreground">
+                  재분석 · 출처 분류 · 프로필 커버리지 · 인사이트가 갱신되었습니다.
+                </span>
+              </>
+            ) : (
+              <>
+                <Badge variant="secondary">자동 분석 후처리 중…</Badge>
+                <span className="text-xs text-muted-foreground">
+                  저장된 결과만 다시 계산합니다. 추가 API 측정 비용은 발생하지 않습니다.
+                </span>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
 
       {/* 측정 결과 요약 */}
       <Card>
@@ -399,14 +491,16 @@ function RunDetailPage() {
         </CardContent>
       </Card>
 
-      {/* 언급 업체 비교 */}
+      {/* 자동 발견 경쟁업체 · 언급 업체 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">경쟁업체 · 언급 업체 비교</CardTitle>
+          <CardTitle className="text-base">자동 발견 경쟁업체 · 언급 업체</CardTitle>
         </CardHeader>
         <CardContent>
-          {data.share.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">언급된 업체가 없습니다.</p>
+          {shareRows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              확정된 특정 업체 언급이 없습니다. 자동 분석 후처리가 끝나면 다시 표시됩니다.
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -419,8 +513,8 @@ function RunDetailPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.share.map((s, i) => (
-                    <TableRow key={`${s.matched_business_id ?? s.display_name}-${i}`}>
+                  {shareRows.map((s) => (
+                    <TableRow key={s.key}>
                       <TableCell className="text-sm">
                         <span className="font-medium">{s.display_name}</span>
                         {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
@@ -429,13 +523,18 @@ function RunDetailPage() {
                           <Badge variant="secondary" className="ml-2">
                             등록 경쟁업체
                           </Badge>
-                        ) : null}
+                        ) : (
+                          <Badge variant="outline" className="ml-2">
+                            자동 발견
+                          </Badge>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right">{s.mention_count ?? 0}</TableCell>
-                      <TableCell className="text-right">{s.response_count ?? 0}</TableCell>
+                      <TableCell className="text-right">{s.mention_count}</TableCell>
+                      <TableCell className="text-right">{s.response_count}</TableCell>
                       <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
                     </TableRow>
                   ))}
+
                 </TableBody>
               </Table>
             </div>
@@ -544,37 +643,45 @@ function JobDetail({
             ) : null}
           </div>
 
-          <div>
-            <p className="mb-1 text-xs font-semibold">감지된 업체 ({mentions.length})</p>
-            {mentions.length === 0 ? (
-              <p className="text-xs text-muted-foreground">감지된 업체가 없습니다.</p>
-            ) : (
-              <ul className="space-y-1 text-xs">
-                {mentions
-                  .slice()
-                  .sort((a, b) => a.position - b.position)
-                  .map((m) => (
-                    <li key={m.id} className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{m.position}위 {m.display_name}</span>
-                      {m.matched_business_id === targetBusinessId && targetBusinessId ? (
-                        <Badge>대상 업체</Badge>
-                      ) : m.matched_business_id ? (
-                        <Badge variant="secondary">등록 업체</Badge>
-                      ) : (
-                        <Badge variant="outline">미등록</Badge>
-                      )}
-                      {m.matched_alias ? (
-                        <span className="text-muted-foreground">별칭 {m.matched_alias}</span>
-                      ) : null}
-                      <span className="text-muted-foreground">
-                        {m.explicit_rank ? "명시적 순위" : "추정 순위"} · 신뢰도{" "}
-                        {CONFIDENCE_LABELS[m.confidence] ?? m.confidence}
-                      </span>
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </div>
+          {(() => {
+            const confirmed = mentions
+              .filter((m) => isConfirmedBusinessMention(m, targetBusinessId))
+              .slice()
+              .sort((a, b) => a.position - b.position);
+            return (
+              <div>
+                <p className="mb-1 text-xs font-semibold">감지된 업체 ({confirmed.length})</p>
+                {confirmed.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">확정된 업체가 없습니다.</p>
+                ) : (
+                  <ul className="space-y-1 text-xs">
+                    {confirmed.map((m) => (
+                      <li key={m.id} className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">
+                          {m.position}위 {m.display_name}
+                        </span>
+                        {m.matched_business_id === targetBusinessId && targetBusinessId ? (
+                          <Badge>대상 업체</Badge>
+                        ) : m.matched_business_id ? (
+                          <Badge variant="secondary">등록 업체</Badge>
+                        ) : (
+                          <Badge variant="outline">자동 발견</Badge>
+                        )}
+                        {m.matched_alias ? (
+                          <span className="text-muted-foreground">별칭 {m.matched_alias}</span>
+                        ) : null}
+                        <span className="text-muted-foreground">
+                          {m.explicit_rank ? "명시적 순위" : "추정 순위"} · 신뢰도{" "}
+                          {CONFIDENCE_LABELS[m.confidence] ?? m.confidence}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
+
 
           <div>
             <p className="mb-1 text-xs font-semibold">출처 ({sources.length})</p>
