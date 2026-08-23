@@ -197,6 +197,7 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
           "id, status, baseline_run_id, baseline_start_at, baseline_end_at, intervention_at, followup_run_id, followup_start_at, followup_end_at, evaluated_at, result_classification, evidence_grade, source_profile_coverage_item_id, created_at",
         )
         .eq("org_id", data.orgId)
+        .eq("business_id", data.businessId)
         .eq("source_type", "profile_coverage_item")
         .in(
           "source_profile_coverage_item_id",
@@ -281,7 +282,7 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
         id: run.id,
         engine_version: run.engine_version,
         completed_at: run.completed_at,
-        business_name: businessRes.data?.name ?? null,
+        business_name: business.name,
         input_measurement_count: run.input_measurement_count,
         eligible_measurement_count: run.eligible_measurement_count,
         excluded_measurement_count: run.excluded_measurement_count,
