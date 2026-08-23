@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/_authenticated/experiments")({
+export const Route = createFileRoute("/_authenticated/experiments/")({
   head: () => ({
     meta: [
       { title: "실험 관리 · AI Visibility Lab" },
@@ -203,15 +203,23 @@ function ExperimentsPage() {
                   <span className="text-xs text-muted-foreground">
                     생성일 {formatSeoul(e.createdAt)}
                   </span>
-                  {e.sourceType === "profile_coverage_item" ? (
-                    <Button asChild variant="outline" size="sm">
-                      <Link to="/profile-coverage">원본 보기</Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm">
+                      <Link to="/experiments/$experimentId" params={{ experimentId: e.experimentId }}>
+                        상세 보기
+                      </Link>
                     </Button>
-                  ) : e.sourceType === "insight_action" ? (
-                    <Button asChild variant="outline" size="sm">
-                      <Link to="/insights">원본 보기</Link>
-                    </Button>
-                  ) : null}
+                    {e.sourceType === "profile_coverage_item" ? (
+                      <Button asChild variant="outline" size="sm">
+                        <Link to="/profile-coverage">원본 보기</Link>
+                      </Button>
+                    ) : e.sourceType === "insight_action" ? (
+                      <Button asChild variant="outline" size="sm">
+                        <Link to="/insights">원본 보기</Link>
+                      </Button>
+                    ) : null}
+                  </div>
+
                 </div>
               </CardContent>
             </Card>
