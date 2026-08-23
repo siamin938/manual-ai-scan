@@ -142,9 +142,18 @@ function buildHeadline(
 
   const firstGap = coverage?.gaps[0];
   const waitingIntervention = experiments.filter(
-    (e) => e.baseline.finalized && !e.interventionAt,
+    (e) =>
+      !["cancelled", "completed"].includes(e.status) &&
+      e.baseline.finalized &&
+      !e.interventionAt,
   ).length;
-  const waitingFollowup = experiments.filter((e) => e.interventionAt && !e.followup.runId).length;
+  const waitingFollowup = experiments.filter(
+    (e) =>
+      !["cancelled", "completed"].includes(e.status) &&
+      !!e.interventionAt &&
+      !e.followup.runId,
+  ).length;
+
   const firstAction = insight?.actions[0];
 
   let nextStep = "—";
