@@ -583,6 +583,192 @@ function QuestionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={openConfirmAi} onOpenChange={(v) => !suggestAi.isPending && setOpenConfirmAi(v)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>AI로 질문 후보를 만들까요?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              대상 업체의 공개 기본 정보(업체명·업종·지역·도시)만 사용합니다. 내부 측정·분석 데이터는 AI에 보내지
+              않습니다.
+            </p>
+            <p className="font-medium text-foreground">AI 추천 생성 시 소액 API 비용이 발생합니다.</p>
+            <div className="space-y-2">
+              <Label htmlFor="ai-count">추천 개수</Label>
+              <Select value={aiCount} onValueChange={setAiCount}>
+                <SelectTrigger id="ai-count" className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[6, 7, 8, 9, 10, 11, 12].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}개
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setOpenConfirmAi(false)}
+              disabled={suggestAi.isPending}
+            >
+              취소
+            </Button>
+            <Button onClick={() => suggestAi.mutate()} disabled={suggestAi.isPending || !businessId}>
+              {suggestAi.isPending ? "생성 중…" : "질문 후보 생성"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openReview} onOpenChange={(v) => !saveSuggestions.isPending && setOpenReview(v)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>AI 추천 질문 검토</DialogTitle>
+          </DialogHeader>
+
+          <p className="text-xs text-muted-foreground">
+            {aiMeta.model ? `모델 ${aiMeta.model} · ` : ""}후보 {candidates.length}개
+            {aiMeta.estimatedCostUsd !== null ? ` · 예상 비용 $${aiMeta.estimatedCostUsd.toFixed(4)}` : ""}
+          </p>
+
+          <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
+            <div className="space-y-2">
+              <Label>저장 대상</Label>
+              <Select
+                value={targetSetMode}
+                onValueChange={(v) => setTargetSetMode(v as "existing" | "new")}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">새 질문 세트 생성</SelectItem>
+                  <SelectItem value="existing" disabled={sets.length === 0}>
+                    기존 질문 세트에 추가
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {targetSetMode === "new" ? (
+              <div className="space-y-2">
+                <Label htmlFor="ai-set-name">새 세트 이름</Label>
+                <Input
+                  id="ai-set-name"
+                  className="w-[260px]"
+                  value={newSetName}
+                  onChange={(e) => setNewSetName(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>질문 세트</Label>
+                <Select value={targetSetId} onValueChange={setTargetSetId}>
+                  <SelectTrigger className="w-[260px]">
+                    <SelectValue placeholder="질문 세트 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sets.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="ml-auto space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCandidates((cs) => cs.map((c) => ({ ...c, selected: true })))}
+              >
+                전체 선택
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCandidates((cs) => cs.map((c) => ({ ...c, selected: false })))}
+              >
+                전체 해제
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {candidates.map((c, i) => (
+              <div key={c.id} className="space-y-2 rounded-md border p-3">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    checked={c.selected}
+                    onCheckedChange={(v) =>
+                      setCandidates((cs) =>
+                        cs.map((x, xi) => (xi === i ? { ...x, selected: v === true } : x)),
+                      )
+                    }
+                  />
+                  <div className="flex-1 space-y-2">
+                    <Textarea
+                      rows={2}
+                      value={c.promptText}
+                      onChange={(e) =>
+                        setCandidates((cs) =>
+                          cs.map((x, xi) => (xi === i ? { ...x, promptText: e.target.value } : x)),
+                        )
+                      }
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Select
+                        value={c.intentType}
+                        onValueChange={(v) =>
+                          setCandidates((cs) =>
+                            cs.map((x, xi) =>
+                              xi === i ? { ...x, intentType: v as SuggestionCandidate["intentType"] } : x,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="w-[200px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ALLOWED_INTENTS.map((it) => (
+                            <SelectItem key={it} value={it}>
+                              {INTENT_LABELS[it]} ({it})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {c.containsBusinessName && (
+                        <Badge variant="destructive">업체명 포함 · 수정 권장</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => saveSuggestions.mutate()}
+              disabled={
+                saveSuggestions.isPending ||
+                selectedCount === 0 ||
+                (targetSetMode === "new" ? !newSetName.trim() : !targetSetId)
+              }
+            >
+              {saveSuggestions.isPending ? "등록 중…" : `선택 질문 등록 (${selectedCount})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+
   );
 }
