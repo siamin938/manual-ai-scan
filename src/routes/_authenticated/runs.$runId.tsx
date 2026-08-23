@@ -15,6 +15,7 @@ import {
   ENTITY_VERIFIER_VERSION,
   isVerifiedBusinessMention,
 } from "@/lib/entity-verification";
+import { RESOLVER_VERSION } from "@/lib/entity-canonical-resolver";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -88,13 +89,21 @@ type VerificationRow = {
  * and is not in the generated Database types yet. Read-only access through a
  * narrowly typed loose view; reason codes are never selected.
  */
-type LooseSelect = {
-  select: (columns: string) => LooseSelect;
-  eq: (column: string, value: unknown) => LooseSelect;
-  in: (column: string, values: readonly unknown[]) => LooseSelect;
+type LooseSelect<TRow> = {
+  select: (columns: string) => LooseSelect<TRow>;
+  eq: (column: string, value: unknown) => LooseSelect<TRow>;
+  in: (column: string, values: readonly unknown[]) => LooseSelect<TRow>;
   then: <T>(
-    onfulfilled: (value: { data: VerificationRow[] | null; error: unknown }) => T,
+    onfulfilled: (value: { data: TRow[] | null; error: unknown }) => T,
   ) => Promise<T>;
+};
+
+/** Canonical grouping only: reason codes / confidence are never selected. */
+type CanonicalRow = {
+  measurement_mention_id: string;
+  canonical_key: string;
+  canonical_display_name: string;
+  resolution_status: string;
 };
 
 type Source = {
@@ -152,6 +161,7 @@ function RunDetailPage() {
 
       let mentions: Mention[] = [];
       const verifications = new Map<string, VerificationRow>();
+      const canonicals = new Map<string, CanonicalRow>();
       let sources: Source[] = [];
       if (mIds.length > 0) {
         const [mn, sr] = await Promise.all([
@@ -173,7 +183,7 @@ function RunDetailPage() {
         const mentionIds = mentions.map((m) => m.id);
         if (mentionIds.length > 0) {
           const { data: vRows } = await (
-            supabase as unknown as { from: (t: string) => LooseSelect }
+            supabase as unknown as { from: (t: string) => LooseSelect<VerificationRow> }
           )
             .from("measurement_entity_verifications")
             .select(
@@ -182,6 +192,17 @@ function RunDetailPage() {
             .eq("verifier_version", ENTITY_VERIFIER_VERSION)
             .in("measurement_mention_id", mentionIds);
           for (const v of vRows ?? []) verifications.set(v.measurement_mention_id, v);
+
+          const { data: cRows } = await (
+            supabase as unknown as { from: (t: string) => LooseSelect<CanonicalRow> }
+          )
+            .from("measurement_entity_canonicalizations")
+            .select(
+              "measurement_mention_id, canonical_key, canonical_display_name, resolution_status",
+            )
+            .eq("resolver_version", RESOLVER_VERSION)
+            .in("measurement_mention_id", mentionIds);
+          for (const c of cRows ?? []) canonicals.set(c.measurement_mention_id, c);
         }
       }
 
@@ -222,6 +243,7 @@ function RunDetailPage() {
         measurements: measurementList,
         mentions,
         verifications,
+        canonicals,
         sources,
         overall: overall.data,
         byProvider: byProvider.data ?? [],
@@ -312,8 +334,15 @@ function RunDetailPage() {
           isVerifiedBusinessMention(data.verifications.get(m.id)),
       )
     : data.mentions;
+  // Canonical grouping: auto-discovered mentions are aggregated by canonical
+  // identity when a resolver row exists; otherwise the original display name.
+  const canonicalMentions = displayMentions.map((m) => {
+    const c = data.canonicals.get(m.id);
+    if (!c || m.matched_business_id) return m;
+    return { ...m, display_name: c.canonical_display_name || m.display_name };
+  });
   const shareRows = aggregateBusinessShare({
-    mentions: displayMentions,
+    mentions: canonicalMentions,
     targetBusinessId: data.targetBusinessId,
     validMeasurementCount: Number(validMeasurementCount ?? 0),
   });
