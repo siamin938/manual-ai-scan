@@ -250,6 +250,8 @@ export const getCustomerReport = createServerFn({ method: "POST" })
         measurementCoverageRate: covRun.measurement_coverage_rate,
         top3CoverageRate: covRun.top3_coverage_rate,
         clientDomainCitationRate: covRun.client_domain_citation_rate,
+        clientFirstPartyCitationRate: covRun.client_first_party_citation_rate,
+        firstPartyClassifierVersion: covRun.first_party_classifier_version,
         coverageScore: covRun.coverage_score === null ? null : Number(covRun.coverage_score),
         evidenceGrade: covRun.evidence_grade,
         gaps,
