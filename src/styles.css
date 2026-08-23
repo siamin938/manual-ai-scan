@@ -144,6 +144,11 @@
   }
 }
 
+@page {
+  size: A4 portrait;
+  margin: 12mm 10mm;
+}
+
 @media print {
   .no-print {
     display: none !important;
@@ -154,4 +159,43 @@
   .print-page {
     padding: 0 !important;
   }
+
+  .print-report {
+    font-size: 10.5pt;
+    line-height: 1.45;
+    color: #000;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .print-report h1 {
+    font-size: 16pt;
+  }
+  .print-report h2 {
+    font-size: 12pt;
+  }
+  .print-report .print-avoid-break,
+  .print-report table,
+  .print-report tr,
+  .print-report li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-report .print-section {
+    break-inside: auto;
+  }
+  .print-report thead {
+    display: table-header-group;
+  }
+  .print-report .print-first-page-end {
+    break-after: page;
+    page-break-after: always;
+  }
+  .print-report [class*="shadow"] {
+    box-shadow: none !important;
+  }
+  .print-report [data-slot="card"] {
+    background: #fff !important;
+    border: 1px solid #d4d4d8 !important;
+  }
 }
+

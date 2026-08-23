@@ -7,7 +7,10 @@ import { formatSeoul } from "@/lib/format";
 import {
   getCustomerReport,
   type ReportExperimentDTO,
+  type ReportCoverageDTO,
+  type ReportInsightDTO,
 } from "@/lib/customer-report.functions";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,7 +109,75 @@ function stageLabel(e: ReportExperimentDTO): string {
   return "초안";
 }
 
+type HeadlineBlock = { label: string; value: string; sub?: string | undefined };
+
+function buildHeadline(
+  coverage: ReportCoverageDTO | null,
+  insight: ReportInsightDTO | null,
+  experiments: ReportExperimentDTO[],
+): {
+  badge: string;
+  badgeVariant: "default" | "secondary" | "destructive" | "outline";
+  sentence: string;
+  blocks: HeadlineBlock[];
+} {
+  let badge = "측정 데이터 준비 필요";
+  let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
+  let sentence = "아직 자동 커버리지 측정 결과가 없어 현재 노출 상태를 요약할 수 없습니다.";
+
+  if (coverage) {
+    if (coverage.missingQuestionCount > 0) {
+      badge = "공개 정보 보강 우선";
+      badgeVariant = "destructive";
+    } else if (coverage.partialQuestionCount > 0) {
+      badge = "노출 안정화 필요";
+      badgeVariant = "secondary";
+    } else {
+      badge = "기본 커버리지 확보";
+      badgeVariant = "default";
+    }
+    sentence = `현재 ${coverage.questionCount}개 질문 중 ${coverage.missingQuestionCount}개가 미노출, ${coverage.partialQuestionCount}개가 일부 노출이며 실제 답변 포함률은 ${pct(coverage.measurementCoverageRate)}입니다.`;
+  }
+
+  const firstGap = coverage?.gaps[0];
+  const waitingIntervention = experiments.filter(
+    (e) => e.baseline.finalized && !e.interventionAt,
+  ).length;
+  const waitingFollowup = experiments.filter((e) => e.interventionAt && !e.followup.runId).length;
+  const firstAction = insight?.actions[0];
+
+  let nextStep = "—";
+  if (waitingIntervention > 0) {
+    nextStep = `${waitingIntervention}개 실험이 실제 변경 적용을 기다리고 있습니다.`;
+  } else if (waitingFollowup > 0) {
+    nextStep = `${waitingFollowup}개 실험이 Follow-up 측정을 기다리고 있습니다.`;
+  } else if (firstAction) {
+    nextStep = `우선 제안: ${firstAction.title}`;
+  }
+
+  const evaluatedCount = experiments.filter((e) => e.evaluatedAt).length;
+
+  return {
+    badge,
+    badgeVariant,
+    sentence,
+    blocks: [
+      {
+        label: "가장 먼저 보완할 영역",
+        value: firstGap?.title ?? "—",
+        sub: firstGap?.questionText ?? undefined,
+      },
+      { label: "다음 실행 단계", value: nextStep },
+      {
+        label: "검증 진행",
+        value: `실험 ${experiments.length}건 · 결과 확정 ${evaluatedCount}건`,
+      },
+    ],
+  };
+}
+
 function Kpi({ label, value }: { label: string; value: string }) {
+
   return (
     <Card>
       <CardContent className="p-4">
@@ -147,9 +218,12 @@ function CustomerReportPage() {
   }
 
   const { business, coverage, insight, experiments } = data;
+  const headline = buildHeadline(coverage, insight, experiments);
+
+
 
   return (
-    <div className="print-page space-y-6">
+    <div className="print-page print-report space-y-6">
       <div className="no-print flex flex-wrap items-center gap-2">
         {data.businesses.length > 0 && (
           <Select
@@ -203,10 +277,35 @@ function CustomerReportPage() {
 
       {business && (
         <>
+          {/* 한눈에 보는 결론 */}
+          <section className="print-section space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold">한눈에 보는 결론</h2>
+              <Badge variant={headline.badgeVariant}>{headline.badge}</Badge>
+            </div>
+            <Card className="print-avoid-break">
+              <CardContent className="space-y-4 p-4">
+                <p className="text-sm leading-relaxed">{headline.sentence}</p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {headline.blocks.map((b) => (
+                    <div key={b.label} className="rounded-md border p-3">
+                      <p className="text-xs text-muted-foreground">{b.label}</p>
+                      <p className="mt-1 text-sm font-medium">{b.value}</p>
+                      {b.sub && (
+                        <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{b.sub}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
           {/* ① 현재 AI 노출 상태 */}
-          <section className="space-y-3">
+          <section className="print-section space-y-3">
             <h2 className="text-lg font-semibold">① 현재 AI 노출 상태</h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+
               <Kpi
                 label="AI 커버리지 점수"
                 value={
@@ -239,10 +338,11 @@ function CustomerReportPage() {
           </section>
 
           {/* ② 현재 진단 요약 */}
-          <section className="space-y-3">
+          <section className="print-section print-first-page-end space-y-3">
             <h2 className="text-lg font-semibold">② 현재 진단 요약</h2>
             {coverage ? (
-              <Card>
+              <Card className="print-avoid-break">
+
                 <CardContent className="space-y-2 p-4 text-sm">
                   <p>
                     측정한 질문 총 {coverage.questionCount}개 중{" "}
@@ -271,12 +371,13 @@ function CustomerReportPage() {
           </section>
 
           {/* ③ 핵심 관찰 */}
-          <section className="space-y-3">
+          <section className="print-section space-y-3">
             <h2 className="text-lg font-semibold">③ 핵심 관찰</h2>
             {insight && insight.findings.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {insight.findings.map((f) => (
-                  <Card key={f.id}>
+                  <Card key={f.id} className="print-avoid-break">
+
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">{f.title}</CardTitle>
                     </CardHeader>
@@ -291,8 +392,9 @@ function CustomerReportPage() {
                         </p>
                       )}
                       <Badge variant="secondary">
-                        {GRADE_LABELS[f.evidenceGrade] ?? f.evidenceGrade}
+                        근거 수준: {GRADE_LABELS[f.evidenceGrade] ?? f.evidenceGrade}
                       </Badge>
+
                     </CardContent>
                   </Card>
                 ))}
@@ -303,12 +405,13 @@ function CustomerReportPage() {
           </section>
 
           {/* ④ 우선 보완 영역 */}
-          <section className="space-y-3">
+          <section className="print-section space-y-3">
             <h2 className="text-lg font-semibold">④ 우선 보완 영역</h2>
             {coverage && coverage.gaps.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {coverage.gaps.map((g) => (
-                  <Card key={g.id}>
+                  <Card key={g.id} className="print-avoid-break">
+
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between gap-2">
                         <CardTitle className="text-base">{g.title}</CardTitle>
@@ -345,36 +448,37 @@ function CustomerReportPage() {
           </section>
 
           {/* ⑤ 권장 다음 행동 */}
-          <section className="space-y-3">
+          <section className="print-section space-y-3">
             <h2 className="text-lg font-semibold">⑤ 권장 다음 행동</h2>
             {insight && insight.actions.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {insight.actions.map((a) => (
-                  <Card key={a.id}>
+                  <Card key={a.id} className="print-avoid-break">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">{a.title}</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <p>
-                        <span className="text-xs font-medium">무엇을 할지 · </span>
-                        {a.recommendedAction}
-                      </p>
-                      <p className="text-muted-foreground">
-                        <span className="text-xs font-medium text-foreground">왜 · </span>
-                        {a.rationale}
-                      </p>
-                      <p className="text-muted-foreground">
-                        <span className="text-xs font-medium text-foreground">어떻게 검증 · </span>
-                        {a.validationPlan}
-                      </p>
+                    <CardContent className="space-y-3 text-sm">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">실행</p>
+                        <p className="mt-0.5">{a.recommendedAction}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">이유</p>
+                        <p className="mt-0.5 text-muted-foreground">{a.rationale}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">검증</p>
+                        <p className="mt-0.5 text-muted-foreground">{a.validationPlan}</p>
+                      </div>
                       <div className="flex flex-wrap gap-1">
                         <Badge variant="secondary">
-                          {GRADE_LABELS[a.evidenceGrade] ?? a.evidenceGrade}
+                          근거 수준: {GRADE_LABELS[a.evidenceGrade] ?? a.evidenceGrade}
                         </Badge>
                         {a.recommendationMode === "test" && (
                           <Badge variant="outline">검증이 필요한 테스트 제안</Badge>
                         )}
                       </div>
+
                     </CardContent>
                   </Card>
                 ))}
@@ -385,8 +489,9 @@ function CustomerReportPage() {
           </section>
 
           {/* ⑥ 실험 진행 현황 */}
-          <section className="space-y-3">
+          <section className="print-section space-y-3">
             <h2 className="text-lg font-semibold">⑥ 실험 진행 현황</h2>
+
             {experiments.length > 0 ? (
               <Card>
                 <CardContent className="p-0">
@@ -464,7 +569,8 @@ function CustomerReportPage() {
           </section>
 
           {/* ⑦ 면책 */}
-          <section className="space-y-2 border-t pt-4 text-xs text-muted-foreground">
+          <section className="print-section print-avoid-break space-y-2 border-t pt-4 text-xs text-muted-foreground">
+
             <h2 className="text-sm font-semibold text-foreground">보고서 해석 안내</h2>
             <p>
               본 보고서는 자동 API 측정, 인사이트 분석, 프로필 커버리지, 실험 데이터를 기반으로
