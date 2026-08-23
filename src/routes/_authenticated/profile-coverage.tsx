@@ -383,6 +383,16 @@ function ProfileCoveragePage() {
               description="응답 출처에 자사 공식 도메인이 인용된 비율입니다."
             />
             <MetricCard
+              title="First-party 출처 인용률"
+              value={
+                run.first_party_classifier_version === null ||
+                run.client_first_party_citation_rate === null
+                  ? "미집계"
+                  : pct(run.client_first_party_citation_rate)
+              }
+              description="응답 출처 중 검증된 자사 채널(자사 도메인, 네이버 플레이스/블로그)이 인용된 측정 비율입니다. 자사 도메인 인용률과는 별도 지표입니다."
+            />
+            <MetricCard
               title="반복 일관성"
               value={pct(run.repeat_stability_rate)}
               description="노출 또는 미노출 결과가 반복 측정에서 얼마나 일정했는지 나타내며, 높은 값이 좋은 노출을 의미하지 않습니다."
@@ -464,6 +474,7 @@ function ProfileCoveragePage() {
                         <TableHead className="text-right">최고 순위</TableHead>
                         <TableHead className="text-right">평균 순위</TableHead>
                         <TableHead className="text-right">도메인 인용률</TableHead>
+                        <TableHead className="text-right">First-party 인용률</TableHead>
                         <TableHead className="text-right">반복 일관성</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -489,6 +500,11 @@ function ProfileCoveragePage() {
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {pct(it.domain_citation_rate)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {it.first_party_classifier_version === null
+                              ? "미집계"
+                              : pct(it.first_party_citation_rate)}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {pct(it.repeat_stability)}

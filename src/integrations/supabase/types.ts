@@ -856,6 +856,70 @@ export type Database = {
           },
         ]
       }
+      measurement_first_party_summaries: {
+        Row: {
+          business_id: string
+          classifier_version: string
+          client_first_party_cited: boolean
+          created_at: string
+          first_party_source_count: number
+          id: string
+          low_confidence_source_count: number
+          measurement_id: string
+          org_id: string
+          source_count: number
+          summarized_at: string
+        }
+        Insert: {
+          business_id: string
+          classifier_version: string
+          client_first_party_cited?: boolean
+          created_at?: string
+          first_party_source_count?: number
+          id?: string
+          low_confidence_source_count?: number
+          measurement_id: string
+          org_id: string
+          source_count?: number
+          summarized_at?: string
+        }
+        Update: {
+          business_id?: string
+          classifier_version?: string
+          client_first_party_cited?: boolean
+          created_at?: string
+          first_party_source_count?: number
+          id?: string
+          low_confidence_source_count?: number
+          measurement_id?: string
+          org_id?: string
+          source_count?: number
+          summarized_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_first_party_summaries_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_first_party_summaries_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_first_party_summaries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_jobs: {
         Row: {
           actual_cost_usd: number
@@ -1448,6 +1512,9 @@ export type Database = {
           created_at: string
           domain_citation_rate: number
           domain_cited_count: number
+          first_party_citation_rate: number
+          first_party_cited_count: number
+          first_party_classifier_version: string | null
           id: string
           manual_review_count: number
           measurement_count: number
@@ -1468,6 +1535,9 @@ export type Database = {
           created_at?: string
           domain_citation_rate?: number
           domain_cited_count?: number
+          first_party_citation_rate?: number
+          first_party_cited_count?: number
+          first_party_classifier_version?: string | null
           id?: string
           manual_review_count?: number
           measurement_count?: number
@@ -1488,6 +1558,9 @@ export type Database = {
           created_at?: string
           domain_citation_rate?: number
           domain_cited_count?: number
+          first_party_citation_rate?: number
+          first_party_cited_count?: number
+          first_party_classifier_version?: string | null
           id?: string
           manual_review_count?: number
           measurement_count?: number
@@ -1514,6 +1587,7 @@ export type Database = {
           analysis_scope: Json
           business_id: string
           client_domain_citation_rate: number | null
+          client_first_party_citation_rate: number | null
           completed_at: string | null
           coverage_score: number | null
           covered_question_count: number
@@ -1522,6 +1596,7 @@ export type Database = {
           engine_version: string
           evidence_grade: string | null
           excluded_measurement_count: number
+          first_party_classifier_version: string | null
           id: string
           input_fingerprint: string
           input_measurement_count: number
@@ -1546,6 +1621,7 @@ export type Database = {
           analysis_scope?: Json
           business_id: string
           client_domain_citation_rate?: number | null
+          client_first_party_citation_rate?: number | null
           completed_at?: string | null
           coverage_score?: number | null
           covered_question_count?: number
@@ -1554,6 +1630,7 @@ export type Database = {
           engine_version?: string
           evidence_grade?: string | null
           excluded_measurement_count?: number
+          first_party_classifier_version?: string | null
           id?: string
           input_fingerprint: string
           input_measurement_count?: number
@@ -1578,6 +1655,7 @@ export type Database = {
           analysis_scope?: Json
           business_id?: string
           client_domain_citation_rate?: number | null
+          client_first_party_citation_rate?: number | null
           completed_at?: string | null
           coverage_score?: number | null
           covered_question_count?: number
@@ -1586,6 +1664,7 @@ export type Database = {
           engine_version?: string
           evidence_grade?: string | null
           excluded_measurement_count?: number
+          first_party_classifier_version?: string | null
           id?: string
           input_fingerprint?: string
           input_measurement_count?: number

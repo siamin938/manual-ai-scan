@@ -24,6 +24,10 @@ export type ProfileCoverageItemDTO = {
   best_position: number | null;
   average_position: number | null;
   repeat_stability: number | null;
+  /** First-party 출처 인용 (classifier v0.1.0). 미집계면 version이 null */
+  first_party_cited_count: number;
+  first_party_citation_rate: number;
+  first_party_classifier_version: string | null;
 };
 
 export type CoverageGapActionDTO = {
@@ -64,6 +68,8 @@ export type ProfileCoverageOverviewDTO = {
     top3_coverage_rate: number | null;
     repeat_stability_rate: number | null;
     client_domain_citation_rate: number | null;
+    client_first_party_citation_rate: number | null;
+    first_party_classifier_version: string | null;
     coverage_score: number | null;
     manual_review_count: number;
     manual_review_rate: number | null;
@@ -95,7 +101,7 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
     const { data: run, error: runErr } = await supabaseAdmin
       .from("profile_coverage_runs")
       .select(
-        "id, business_id, engine_version, completed_at, input_measurement_count, eligible_measurement_count, excluded_measurement_count, question_count, covered_question_count, partial_question_count, missing_question_count, question_coverage_rate, measurement_coverage_rate, top3_coverage_rate, repeat_stability_rate, client_domain_citation_rate, coverage_score, manual_review_count, manual_review_rate, evidence_grade",
+        "id, business_id, engine_version, completed_at, input_measurement_count, eligible_measurement_count, excluded_measurement_count, question_count, covered_question_count, partial_question_count, missing_question_count, question_coverage_rate, measurement_coverage_rate, top3_coverage_rate, repeat_stability_rate, client_domain_citation_rate, client_first_party_citation_rate, first_party_classifier_version, coverage_score, manual_review_count, manual_review_rate, evidence_grade",
       )
       .eq("org_id", data.orgId)
       .eq("status", "completed")
@@ -115,7 +121,7 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
       supabaseAdmin
         .from("profile_coverage_items")
         .select(
-          "id, question_id, coverage_status, measurement_count, mentioned_count, mention_rate, top3_count, top3_rate, domain_citation_rate, manual_review_count, best_position, average_position, metrics",
+          "id, question_id, coverage_status, measurement_count, mentioned_count, mention_rate, top3_count, top3_rate, domain_citation_rate, first_party_cited_count, first_party_citation_rate, first_party_classifier_version, manual_review_count, best_position, average_position, metrics",
         )
         .eq("org_id", data.orgId)
         .eq("coverage_run_id", run.id),
@@ -154,6 +160,9 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
           top3_count: i.top3_count,
           top3_rate: Number(i.top3_rate),
           domain_citation_rate: Number(i.domain_citation_rate),
+          first_party_cited_count: Number(i.first_party_cited_count ?? 0),
+          first_party_citation_rate: Number(i.first_party_citation_rate ?? 0),
+          first_party_classifier_version: i.first_party_classifier_version ?? null,
           manual_review_count: i.manual_review_count,
           best_position: i.best_position,
           average_position: i.average_position === null ? null : Number(i.average_position),
@@ -275,6 +284,8 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
         top3_coverage_rate: run.top3_coverage_rate,
         repeat_stability_rate: run.repeat_stability_rate,
         client_domain_citation_rate: run.client_domain_citation_rate,
+        client_first_party_citation_rate: run.client_first_party_citation_rate,
+        first_party_classifier_version: run.first_party_classifier_version ?? null,
         coverage_score: run.coverage_score === null ? null : Number(run.coverage_score),
         manual_review_count: run.manual_review_count,
         manual_review_rate: run.manual_review_rate,
