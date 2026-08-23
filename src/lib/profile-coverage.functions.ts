@@ -128,21 +128,14 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
     if (!run) return { run: null, items: [], actions: [] };
 
 
-    const [businessRes, itemsRes] = await Promise.all([
-      supabaseAdmin
-        .from("businesses")
-        .select("name")
-        .eq("id", run.business_id)
-        .eq("org_id", data.orgId)
-        .maybeSingle(),
-      supabaseAdmin
-        .from("profile_coverage_items")
-        .select(
-          "id, question_id, coverage_status, measurement_count, mentioned_count, mention_rate, top3_count, top3_rate, domain_citation_rate, first_party_cited_count, first_party_citation_rate, first_party_classifier_version, manual_review_count, best_position, average_position, metrics",
-        )
-        .eq("org_id", data.orgId)
-        .eq("coverage_run_id", run.id),
-    ]);
+    const itemsRes = await supabaseAdmin
+      .from("profile_coverage_items")
+      .select(
+        "id, question_id, coverage_status, measurement_count, mentioned_count, mention_rate, top3_count, top3_rate, domain_citation_rate, first_party_cited_count, first_party_citation_rate, first_party_classifier_version, manual_review_count, best_position, average_position, metrics",
+      )
+      .eq("org_id", data.orgId)
+      .eq("coverage_run_id", run.id);
+
 
     const rawItems = itemsRes.data ?? [];
     const questionIds = [...new Set(rawItems.map((i) => i.question_id).filter(Boolean))] as string[];
