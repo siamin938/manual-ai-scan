@@ -215,11 +215,22 @@ function CustomerReportPage() {
                     : `${coverage.coverageScore.toFixed(0)}/100`
                 }
               />
-              <Kpi label="질문 커버리지" value={pct(coverage?.questionCoverageRate)} />
+              <Kpi label="노출된 질문 비율" value={pct(coverage?.questionCoverageRate)} />
               <Kpi label="실제 답변 포함률" value={pct(coverage?.measurementCoverageRate)} />
               <Kpi label="Top3 노출률" value={pct(coverage?.top3CoverageRate)} />
-              <Kpi label="자사 도메인 인용률" value={pct(coverage?.clientDomainCitationRate)} />
+              <Kpi
+                label="자사 도메인 인용률"
+                value={
+                  business?.hasOfficialDomain
+                    ? pct(coverage?.clientDomainCitationRate)
+                    : "미등록"
+                }
+              />
             </div>
+            <p className="text-xs text-muted-foreground">
+              노출된 질문 비율은 전체 질문 중 AI 답변에 한 번 이상 업체가 포함된 질문의 비율입니다.
+              공식 도메인이 등록된 경우에만 인용률을 평가합니다.
+            </p>
             {coverage?.completedAt && (
               <p className="text-xs text-muted-foreground">
                 측정 기준 시각(KST): {formatSeoul(coverage.completedAt)}
