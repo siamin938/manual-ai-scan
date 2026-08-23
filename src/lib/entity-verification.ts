@@ -223,7 +223,66 @@ export function isGenericNetworkName(displayName: string): boolean {
   return !hasBranchMarker(displayName);
 }
 
+/**
+ * Structural negative detector: the candidate reads as an explanation,
+ * condition or checklist item rather than a proper shop name.
+ * Grammar-driven only — no brand / phrase blacklists.
+ */
+export function isDescriptiveCriteriaLike(displayName: string): boolean {
+  const text = normalize(displayName);
+  const c = compact(text);
+  if (c.length === 0) return false;
+
+  // label / arrow style explanatory construct ("성격: ...", "A → B")
+  if (LABEL_CONSTRUCT_RE.test(text)) return true;
+
+  // quantified plural shop expressions ("2~3곳", "몇 곳")
+  if (QUANTIFIED_PLACES_RE.test(text)) return true;
+
+  // condition / classification clauses
+  if (c.endsWith("경우") || c.endsWith("할때") || c.endsWith("일때")) return true;
+  if (c.includes("할때") || c.includes("인경우") || c.includes("는경우")) return true;
+  if (c.includes("계열") || c.includes("위주") || c.includes("종류별") || c.includes("유형별")) return true;
+
+  // multi-token clause carrying grammatical particles (subject/object/adverbial)
+  const tokens = text.split(" ");
+  if (tokens.length >= 3) {
+    const hasParticleToken = tokens.some((token, index) => {
+      if (index === tokens.length - 1) return false;
+      const t = token.replace(/[*_"'`~()[\]]/g, "");
+      return t.length >= 3 && CLAUSE_PARTICLES.some((p) => t.endsWith(p));
+    });
+    if (hasParticleToken) return true;
+  }
+  return false;
+}
+
+/**
+ * Structural negative detector: enumeration of services / attributes /
+ * checklist items rather than a single business identity.
+ */
+export function isServiceOrCriteriaEnumeration(displayName: string): boolean {
+  const text = normalize(displayName);
+  if (text.length === 0) return false;
+  if (ENUMERATION_SEPARATOR_RE.test(text)) return true;
+  if (ENUMERATION_CONJUNCTION_RE.test(text)) return true;
+  return false;
+}
+
+/**
+ * "official + generic service category" with no concrete branch identity,
+ * e.g. an official maintenance-shop category rather than a named shop.
+ */
+export function isGenericOfficialServiceCategory(displayName: string): boolean {
+  const c = compact(displayName);
+  if (c.length === 0) return false;
+  if (!OFFICIAL_MARKERS.some((m) => c.includes(m))) return false;
+  if (!SERVICE_CATEGORY_WORDS.some((w) => c.includes(w))) return false;
+  return !hasBranchMarker(displayName);
+}
+
 function tokenCount(displayName: string): number {
+
   const text = normalize(displayName);
   return text.length === 0 ? 0 : text.split(" ").length;
 }
