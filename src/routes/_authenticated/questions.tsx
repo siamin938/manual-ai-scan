@@ -202,7 +202,107 @@ function QuestionsPage() {
     onError: (e: Error) => toast.error(`변경 실패: ${e.message}`),
   });
 
+  const suggestAi = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("suggest-questions", {
+        body: { orgId: activeOrgId, businessId, count: Number(aiCount) || 10 },
+      });
+      if (error) throw new Error(error.message);
+      return data as {
+        suggestions?: unknown;
+        model?: string;
+        estimatedCostUsd?: number;
+        error?: string;
+      };
+    },
+    onSuccess: (data) => {
+      if (data?.error) {
+        toast.error(mapSuggestError(data.error));
+        return;
+      }
+      const list = toCandidates(data?.suggestions, selectedBusiness?.name ?? "");
+      if (list.length === 0) {
+        toast.error("사용할 수 있는 질문 후보가 없습니다. 다시 시도해 주세요.");
+        return;
+      }
+      setCandidates(list);
+      setAiMeta({
+        model: typeof data?.model === "string" ? data.model : null,
+        estimatedCostUsd: typeof data?.estimatedCostUsd === "number" ? data.estimatedCostUsd : null,
+      });
+      setTargetSetMode(setId ? "existing" : "new");
+      setTargetSetId(setId);
+      setNewSetName(`${selectedBusiness?.name ?? "업체"} AI 추천 v1`);
+      setOpenConfirmAi(false);
+      setOpenReview(true);
+    },
+    onError: (e: Error) => toast.error(mapSuggestError(e.message)),
+  });
+
+  const saveSuggestions = useMutation({
+    mutationFn: async () => {
+      const selected = candidates.filter((c) => c.selected);
+      if (selected.length === 0) throw new Error("NO_SELECTION");
+
+      let destSetId = targetSetMode === "existing" ? targetSetId : "";
+      if (targetSetMode === "new") {
+        const { data, error } = await supabase
+          .from("question_sets")
+          .insert({ org_id: activeOrgId!, business_id: businessId, name: newSetName.trim() })
+          .select("id")
+          .single();
+        if (error) throw error;
+        destSetId = data.id as string;
+      }
+      if (!destSetId) throw new Error("NO_SET");
+
+      const { data: existing, error: exErr } = await supabase
+        .from("questions")
+        .select("prompt_text")
+        .eq("question_set_id", destSetId);
+      if (exErr) throw exErr;
+
+      const { kept, skipped } = dedupeForSave(
+        selected,
+        (existing ?? []).map((q) => q.prompt_text as string),
+      );
+      if (kept.length === 0) throw new Error("ALL_DUPLICATE");
+
+      const payloads = buildInsertPayloads(kept, {
+        orgId: activeOrgId!,
+        questionSetId: destSetId,
+        region: selectedBusiness?.region ?? null,
+        city: selectedBusiness?.city ?? null,
+      });
+      const { error } = await supabase.from("questions").insert(payloads);
+      if (error) throw error;
+      return { destSetId, inserted: kept.length, skipped };
+    },
+    onSuccess: (res) => {
+      toast.success(`${res.inserted}개 질문을 등록했습니다.`);
+      if (res.skipped > 0) toast.message(`중복 ${res.skipped}개는 제외했습니다.`);
+      setOpenReview(false);
+      setCandidates([]);
+      setSetId(res.destSetId);
+      qc.invalidateQueries({ queryKey: ["question-sets", activeOrgId, businessId] });
+      qc.invalidateQueries({ queryKey: ["questions", activeOrgId, res.destSetId] });
+    },
+    onError: (e: Error) => {
+      if (e.message === "ALL_DUPLICATE") {
+        toast.error("선택한 질문이 모두 기존 질문과 중복되어 등록하지 않았습니다.");
+        return;
+      }
+      if (e.message === "NO_SELECTION") {
+        toast.error("등록할 질문을 선택해 주세요.");
+        return;
+      }
+      toast.error(`등록 실패: ${e.message}`);
+    },
+  });
+
+  const selectedCount = candidates.filter((c) => c.selected).length;
   const nonPublic = questions.filter((q) => q.data_class !== "public");
+
 
   return (
     <div className="space-y-6">
