@@ -59,8 +59,41 @@ const QUESTION_MARKERS = [
 
 const LONG_TEXT_MIN_LENGTH = 12;
 
+/**
+ * Generic brand-network / service-network expressions. These describe a brand's
+ * dealer or repair network, not an individual competitor shop, so they are
+ * excluded from the auto-discovered competitor candidate layer.
+ * Matched only at the END of the name, so branch names like
+ * "르노코리아 서비스센터 진접정비" or "진접정비센터" stay.
+ */
+const GENERIC_NETWORK_SUFFIXES = [
+  "공식서비스네트워크",
+  "서비스네트워크",
+  "공식네트워크",
+  "공식서비스망",
+  "서비스망",
+  "정비네트워크",
+  "정비망",
+  "협력망",
+  "지정정비망",
+  "공식정비네트워크",
+  "딜러네트워크",
+  "네트워크",
+];
+
 function normalize(text: string): string {
   return text.replace(/\s+/g, " ").trim();
+}
+
+/** True when the name is a generic brand service-network expression. */
+export function isGenericNetworkPhrase(displayName: string): boolean {
+  const compact = normalize(displayName).replace(/\s+/g, "");
+  if (compact.length === 0) return false;
+  for (const suffix of GENERIC_NETWORK_SUFFIXES) {
+    if (compact === suffix) return true;
+    if (compact.endsWith(suffix)) return true;
+  }
+  return false;
 }
 
 /**
@@ -76,6 +109,8 @@ export function isObviousNonBusinessPhrase(displayName: string): boolean {
     if (compact === heading.replace(/\s+/g, "")) return true;
   }
 
+  if (isGenericNetworkPhrase(text)) return true;
+
   if (text.length >= LONG_TEXT_MIN_LENGTH) {
     for (const marker of QUESTION_MARKERS) {
       if (text.includes(marker)) return true;
@@ -83,6 +118,7 @@ export function isObviousNonBusinessPhrase(displayName: string): boolean {
   }
   return false;
 }
+
 
 /**
  * Is this mention allowed to appear as a business in the comparison card?
