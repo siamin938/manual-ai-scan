@@ -15,7 +15,7 @@
  * - reasonCodes are internal only and must not be surfaced to the browser.
  */
 
-export const ENTITY_VERIFIER_VERSION = "0.1.0";
+export const ENTITY_VERIFIER_VERSION = "0.1.1";
 
 export type VerificationStatus =
   | "confirmed_business"
