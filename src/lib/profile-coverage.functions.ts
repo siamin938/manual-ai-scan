@@ -284,6 +284,8 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
         top3_coverage_rate: run.top3_coverage_rate,
         repeat_stability_rate: run.repeat_stability_rate,
         client_domain_citation_rate: run.client_domain_citation_rate,
+        client_first_party_citation_rate: run.client_first_party_citation_rate,
+        first_party_classifier_version: run.first_party_classifier_version ?? null,
         coverage_score: run.coverage_score === null ? null : Number(run.coverage_score),
         manual_review_count: run.manual_review_count,
         manual_review_rate: run.manual_review_rate,
