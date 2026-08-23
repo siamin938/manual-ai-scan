@@ -104,3 +104,47 @@ describe("aggregateBusinessShare", () => {
     expect(rows[0]!.answer_share_pct).toBeNull();
   });
 });
+
+describe("generic network phrase filter", () => {
+  const NETWORK_NAMES = [
+    "르노코리아 공식 서비스 네트워크",
+    "공식 서비스 네트워크",
+    "서비스 네트워크",
+    "공식 서비스망",
+    "서비스망",
+    "정비 네트워크",
+    "정비망",
+  ];
+  const REAL_NAMES = [
+    "가르시아 팩토리",
+    "남양주 팀카본 수입차정비센터 공임나라 협력점",
+    "답모터스",
+    "르노코리아 서비스센터 진접정비",
+    "진접정비센터",
+    "코스모모터스",
+    "평택 코스모모터스",
+  ];
+
+  it("excludes generic brand service-network expressions", () => {
+    for (const name of NETWORK_NAMES) {
+      expect(isObviousNonBusinessPhrase(name)).toBe(true);
+      expect(isConfirmedBusinessMention(m({ display_name: name }), TARGET)).toBe(false);
+    }
+  });
+
+  it("keeps branch and service-center specific names", () => {
+    for (const name of REAL_NAMES) {
+      expect(isObviousNonBusinessPhrase(name)).toBe(false);
+      expect(isConfirmedBusinessMention(m({ display_name: name }), TARGET)).toBe(true);
+    }
+  });
+
+  it("keeps registered DB businesses even with network-like names", () => {
+    expect(
+      isConfirmedBusinessMention(
+        m({ display_name: "르노코리아 공식 서비스 네트워크", matched_business_id: "b-1" }),
+        TARGET,
+      ),
+    ).toBe(true);
+  });
+});
