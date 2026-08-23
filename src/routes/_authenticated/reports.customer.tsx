@@ -90,24 +90,25 @@ function stageLabel(e: ReportExperimentDTO): string {
   const f = e.followup;
   if (e.evaluatedAt || e.status === "completed") return "완료";
 
+  if (f.finalized) return "결과 비교 대기";
   if (f.runId) {
     if (f.runStatus === "completed" && !f.finalized) return "Follow-up 확정 필요";
     if (f.runStatus === "draft") return "Follow-up 준비";
     if (f.runStatus === "queued" || f.runStatus === "running") return "Follow-up 측정 중";
-    return "Follow-up 측정 중";
+    return "Follow-up 확인 필요";
   }
-  if (f.finalized) return "결과 비교 대기";
   if (e.interventionAt) return "Follow-up 대기";
 
+  if (b.finalized) return "변경 적용 대기";
   if (b.runId) {
     if (b.runStatus === "completed" && !b.finalized) return "Baseline 확정 필요";
     if (b.runStatus === "draft") return "Baseline 준비";
     if (b.runStatus === "queued" || b.runStatus === "running") return "Baseline 측정 중";
-    return "Baseline 측정 중";
+    return "Baseline 확인 필요";
   }
-  if (b.finalized) return "변경 적용 대기";
   return "초안";
 }
+
 
 type HeadlineBlock = { label: string; value: string; sub?: string | undefined };
 
@@ -141,9 +142,18 @@ function buildHeadline(
 
   const firstGap = coverage?.gaps[0];
   const waitingIntervention = experiments.filter(
-    (e) => e.baseline.finalized && !e.interventionAt,
+    (e) =>
+      !["cancelled", "completed"].includes(e.status) &&
+      e.baseline.finalized &&
+      !e.interventionAt,
   ).length;
-  const waitingFollowup = experiments.filter((e) => e.interventionAt && !e.followup.runId).length;
+  const waitingFollowup = experiments.filter(
+    (e) =>
+      !["cancelled", "completed"].includes(e.status) &&
+      !!e.interventionAt &&
+      !e.followup.runId,
+  ).length;
+
   const firstAction = insight?.actions[0];
 
   let nextStep = "—";
