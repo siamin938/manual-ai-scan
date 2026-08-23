@@ -314,8 +314,7 @@ function CustomerReportPage() {
           {/* ① 현재 AI 노출 상태 */}
           <section className="print-section space-y-3">
             <h2 className="text-lg font-semibold">① 현재 AI 노출 상태</h2>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               <Kpi
                 label="AI 커버리지 점수"
                 value={
@@ -335,10 +334,24 @@ function CustomerReportPage() {
                     : "미등록"
                 }
               />
+              <Kpi
+                label="First-party 출처 인용률"
+                value={
+                  coverage?.firstPartyClassifierVersion === null ||
+                  coverage?.firstPartyClassifierVersion === undefined ||
+                  coverage?.clientFirstPartyCitationRate === null ||
+                  coverage?.clientFirstPartyCitationRate === undefined
+                    ? "미집계"
+                    : pct(coverage.clientFirstPartyCitationRate)
+                }
+              />
             </div>
             <p className="text-xs text-muted-foreground">
               노출된 질문 비율은 전체 질문 중 AI 답변에 한 번 이상 업체가 포함된 질문의 비율입니다.
-              공식 도메인이 등록된 경우에만 인용률을 평가합니다.
+              자사 도메인 인용률은 등록된 공식 도메인이 인용된 측정 비율입니다.
+              First-party 출처 인용률은 검증된 자사 관리 출처(공식 도메인·네이버 플레이스·네이버 블로그 등)
+              중 하나 이상이 출처로 인용된 측정 비율입니다. 두 인용률은 서로 다른 지표이며, 인과적 보장을
+              의미하지 않습니다.
             </p>
             {coverage?.completedAt && (
               <p className="text-xs text-muted-foreground">
