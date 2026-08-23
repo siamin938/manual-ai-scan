@@ -7,7 +7,10 @@ import { formatSeoul } from "@/lib/format";
 import {
   getCustomerReport,
   type ReportExperimentDTO,
+  type ReportCoverageDTO,
+  type ReportInsightDTO,
 } from "@/lib/customer-report.functions";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,7 +109,75 @@ function stageLabel(e: ReportExperimentDTO): string {
   return "초안";
 }
 
+type HeadlineBlock = { label: string; value: string; sub?: string };
+
+function buildHeadline(
+  coverage: ReportCoverageDTO | null,
+  insight: ReportInsightDTO | null,
+  experiments: ReportExperimentDTO[],
+): {
+  badge: string;
+  badgeVariant: "default" | "secondary" | "destructive" | "outline";
+  sentence: string;
+  blocks: HeadlineBlock[];
+} {
+  let badge = "측정 데이터 준비 필요";
+  let badgeVariant: "default" | "secondary" | "destructive" | "outline" = "outline";
+  let sentence = "아직 자동 커버리지 측정 결과가 없어 현재 노출 상태를 요약할 수 없습니다.";
+
+  if (coverage) {
+    if (coverage.missingQuestionCount > 0) {
+      badge = "공개 정보 보강 우선";
+      badgeVariant = "destructive";
+    } else if (coverage.partialQuestionCount > 0) {
+      badge = "노출 안정화 필요";
+      badgeVariant = "secondary";
+    } else {
+      badge = "기본 커버리지 확보";
+      badgeVariant = "default";
+    }
+    sentence = `현재 ${coverage.questionCount}개 질문 중 ${coverage.missingQuestionCount}개가 미노출, ${coverage.partialQuestionCount}개가 일부 노출이며 실제 답변 포함률은 ${pct(coverage.measurementCoverageRate)}입니다.`;
+  }
+
+  const firstGap = coverage?.gaps[0];
+  const waitingIntervention = experiments.filter(
+    (e) => e.baseline.finalized && !e.interventionAt,
+  ).length;
+  const waitingFollowup = experiments.filter((e) => e.interventionAt && !e.followup.runId).length;
+  const firstAction = insight?.actions[0];
+
+  let nextStep = "—";
+  if (waitingIntervention > 0) {
+    nextStep = `${waitingIntervention}개 실험이 실제 변경 적용을 기다리고 있습니다.`;
+  } else if (waitingFollowup > 0) {
+    nextStep = `${waitingFollowup}개 실험이 Follow-up 측정을 기다리고 있습니다.`;
+  } else if (firstAction) {
+    nextStep = `우선 제안: ${firstAction.title}`;
+  }
+
+  const evaluatedCount = experiments.filter((e) => e.evaluatedAt).length;
+
+  return {
+    badge,
+    badgeVariant,
+    sentence,
+    blocks: [
+      {
+        label: "가장 먼저 보완할 영역",
+        value: firstGap?.title ?? "—",
+        sub: firstGap?.questionText ?? undefined,
+      },
+      { label: "다음 실행 단계", value: nextStep },
+      {
+        label: "검증 진행",
+        value: `실험 ${experiments.length}건 · 결과 확정 ${evaluatedCount}건`,
+      },
+    ],
+  };
+}
+
 function Kpi({ label, value }: { label: string; value: string }) {
+
   return (
     <Card>
       <CardContent className="p-4">
