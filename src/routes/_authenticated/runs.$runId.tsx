@@ -93,7 +93,7 @@ function RunDetailPage() {
       return s && TERMINAL.has(s) ? false : 5000;
     },
     queryFn: async () => {
-      const [run, jobs, measurements, overall, byProvider, qMetrics, share] = await Promise.all([
+      const [run, jobs, measurements, overall, byProvider, qMetrics] = await Promise.all([
         supabase
           .from("measurement_runs")
           .select("*")
@@ -116,7 +116,7 @@ function RunDetailPage() {
         supabase.from("run_metrics_overall").select("*").eq("run_id", runId).maybeSingle(),
         supabase.from("run_metrics").select("*").eq("run_id", runId),
         supabase.from("question_metrics").select("*").eq("run_id", runId),
-        supabase.from("run_business_share").select("*").eq("run_id", runId),
+
       ]);
       if (run.error) throw run.error;
       if (jobs.error) throw jobs.error;
@@ -132,7 +132,7 @@ function RunDetailPage() {
           supabase
             .from("measurement_mentions")
             .select(
-              "id, measurement_id, matched_business_id, display_name, matched_alias, position, explicit_rank, confidence",
+              "id, measurement_id, matched_business_id, display_name, matched_alias, position, explicit_rank, confidence, entity_kind, specificity, count_as_confirmed_business, resolution_confidence",
             )
             .in("measurement_id", mIds)
             .order("position", { ascending: true }),
@@ -185,7 +185,6 @@ function RunDetailPage() {
         overall: overall.data,
         byProvider: byProvider.data ?? [],
         questionMetrics: qMetrics.data ?? [],
-        share: share.data ?? [],
         prompts,
         businessName,
         questionCount,
