@@ -80,19 +80,23 @@ function QuestionsPage() {
   const [form, setForm] = useState({ ...EMPTY_Q });
 
   const { data: businesses = [] } = useQuery({
-    queryKey: ["businesses-min", activeOrgId],
+    queryKey: ["client-businesses-min", activeOrgId],
     enabled: !!activeOrgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("businesses")
-        .select("id, name, is_client_business")
+        .select("id, name, region, city")
         .eq("org_id", activeOrgId!)
         .eq("active", true)
+        .eq("is_client_business", true)
         .order("name");
       if (error) throw error;
       return data ?? [];
     },
   });
+
+  const selectedBusiness = businesses.find((b) => b.id === businessId) ?? null;
+
 
   const { data: sets = [] } = useQuery({
     queryKey: ["question-sets", activeOrgId, businessId],
