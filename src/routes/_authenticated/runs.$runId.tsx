@@ -289,6 +289,46 @@ function RunDetailPage() {
         </div>
       </div>
 
+      {/* 자동 분석 후처리 상태 (추가 API 측정 비용 없음) */}
+      {postprocessEligible ? (
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-3 p-4">
+            {postprocessFailed ? (
+              <>
+                <Badge variant="destructive">자동 분석 후처리 확인 필요</Badge>
+                <span className="text-xs text-muted-foreground">
+                  일부 단계가 완료되지 않았습니다. 다시 시도할 수 있습니다.
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-auto"
+                  disabled={postprocess.isPending}
+                  onClick={() => postprocess.mutate()}
+                >
+                  다시 시도
+                </Button>
+              </>
+            ) : postprocessDone ? (
+              <>
+                <Badge variant="secondary">자동 분석 준비 완료</Badge>
+                <span className="text-xs text-muted-foreground">
+                  재분석 · 출처 분류 · 프로필 커버리지 · 인사이트가 갱신되었습니다.
+                </span>
+              </>
+            ) : (
+              <>
+                <Badge variant="secondary">자동 분석 후처리 중…</Badge>
+                <span className="text-xs text-muted-foreground">
+                  저장된 결과만 다시 계산합니다. 추가 API 측정 비용은 발생하지 않습니다.
+                </span>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+
       {/* 측정 결과 요약 */}
       <Card>
         <CardHeader>
