@@ -303,10 +303,21 @@ export async function prepareBaselineSnapshotData(args: {
     org_id: orgId,
     business_id: experiment.business_id,
     source_type: sourceType,
+    // Legacy Edge Function (v5 enqueue-run / v9 process-measurement-job) compatibility shadow:
+    // The deployed parser only accepts typeof string for source_insight_action_id, so we serialize
+    // an empty string instead of null for profile_coverage_item sources. Authoritative lineage is
+    // always stored in the nullable experiments row columns (source_type, source_insight_action_id,
+    // source_profile_coverage_item_id); this field in the snapshot is lineage metadata only and is
+    // never used as a runtime lookup key or included in the condition hash.
     source_insight_action_id:
-      sourceType === "insight_action" ? experiment.source_insight_action_id : null,
+      sourceType === "insight_action"
+        ? experiment.source_insight_action_id
+        : sourceType === "profile_coverage_item"
+          ? ""
+          : null,
     source_profile_coverage_item_id:
       sourceType === "profile_coverage_item" ? experiment.source_profile_coverage_item_id : null,
+
 
     reference_source_run_id: sourceRun.id,
     question_set_id: questionSet.id,
