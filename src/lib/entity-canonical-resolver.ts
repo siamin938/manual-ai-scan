@@ -137,7 +137,7 @@ export function coreNameVariants(displayName: string): string[] {
     }
     // trailing token alone (e.g. `X 서비스센터 Y` -> `Y`)
     const last = tokens[tokens.length - 1]!;
-    if (stripGenericMarkers(compactName(last)).length >= 3) push(last);
+    if (stripGenericMarkers(compactName(last)).length >= 4) push(last);
   }
   return Array.from(variants).sort();
 }
