@@ -39,6 +39,8 @@ export type ReportCoverageDTO = {
   measurementCoverageRate: number | null;
   top3CoverageRate: number | null;
   clientDomainCitationRate: number | null;
+  clientFirstPartyCitationRate: number | null;
+  firstPartyClassifierVersion: string | null;
   coverageScore: number | null;
   evidenceGrade: string | null;
   gaps: ReportCoverageGapDTO[];
