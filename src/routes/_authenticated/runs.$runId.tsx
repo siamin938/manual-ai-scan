@@ -656,28 +656,32 @@ function JobDetail({
                 ) : (
                   <ul className="space-y-1 text-xs">
                     {confirmed.map((m) => (
+                      <li key={m.id} className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">
+                          {m.position}위 {m.display_name}
+                        </span>
+                        {m.matched_business_id === targetBusinessId && targetBusinessId ? (
+                          <Badge>대상 업체</Badge>
+                        ) : m.matched_business_id ? (
+                          <Badge variant="secondary">등록 업체</Badge>
+                        ) : (
+                          <Badge variant="outline">자동 발견</Badge>
+                        )}
+                        {m.matched_alias ? (
+                          <span className="text-muted-foreground">별칭 {m.matched_alias}</span>
+                        ) : null}
+                        <span className="text-muted-foreground">
+                          {m.explicit_rank ? "명시적 순위" : "추정 순위"} · 신뢰도{" "}
+                          {CONFIDENCE_LABELS[m.confidence] ?? m.confidence}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
 
-                    <li key={m.id} className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{m.position}위 {m.display_name}</span>
-                      {m.matched_business_id === targetBusinessId && targetBusinessId ? (
-                        <Badge>대상 업체</Badge>
-                      ) : m.matched_business_id ? (
-                        <Badge variant="secondary">등록 업체</Badge>
-                      ) : (
-                        <Badge variant="outline">미등록</Badge>
-                      )}
-                      {m.matched_alias ? (
-                        <span className="text-muted-foreground">별칭 {m.matched_alias}</span>
-                      ) : null}
-                      <span className="text-muted-foreground">
-                        {m.explicit_rank ? "명시적 순위" : "추정 순위"} · 신뢰도{" "}
-                        {CONFIDENCE_LABELS[m.confidence] ?? m.confidence}
-                      </span>
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </div>
 
           <div>
             <p className="mb-1 text-xs font-semibold">출처 ({sources.length})</p>
