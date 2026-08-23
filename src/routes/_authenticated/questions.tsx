@@ -29,6 +29,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ALLOWED_INTENTS,
+  INTENT_LABELS,
+  buildInsertPayloads,
+  dedupeForSave,
+  mapSuggestError,
+  toCandidates,
+  type SuggestionCandidate,
+} from "@/lib/question-suggestions";
+
 
 export const Route = createFileRoute("/_authenticated/questions")({
   head: () => ({
