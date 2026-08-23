@@ -856,6 +856,90 @@ export type Database = {
           },
         ]
       }
+      measurement_entity_canonicalizations: {
+        Row: {
+          business_id: string
+          canonical_display_name: string
+          canonical_key: string
+          confidence: string
+          created_at: string
+          id: string
+          measurement_id: string
+          measurement_mention_id: string
+          org_id: string
+          reason_codes: string[]
+          resolution_status: string
+          resolver_version: string
+          source_run_id: string
+        }
+        Insert: {
+          business_id: string
+          canonical_display_name: string
+          canonical_key: string
+          confidence: string
+          created_at?: string
+          id?: string
+          measurement_id: string
+          measurement_mention_id: string
+          org_id: string
+          reason_codes?: string[]
+          resolution_status: string
+          resolver_version: string
+          source_run_id: string
+        }
+        Update: {
+          business_id?: string
+          canonical_display_name?: string
+          canonical_key?: string
+          confidence?: string
+          created_at?: string
+          id?: string
+          measurement_id?: string
+          measurement_mention_id?: string
+          org_id?: string
+          reason_codes?: string[]
+          resolution_status?: string
+          resolver_version?: string
+          source_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_entity_canonicalization_measurement_mention_id_fkey"
+            columns: ["measurement_mention_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_mentions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_canonicalizations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_canonicalizations_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_canonicalizations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_canonicalizations_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_entity_verifications: {
         Row: {
           business_id: string
