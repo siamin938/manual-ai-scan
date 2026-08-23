@@ -100,9 +100,11 @@ function lowestGrade(values: string[]): string | null {
 
 export const getInsightOverview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { orgId: string }) => {
+  .inputValidator((input: { orgId: string; businessId: string }) => {
     if (!input?.orgId || typeof input.orgId !== "string") throw new Error("INVALID_ORG");
-    return { orgId: input.orgId };
+    if (!input?.businessId || typeof input.businessId !== "string")
+      throw new Error("INVALID_BUSINESS");
+    return { orgId: input.orgId, businessId: input.businessId };
   })
   .handler(async ({ data, context }): Promise<InsightOverviewDTO> => {
     // 조직 소속 검증: 사용자 권한 클라이언트로 확인 (RLS 적용)
@@ -117,23 +119,37 @@ export const getInsightOverview = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // 클라이언트 입력 businessId는 신뢰하지 않는다. org 범위의 활성 대상 업체만 허용.
+    const { data: business, error: bizErr } = await supabaseAdmin
+      .from("businesses")
+      .select("id, name")
+      .eq("id", data.businessId)
+      .eq("org_id", data.orgId)
+      .eq("is_client_business", true)
+      .eq("active", true)
+      .maybeSingle();
+    if (bizErr) throw new Error("BUSINESS_CHECK_FAILED");
+    if (!business) throw new Error("BUSINESS_NOT_AVAILABLE");
+
     const { data: run, error: runErr } = await supabaseAdmin
       .from("insight_engine_runs")
       .select(
         "id, org_id, business_id, engine_version, completed_at, created_at, input_measurement_count, eligible_measurement_count, excluded_measurement_count, finding_count",
       )
       .eq("org_id", data.orgId)
+      .eq("business_id", data.businessId)
       .eq("status", "completed")
       .order("completed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (runErr) throw new Error("RUN_QUERY_FAILED");
+    // 선택 업체에 결과가 없으면 다른 업체 run으로 fallback하지 않는다.
     if (!run) {
       return { run: null, evidence_grade: null, recommendation_mode: null, findings: [], actions: [] };
     }
 
-    const [businessRes, findingsRes, actionsRes] = await Promise.all([
-      supabaseAdmin.from("businesses").select("name").eq("id", run.business_id).eq("org_id", data.orgId).maybeSingle(),
+    const [findingsRes, actionsRes] = await Promise.all([
+
       supabaseAdmin
         .from("insight_findings")
         .select(
