@@ -450,13 +450,18 @@ function CustomerReportPage() {
                         <p className="text-muted-foreground">질문: {g.questionText}</p>
                       )}
                       <div>
-                        <p className="text-xs font-medium">보강할 공개 정보</p>
+                        <p className="text-xs font-medium">우선 점검할 공개 정보 후보</p>
                         <ul className="mt-1 list-disc pl-4 text-xs text-muted-foreground">
                           {g.profileFields.map((f) => (
                             <li key={f}>{f}</li>
                           ))}
                         </ul>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          현재 측정에서 노출이 약한 질문이 요구하는 정보 후보입니다. 실제 공개정보의
+                          누락 여부를 확인한 뒤 사실 기반으로 보완합니다.
+                        </p>
                       </div>
+
                       <p className="text-xs text-muted-foreground">
                         현재 관찰: {g.measurementCount}회 측정 중 {g.mentionedCount}회 노출 (
                         {pct(g.mentionRate)})
