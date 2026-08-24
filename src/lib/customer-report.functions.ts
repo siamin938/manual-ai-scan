@@ -286,13 +286,14 @@ export const getCustomerReport = createServerFn({ method: "POST" })
         supabaseAdmin
           .from("insight_actions")
           .select(
-            "id, title, recommended_action, rationale, validation_plan, evidence_grade, recommendation_mode, priority_score",
+            "id, title, action_type, recommended_action, rationale, validation_plan, evidence_grade, recommendation_mode, priority_score",
           )
           .eq("org_id", data.orgId)
           .eq("engine_run_id", insightRun.id)
           .order("priority_score", { ascending: false })
-          .limit(3),
+          .limit(20),
       ]);
+
 
       const findingRows = findingsRes.data ?? [];
       const fqIds = [...new Set(findingRows.map((f) => f.question_id).filter(Boolean))] as string[];
