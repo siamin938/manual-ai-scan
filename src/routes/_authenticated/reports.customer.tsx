@@ -186,17 +186,18 @@ function buildHeadline(
   };
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
-
+function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <Card>
       <CardContent className="p-4">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+        {sub && <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>}
       </CardContent>
     </Card>
   );
 }
+
 
 function CustomerReportPage() {
   const { activeOrgId } = useOrg();
