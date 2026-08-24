@@ -59,12 +59,14 @@ export type ReportFindingDTO = {
 export type ReportActionDTO = {
   id: string;
   title: string;
+  actionType: string | null;
   recommendedAction: string;
   rationale: string;
   validationPlan: string;
   evidenceGrade: string;
   recommendationMode: string;
 };
+
 
 export type ReportInsightDTO = {
   completedAt: string | null;
