@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { coverageActionFields, coverageActionTitle } from "./profile-coverage.helpers";
+import { compareCustomerActions } from "./customer-report.helpers";
+
 
 /* =========================================================================
  * 고객 보고서 v0.2 — READ ONLY safe DTO
@@ -59,12 +61,14 @@ export type ReportFindingDTO = {
 export type ReportActionDTO = {
   id: string;
   title: string;
+  actionType: string | null;
   recommendedAction: string;
   rationale: string;
   validationPlan: string;
   evidenceGrade: string;
   recommendationMode: string;
 };
+
 
 export type ReportInsightDTO = {
   completedAt: string | null;
@@ -284,13 +288,14 @@ export const getCustomerReport = createServerFn({ method: "POST" })
         supabaseAdmin
           .from("insight_actions")
           .select(
-            "id, title, recommended_action, rationale, validation_plan, evidence_grade, recommendation_mode, priority_score",
+            "id, title, action_type, recommended_action, rationale, validation_plan, evidence_grade, recommendation_mode, priority_score",
           )
           .eq("org_id", data.orgId)
           .eq("engine_run_id", insightRun.id)
           .order("priority_score", { ascending: false })
-          .limit(3),
+          .limit(20),
       ]);
+
 
       const findingRows = findingsRes.data ?? [];
       const fqIds = [...new Set(findingRows.map((f) => f.question_id).filter(Boolean))] as string[];
@@ -332,15 +337,34 @@ export const getCustomerReport = createServerFn({ method: "POST" })
             ? (cMap.get(f.competitor_business_id) ?? null)
             : null,
         })),
-        actions: (actionsRes.data ?? []).map((a) => ({
-          id: a.id,
-          title: a.title,
-          recommendedAction: a.recommended_action,
-          rationale: a.rationale,
-          validationPlan: a.validation_plan,
-          evidenceGrade: a.evidence_grade,
-          recommendationMode: a.recommendation_mode,
-        })),
+        actions: (actionsRes.data ?? [])
+          .slice()
+          .sort((a, b) =>
+            compareCustomerActions(
+              {
+                actionType: a.action_type ?? null,
+                evidenceGrade: a.evidence_grade ?? null,
+                priorityScore: Number(a.priority_score),
+              },
+              {
+                actionType: b.action_type ?? null,
+                evidenceGrade: b.evidence_grade ?? null,
+                priorityScore: Number(b.priority_score),
+              },
+            ),
+          )
+          .slice(0, 3)
+          .map((a) => ({
+            id: a.id,
+            title: a.title,
+            actionType: a.action_type ?? null,
+            recommendedAction: a.recommended_action,
+            rationale: a.rationale,
+            validationPlan: a.validation_plan,
+            evidenceGrade: a.evidence_grade,
+            recommendationMode: a.recommendation_mode,
+          })),
+
       };
     }
 

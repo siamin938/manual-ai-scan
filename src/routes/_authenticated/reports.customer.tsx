@@ -186,17 +186,18 @@ function buildHeadline(
   };
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
-
+function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <Card>
       <CardContent className="p-4">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+        {sub && <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>}
       </CardContent>
     </Card>
   );
 }
+
 
 function CustomerReportPage() {
   const { activeOrgId } = useOrg();
@@ -316,13 +317,15 @@ function CustomerReportPage() {
             <h2 className="text-lg font-semibold">① 현재 AI 노출 상태</h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               <Kpi
-                label="AI 커버리지 점수"
+                label="이번 측정 AI 커버리지"
                 value={
                   coverage?.coverageScore === null || coverage?.coverageScore === undefined
                     ? "—"
                     : `${coverage.coverageScore.toFixed(0)}/100`
                 }
+                sub="현재 질문군·측정 조건 기준"
               />
+
               <Kpi label="노출된 질문 비율" value={pct(coverage?.questionCoverageRate)} />
               <Kpi label="실제 답변 포함률" value={pct(coverage?.measurementCoverageRate)} />
               <Kpi label="Top3 노출률" value={pct(coverage?.top3CoverageRate)} />
@@ -450,13 +453,18 @@ function CustomerReportPage() {
                         <p className="text-muted-foreground">질문: {g.questionText}</p>
                       )}
                       <div>
-                        <p className="text-xs font-medium">보강할 공개 정보</p>
+                        <p className="text-xs font-medium">우선 점검할 공개 정보 후보</p>
                         <ul className="mt-1 list-disc pl-4 text-xs text-muted-foreground">
                           {g.profileFields.map((f) => (
                             <li key={f}>{f}</li>
                           ))}
                         </ul>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          현재 측정에서 노출이 약한 질문이 요구하는 정보 후보입니다. 실제 공개정보의
+                          누락 여부를 확인한 뒤 사실 기반으로 보완합니다.
+                        </p>
                       </div>
+
                       <p className="text-xs text-muted-foreground">
                         현재 관찰: {g.measurementCount}회 측정 중 {g.mentionedCount}회 노출 (
                         {pct(g.mentionRate)})
