@@ -317,13 +317,15 @@ function CustomerReportPage() {
             <h2 className="text-lg font-semibold">① 현재 AI 노출 상태</h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               <Kpi
-                label="AI 커버리지 점수"
+                label="이번 측정 AI 커버리지"
                 value={
                   coverage?.coverageScore === null || coverage?.coverageScore === undefined
                     ? "—"
                     : `${coverage.coverageScore.toFixed(0)}/100`
                 }
+                sub="현재 질문군·측정 조건 기준"
               />
+
               <Kpi label="노출된 질문 비율" value={pct(coverage?.questionCoverageRate)} />
               <Kpi label="실제 답변 포함률" value={pct(coverage?.measurementCoverageRate)} />
               <Kpi label="Top3 노출률" value={pct(coverage?.top3CoverageRate)} />
