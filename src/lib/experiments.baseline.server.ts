@@ -202,16 +202,19 @@ export async function prepareBaselineSnapshotData(args: {
     return { ok: false, error: "QUESTION_SET_CHANGED" };
   }
 
-  const { data: questionRows, error: qErr } = await supabaseAdmin
+  let questionQuery = supabaseAdmin
     .from("questions")
     .select(
       "id, prompt_text, prompt_hash, intent_type, language, country_code, region, city, weight, data_class, active",
     )
     .eq("org_id", orgId)
     .eq("question_set_id", questionSet.id)
-    .eq("active", true)
-    .order("id", { ascending: true });
+    .eq("active", true);
+  // 선택된 질문이 있으면 해당 ID로만 제한한다. question_set/active 검증은 위 조건으로 강제된다.
+  if (relatedQuestionIds) questionQuery = questionQuery.in("id", relatedQuestionIds);
+  const { data: questionRows, error: qErr } = await questionQuery.order("id", { ascending: true });
   if (qErr) return { ok: false, error: "INTERNAL_ERROR" };
+
   const questions: SnapshotQuestion[] = (questionRows ?? []).map((q) => ({
     id: q.id,
     prompt_text: q.prompt_text, // 원문 그대로 보존 (정규화 금지)
