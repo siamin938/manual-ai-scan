@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { coverageActionFields, coverageActionTitle } from "./profile-coverage.helpers";
+import { compareCustomerActions } from "./customer-report.helpers";
+
 
 /* =========================================================================
  * 고객 보고서 v0.2 — READ ONLY safe DTO
