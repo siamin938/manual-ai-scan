@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { fetchCoverageRecommendationActions } from "./profile-coverage.recommendation.server";
-import { compareCustomerActions } from "./customer-report.helpers";
+import { fetchRankedCustomerActions } from "./customer-report.ranking.server";
 
 
 /* =========================================================================
@@ -251,7 +251,7 @@ export const getCustomerReport = createServerFn({ method: "POST" })
 
     let insight: ReportInsightDTO | null = null;
     if (insightRun) {
-      const [findingsRes, actionsRes] = await Promise.all([
+      const [findingsRes, rankedActions] = await Promise.all([
         supabaseAdmin
           .from("insight_findings")
           .select(
@@ -261,15 +261,13 @@ export const getCustomerReport = createServerFn({ method: "POST" })
           .eq("engine_run_id", insightRun.id)
           .order("priority_score", { ascending: false })
           .limit(3),
-        supabaseAdmin
-          .from("insight_actions")
-          .select(
-            "id, title, action_type, recommended_action, rationale, validation_plan, evidence_grade, recommendation_mode, priority_score",
-          )
-          .eq("org_id", data.orgId)
-          .eq("engine_run_id", insightRun.id)
-          .order("priority_score", { ascending: false })
-          .limit(20),
+        // Action 목록/순서/상위 선택은 Edge Function이 전담한다.
+        fetchRankedCustomerActions({
+          supabase: context.supabase,
+          orgId: data.orgId,
+          engineRunId: insightRun.id,
+          limit: 3,
+        }),
       ]);
 
 
