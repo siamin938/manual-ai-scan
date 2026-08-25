@@ -311,33 +311,8 @@ export const getCustomerReport = createServerFn({ method: "POST" })
             ? (cMap.get(f.competitor_business_id) ?? null)
             : null,
         })),
-        actions: (actionsRes.data ?? [])
-          .slice()
-          .sort((a, b) =>
-            compareCustomerActions(
-              {
-                actionType: a.action_type ?? null,
-                evidenceGrade: a.evidence_grade ?? null,
-                priorityScore: Number(a.priority_score),
-              },
-              {
-                actionType: b.action_type ?? null,
-                evidenceGrade: b.evidence_grade ?? null,
-                priorityScore: Number(b.priority_score),
-              },
-            ),
-          )
-          .slice(0, 3)
-          .map((a) => ({
-            id: a.id,
-            title: a.title,
-            actionType: a.action_type ?? null,
-            recommendedAction: a.recommended_action,
-            rationale: a.rationale,
-            validationPlan: a.validation_plan,
-            evidenceGrade: a.evidence_grade,
-            recommendationMode: a.recommendation_mode,
-          })),
+        actions: rankedActions,
+
 
       };
     }
