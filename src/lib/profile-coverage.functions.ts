@@ -1,12 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  COVERAGE_VALIDATION_PLAN,
-  coverageActionFields,
-  coverageActionPriority,
-  coverageActionRationale,
-  coverageActionTitle,
-} from "./profile-coverage.helpers";
+import { fetchCoverageRecommendationActions } from "./profile-coverage.recommendation.server";
 import type { ActiveExperimentDTO } from "./insights.functions";
 
 export type ProfileCoverageItemDTO = {
@@ -186,11 +180,8 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
       );
 
     // 진행 중인 coverage experiment (snapshot 미노출, safe 필드만)
-    const gapItems = items.filter(
-      (it) => it.coverage_status === "missing" || it.coverage_status === "partial",
-    );
     const expByItem = new Map<string, ActiveExperimentDTO>();
-    if (gapItems.length) {
+    if (items.length) {
       const { data: exps } = await supabaseAdmin
         .from("experiments")
         .select(
@@ -201,8 +192,9 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
         .eq("source_type", "profile_coverage_item")
         .in(
           "source_profile_coverage_item_id",
-          gapItems.map((it) => it.id),
+          items.map((it) => it.id),
         )
+
         .in("status", ["draft", "baseline", "action_applied", "followup"])
         .order("created_at", { ascending: false });
 
@@ -246,36 +238,17 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
       }
     }
 
-    const priorityOrder: Record<string, number> = { high: 0, medium: 1 };
-    const actions: CoverageGapActionDTO[] = gapItems
-      .map((it) => ({
-        coverage_item_id: it.id,
-        question_text: it.question_text,
-        intent_type: it.intent_type,
-        coverage_status: it.coverage_status,
-        priority_level: coverageActionPriority(it.coverage_status),
-        title: coverageActionTitle(it.intent_type),
-        rationale: coverageActionRationale({
-          intent_type: it.intent_type,
-          coverage_status: it.coverage_status,
-          measurement_count: it.measurement_count,
-          mentioned_count: it.mentioned_count,
-        }),
-        profile_fields: coverageActionFields(it.intent_type),
-        validation_plan: COVERAGE_VALIDATION_PLAN,
-        evidence_grade: run.evidence_grade,
-        recommendation_mode: "test" as const,
-        measurement_count: it.measurement_count,
-        mentioned_count: it.mentioned_count,
-        mention_rate: it.mention_rate,
-        active_experiment: expByItem.get(it.id) ?? null,
-      }))
-      .sort(
-        (a, b) =>
-          (priorityOrder[a.priority_level] ?? 9) - (priorityOrder[b.priority_level] ?? 9) ||
-          a.mention_rate - b.mention_rate,
-      );
-
+    // 추천 액션(우선순위/문구/정렬)은 Edge Function이 전담한다.
+    const recommended = await fetchCoverageRecommendationActions({
+      supabase: context.supabase,
+      orgId: data.orgId,
+      businessId: data.businessId,
+    });
+    const actions: CoverageGapActionDTO[] = recommended.map((a) => ({
+      ...a,
+      evidence_grade: run.evidence_grade,
+      active_experiment: expByItem.get(a.coverage_item_id) ?? null,
+    }));
 
     return {
       run: {
