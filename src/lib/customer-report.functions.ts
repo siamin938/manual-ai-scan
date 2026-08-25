@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { coverageActionFields, coverageActionTitle } from "./profile-coverage.helpers";
+import { fetchCoverageRecommendationActions } from "./profile-coverage.recommendation.server";
 import { compareCustomerActions } from "./customer-report.helpers";
 
 
@@ -203,46 +203,22 @@ export const getCustomerReport = createServerFn({ method: "POST" })
 
     let coverage: ReportCoverageDTO | null = null;
     if (covRun) {
-      const { data: items } = await supabaseAdmin
-        .from("profile_coverage_items")
-        .select(
-          "id, question_id, coverage_status, measurement_count, mentioned_count, mention_rate",
-        )
-        .eq("org_id", data.orgId)
-        .eq("coverage_run_id", covRun.id)
-        .in("coverage_status", ["missing", "partial"]);
-
-      const gapRows = items ?? [];
-      const qIds = [...new Set(gapRows.map((i) => i.question_id).filter(Boolean))] as string[];
-      const qRes = qIds.length
-        ? await supabaseAdmin
-            .from("questions")
-            .select("id, prompt_text, intent_type")
-            .eq("org_id", data.orgId)
-            .in("id", qIds)
-        : { data: [] as { id: string; prompt_text: string; intent_type: string }[] };
-      const qMap = new Map((qRes.data ?? []).map((q) => [q.id, q]));
-
-      const gaps = gapRows
-        .sort(
-          (a, b) =>
-            (a.coverage_status === "missing" ? 0 : 1) - (b.coverage_status === "missing" ? 0 : 1) ||
-            Number(a.mention_rate) - Number(b.mention_rate),
-        )
-        .slice(0, 3)
-        .map((i) => {
-          const q = qMap.get(i.question_id);
-          return {
-            id: i.id,
-            questionText: snippet(q?.prompt_text ?? null),
-            coverageStatus: i.coverage_status,
-            title: coverageActionTitle(q?.intent_type ?? null),
-            profileFields: coverageActionFields(q?.intent_type ?? null),
-            measurementCount: i.measurement_count,
-            mentionedCount: i.mentioned_count,
-            mentionRate: Number(i.mention_rate),
-          };
-        });
+      // gap 추천(문구/필드/정렬/우선순위)은 Edge Function이 전담한다.
+      const recommended = await fetchCoverageRecommendationActions({
+        supabase: context.supabase,
+        orgId: data.orgId,
+        businessId: business.id,
+      });
+      const gaps = recommended.slice(0, 3).map((a) => ({
+        id: a.coverage_item_id,
+        questionText: snippet(a.question_text),
+        coverageStatus: a.coverage_status,
+        title: a.title,
+        profileFields: a.profile_fields,
+        measurementCount: a.measurement_count,
+        mentionedCount: a.mentioned_count,
+        mentionRate: a.mention_rate,
+      }));
 
       coverage = {
         completedAt: covRun.completed_at,
