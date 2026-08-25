@@ -180,11 +180,8 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
       );
 
     // 진행 중인 coverage experiment (snapshot 미노출, safe 필드만)
-    const gapItems = items.filter(
-      (it) => it.coverage_status === "missing" || it.coverage_status === "partial",
-    );
     const expByItem = new Map<string, ActiveExperimentDTO>();
-    if (gapItems.length) {
+    if (items.length) {
       const { data: exps } = await supabaseAdmin
         .from("experiments")
         .select(
@@ -195,8 +192,9 @@ export const getProfileCoverageOverview = createServerFn({ method: "POST" })
         .eq("source_type", "profile_coverage_item")
         .in(
           "source_profile_coverage_item_id",
-          gapItems.map((it) => it.id),
+          items.map((it) => it.id),
         )
+
         .in("status", ["draft", "baseline", "action_applied", "followup"])
         .order("created_at", { ascending: false });
 
