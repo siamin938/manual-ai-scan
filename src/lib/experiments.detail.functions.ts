@@ -98,7 +98,6 @@ export const getExperimentDetail = createServerFn({ method: "POST" })
       computeDetailPhaseMetrics,
       detailDeltaPp,
       detailPromptSnippet,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } = await import("@/lib/experiments.detail.metrics.server");
     type MeasurementFact = Parameters<typeof computeDetailPhaseMetrics>[0][number];
     const computePhaseMetrics = computeDetailPhaseMetrics;
