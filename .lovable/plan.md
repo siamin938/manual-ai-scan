@@ -1,79 +1,43 @@
-# Entity Verification을 competitor_substitution 입력 gate로 전환 (조사 결과 + 계획)
+# Core Engine Isolation Boundary Audit v2 (읽기 전용 감사 결과)
 
-## 1) 자동 후처리 호출 순서가 구현된 위치
+이번 문서는 감사 보고서입니다. 코드 변경/삭제/배포는 하지 않았고, 새로운 규칙 목록이나 세부 임계값을 여기에 추가하지도 않았습니다.
 
-`src/lib/run-postprocess.functions.ts` (server function `runPostprocess`)에 단일 오케스트레이터로 구현되어 있습니다. 순서는:
+## 1. 등급 분류 요약
 
-```text
-reparse-measurements (Edge)
-  -> entityVerification (verifyAndPersistBusinessEntities, .server.ts)
-  -> sourceClassification
-  -> measurementSummary
-  -> compute-profile-coverage (Edge)
-  -> firstPartyCoverage
-  -> compute-insights (Edge)
-```
+| 파일 | 등급 | 근거 |
+| --- | --- | --- |
+| entity-verification.ts | A | 실제 오류 사례(제목·질문문·브랜드 네트워크가 업체로 집계됨)에서 축적된 bespoke 판정 heuristic. 고객이 보는 "경쟁업체/언급업체" 결과를 직접 바꾼다. |
+| entity-verification.server.ts | B | 조회·저장 orchestration 자체는 범용이지만, 순수 판정 모듈과 함께 이동하는 편이 자연스럽다. |
+| entity-canonical-resolver.ts | A | 어떤 언급이 같은 업체인지 병합하는 판정 규칙. 중복 집계 여부가 고객 수치에 직접 반영된다. |
+| entity-canonical-resolver.server.ts | B | 위와 동일 사유(persist 계층). |
+| mention-business-filter.ts (+test) | A로 취급 (사실상 레거시) | 남아 있는 동안은 Entity Verification과 같은 성격의 판정 규칙이며, 테스트가 규칙을 그대로 노출한다. |
+| first-party-source-classifier.ts | 대부분 C, 일부 B | URL canonicalization·매치 모드 우선순위는 범용 기술 정제. 특정 플랫폼(Naver Place/Blog) 취급 부분만 제품 품질 지식(B). |
+| first-party-source-classification.helpers.ts / server.ts | C | registry row → classifier 입력 매핑과 저장. 판정 자체는 classifier에 있음. |
+| question-suggestions.ts | C | 길이·intent 화이트리스트·정규화 dedupe·업체명 포함 시 기본 해제는 입력 검증/UX 안전장치 수준. |
+| insights.tsx / reports.manual.tsx priority 표시 구간 | C | DB의 priority_score를 라벨/배지로 바꾸는 presentation. 점수 자체를 만들지 않는다. |
 
-단계 상태/에러 코드 정의는 `src/lib/run-postprocess.helpers.ts`, UI 자동 트리거는 `src/routes/_authenticated/runs.$runId.tsx`에 있습니다.
+## 2. 질문별 답변
 
-즉 **Entity Verification이 compute-insights보다 먼저 실행되는 순서는 이미 충족**되어 있으며, 이번 단계에서 순서 변경은 필요하지 않습니다. 단계가 실패하면 이후 단계는 skipped 처리되어 insights도 실행되지 않습니다(fail-closed).
+1) **Entity Verification = A, Canonical Resolver = A.** 둘 다 "무엇을 업체로 셀지"와 "무엇을 같은 업체로 볼지"를 결정하며, 이는 경쟁업체 카드·인사이트·실험 결과로 전파되는 최종 판정이다. 외부에서 코드를 보면 한국어 AI 답변 파싱 품질을 상당 부분 재현할 수 있다.
 
-## 2) compute-insights Edge Function 소스 접근 가능 여부
+2) **mention-business-filter는 여전히 실제 경로에서 쓰인다** — `src/routes/_authenticated/runs.$runId.tsx`가 `aggregateBusinessShare` / `isConfirmedBusinessMention`을 import해 운영자용 실행 상세 화면에서 사용한다. 같은 화면이 이미 `measurement_entity_verifications` / `measurement_entity_canonicalizations` 결과도 읽고 있어, 판정 성격은 Entity Verification과 **중복(레거시)** 이다. 따라서 제거보다는 "저장된 verification/canonicalization 결과 기반 집계로 교체" 후보다. 집계(카운트·share 계산) 부분만 클라이언트에 남기고, 판정 부분은 남기지 않는 방향이 맞다.
 
-**Lovable 저장소에서 직접 읽을 수 없습니다.** 이 프로젝트에는 `supabase/functions/` 디렉터리 자체가 없고(`supabase/`에는 `config.toml`과 `migrations`만 존재), Edge Function 소스는 연결된 외부 Supabase 프로젝트에만 존재합니다. 사용 가능한 도구는 배포/호출/로그 조회뿐이라, 기존 소스를 내려받아 diff 하는 것은 불가능합니다. 전체 소스를 새로 작성해 덮어쓰는 배포는 기술적으로 가능하지만, 현재 0.2.0 로직을 알 수 없으므로 **덮어쓰기는 회귀 위험이 커서 권장하지 않습니다.**
+3) **First-party classifier의 MATCH_PRIORITY는 핵심 IP가 아니다.** exact > prefix > host 우선순위는 URL 매칭의 관례적 특정성 순서이고, canonicalization도 범용이다. Naver Place/Blog 취급은 "어떤 플랫폼을 first-party로 인정하는가"라는 제품 정책이라 B 정도이며, 단독으로는 경쟁력 유출이 크지 않다.
 
-따라서 gate 적용 방식은 아래 두 갈래이며, 이 계획은 A안을 기본으로 합니다.
+4) **question-suggestions 필터는 핵심 IP가 아니다(C).** Edge Function 응답을 신뢰하지 않는 형태 검증 + 중복 제거 + 대상 업체명이 들어간 질문을 기본 해제하는 UX 안전장치이며, 질문 생성 규칙 자체는 이미 Edge Function에 있다.
 
-- **A안 (권장): DB 레이어 gate.** 코드가 아닌 데이터/뷰 계약으로 gate를 강제하고, Edge Function은 그 계약만 읽도록 최소 패치를 사용자가 적용.
-- **B안: Edge Function 전면 재작성 배포.** 소스 확보 후에만 검토.
+5) **priority 표시 구간은 presentation(C).** 두 화면 모두 점수를 만들지 않고 DB 값을 사람이 읽는 라벨로 변환할 뿐이다. 다만 insights와 reports.manual의 구간이 서로 다르다는 일관성 이슈는 있고, 이는 보안 문제가 아니라 UX 문제다.
 
-## 3) 확인된 현재 상태 (READ ONLY)
+6) **현재 실행 위치 (모두 `src/lib/run-postprocess.functions.ts` 안, 인증된 server function 내부 dynamic import):**
+   - Entity Verification: step `entityVerification` → `entity-verification.server.ts`의 persist 함수. 판정 자체는 Lovable 저장소의 순수 모듈에서 실행됨.
+   - Canonical Resolver: step `entityCanonicalization` → `entity-canonical-resolver.server.ts`. 동일하게 Lovable 내부 실행.
+   - First-party Classification: step `sourceClassification` → `first-party-source-classification.server.ts` → `first-party-source-classifier.ts`. 역시 Lovable 내부 실행.
+   - 대비: reparse / profile coverage / insights는 이미 Supabase Edge Function 호출이다. 즉 세 단계만 아직 Lovable 안에서 판정한다.
 
-- `public.measurement_entity_verifications` 컬럼: `org_id, business_id, measurement_id, measurement_mention_id, verifier_version, verification_status, verified_entity_kind, verified_count_as_business, confidence, reason_codes, created_at`. RLS 활성, service_role SELECT 가능.
-- 현재 데이터 분포(verifier_version 0.1.0): confirmed_business/specific_business/true = 9건, needs_review = 44건, rejected_non_business = 29건.
-- `insight_engine_runs.engine_version`에 존재하는 값: `0.1.1`, `0.2.0`. `0.2.1`은 아직 없음 → provenance 분리 여지 있음.
+## 3. 다음 격리 작업 우선순위 제안
 
-## 4) 계획
+1. **Entity Verification 격리** — 가장 상류 판정이며 모든 하류 수치(경쟁업체, 인사이트, 실험)에 영향. Lovable 측은 run-postprocess에서 최소 식별자만 보내고 요약 카운트만 받는 기존 패턴을 재사용.
+2. **Canonical Resolver 격리** — Verification 결과에 의존하므로 같은 Edge 경계 뒤에 두는 것이 자연스럽고, 1번과 함께 또는 직후에 진행.
+3. **mention-business-filter 정리** — 1·2번 완료 후 운영자 화면을 저장된 verification/canonicalization 결과 기반으로 전환하여 중복 판정 규칙과 그 테스트를 저장소에서 없앤다.
 
-### 단계 1 — Gate 계약을 DB 뷰로 고정 (migration)
-
-읽기 전용 뷰 `public.v_entity_verified_business_mentions`를 추가:
-
-- 조건: `verifier_version='0.1.0' AND verification_status='confirmed_business' AND verified_entity_kind='specific_business' AND verified_count_as_business=true`
-- 노출 컬럼: `org_id, business_id, measurement_id, measurement_mention_id` (텍스트/이유코드/증거 미노출)
-- `security_invoker=on`, `GRANT SELECT`는 `authenticated`, `service_role`에만 부여(anon 제외).
-
-이 뷰가 competitor_substitution의 **유일한 허용 mention 집합**입니다. verification row가 없으면 애초에 뷰에 없으므로 자동으로 fail-closed가 됩니다.
-
-### 단계 2 — compute-insights 최소 패치 지시서 재작성 (문서만, 배포는 사용자 확인 후)
-
-`docs/compute-insights-0.2.1-competitor-gate.md`를 **전면 교체**합니다(기존 텍스트 금지어/블랙리스트 방식 폐기 명시).
-
-새 지시서 내용:
-
-- `ENGINE_VERSION = "0.2.1"` (0.2.0 insight run은 그대로 보존, 재실행 시 새 run으로 분리)
-- `buildCompetitorSubstitutionFindings`에서 후보 루프 진입 전, 해당 run의 measurement mention id 집합을 위 뷰에서 조회해 `Set<measurement_mention_id>` 구성
-- 각 후보의 근거 mention이 그 Set에 없으면 `continue` (verification 없음/needs_review/rejected 모두 제외)
-- 텍스트 패턴 기반 판정 코드는 추가하지 않음. Parser v1.2.3 입력/규칙/버전 무변경. `buildConditionCanonical` 등 해시 입력 무변경.
-- 다른 finding type(생성 로직·임계값·evidence grade)은 무변경
-
-### 단계 3 — 앱 측 정합성 보강 (선택, 같은 계약 재사용)
-
-`src/routes/_authenticated/runs.$runId.tsx`의 자동 경쟁업체 후보 카드가 로컬 필터 대신 동일한 verification 계약을 우선 사용하도록 정리(이미 verifier 결과를 읽는 경로가 있으면 그 조건을 위 4개 컬럼 조건으로 통일). UI는 이유코드를 표시하지 않습니다.
-
-### 단계 4 — 검증
-
-- `bun test`, `tsgo --noEmit`, production build
-- 뷰 적용 후 READ ONLY 카운트 확인: 뷰 행 수 == confirmed_business 9건
-- client bundle secret scan
-- **실제 compute-insights 호출/재처리, Run 실행은 하지 않음.** 사용자가 별도로 배포·실행 후 0.2.1 run 생성 여부를 확인.
-
-## 보안 원칙 준수
-
-- verifier 입력·gate 모두 `response_text`, aliases, Registry, 내부 Insight 로직을 사용하지 않으며 provider/AI 호출 0.
-- service_role은 `.server.ts` 및 Edge Function 런타임에서만 사용, 클라이언트 노출 없음.
-- 뷰/서버 함수 모두 `org_id` + `business_id` 스코프 강제, anon grant 없음 → 타 org 데이터 접근 불가.
-
-## 확인이 필요한 사항
-
-- compute-insights를 Lovable에서 전체 재작성 배포(B안)까지 원하시면 현재 0.2.0 소스를 붙여 주세요. 그렇지 않으면 단계 2의 지시서를 그대로 Supabase 쪽에 적용하시는 방식으로 진행합니다.
+이후(선택) first-party 플랫폼 인정 정책만 서버로 옮기는 정도가 남고, question-suggestions와 priority 표시는 그대로 두어도 무방하다.
