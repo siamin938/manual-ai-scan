@@ -13,11 +13,6 @@ import {
   type ActionAppliedResult,
   type RecordActionAppliedInput,
 } from "./experiments.helpers";
-import {
-  COVERAGE_EXPERIMENT_ACTION_TYPE,
-  coverageActionFields,
-  coverageActionTitle,
-} from "./profile-coverage.helpers";
 
 
 type UserClient = SupabaseClient<Database>;
@@ -88,7 +83,7 @@ export async function recordExperimentActionAppliedImpl(args: {
   const { data: experiment, error: expErr } = await supabaseAdmin
     .from("experiments")
     .select(
-      "id, org_id, business_id, status, baseline_run_id, baseline_start_at, baseline_end_at, baseline_condition_snapshot, source_type, source_insight_action_id, source_profile_coverage_item_id, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot",
+      "id, org_id, business_id, name, action_type, status, baseline_run_id, baseline_start_at, baseline_end_at, baseline_condition_snapshot, source_type, source_insight_action_id, source_profile_coverage_item_id, intervention_at, intervention_confirmed_at, changed_by, action_application_snapshot",
     )
     .eq("id", experimentId)
     .eq("org_id", orgId)
@@ -186,7 +181,7 @@ export async function recordExperimentActionAppliedImpl(args: {
   } else {
     const { data: item, error: itemErr } = await supabaseAdmin
       .from("profile_coverage_items")
-      .select("id, org_id, business_id, coverage_status, question_id")
+      .select("id, org_id, business_id")
       .eq("id", experiment.source_profile_coverage_item_id!)
       .eq("org_id", orgId)
       .eq("business_id", experiment.business_id)
@@ -194,18 +189,11 @@ export async function recordExperimentActionAppliedImpl(args: {
     if (itemErr) return fail("INTERNAL_ERROR");
     if (!item) return fail("ACTION_APPLY_INVALID_STATE");
 
-    const { data: question, error: qErr } = await supabaseAdmin
-      .from("questions")
-      .select("id, intent_type")
-      .eq("id", item.question_id)
-      .eq("org_id", orgId)
-      .maybeSingle();
-    if (qErr) return fail("INTERNAL_ERROR");
-
+    // 추천 문구/action_type은 실험 생성 시 Edge Function이 결정해 저장한 값을 그대로 사용한다.
     recommendedAction = {
-      action_type: COVERAGE_EXPERIMENT_ACTION_TYPE,
-      title: coverageActionTitle(question?.intent_type ?? null),
-      recommended_action: coverageActionFields(question?.intent_type ?? null).join(", "),
+      action_type: experiment.action_type,
+      title: experiment.name,
+      recommended_action: null,
       recommendation_mode: "test",
     };
   }
