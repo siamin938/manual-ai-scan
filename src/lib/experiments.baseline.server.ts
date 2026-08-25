@@ -24,6 +24,7 @@ import {
   type SnapshotQuestion,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
+import { fetchBaselineQuestionSelection } from "./experiments.baseline-question-selection";
 
 
 type UserClient = SupabaseClient<Database>;
@@ -569,6 +570,7 @@ export async function previewExperimentBaselineImpl(args: {
   // 1) 신규 draft — 현재 live 조건으로 plan summary 계산
   if (experiment.status === "draft" && !experiment.baseline_run_id) {
     const prepared = await prepareBaselineSnapshotData({
+      supabase: args.supabase,
       orgId: args.orgId,
       experimentId: args.experimentId,
     });
@@ -752,6 +754,7 @@ export async function startExperimentBaselineImpl(args: {
 
   // C. 신규 Baseline plan
   const prepared = await prepareBaselineSnapshotData({
+    supabase: args.supabase,
     orgId: args.orgId,
     experimentId: args.experimentId,
   });
