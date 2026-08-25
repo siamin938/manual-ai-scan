@@ -24,6 +24,7 @@ import {
   type SnapshotQuestion,
   type StartExperimentBaselineResult,
 } from "./experiments.helpers";
+import { fetchBaselineQuestionSelection } from "./experiments.baseline-question-selection";
 
 
 type UserClient = SupabaseClient<Database>;
@@ -69,11 +70,13 @@ export type BaselinePlan = {
  * 순수 read-only. write/enqueue 없음.
  */
 export async function prepareBaselineSnapshotData(args: {
+  supabase: UserClient;
   orgId: string;
   experimentId: string;
 }): Promise<{ ok: true; plan: BaselinePlan } | { ok: false; error: BaselineErrorCode }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { orgId, experimentId } = args;
+
 
   // 1) Experiment (id + org_id)
   const { data: experiment, error: expErr } = await supabaseAdmin
@@ -102,7 +105,7 @@ export async function prepareBaselineSnapshotData(args: {
     }
     const { data: action, error: actErr } = await supabaseAdmin
       .from("insight_actions")
-      .select("id, org_id, business_id, engine_run_id, source_finding_ids")
+      .select("id, org_id, business_id, engine_run_id")
       .eq("id", experiment.source_insight_action_id)
       .eq("org_id", orgId)
       .maybeSingle();
@@ -122,33 +125,16 @@ export async function prepareBaselineSnapshotData(args: {
     if (!engineRun?.source_run_id) return { ok: false, error: "SOURCE_RUN_NOT_FOUND" };
     sourceRunId = engineRun.source_run_id;
 
-    // 2-1) source findings에서 Baseline 대상 질문을 결정적으로 선택 (클라이언트 입력 없음)
-    const findingIds = Array.isArray(action.source_finding_ids) ? action.source_finding_ids : [];
-    if (findingIds.length > 0) {
-      const { data: findingRows, error: findErr } = await supabaseAdmin
-        .from("insight_findings")
-        .select("finding_key, question_id, priority_score, metric_value")
-        .in("id", findingIds)
-        .eq("org_id", orgId)
-        .eq("business_id", experiment.business_id)
-        .eq("engine_run_id", action.engine_run_id)
-        .not("question_id", "is", null);
-      if (findErr) return { ok: false, error: "INTERNAL_ERROR" };
-      const { selectBaselineQuestionIds } = await import(
-        "./experiments.baseline-question-selection"
-      );
-      const selection = selectBaselineQuestionIds(
-        (findingRows ?? []).map((r) => ({
-          finding_key: r.finding_key,
-          question_id: r.question_id,
-          priority_score: r.priority_score,
-          metric_value: r.metric_value,
-        })),
-        BASELINE_EXPECTED_QUESTION_COUNT,
-      );
-      if (selection.kind === "insufficient") return { ok: false, error: "QUESTION_SET_CHANGED" };
-      if (selection.kind === "selected") relatedQuestionIds = selection.questionIds;
-    }
+    // 2-1) Baseline 대상 질문 선택은 비공개 Edge Function이 결정한다 (클라이언트 입력 없음).
+    const selection = await fetchBaselineQuestionSelection({
+      supabase: args.supabase,
+      orgId,
+      experimentId,
+    });
+    if (!selection) return { ok: false, error: "INTERNAL_ERROR" };
+    if (selection.kind === "insufficient") return { ok: false, error: "QUESTION_SET_CHANGED" };
+    if (selection.kind === "selected") relatedQuestionIds = selection.questionIds;
+
 
   } else {
     if (!experiment.source_profile_coverage_item_id) {
@@ -584,6 +570,7 @@ export async function previewExperimentBaselineImpl(args: {
   // 1) 신규 draft — 현재 live 조건으로 plan summary 계산
   if (experiment.status === "draft" && !experiment.baseline_run_id) {
     const prepared = await prepareBaselineSnapshotData({
+      supabase: args.supabase,
       orgId: args.orgId,
       experimentId: args.experimentId,
     });
@@ -767,6 +754,7 @@ export async function startExperimentBaselineImpl(args: {
 
   // C. 신규 Baseline plan
   const prepared = await prepareBaselineSnapshotData({
+    supabase: args.supabase,
     orgId: args.orgId,
     experimentId: args.experimentId,
   });

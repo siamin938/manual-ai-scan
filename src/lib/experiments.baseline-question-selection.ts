@@ -1,53 +1,45 @@
-// 순수 helper: Insight Action의 source findings에서 Baseline 대상 질문을 결정적으로 선택한다.
-// DB/네트워크 접근 없음. 클라이언트 입력을 신뢰하지 않는 서버 로직에서만 사용된다.
-
-export type BaselineFindingCandidate = {
-  finding_key: string;
-  question_id: string | null;
-  priority_score: number | null;
-  metric_value: number | null;
-};
+// Baseline 대상 질문 선택은 비공개 Supabase Edge Function(`experiment-baseline-select`)이 전담한다.
+// 이 파일은 현재 사용자 JWT로 호출해 최소 DTO만 전달하는 얇은 wrapper이며,
+// 선택 규칙/정렬/임계값은 이 저장소에 존재하지 않는다.
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 
 export type BaselineQuestionSelection =
   | { kind: "selected"; questionIds: string[] }
   | { kind: "legacy_fallback" }
   | { kind: "insufficient"; relatedCount: number };
 
+type SelectResponse = {
+  mode?: "selected" | "legacy_fallback" | "insufficient";
+  questionIds?: unknown;
+  relatedCount?: unknown;
+};
+
 /**
- * 결정적 정렬:
- *  priority_score DESC → metric_value ASC (NULLS LAST) → finding_key ASC
- * question_id dedupe 후 상위 expectedCount개를 선택한다.
+ * Edge Function 호출 wrapper. 실패하면 호출자가 fail-closed 하도록 null을 반환한다.
  */
-export function selectBaselineQuestionIds(
-  findings: readonly BaselineFindingCandidate[],
-  expectedCount: number,
-): BaselineQuestionSelection {
-  const candidates = findings.filter(
-    (f): f is BaselineFindingCandidate & { question_id: string } =>
-      typeof f.question_id === "string" && f.question_id.length > 0,
+export async function fetchBaselineQuestionSelection(args: {
+  supabase: SupabaseClient<Database>;
+  orgId: string;
+  experimentId: string;
+}): Promise<BaselineQuestionSelection | null> {
+  const { data, error } = await args.supabase.functions.invoke<SelectResponse>(
+    "experiment-baseline-select",
+    { body: { orgId: args.orgId, experimentId: args.experimentId } },
   );
+  if (error || !data) return null;
 
-  const sorted = [...candidates].sort((a, b) => {
-    const pa = Number.isFinite(a.priority_score) ? Number(a.priority_score) : -Infinity;
-    const pb = Number.isFinite(b.priority_score) ? Number(b.priority_score) : -Infinity;
-    if (pa !== pb) return pb - pa;
-
-    const ma = a.metric_value === null || !Number.isFinite(a.metric_value) ? null : Number(a.metric_value);
-    const mb = b.metric_value === null || !Number.isFinite(b.metric_value) ? null : Number(b.metric_value);
-    if (ma !== mb) {
-      if (ma === null) return 1; // NULLS LAST
-      if (mb === null) return -1;
-      return ma - mb;
-    }
-    return a.finding_key < b.finding_key ? -1 : a.finding_key > b.finding_key ? 1 : 0;
-  });
-
-  const unique: string[] = [];
-  for (const f of sorted) {
-    if (!unique.includes(f.question_id)) unique.push(f.question_id);
+  if (data.mode === "legacy_fallback") return { kind: "legacy_fallback" };
+  if (data.mode === "insufficient") {
+    const count = Number(data.relatedCount);
+    return { kind: "insufficient", relatedCount: Number.isFinite(count) ? count : 0 };
   }
-
-  if (unique.length === 0) return { kind: "legacy_fallback" };
-  if (unique.length < expectedCount) return { kind: "insufficient", relatedCount: unique.length };
-  return { kind: "selected", questionIds: unique.slice(0, expectedCount) };
+  if (data.mode === "selected") {
+    const ids = Array.isArray(data.questionIds)
+      ? data.questionIds.filter((v): v is string => typeof v === "string" && v.length > 0)
+      : [];
+    if (ids.length === 0) return null;
+    return { kind: "selected", questionIds: ids };
+  }
+  return null;
 }
