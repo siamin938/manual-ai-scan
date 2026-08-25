@@ -2,12 +2,6 @@
 // snapshot(조건/평가/액션), raw response_text, provider payload, 경쟁사 목록은 DTO로 절대 반환하지 않는다.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  computePhaseMetrics,
-  deltaPp,
-  promptSnippet,
-  type MeasurementFact,
-} from "@/lib/experiments.evaluation.helpers";
 import type { ExperimentSourceType } from "@/lib/experiments.overview.functions";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -100,6 +94,15 @@ export const getExperimentDetail = createServerFn({ method: "POST" })
     return { orgId: input.orgId, experimentId: input.experimentId };
   })
   .handler(async ({ data, context }): Promise<GetExperimentDetailResult> => {
+    const {
+      computeDetailPhaseMetrics,
+      detailDeltaPp,
+      detailPromptSnippet,
+    } = await import("@/lib/experiments.detail.metrics.server");
+    type MeasurementFact = Parameters<typeof computeDetailPhaseMetrics>[0][number];
+    const computePhaseMetrics = computeDetailPhaseMetrics;
+    const deltaPp = detailDeltaPp;
+    const promptSnippet = detailPromptSnippet;
     const { data: membership, error: memErr } = await context.supabase
       .from("organization_members")
       .select("org_id")
