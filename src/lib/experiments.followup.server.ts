@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { invokeEnqueueRunWithUserJwt } from "./experiments.baseline.server";
+import { buildPinnedLiveQuestions } from "./experiments.followup.helpers";
 import {
   ALLOWED_ROLES,
   ALLOWED_SEARCH_CONTEXT_SIZES,
@@ -399,21 +400,15 @@ async function assertLiveMatchesBaseline(
     )
     .eq("org_id", orgId)
     .eq("question_set_id", baseline.question_set_id)
-    .eq("active", true);
+    .eq("active", true)
+    .in(
+      "id",
+      baseline.questions.map((q) => q.id),
+    );
   if (qErr) return { ok: false, error: "INTERNAL_ERROR" };
-  const questions: SnapshotQuestion[] = (questionRows ?? []).map((q) => ({
-    id: q.id,
-    prompt_text: q.prompt_text,
-    prompt_hash: q.prompt_hash ?? null,
-    intent_type: q.intent_type,
-    language: q.language,
-    country_code: q.country_code,
-    region: q.region ?? null,
-    city: q.city ?? null,
-    weight: Number(q.weight),
-    data_class: q.data_class,
-    active: q.active,
-  }));
+  const pinnedQuestions = buildPinnedLiveQuestions(baseline.questions, questionRows ?? []);
+  if (!pinnedQuestions.ok) return pinnedQuestions;
+  const questions: SnapshotQuestion[] = pinnedQuestions.questions;
 
   const { data: ps, error: psErr } = await supabaseAdmin
     .from("provider_settings")
