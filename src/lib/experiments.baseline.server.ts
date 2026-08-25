@@ -69,11 +69,13 @@ export type BaselinePlan = {
  * 순수 read-only. write/enqueue 없음.
  */
 export async function prepareBaselineSnapshotData(args: {
+  supabase: UserClient;
   orgId: string;
   experimentId: string;
 }): Promise<{ ok: true; plan: BaselinePlan } | { ok: false; error: BaselineErrorCode }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { orgId, experimentId } = args;
+
 
   // 1) Experiment (id + org_id)
   const { data: experiment, error: expErr } = await supabaseAdmin
