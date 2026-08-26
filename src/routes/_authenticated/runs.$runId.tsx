@@ -5,16 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
-import {
-  aggregateBusinessShare,
-  isConfirmedBusinessMention,
-  type MentionFact,
-} from "@/lib/mention-business-filter";
+import { aggregateBusinessShare } from "@/lib/business-share.helpers";
 import { runPostprocess } from "@/lib/run-postprocess.functions";
-import {
-  ENTITY_VERIFIER_VERSION,
-  isVerifiedBusinessMention,
-} from "@/lib/entity-verification";
 import { RESOLVER_VERSION } from "@/lib/entity-canonical-resolver";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,8 +59,11 @@ const CONFIDENCE_LABELS: Record<string, string> = {
 
 const TERMINAL = new Set(["completed", "partial", "failed", "cancelled"]);
 
-type Mention = MentionFact & {
+type Mention = {
   id: string;
+  measurement_id: string;
+  matched_business_id: string | null;
+  display_name: string;
   matched_alias: string | null;
   position: number;
   explicit_rank: boolean;
@@ -77,11 +72,10 @@ type Mention = MentionFact & {
 };
 
 
-type VerificationRow = {
-  measurement_mention_id: string;
-  verifier_version: string;
-  verification_status: string;
-  verified_count_as_business: boolean;
+/** Mention that already passed verification + canonical resolution. */
+type ApprovedMention = Mention & {
+  canonical_key: string;
+  canonical_display_name: string;
 };
 
 /**
@@ -160,7 +154,6 @@ function RunDetailPage() {
       const mIds = measurementList.map((m) => m.id);
 
       let mentions: Mention[] = [];
-      const verifications = new Map<string, VerificationRow>();
       const canonicals = new Map<string, CanonicalRow>();
       let sources: Source[] = [];
       if (mIds.length > 0) {
@@ -182,17 +175,6 @@ function RunDetailPage() {
 
         const mentionIds = mentions.map((m) => m.id);
         if (mentionIds.length > 0) {
-          const { data: vRows } = await (
-            supabase as unknown as { from: (t: string) => LooseSelect<VerificationRow> }
-          )
-            .from("measurement_entity_verifications")
-            .select(
-              "measurement_mention_id, verifier_version, verification_status, verified_count_as_business",
-            )
-            .eq("verifier_version", ENTITY_VERIFIER_VERSION)
-            .in("measurement_mention_id", mentionIds);
-          for (const v of vRows ?? []) verifications.set(v.measurement_mention_id, v);
-
           const { data: cRows } = await (
             supabase as unknown as { from: (t: string) => LooseSelect<CanonicalRow> }
           )
@@ -242,7 +224,6 @@ function RunDetailPage() {
         jobs: jobs.data ?? [],
         measurements: measurementList,
         mentions,
-        verifications,
         canonicals,
         sources,
         overall: overall.data,
@@ -326,24 +307,22 @@ function RunDetailPage() {
 
   const validMeasurementCount =
     data.overall?.valid_n ?? data.measurements.filter((m) => m.valid).length;
-  const verifierApplied = data.verifications.size > 0;
-  const displayMentions = verifierApplied
-    ? data.mentions.filter(
-        (m) =>
-          (data.targetBusinessId && m.matched_business_id === data.targetBusinessId) ||
-          isVerifiedBusinessMention(data.verifications.get(m.id)),
-      )
-    : data.mentions;
-  // Canonical grouping: auto-discovered mentions are aggregated by canonical
-  // identity when a resolver row exists; otherwise the original display name.
-  const canonicalMentions = displayMentions.map((m) => {
+  // Business 표시 gate: Entity Verification + Canonical Resolver를 통과해
+  // canonicalization row가 저장된 mention만 업체로 표시/집계한다 (fail-closed).
+  // 추가 text/entity heuristic은 적용하지 않는다.
+  const approvedMentions = data.mentions.flatMap((m) => {
     const c = data.canonicals.get(m.id);
-    if (!c || m.matched_business_id) return m;
-    return { ...m, display_name: c.canonical_display_name || m.display_name };
+    if (!c) return [];
+    return [
+      {
+        ...m,
+        canonical_key: c.canonical_key,
+        canonical_display_name: c.canonical_display_name || m.display_name,
+      },
+    ];
   });
   const shareRows = aggregateBusinessShare({
-    mentions: canonicalMentions,
-    targetBusinessId: data.targetBusinessId,
+    mentions: approvedMentions,
     validMeasurementCount: Number(validMeasurementCount ?? 0),
   });
 
@@ -513,7 +492,7 @@ function RunDetailPage() {
                                 job={j}
                                 prompt={data.prompts.get(j.question_id) ?? j.question_id}
                                 measurement={m ?? null}
-                                mentions={displayMentions.filter((x) => x.measurement_id === m?.id)}
+                                mentions={approvedMentions.filter((x) => x.measurement_id === m?.id)}
                                 sources={data.sources.filter((x) => x.measurement_id === m?.id)}
                                 targetBusinessId={data.targetBusinessId}
                               />
@@ -665,7 +644,7 @@ function JobDetail({
   job: JobRow;
   prompt: string;
   measurement: MeasurementRow | null;
-  mentions: Mention[];
+  mentions: ApprovedMention[];
   sources: Source[];
   targetBusinessId: string | null;
 }) {
@@ -723,7 +702,6 @@ function JobDetail({
 
           {(() => {
             const confirmed = mentions
-              .filter((m) => isConfirmedBusinessMention(m, targetBusinessId))
               .slice()
               .sort((a, b) => a.position - b.position);
             return (
@@ -736,7 +714,7 @@ function JobDetail({
                     {confirmed.map((m) => (
                       <li key={m.id} className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">
-                          {m.position}위 {m.display_name}
+                          {m.position}위 {m.canonical_display_name}
                         </span>
                         {m.matched_business_id === targetBusinessId && targetBusinessId ? (
                           <Badge>대상 업체</Badge>
