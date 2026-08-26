@@ -4,6 +4,13 @@ import { OrgProvider, useOrg, useSession } from "@/lib/org";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { ROLE_LABELS } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -24,17 +31,20 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const NAV = [
-  { to: "/dashboard", label: "대시보드" },
-  { to: "/businesses", label: "업체 관리" },
-  { to: "/questions", label: "질문 관리" },
-  { to: "/manual-checks", label: "수동 UI 점검" },
-  { to: "/runs", label: "자동 측정" },
-  { to: "/profile-coverage", label: "프로필 커버리지" },
-  { to: "/experiments", label: "실험 관리" },
-  { to: "/insights", label: "AI 인사이트" },
-  { to: "/reports/customer", label: "고객 보고서" },
-
+  { to: "/dashboard", label: "진단" },
+  { to: "/questions", label: "질문 인벤토리" },
+  { to: "/runs", label: "측정" },
+  { to: "/reports/customer", label: "보고서" },
+  { to: "/businesses", label: "업체" },
 ] as const;
+
+const ADVANCED_NAV = [
+  { to: "/insights", label: "AI 인사이트" },
+  { to: "/profile-coverage", label: "프로필 커버리지" },
+  { to: "/experiments", label: "Change Impact" },
+  { to: "/manual-checks", label: "수동 UI 점검" },
+] as const;
+
 
 function AuthedLayout() {
   const { session } = useSession();
@@ -72,7 +82,22 @@ function Shell() {
                 {n.label}
               </Link>
             ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-sm text-muted-foreground">
+                  고급/운영
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {ADVANCED_NAV.map((n) => (
+                  <DropdownMenuItem key={n.to} asChild>
+                    <Link to={n.to}>{n.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
+
           <div className="ml-auto flex items-center gap-2">
             {memberships.length > 0 && (
               <Select value={activeOrgId ?? ""} onValueChange={setActiveOrgId}>

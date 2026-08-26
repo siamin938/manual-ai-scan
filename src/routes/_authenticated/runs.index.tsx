@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,17 +34,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export const Route = createFileRoute("/_authenticated/runs/")({
   head: () => ({
     meta: [
-      { title: "자동 측정 · AI Visibility Lab" },
+      { title: "측정 · AI Visibility Lab" },
       {
         name: "description",
-        content: "OpenAI Web Search API 벤치마크 자동 측정 실행을 생성하고 진행 상태를 확인합니다.",
+        content: "관찰된 노출 상태를 확인하기 위한 측정 실행을 생성하고 진행 상태를 확인합니다.",
       },
-      { property: "og:title", content: "자동 측정 · AI Visibility Lab" },
-      { property: "og:description", content: "OpenAI Web Search API 벤치마크 실행 목록" },
+      { property: "og:title", content: "측정 · AI Visibility Lab" },
+      { property: "og:description", content: "AI 노출 측정 실행 목록" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -77,6 +82,8 @@ const usd = (n: number | string | null | undefined) =>
 type RunRow = {
   id: string;
   name: string;
+  run_type: string;
+  phase: string;
   business_id: string;
   status: string;
   selected_providers: string[];
@@ -99,9 +106,11 @@ function RunsPage() {
         supabase
           .from("measurement_runs")
           .select(
-            "id, name, business_id, status, selected_providers, total_jobs, completed_jobs, failed_jobs, estimated_cost_usd, actual_cost_usd, created_at",
+            "id, name, business_id, status, selected_providers, run_type, phase, total_jobs, completed_jobs, failed_jobs, estimated_cost_usd, actual_cost_usd, created_at",
           )
           .eq("org_id", activeOrgId!)
+          .eq("run_type", "audit")
+          .eq("phase", "standalone")
           .order("created_at", { ascending: false })
           .limit(100),
         supabase.from("businesses").select("id, name").eq("org_id", activeOrgId!),
@@ -117,9 +126,10 @@ function RunsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">자동 측정</h1>
+          <h1 className="text-xl font-semibold tracking-tight">측정</h1>
           <p className="text-sm text-muted-foreground">
-            {ENGINE_LABEL} · 사람이 직접 확인하는 수동 UI 점검과는 별도의 측정입니다.
+            관찰된 노출 상태를 확인하기 위한 측정 실행 목록입니다. Change Impact용 baseline·follow-up 실행은 별도
+            화면에서 관리합니다.
           </p>
         </div>
         <div className="ml-auto">
@@ -140,7 +150,7 @@ function RunsPage() {
             <p className="py-8 text-center text-sm text-muted-foreground">불러오는 중…</p>
           ) : (runsQuery.data?.runs.length ?? 0) === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              자동 측정 작업을 기다리고 있습니다.
+              측정 실행이 아직 없습니다.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -261,6 +271,14 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   });
 
   const sets = (meta.data?.sets ?? []).filter((s) => s.business_id === businessId);
+  const selectedBusinessName = (meta.data?.businesses ?? []).find((b) => b.id === businessId)?.name ?? "";
+
+  /** 실행명 기본값 제안: 업체명 + 날짜. 사용자가 직접 수정할 수 있다. */
+  useEffect(() => {
+    if (!selectedBusinessName) return;
+    const suggestion = `${selectedBusinessName} 측정 ${new Date().toISOString().slice(0, 10)}`;
+    setName((prev) => (prev.trim() ? prev : suggestion));
+  }, [selectedBusinessName]);
   const activeCount = questions.data?.length ?? 0;
   const nonPublicCount = (questions.data ?? []).filter((q) => q.data_class !== "public").length;
   const reps = Number(repetitions);
@@ -340,7 +358,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
       });
       if (fnError) throw fnError;
 
-      toast.success("자동 측정 실행을 대기열에 등록했습니다.");
+      toast.success("측정 실행을 대기열에 등록했습니다.");
       setOpen(false);
       onCreated();
       navigate({ to: "/runs/$runId", params: { runId: runId! } });
@@ -363,11 +381,11 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm">새 자동 측정</Button>
+        <Button size="sm">새 측정</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>새 자동 측정</DialogTitle>
+          <DialogTitle>새 측정</DialogTitle>
           <DialogDescription>{ENGINE_LABEL}</DialogDescription>
         </DialogHeader>
 
@@ -421,40 +439,45 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label>엔진</Label>
-            <Input value={ENGINE_LABEL} readOnly className="bg-muted" />
-            <p className="text-xs text-muted-foreground">
-              모델: {meta.data?.openai?.model_name ?? "-"}
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            엔진: {ENGINE_LABEL} (고정) · 모델 {meta.data?.openai?.model_name ?? "-"}
+          </p>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="reps">반복 횟수 (1~5)</Label>
-              <Input
-                id="reps"
-                type="number"
-                min={1}
-                max={5}
-                step={1}
-                value={repetitions}
-                onChange={(e) => setRepetitions(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="maxcost">실행 최대 비용 (USD)</Label>
-              <Input
-                id="maxcost"
-                type="number"
-                min={0.01}
-                max={1}
-                step={0.01}
-                value={maxCost}
-                onChange={(e) => setMaxCost(e.target.value)}
-              />
-            </div>
-          </div>
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="px-0 text-xs text-muted-foreground">
+                고급 설정
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reps">반복 횟수 (1~5)</Label>
+                  <Input
+                    id="reps"
+                    type="number"
+                    min={1}
+                    max={5}
+                    step={1}
+                    value={repetitions}
+                    onChange={(e) => setRepetitions(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="maxcost">실행 최대 비용 (USD)</Label>
+                  <Input
+                    id="maxcost"
+                    type="number"
+                    min={0.01}
+                    max={1}
+                    step={0.01}
+                    value={maxCost}
+                    onChange={(e) => setMaxCost(e.target.value)}
+                  />
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           <div className="rounded-md border bg-muted/40 p-3 text-sm">
             <div className="flex justify-between">
