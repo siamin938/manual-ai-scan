@@ -34,7 +34,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       {
         name: "description",
         content:
-          "여러 고객 질문에서 업체가 AI 답변에 관찰된 노출 상태, 질문군별 강약, 대신 등장한 경쟁업체와 인용 출처를 확인하는 진단 대시보드.",
+          "여러 고객 질문에서 업체가 AI 답변에 관찰된 노출 상태, 질문군별 수치, 대신 등장한 경쟁업체와 인용 출처를 확인하는 진단 대시보드.",
       },
       { property: "og:title", content: "AI 노출 진단 · AI Visibility Lab" },
       {
@@ -48,14 +48,14 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-function pct(value: number | null | undefined): string {
-  return value === null || value === undefined ? "–" : `${value.toFixed(1)}%`;
+/** Edge DTO가 준 퍼센트 값을 그대로 표시한다(재계산/변환 없음). */
+function pct(value: number | null): string {
+  return value === null ? "–" : `${value.toFixed(1)}%`;
 }
 
-const STANDING_LABEL: Record<string, string> = {
-  strong: "상대적 강점",
-  weak: "우선 점검",
-  mixed: "혼합",
+const STATUS_LABEL: Record<"missing" | "partial", string> = {
+  missing: "미노출",
+  partial: "부분 노출",
 };
 
 function DashboardPage() {
@@ -75,8 +75,8 @@ function DashboardPage() {
   });
 
   const result = query.data;
-  const diagnostic: VisibilityDiagnosticDTO | null =
-    result && result.ok ? result.diagnostic : null;
+  const payload: VisibilityDiagnosticDTO | null = result && result.ok ? result.diagnostic : null;
+  const d = payload?.diagnostic ?? null;
 
   return (
     <div className="space-y-6">
@@ -85,7 +85,7 @@ function DashboardPage() {
           <h1 className="text-xl font-semibold tracking-tight">AI 노출 진단</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             동일 조건으로 반복 측정한 AI 검색 결과에서 관찰된 노출 상태를 요약합니다. 특정 작업이
-            노출을 올린다는 의미는 아니며, 관찰된 값과 우선 점검 영역만 보여줍니다.
+            노출을 올린다는 의미는 아니며, 관찰된 값과 우선 점검 대상만 보여줍니다.
           </p>
         </div>
         <BusinessSelector
@@ -133,38 +133,42 @@ function DashboardPage() {
         </Card>
       )}
 
-      {diagnostic && (
+      {payload && d && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
               label="전체 AI 노출률"
-              value={pct(diagnostic.summary.exposure_rate_pct)}
-              note={
-                diagnostic.summary.exposed_measurement_count !== null
-                  ? `노출 ${diagnostic.summary.exposed_measurement_count}회 / 유효 ${diagnostic.summary.valid_measurement_count}회`
-                  : null
-              }
+              value={pct(d.overview.visibilityRatePct)}
+              note={`노출 ${d.overview.mentionCount}회 / 유효 ${d.overview.validCount}회`}
             />
-            <MetricCard label="Top3 노출률" value={pct(diagnostic.summary.top3_rate_pct)} note="답변 상위 3순위 내 관찰" />
+            <MetricCard
+              label="Top3 노출률"
+              value={pct(d.overview.top3RatePct)}
+              note={`Top3 ${d.overview.top3Count}회`}
+            />
             <MetricCard
               label="노출 질문 비율"
-              value={pct(diagnostic.summary.exposed_question_rate_pct)}
-              note={
-                diagnostic.summary.question_count !== null
-                  ? `질문 ${diagnostic.summary.exposed_question_count ?? 0} / ${diagnostic.summary.question_count}개`
-                  : null
-              }
+              value={pct(d.overview.questionCoverageRatePct)}
+              note={`질문 ${d.overview.coveredQuestionCount} / ${d.overview.questionCount}개`}
             />
             <MetricCard
               label="유효 측정 수"
-              value={String(diagnostic.summary.valid_measurement_count)}
-              note={
-                diagnostic.latest_observed_at
-                  ? `최근 측정 ${formatSeoul(diagnostic.latest_observed_at)}`
-                  : null
-              }
+              value={String(d.overview.validCount)}
+              note={`최근 측정 ${formatSeoul(d.scope.measuredAt)}`}
             />
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            기준 측정: {d.scope.runName} · {d.scope.providers.join(", ")} · 반복{" "}
+            {d.scope.repetitions}회 · 완료 {d.scope.completedJobs}/{d.scope.totalJobs}
+            {d.overview.invalidCount > 0 ? ` · 제외 ${d.overview.invalidCount}건` : ""}
+          </p>
+
+          {(d.dataQuality.measurementRowsCapped || d.dataQuality.sourceRowsCapped) && (
+            <p className="text-xs text-muted-foreground">
+              이번 진단은 조회 상한에 도달해 일부 기록만 사용했습니다.
+            </p>
+          )}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
@@ -172,7 +176,7 @@ function DashboardPage() {
                 <CardTitle className="text-base">질문군별 노출 상태</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
-                {diagnostic.clusters.length === 0 ? (
+                {d.questionGroups.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     질문군 요약이 아직 없습니다.
                   </p>
@@ -181,25 +185,27 @@ function DashboardPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>질문군</TableHead>
-                        <TableHead>질문 수</TableHead>
+                        <TableHead>질문</TableHead>
+                        <TableHead>측정</TableHead>
+                        <TableHead>노출</TableHead>
                         <TableHead>노출률</TableHead>
-                        <TableHead>상태</TableHead>
+                        <TableHead>Top3</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {diagnostic.clusters.map((c) => (
-                        <TableRow key={c.label}>
-                          <TableCell className="text-sm">{c.label}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{c.question_count}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{pct(c.exposure_rate_pct)}</TableCell>
-                          <TableCell>
-                            {c.standing ? (
-                              <Badge variant={c.standing === "weak" ? "destructive" : "secondary"}>
-                                {STANDING_LABEL[c.standing]}
-                              </Badge>
-                            ) : (
-                              <span className="text-sm text-muted-foreground">-</span>
-                            )}
+                      {d.questionGroups.map((g) => (
+                        <TableRow key={g.intentType}>
+                          <TableCell className="text-sm">{g.intentType}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{g.questionCount}</TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {g.measurementCount}
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">{g.mentionCount}</TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {pct(g.visibilityRatePct)}
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {pct(g.top3RatePct)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -214,7 +220,7 @@ function DashboardPage() {
                 <CardTitle className="text-base">대신 등장한 경쟁업체</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
-                {diagnostic.competitors.length === 0 ? (
+                {d.competitors.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     확정된 경쟁업체 언급이 없습니다.
                   </p>
@@ -224,15 +230,19 @@ function DashboardPage() {
                       <TableRow>
                         <TableHead>업체</TableHead>
                         <TableHead>등장 답변 수</TableHead>
-                        <TableHead>답변 점유율</TableHead>
+                        <TableHead>언급 수</TableHead>
+                        <TableHead>답변 비율</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {diagnostic.competitors.map((c) => (
-                        <TableRow key={c.display_name}>
-                          <TableCell className="text-sm">{c.display_name}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{c.response_count}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{pct(c.share_pct)}</TableCell>
+                      {d.competitors.map((c) => (
+                        <TableRow key={c.name}>
+                          <TableCell className="text-sm">{c.name}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.responseCount}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.mentionCount}</TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {pct(c.responseRatePct)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -246,7 +256,7 @@ function DashboardPage() {
                 <CardTitle className="text-base">자주 인용된 출처 도메인</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
-                {diagnostic.sources.length === 0 ? (
+                {d.sources.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     인용 출처 정보가 없습니다.
                   </p>
@@ -255,20 +265,27 @@ function DashboardPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>도메인</TableHead>
-                        <TableHead>구분</TableHead>
+                        <TableHead>등장 답변 수</TableHead>
                         <TableHead>인용 수</TableHead>
-                        <TableHead>비중</TableHead>
+                        <TableHead>답변 비율</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {diagnostic.sources.map((s) => (
+                      {d.sources.map((s) => (
                         <TableRow key={s.domain}>
-                          <TableCell className="text-sm">{s.domain}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {s.source_type ?? "-"}
+                          <TableCell className="text-sm">
+                            {s.domain}
+                            {s.sampleTitle && (
+                              <span className="mt-0.5 block max-w-[240px] truncate text-xs text-muted-foreground">
+                                {s.sampleTitle}
+                              </span>
+                            )}
                           </TableCell>
-                          <TableCell className="text-sm tabular-nums">{s.citation_count}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{pct(s.share_pct)}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{s.responseCount}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{s.citationCount}</TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {pct(s.responseRatePct)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -279,26 +296,26 @@ function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">우선 점검 질문·영역</CardTitle>
+                <CardTitle className="text-base">우선 점검 질문</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {diagnostic.priorities.length === 0 ? (
+                {d.priorityAreas.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     우선 점검 항목이 없습니다.
                   </p>
                 ) : (
-                  diagnostic.priorities.map((p, i) => (
-                    <div key={`${p.title}-${i}`} className="rounded-md border p-3">
+                  d.priorityAreas.map((p) => (
+                    <div key={p.questionId} className="rounded-md border p-3">
                       <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-medium">{p.title}</p>
-                        <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-                          {pct(p.exposure_rate_pct)}
-                        </span>
+                        <p className="text-sm font-medium">{p.questionText}</p>
+                        <Badge variant={p.status === "missing" ? "destructive" : "secondary"}>
+                          {STATUS_LABEL[p.status]}
+                        </Badge>
                       </div>
-                      {p.cluster_label && (
-                        <p className="mt-1 text-xs text-muted-foreground">{p.cluster_label}</p>
-                      )}
-                      {p.detail && <p className="mt-2 text-sm text-muted-foreground">{p.detail}</p>}
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {p.intentType} · 측정 {p.measurementCount}회 · 노출 {p.mentionCount}회 ·
+                        노출률 {pct(p.visibilityRatePct)}
+                      </p>
                     </div>
                   ))
                 )}
@@ -311,13 +328,14 @@ function DashboardPage() {
               <CardTitle className="text-base">노출률 변화 추적</CardTitle>
             </CardHeader>
             <CardContent>
-              {diagnostic.trend.length >= 2 ? (
+              {payload.trend.length >= 2 ? (
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
-                      data={diagnostic.trend.map((t) => ({
-                        시점: formatSeoul(t.observed_at),
-                        노출률: t.exposure_rate_pct ?? 0,
+                      data={payload.trend.map((t) => ({
+                        시점: formatSeoul(t.measuredAt),
+                        노출률: t.visibilityRatePct,
+                        Top3: t.top3RatePct,
                       }))}
                     >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -331,6 +349,13 @@ function DashboardPage() {
                         strokeWidth={2}
                         dot
                       />
+                      <Line
+                        type="monotone"
+                        dataKey="Top3"
+                        stroke="var(--color-chart-2)"
+                        strokeWidth={2}
+                        dot
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -340,16 +365,12 @@ function DashboardPage() {
                     비교할 이전 측정 시점이 아직 없습니다. 현재 1개 시점 상태만 표시합니다.
                   </p>
                   <p className="mt-2 text-2xl font-semibold tabular-nums">
-                    {pct(
-                      diagnostic.trend[0]?.exposure_rate_pct ??
-                        diagnostic.summary.exposure_rate_pct,
-                    )}
+                    {pct(payload.trend[0]?.visibilityRatePct ?? d.overview.visibilityRatePct)}
                   </p>
-                  {diagnostic.latest_observed_at && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatSeoul(diagnostic.latest_observed_at)} 기준
-                    </p>
-                  )}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatSeoul(payload.trend[0]?.measuredAt ?? d.scope.measuredAt)} 기준 · 유효
+                    측정 {payload.trend[0]?.validCount ?? d.overview.validCount}회
+                  </p>
                 </div>
               )}
             </CardContent>

@@ -1,60 +1,103 @@
 /**
- * `visibility-diagnostic` Edge Function DTO의 UI용 타입 정의.
- * 계산 규칙은 포함하지 않는다 (Core Engine Isolation).
+ * `visibility-diagnostic` Edge Function v1 응답 계약 (camelCase 그대로).
+ * 계산/판정 규칙은 포함하지 않는다 (Core Engine Isolation).
  */
 
-export type VisibilityClusterDTO = {
-  label: string;
-  question_count: number;
-  exposure_rate_pct: number | null;
-  standing: "strong" | "weak" | "mixed" | null;
+export type VisibilityBusinessDTO = {
+  id: string;
+  name: string;
+  category: string | null;
+  region: string | null;
+  city: string | null;
+};
+
+export type VisibilityScopeDTO = {
+  runId: string;
+  runName: string;
+  measuredAt: string;
+  runType: "audit";
+  phase: "standalone";
+  providers: string[];
+  repetitions: number;
+  totalJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  experimentRunsExcluded: true;
+};
+
+export type VisibilityOverviewDTO = {
+  validCount: number;
+  invalidCount: number;
+  mentionCount: number;
+  visibilityRatePct: number | null;
+  top3Count: number;
+  top3RatePct: number | null;
+  questionCount: number;
+  coveredQuestionCount: number;
+  questionCoverageRatePct: number | null;
+};
+
+export type VisibilityQuestionGroupDTO = {
+  intentType: string;
+  questionCount: number;
+  measurementCount: number;
+  mentionCount: number;
+  visibilityRatePct: number | null;
+  top3RatePct: number | null;
 };
 
 export type VisibilityCompetitorDTO = {
-  display_name: string;
-  response_count: number;
-  share_pct: number | null;
+  name: string;
+  mentionCount: number;
+  responseCount: number;
+  responseRatePct: number | null;
 };
 
 export type VisibilitySourceDTO = {
   domain: string;
-  citation_count: number;
-  share_pct: number | null;
-  source_type: string | null;
+  citationCount: number;
+  responseCount: number;
+  responseRatePct: number | null;
+  sampleTitle: string | null;
 };
 
-export type VisibilityPriorityDTO = {
-  title: string;
-  detail: string | null;
-  cluster_label: string | null;
-  exposure_rate_pct: number | null;
+export type VisibilityPriorityAreaDTO = {
+  questionId: string;
+  questionText: string;
+  intentType: string;
+  status: "missing" | "partial";
+  measurementCount: number;
+  mentionCount: number;
+  visibilityRatePct: number | null;
+};
+
+export type VisibilityDataQualityDTO = {
+  measurementRowsCapped: boolean;
+  sourceRowsCapped: boolean;
+};
+
+export type VisibilityDiagnosticBodyDTO = {
+  scope: VisibilityScopeDTO;
+  overview: VisibilityOverviewDTO;
+  questionGroups: VisibilityQuestionGroupDTO[];
+  competitors: VisibilityCompetitorDTO[];
+  sources: VisibilitySourceDTO[];
+  priorityAreas: VisibilityPriorityAreaDTO[];
+  dataQuality: VisibilityDataQualityDTO;
 };
 
 export type VisibilityTrendPointDTO = {
-  observed_at: string;
-  exposure_rate_pct: number | null;
-  valid_measurement_count: number | null;
-};
-
-export type VisibilitySummaryDTO = {
-  valid_measurement_count: number;
-  exposure_rate_pct: number | null;
-  top3_rate_pct: number | null;
-  exposed_question_rate_pct: number | null;
-  exposed_measurement_count: number | null;
-  question_count: number | null;
-  exposed_question_count: number | null;
+  measuredAt: string;
+  validCount: number;
+  mentionCount: number;
+  visibilityRatePct: number | null;
+  top3RatePct: number | null;
 };
 
 export type VisibilityDiagnosticDTO = {
-  business_name: string | null;
-  latest_observed_at: string | null;
-  run_count: number | null;
-  summary: VisibilitySummaryDTO;
-  clusters: VisibilityClusterDTO[];
-  competitors: VisibilityCompetitorDTO[];
-  sources: VisibilitySourceDTO[];
-  priorities: VisibilityPriorityDTO[];
+  generatedAt: string;
+  business: VisibilityBusinessDTO;
+  diagnostic: VisibilityDiagnosticBodyDTO;
   trend: VisibilityTrendPointDTO[];
 };
 
@@ -66,4 +109,9 @@ export type VisibilityDiagnosticErrorCode =
 
 export type VisibilityDiagnosticResponseDTO =
   | { ok: true; diagnostic: VisibilityDiagnosticDTO }
-  | { ok: false; error: VisibilityDiagnosticErrorCode };
+  | {
+      ok: false;
+      error: VisibilityDiagnosticErrorCode;
+      /** NO_DATA일 때만 채워지는 업체 표시용 최소 정보 */
+      business?: VisibilityBusinessDTO;
+    };
