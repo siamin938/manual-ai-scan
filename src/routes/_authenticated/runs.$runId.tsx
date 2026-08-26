@@ -7,7 +7,6 @@ import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { aggregateBusinessShare } from "@/lib/business-share.helpers";
 import { runPostprocess } from "@/lib/run-postprocess.functions";
-import { ENTITY_VERIFIER_VERSION } from "@/lib/entity-verification";
 import { RESOLVER_VERSION } from "@/lib/entity-canonical-resolver";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
