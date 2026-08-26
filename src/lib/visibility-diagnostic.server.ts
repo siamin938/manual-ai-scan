@@ -11,6 +11,8 @@ import type {
   VisibilitySourceDTO,
   VisibilityPriorityDTO,
   VisibilityTrendPointDTO,
+  VisibilityDiagnosticErrorCode,
+  VisibilityDiagnosticResponseDTO,
 } from "./visibility-diagnostic.types";
 
 type UserClient = SupabaseClient<Database>;
@@ -178,11 +180,9 @@ export function parseVisibilityDiagnostic(payload: unknown): VisibilityDiagnosti
   };
 }
 
-export type VisibilityDiagnosticResult =
-  | { ok: true; diagnostic: VisibilityDiagnosticDTO }
-  | { ok: false; error: "NO_DATA" | "FORBIDDEN" | "INVALID_DTO" | "INTERNAL_ERROR" };
+export type VisibilityDiagnosticResult = VisibilityDiagnosticResponseDTO;
 
-function asErrorCode(value: unknown): VisibilityDiagnosticResult extends never ? never : "NO_DATA" | "FORBIDDEN" | "INTERNAL_ERROR" {
+function asErrorCode(value: unknown): VisibilityDiagnosticErrorCode {
   if (value === "NO_DATA" || value === "FORBIDDEN") return value;
   return "INTERNAL_ERROR";
 }
