@@ -98,10 +98,12 @@ export const runPostprocess = createServerFn({ method: "POST" })
     try {
       const { verifyAndPersistBusinessEntities } = await import("./entity-verification.server");
       const summary = await verifyAndPersistBusinessEntities({
+        supabase: context.supabase,
         orgId: data.orgId,
         businessId,
         runId: data.runId,
       });
+
       counts.entityVerified = summary.confirmedBusinessCount;
       counts.entityNeedsReview = summary.needsReviewCount;
     } catch {
