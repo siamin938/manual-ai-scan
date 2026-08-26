@@ -46,6 +46,13 @@ function nullableNum(value: unknown): { ok: true; value: number | null } | { ok:
   return n === null ? { ok: false } : { ok: true, value: n };
 }
 
+/** string | null 계약: null 허용, 그 외 문자열만. */
+function nullableStr(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === null) return { ok: true, value: null };
+  const v = str(value);
+  return v === null ? { ok: false } : { ok: true, value: v };
+}
+
 function bool(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
@@ -68,11 +75,11 @@ function parseBusiness(value: unknown): VisibilityBusinessDTO | null {
   const id = str(value["id"]);
   const name = str(value["name"]);
   if (id === null || name === null) return null;
-  const category = value["category"] === null ? null : str(value["category"]);
-  const region = value["region"] === null ? null : str(value["region"]);
-  const city = value["city"] === null ? null : str(value["city"]);
-  if (category === undefined || region === undefined || city === undefined) return null;
-  return { id, name, category, region, city };
+  const category = nullableStr(value["category"]);
+  const region = nullableStr(value["region"]);
+  const city = nullableStr(value["city"]);
+  if (!category.ok || !region.ok || !city.ok) return null;
+  return { id, name, category: category.value, region: region.value, city: city.value };
 }
 
 function parseScope(value: unknown): VisibilityScopeDTO | null {
@@ -202,14 +209,14 @@ function parseSource(o: Obj): VisibilitySourceDTO | null {
   if (domain === null || citationCount === null || responseCount === null || !responseRatePct.ok) {
     return null;
   }
-  const sampleTitle = o["sampleTitle"] === null ? null : str(o["sampleTitle"]);
-  if (sampleTitle === undefined) return null;
+  const sampleTitle = nullableStr(o["sampleTitle"]);
+  if (!sampleTitle.ok) return null;
   return {
     domain,
     citationCount,
     responseCount,
     responseRatePct: responseRatePct.value,
-    sampleTitle,
+    sampleTitle: sampleTitle.value,
   };
 }
 
