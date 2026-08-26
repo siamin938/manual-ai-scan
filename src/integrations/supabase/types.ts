@@ -2234,6 +2234,27 @@ export type Database = {
           },
         ]
       }
+      visibility_postprocess_tokens: {
+        Row: {
+          active: boolean
+          created_at: string
+          name: string
+          token: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          name: string
+          token: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          name?: string
+          token?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       experiment_effects: {

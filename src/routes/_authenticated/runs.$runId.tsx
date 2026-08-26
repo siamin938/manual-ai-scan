@@ -1,12 +1,10 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { aggregateBusinessShare } from "@/lib/business-share.helpers";
-import { runPostprocess } from "@/lib/run-postprocess.functions";
 import { RESOLVER_VERSION } from "@/lib/entity-canonical-resolver";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,7 +119,7 @@ function RunDetailPage() {
       return s && TERMINAL.has(s) ? false : 5000;
     },
     queryFn: async () => {
-      const [run, jobs, measurements, overall, byProvider, qMetrics] = await Promise.all([
+      const [run, jobs, measurements, overall, byProvider, qMetrics, latestEvent] = await Promise.all([
         supabase
           .from("measurement_runs")
           .select("*")
@@ -144,7 +142,20 @@ function RunDetailPage() {
         supabase.from("run_metrics_overall").select("*").eq("run_id", runId).maybeSingle(),
         supabase.from("run_metrics").select("*").eq("run_id", runId),
         supabase.from("question_metrics").select("*").eq("run_id", runId),
-
+        supabase
+          .from("system_events")
+          .select("event_type, created_at, message, severity")
+          .eq("org_id", activeOrgId!)
+          .eq("run_id", runId)
+          .in("event_type", [
+            "visibility_postprocess_triggered",
+            "visibility_postprocess_started",
+            "visibility_postprocess_completed",
+            "visibility_postprocess_failed",
+          ])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
       if (run.error) throw run.error;
       if (jobs.error) throw jobs.error;
@@ -229,6 +240,7 @@ function RunDetailPage() {
         overall: overall.data,
         byProvider: byProvider.data ?? [],
         questionMetrics: qMetrics.data ?? [],
+        latestEvent: latestEvent.data ?? null,
         prompts,
         businessName,
         questionCount,
@@ -238,41 +250,6 @@ function RunDetailPage() {
     },
   });
 
-  // ── 완료된 일반 Run 자동 후처리 (측정/Provider 호출 없음) ──────────────
-  const queryClient = useQueryClient();
-  const postprocessFn = useServerFn(runPostprocess);
-  const startedRef = useRef<string | null>(null);
-
-  const postprocess = useMutation({
-    mutationKey: ["run-postprocess", activeOrgId, runId],
-    mutationFn: async () => postprocessFn({ data: { orgId: activeOrgId!, runId } }),
-    onSuccess: async (res) => {
-      if (!res?.ok) return;
-      await queryClient.invalidateQueries({ queryKey: ["run-detail", runId, activeOrgId] });
-      await queryClient.invalidateQueries({ queryKey: ["profile-coverage"] });
-      await queryClient.invalidateQueries({ queryKey: ["insight-overview"] });
-    },
-  });
-
-  const runRow = data?.run;
-  const postprocessEligible =
-    !!activeOrgId &&
-    !!runRow &&
-    runRow.run_type === "audit" &&
-    runRow.phase === "standalone" &&
-    (runRow.status === "completed" || runRow.status === "partial");
-
-  const startPostprocess = postprocess.mutate;
-  useEffect(() => {
-    if (!postprocessEligible) return;
-    const key = `${activeOrgId}:${runId}`;
-    if (startedRef.current === key) return;
-    startedRef.current = key;
-    startPostprocess();
-  }, [postprocessEligible, activeOrgId, runId, startPostprocess]);
-
-  const postprocessFailed = postprocess.isError || postprocess.data?.ok === false;
-  const postprocessDone = postprocess.data?.ok === true;
 
 
   if (isLoading) {
@@ -346,44 +323,66 @@ function RunDetailPage() {
         </div>
       </div>
 
-      {/* 자동 분석 후처리 상태 (추가 API 측정 비용 없음) */}
-      {postprocessEligible ? (
-        <Card>
-          <CardContent className="flex flex-wrap items-center gap-3 p-4">
-            {postprocessFailed ? (
-              <>
-                <Badge variant="destructive">자동 분석 후처리 확인 필요</Badge>
+      {/* 서버 자동 진단 정리 상태 (프론트에서 실행하지 않음) */}
+      {(() => {
+        const runRow = data.run;
+        const eligible =
+          runRow.run_type === "audit" &&
+          runRow.phase === "standalone" &&
+          (runRow.status === "completed" || runRow.status === "partial");
+        if (!eligible) return null;
+        const event = data.latestEvent;
+        if (!event) {
+          return (
+            <Card>
+              <CardContent className="flex flex-wrap items-center gap-3 p-4">
+                <Badge variant="secondary">기존 실행</Badge>
                 <span className="text-xs text-muted-foreground">
-                  일부 단계가 완료되지 않았습니다. 다시 시도할 수 있습니다.
+                  서버 자동 진단 이력이 없는 실행입니다.
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="ml-auto"
-                  disabled={postprocess.isPending}
-                  onClick={() => postprocess.mutate()}
-                >
-                  다시 시도
-                </Button>
-              </>
-            ) : postprocessDone ? (
-              <>
-                <Badge variant="secondary">자동 분석 준비 완료</Badge>
+              </CardContent>
+            </Card>
+          );
+        }
+        if (event.event_type === "visibility_postprocess_failed") {
+          return (
+            <Card>
+              <CardContent className="flex flex-wrap items-center gap-3 p-4">
+                <Badge variant="destructive">자동 진단 정리 확인 필요</Badge>
                 <span className="text-xs text-muted-foreground">
-                  재분석 · 출처 분류 · 프로필 커버리지 · 인사이트가 갱신되었습니다.
+                  서버 후처리 중 오류가 발생했습니다.
                 </span>
-              </>
-            ) : (
-              <>
-                <Badge variant="secondary">자동 분석 후처리 중…</Badge>
+              </CardContent>
+            </Card>
+          );
+        }
+        if (
+          event.event_type === "visibility_postprocess_triggered" ||
+          event.event_type === "visibility_postprocess_started"
+        ) {
+          return (
+            <Card>
+              <CardContent className="flex flex-wrap items-center gap-3 p-4">
+                <Badge variant="secondary">자동 진단 정리 중…</Badge>
                 <span className="text-xs text-muted-foreground">
-                  저장된 결과만 다시 계산합니다. 추가 API 측정 비용은 발생하지 않습니다.
+                  측정 결과를 정리하고 있습니다. 추가 AI 측정 비용은 발생하지 않습니다.
                 </span>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
+              </CardContent>
+            </Card>
+          );
+        }
+        return (
+          <Card>
+            <CardContent className="flex flex-wrap items-center gap-3 p-4">
+              <Badge variant="secondary">자동 진단 준비 완료</Badge>
+              <span className="text-xs text-muted-foreground">
+                업체 검증·정규화가 완료되었습니다.
+              </span>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
 
 
       {/* 측정 결과 요약 */}
