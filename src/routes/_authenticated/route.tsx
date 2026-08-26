@@ -4,6 +4,13 @@ import { OrgProvider, useOrg, useSession } from "@/lib/org";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { ROLE_LABELS } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -75,7 +82,22 @@ function Shell() {
                 {n.label}
               </Link>
             ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-sm text-muted-foreground">
+                  고급/운영
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {ADVANCED_NAV.map((n) => (
+                  <DropdownMenuItem key={n.to} asChild>
+                    <Link to={n.to}>{n.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
+
           <div className="ml-auto flex items-center gap-2">
             {memberships.length > 0 && (
               <Select value={activeOrgId ?? ""} onValueChange={setActiveOrgId}>
