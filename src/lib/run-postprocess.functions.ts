@@ -117,6 +117,7 @@ export const runPostprocess = createServerFn({ method: "POST" })
         "./entity-canonical-resolver.server"
       );
       const summary = await resolveAndPersistRunCanonicalEntities({
+        supabase: context.supabase,
         orgId: data.orgId,
         businessId,
         runId: data.runId,
