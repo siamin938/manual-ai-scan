@@ -1,18 +1,24 @@
 // Core Engine Isolation: 이 파일은 Supabase Edge Function `visibility-diagnostic`
-// 호출 wrapper이다. 진단 계산 규칙(대표 run 선택, 경쟁업체 판정, 출처 집계,
-// 우선순위 산식)은 이 저장소에 없다. 요청은 현재 사용자 JWT로 전송되며
-// `{ orgId, businessId }` 최소 식별자만 보낸다. 응답은 형태 검증만 수행한다.
+// 호출 wrapper이다. 대표 run 선택, 경쟁업체 판정, 출처 집계, 우선순위 산식 등
+// 계산 규칙은 이 저장소에 없다. 요청은 현재 사용자 JWT로 전송되며
+// `{ orgId, businessId }` 최소 식별자만 보낸다. 응답은 계약 형태만 엄격 검증하고
+// 숫자는 받은 값을 그대로 사용한다(변환/추정 금지).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import type {
-  VisibilityDiagnosticDTO,
-  VisibilityClusterDTO,
+  VisibilityBusinessDTO,
   VisibilityCompetitorDTO,
-  VisibilitySourceDTO,
-  VisibilityPriorityDTO,
-  VisibilityTrendPointDTO,
+  VisibilityDataQualityDTO,
+  VisibilityDiagnosticBodyDTO,
+  VisibilityDiagnosticDTO,
   VisibilityDiagnosticErrorCode,
   VisibilityDiagnosticResponseDTO,
+  VisibilityOverviewDTO,
+  VisibilityPriorityAreaDTO,
+  VisibilityQuestionGroupDTO,
+  VisibilityScopeDTO,
+  VisibilitySourceDTO,
+  VisibilityTrendPointDTO,
 } from "./visibility-diagnostic.types";
 
 type UserClient = SupabaseClient<Database>;
@@ -25,167 +31,302 @@ function isObj(value: unknown): value is Obj {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-/** DTO 키 표기 차이(camel/snake)만 흡수한다. 값은 변형하지 않는다. */
-function pick(obj: Obj, keys: readonly string[]): unknown {
-  for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null) return obj[k];
+function str(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function num(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** number | null 계약: null 허용, 그 외 숫자만. undefined/문자열은 계약 위반. */
+function nullableNum(value: unknown): { ok: true; value: number | null } | { ok: false } {
+  if (value === null) return { ok: true, value: null };
+  const n = num(value);
+  return n === null ? { ok: false } : { ok: true, value: n };
+}
+
+function bool(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+/** 배열 요소 중 하나라도 계약 위반이면 전체를 실패로 본다(fail-closed). */
+function strictArray<T>(value: unknown, parse: (item: Obj) => T | null): T[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: T[] = [];
+  for (const item of value) {
+    if (!isObj(item)) return null;
+    const parsed = parse(item);
+    if (parsed === null) return null;
+    out.push(parsed);
   }
-  return undefined;
+  return out;
 }
 
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
+function parseBusiness(value: unknown): VisibilityBusinessDTO | null {
+  if (!isObj(value)) return null;
+  const id = str(value["id"]);
+  const name = str(value["name"]);
+  if (id === null || name === null) return null;
+  const category = value["category"] === null ? null : str(value["category"]);
+  const region = value["region"] === null ? null : str(value["region"]);
+  const city = value["city"] === null ? null : str(value["city"]);
+  if (category === undefined || region === undefined || city === undefined) return null;
+  return { id, name, category, region, city };
 }
 
-function asCount(value: unknown): number | null {
-  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
-  return Number.isFinite(n) ? n : null;
-}
-
-/** Edge DTO가 비율(0~1) 또는 퍼센트(0~100) 중 어떤 표기든 퍼센트로 표시만 맞춘다. */
-function asPercent(value: unknown): number | null {
-  const n = asCount(value);
-  if (n === null) return null;
-  if (n >= 0 && n <= 1) return n * 100;
-  return n;
-}
-
-function arrayOf<T>(value: unknown, map: (item: Obj) => T | null): T[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isObj).map(map).filter((v): v is T => v !== null);
-}
-
-function parseCluster(o: Obj): VisibilityClusterDTO | null {
-  const label = asString(pick(o, ["label", "cluster_label", "name", "intent_type"]));
-  if (!label) return null;
+function parseScope(value: unknown): VisibilityScopeDTO | null {
+  if (!isObj(value)) return null;
+  const runId = str(value["runId"]);
+  const runName = str(value["runName"]);
+  const measuredAt = str(value["measuredAt"]);
+  const providers = Array.isArray(value["providers"])
+    ? value["providers"].every((p) => typeof p === "string")
+      ? (value["providers"] as string[])
+      : null
+    : null;
+  const repetitions = num(value["repetitions"]);
+  const totalJobs = num(value["totalJobs"]);
+  const completedJobs = num(value["completedJobs"]);
+  const failedJobs = num(value["failedJobs"]);
+  if (
+    runId === null ||
+    runName === null ||
+    measuredAt === null ||
+    providers === null ||
+    repetitions === null ||
+    totalJobs === null ||
+    completedJobs === null ||
+    failedJobs === null ||
+    value["runType"] !== "audit" ||
+    value["phase"] !== "standalone" ||
+    value["experimentRunsExcluded"] !== true
+  ) {
+    return null;
+  }
   return {
-    label,
-    question_count: asCount(pick(o, ["question_count", "questionCount"])) ?? 0,
-    exposure_rate_pct: asPercent(
-      pick(o, ["exposure_rate", "exposureRate", "mention_rate", "visibility_rate"]),
-    ),
-    standing: (() => {
-      const s = asString(pick(o, ["standing", "strength", "level"]));
-      return s === "strong" || s === "weak" || s === "mixed" ? s : null;
-    })(),
+    runId,
+    runName,
+    measuredAt,
+    runType: "audit",
+    phase: "standalone",
+    providers,
+    repetitions,
+    totalJobs,
+    completedJobs,
+    failedJobs,
+    experimentRunsExcluded: true,
+  };
+}
+
+function parseOverview(value: unknown): VisibilityOverviewDTO | null {
+  if (!isObj(value)) return null;
+  const validCount = num(value["validCount"]);
+  const invalidCount = num(value["invalidCount"]);
+  const mentionCount = num(value["mentionCount"]);
+  const top3Count = num(value["top3Count"]);
+  const questionCount = num(value["questionCount"]);
+  const coveredQuestionCount = num(value["coveredQuestionCount"]);
+  const visibilityRatePct = nullableNum(value["visibilityRatePct"]);
+  const top3RatePct = nullableNum(value["top3RatePct"]);
+  const questionCoverageRatePct = nullableNum(value["questionCoverageRatePct"]);
+  if (
+    validCount === null ||
+    invalidCount === null ||
+    mentionCount === null ||
+    top3Count === null ||
+    questionCount === null ||
+    coveredQuestionCount === null ||
+    !visibilityRatePct.ok ||
+    !top3RatePct.ok ||
+    !questionCoverageRatePct.ok
+  ) {
+    return null;
+  }
+  return {
+    validCount,
+    invalidCount,
+    mentionCount,
+    visibilityRatePct: visibilityRatePct.value,
+    top3Count,
+    top3RatePct: top3RatePct.value,
+    questionCount,
+    coveredQuestionCount,
+    questionCoverageRatePct: questionCoverageRatePct.value,
+  };
+}
+
+function parseQuestionGroup(o: Obj): VisibilityQuestionGroupDTO | null {
+  const intentType = str(o["intentType"]);
+  const questionCount = num(o["questionCount"]);
+  const measurementCount = num(o["measurementCount"]);
+  const mentionCount = num(o["mentionCount"]);
+  const visibilityRatePct = nullableNum(o["visibilityRatePct"]);
+  const top3RatePct = nullableNum(o["top3RatePct"]);
+  if (
+    intentType === null ||
+    questionCount === null ||
+    measurementCount === null ||
+    mentionCount === null ||
+    !visibilityRatePct.ok ||
+    !top3RatePct.ok
+  ) {
+    return null;
+  }
+  return {
+    intentType,
+    questionCount,
+    measurementCount,
+    mentionCount,
+    visibilityRatePct: visibilityRatePct.value,
+    top3RatePct: top3RatePct.value,
   };
 }
 
 function parseCompetitor(o: Obj): VisibilityCompetitorDTO | null {
-  const name = asString(pick(o, ["display_name", "canonical_display_name", "name"]));
-  if (!name) return null;
-  return {
-    display_name: name,
-    response_count: asCount(pick(o, ["response_count", "responseCount", "mention_count"])) ?? 0,
-    share_pct: asPercent(pick(o, ["answer_share_pct", "share_pct", "share", "rate"])),
-  };
+  const name = str(o["name"]);
+  const mentionCount = num(o["mentionCount"]);
+  const responseCount = num(o["responseCount"]);
+  const responseRatePct = nullableNum(o["responseRatePct"]);
+  if (name === null || mentionCount === null || responseCount === null || !responseRatePct.ok) {
+    return null;
+  }
+  return { name, mentionCount, responseCount, responseRatePct: responseRatePct.value };
 }
 
 function parseSource(o: Obj): VisibilitySourceDTO | null {
-  const domain = asString(pick(o, ["domain", "source_domain", "host"]));
-  if (!domain) return null;
+  const domain = str(o["domain"]);
+  const citationCount = num(o["citationCount"]);
+  const responseCount = num(o["responseCount"]);
+  const responseRatePct = nullableNum(o["responseRatePct"]);
+  if (domain === null || citationCount === null || responseCount === null || !responseRatePct.ok) {
+    return null;
+  }
+  const sampleTitle = o["sampleTitle"] === null ? null : str(o["sampleTitle"]);
+  if (sampleTitle === undefined) return null;
   return {
     domain,
-    citation_count: asCount(pick(o, ["citation_count", "count", "cited_count"])) ?? 0,
-    share_pct: asPercent(pick(o, ["share_pct", "citation_rate", "rate"])),
-    source_type: asString(pick(o, ["source_type", "type", "classification"])),
+    citationCount,
+    responseCount,
+    responseRatePct: responseRatePct.value,
+    sampleTitle,
   };
 }
 
-function parsePriority(o: Obj): VisibilityPriorityDTO | null {
-  const title = asString(pick(o, ["title", "question_text", "label", "area"]));
-  if (!title) return null;
+function parsePriorityArea(o: Obj): VisibilityPriorityAreaDTO | null {
+  const questionId = str(o["questionId"]);
+  const questionText = str(o["questionText"]);
+  const intentType = str(o["intentType"]);
+  const status = o["status"];
+  const measurementCount = num(o["measurementCount"]);
+  const mentionCount = num(o["mentionCount"]);
+  const visibilityRatePct = nullableNum(o["visibilityRatePct"]);
+  if (
+    questionId === null ||
+    questionText === null ||
+    intentType === null ||
+    (status !== "missing" && status !== "partial") ||
+    measurementCount === null ||
+    mentionCount === null ||
+    !visibilityRatePct.ok
+  ) {
+    return null;
+  }
   return {
-    title,
-    detail: asString(pick(o, ["detail", "note", "rationale", "description"])),
-    cluster_label: asString(pick(o, ["cluster_label", "intent_type", "cluster"])),
-    exposure_rate_pct: asPercent(pick(o, ["exposure_rate", "mention_rate", "exposureRate"])),
+    questionId,
+    questionText,
+    intentType,
+    status,
+    measurementCount,
+    mentionCount,
+    visibilityRatePct: visibilityRatePct.value,
   };
+}
+
+function parseDataQuality(value: unknown): VisibilityDataQualityDTO | null {
+  if (!isObj(value)) return null;
+  const measurementRowsCapped = bool(value["measurementRowsCapped"]);
+  const sourceRowsCapped = bool(value["sourceRowsCapped"]);
+  if (measurementRowsCapped === null || sourceRowsCapped === null) return null;
+  return { measurementRowsCapped, sourceRowsCapped };
+}
+
+function parseDiagnosticBody(value: unknown): VisibilityDiagnosticBodyDTO | null {
+  if (!isObj(value)) return null;
+  const scope = parseScope(value["scope"]);
+  const overview = parseOverview(value["overview"]);
+  const questionGroups = strictArray(value["questionGroups"], parseQuestionGroup);
+  const competitors = strictArray(value["competitors"], parseCompetitor);
+  const sources = strictArray(value["sources"], parseSource);
+  const priorityAreas = strictArray(value["priorityAreas"], parsePriorityArea);
+  const dataQuality = parseDataQuality(value["dataQuality"]);
+  if (
+    scope === null ||
+    overview === null ||
+    questionGroups === null ||
+    competitors === null ||
+    sources === null ||
+    priorityAreas === null ||
+    dataQuality === null
+  ) {
+    return null;
+  }
+  return { scope, overview, questionGroups, competitors, sources, priorityAreas, dataQuality };
 }
 
 function parseTrendPoint(o: Obj): VisibilityTrendPointDTO | null {
-  const at = asString(pick(o, ["observed_at", "completed_at", "date", "run_completed_at"]));
-  if (!at) return null;
+  const measuredAt = str(o["measuredAt"]);
+  const validCount = num(o["validCount"]);
+  const mentionCount = num(o["mentionCount"]);
+  const visibilityRatePct = nullableNum(o["visibilityRatePct"]);
+  const top3RatePct = nullableNum(o["top3RatePct"]);
+  if (
+    measuredAt === null ||
+    validCount === null ||
+    mentionCount === null ||
+    !visibilityRatePct.ok ||
+    !top3RatePct.ok
+  ) {
+    return null;
+  }
   return {
-    observed_at: at,
-    exposure_rate_pct: asPercent(pick(o, ["exposure_rate", "exposureRate", "mention_rate"])),
-    valid_measurement_count: asCount(
-      pick(o, ["valid_measurement_count", "measurement_count", "validMeasurementCount"]),
-    ),
+    measuredAt,
+    validCount,
+    mentionCount,
+    visibilityRatePct: visibilityRatePct.value,
+    top3RatePct: top3RatePct.value,
   };
+}
+
+function asErrorCode(value: unknown): VisibilityDiagnosticErrorCode {
+  return value === "FORBIDDEN" ? "FORBIDDEN" : "INTERNAL_ERROR";
 }
 
 /**
- * fail-closed: DTO 형태가 기대와 다르면 값을 추측해 채우지 않고 null을 돌려준다.
+ * 계약 검증 결과. `diagnostic: null`은 진단 데이터 없음(NO_DATA)으로 매핑한다.
+ * 계약과 조금이라도 다르면 값을 보정하지 않고 INVALID_DTO로 닫는다.
  */
-export function parseVisibilityDiagnostic(payload: unknown): VisibilityDiagnosticDTO | null {
-  if (!isObj(payload)) return null;
-  const root = isObj(payload["diagnostic"]) ? (payload["diagnostic"] as Obj) : payload;
+export function parseVisibilityDiagnosticResponse(
+  payload: unknown,
+): VisibilityDiagnosticResponseDTO {
+  if (!isObj(payload) || payload["ok"] !== true) return { ok: false, error: "INVALID_DTO" };
 
-  const summaryRaw = pick(root, ["summary", "overview", "metrics", "kpis"]);
-  const summary = isObj(summaryRaw) ? summaryRaw : root;
+  const generatedAt = str(payload["generatedAt"]);
+  const business = parseBusiness(payload["business"]);
+  const trend = strictArray(payload["trend"], parseTrendPoint);
+  if (generatedAt === null || business === null || trend === null) {
+    return { ok: false, error: "INVALID_DTO" };
+  }
 
-  const validCount = asCount(
-    pick(summary, [
-      "valid_measurement_count",
-      "validMeasurementCount",
-      "measurement_count",
-      "eligible_measurement_count",
-    ]),
-  );
-  if (validCount === null) return null;
+  if (payload["diagnostic"] === null) return { ok: false, error: "NO_DATA", business };
 
-  const clusters = arrayOf(
-    pick(root, ["clusters", "question_clusters", "intent_clusters"]),
-    parseCluster,
-  );
-  const competitors = arrayOf(pick(root, ["competitors", "substitutes", "competitor_share"]), parseCompetitor);
-  const sources = arrayOf(pick(root, ["sources", "source_domains", "citations"]), parseSource);
-  const priorities = arrayOf(pick(root, ["priorities", "priority_areas", "focus_areas", "actions"]), parsePriority);
-  const trend = arrayOf(pick(root, ["trend", "trend_points", "history", "timeline"]), parseTrendPoint);
+  const diagnostic = parseDiagnosticBody(payload["diagnostic"]);
+  if (diagnostic === null) return { ok: false, error: "INVALID_DTO" };
 
-  return {
-    business_name: asString(pick(root, ["business_name", "businessName"])),
-    latest_observed_at: asString(
-      pick(root, ["latest_observed_at", "observed_at", "completed_at", "generated_at"]),
-    ),
-    run_count: asCount(pick(root, ["run_count", "runCount"])),
-    summary: {
-      valid_measurement_count: validCount,
-      exposure_rate_pct: asPercent(
-        pick(summary, ["exposure_rate", "exposureRate", "visibility_rate", "mention_rate"]),
-      ),
-      top3_rate_pct: asPercent(pick(summary, ["top3_rate", "top3Rate", "top3_exposure_rate"])),
-      exposed_question_rate_pct: asPercent(
-        pick(summary, [
-          "exposed_question_rate",
-          "exposedQuestionRate",
-          "question_exposure_rate",
-          "question_coverage_rate",
-        ]),
-      ),
-      exposed_measurement_count: asCount(
-        pick(summary, ["exposed_measurement_count", "mentioned_count", "exposure_count"]),
-      ),
-      question_count: asCount(pick(summary, ["question_count", "questionCount"])),
-      exposed_question_count: asCount(
-        pick(summary, ["exposed_question_count", "exposedQuestionCount", "covered_question_count"]),
-      ),
-    },
-    clusters,
-    competitors,
-    sources,
-    priorities,
-    trend,
-  };
+  return { ok: true, diagnostic: { generatedAt, business, diagnostic, trend } };
 }
 
 export type VisibilityDiagnosticResult = VisibilityDiagnosticResponseDTO;
-
-function asErrorCode(value: unknown): VisibilityDiagnosticErrorCode {
-  if (value === "NO_DATA" || value === "FORBIDDEN") return value;
-  return "INTERNAL_ERROR";
-}
 
 export async function fetchVisibilityDiagnostic(args: {
   supabase: UserClient;
@@ -201,7 +342,8 @@ export async function fetchVisibilityDiagnostic(args: {
     const ctx = (error as { context?: unknown }).context;
     if (ctx instanceof Response) {
       try {
-        payload = (await ctx.clone().json()) as Obj;
+        const parsed: unknown = await ctx.clone().json();
+        payload = isObj(parsed) ? parsed : null;
       } catch {
         payload = null;
       }
@@ -215,12 +357,9 @@ export async function fetchVisibilityDiagnostic(args: {
   }
 
   if (!payload) return { ok: false, error: "INTERNAL_ERROR" };
-  if (payload["ok"] === false || typeof payload["error"] === "string") {
-    return { ok: false, error: asErrorCode(payload["error"] ?? payload["code"]) };
-  }
+  if (payload["ok"] !== true) return { ok: false, error: asErrorCode(payload["error"]) };
 
-  const diagnostic = parseVisibilityDiagnostic(payload);
-  if (!diagnostic) return { ok: false, error: "INVALID_DTO" };
-  if (diagnostic.summary.valid_measurement_count <= 0) return { ok: false, error: "NO_DATA" };
-  return { ok: true, diagnostic };
+  return parseVisibilityDiagnosticResponse(payload);
 }
+
+export type { VisibilityDiagnosticDTO };
