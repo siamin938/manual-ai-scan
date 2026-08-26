@@ -240,6 +240,7 @@ function RunDetailPage() {
         overall: overall.data,
         byProvider: byProvider.data ?? [],
         questionMetrics: qMetrics.data ?? [],
+        latestEvent: latestEvent.data ?? null,
         prompts,
         businessName,
         questionCount,
