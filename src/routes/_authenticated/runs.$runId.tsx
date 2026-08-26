@@ -323,44 +323,66 @@ function RunDetailPage() {
         </div>
       </div>
 
-      {/* 자동 분석 후처리 상태 (추가 API 측정 비용 없음) */}
-      {postprocessEligible ? (
-        <Card>
-          <CardContent className="flex flex-wrap items-center gap-3 p-4">
-            {postprocessFailed ? (
-              <>
-                <Badge variant="destructive">자동 분석 후처리 확인 필요</Badge>
+      {/* 서버 자동 진단 정리 상태 (프론트에서 실행하지 않음) */}
+      {(() => {
+        const runRow = data.run;
+        const eligible =
+          runRow.run_type === "audit" &&
+          runRow.phase === "standalone" &&
+          (runRow.status === "completed" || runRow.status === "partial");
+        if (!eligible) return null;
+        const event = data.latestEvent;
+        if (!event) {
+          return (
+            <Card>
+              <CardContent className="flex flex-wrap items-center gap-3 p-4">
+                <Badge variant="secondary">기존 실행</Badge>
                 <span className="text-xs text-muted-foreground">
-                  일부 단계가 완료되지 않았습니다. 다시 시도할 수 있습니다.
+                  서버 자동 진단 이력이 없는 실행입니다.
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="ml-auto"
-                  disabled={postprocess.isPending}
-                  onClick={() => postprocess.mutate()}
-                >
-                  다시 시도
-                </Button>
-              </>
-            ) : postprocessDone ? (
-              <>
-                <Badge variant="secondary">자동 분석 준비 완료</Badge>
+              </CardContent>
+            </Card>
+          );
+        }
+        if (event.event_type === "visibility_postprocess_failed") {
+          return (
+            <Card>
+              <CardContent className="flex flex-wrap items-center gap-3 p-4">
+                <Badge variant="destructive">자동 진단 정리 확인 필요</Badge>
                 <span className="text-xs text-muted-foreground">
-                  재분석 · 출처 분류 · 프로필 커버리지 · 인사이트가 갱신되었습니다.
+                  서버 후처리 중 오류가 발생했습니다.
                 </span>
-              </>
-            ) : (
-              <>
-                <Badge variant="secondary">자동 분석 후처리 중…</Badge>
+              </CardContent>
+            </Card>
+          );
+        }
+        if (
+          event.event_type === "visibility_postprocess_triggered" ||
+          event.event_type === "visibility_postprocess_started"
+        ) {
+          return (
+            <Card>
+              <CardContent className="flex flex-wrap items-center gap-3 p-4">
+                <Badge variant="secondary">자동 진단 정리 중…</Badge>
                 <span className="text-xs text-muted-foreground">
-                  저장된 결과만 다시 계산합니다. 추가 API 측정 비용은 발생하지 않습니다.
+                  측정 결과를 정리하고 있습니다. 추가 AI 측정 비용은 발생하지 않습니다.
                 </span>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
+              </CardContent>
+            </Card>
+          );
+        }
+        return (
+          <Card>
+            <CardContent className="flex flex-wrap items-center gap-3 p-4">
+              <Badge variant="secondary">자동 진단 준비 완료</Badge>
+              <span className="text-xs text-muted-foreground">
+                업체 검증·정규화가 완료되었습니다.
+              </span>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
 
 
       {/* 측정 결과 요약 */}
