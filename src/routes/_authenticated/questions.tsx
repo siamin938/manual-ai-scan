@@ -1,9 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { DATA_CLASS_LABELS } from "@/lib/format";
+import {
+  BusinessSelector,
+  useClientBusinessSelection,
+} from "@/components/business-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +17,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -35,19 +45,24 @@ import {
   INTENT_LABELS,
   buildInsertPayloads,
   dedupeForSave,
+  isAllowedIntent,
   mapSuggestError,
   toCandidates,
   type SuggestionCandidate,
 } from "@/lib/question-suggestions";
 
-
 export const Route = createFileRoute("/_authenticated/questions")({
   head: () => ({
     meta: [
-      { title: "질문 관리 · AI Visibility Lab" },
-      { name: "description", content: "업체별 질문 세트와 점검용 질문을 등록하고 관리합니다." },
-      { property: "og:title", content: "질문 관리 · AI Visibility Lab" },
-      { property: "og:description", content: "질문 세트와 질문 등록 관리" },
+      { title: "질문 인벤토리 · AI Visibility Lab" },
+      {
+        name: "description",
+        content: "업체별로 실제 고객이 AI에 물을 법한 질문 인벤토리를 생성하고 검토합니다.",
+      },
+      { property: "og:title", content: "질문 인벤토리 · AI Visibility Lab" },
+      { property: "og:description", content: "AI 질문 인벤토리 생성과 검토" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: QuestionsPage,
@@ -80,18 +95,27 @@ const EMPTY_Q = {
   active: true,
 };
 
+const COUNT_PRESETS = ["24", "48", "72", "96"] as const;
+
+function intentLabel(intent: string): string {
+  return isAllowedIntent(intent) ? INTENT_LABELS[intent] : intent;
+}
+
 function QuestionsPage() {
   const { activeOrgId, canWrite } = useOrg();
   const qc = useQueryClient();
-  const [businessId, setBusinessId] = useState("");
+  const businessSelection = useClientBusinessSelection(activeOrgId);
+  const businessId = businessSelection.selectedBusinessId ?? "";
+
   const [setId, setSetId] = useState("");
   const [setName, setSetName] = useState("");
   const [openSet, setOpenSet] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_Q });
-  // --- AI 질문 추천 v0.1 상태 ---
+
+  // --- AI 질문 인벤토리 생성 상태 ---
   const [openConfirmAi, setOpenConfirmAi] = useState(false);
-  const [aiCount, setAiCount] = useState("10");
+  const [aiCount, setAiCount] = useState<string>("48");
   const [openReview, setOpenReview] = useState(false);
   const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
   const [aiMeta, setAiMeta] = useState<{
@@ -99,35 +123,38 @@ function QuestionsPage() {
     costStatus: string | null;
     usage: { inputTokens?: number; outputTokens?: number } | null;
     estimatedCostUsd: number | null;
+    requestedCount: number | null;
+    suggestionCount: number | null;
+    batchCount: number | null;
+    mode: string | null;
   }>({
     model: null,
     costStatus: null,
     usage: null,
     estimatedCostUsd: null,
+    requestedCount: null,
+    suggestionCount: null,
+    batchCount: null,
+    mode: null,
   });
+  const [showAiDetails, setShowAiDetails] = useState(false);
   const [targetSetMode, setTargetSetMode] = useState<"existing" | "new">("new");
   const [targetSetId, setTargetSetId] = useState("");
   const [newSetName, setNewSetName] = useState("");
 
-
-  const { data: businesses = [] } = useQuery({
-    queryKey: ["client-businesses-min", activeOrgId],
-    enabled: !!activeOrgId,
+  const { data: selectedBusiness = null } = useQuery({
+    queryKey: ["business-locale", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("businesses")
         .select("id, name, region, city")
-        .eq("org_id", activeOrgId!)
-        .eq("active", true)
-        .eq("is_client_business", true)
-        .order("name");
+        .eq("id", businessId)
+        .maybeSingle();
       if (error) throw error;
-      return data ?? [];
+      return data;
     },
   });
-
-  const selectedBusiness = businesses.find((b) => b.id === businessId) ?? null;
-
 
   const { data: sets = [] } = useQuery({
     queryKey: ["question-sets", activeOrgId, businessId],
@@ -139,6 +166,22 @@ function QuestionsPage() {
         .eq("org_id", activeOrgId!)
         .eq("business_id", businessId)
         .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const setIds = useMemo(() => sets.map((s) => s.id), [sets]);
+
+  /** 선택 업체의 전체 질문 현황(인벤토리 요약용). */
+  const { data: allQuestions = [] } = useQuery({
+    queryKey: ["questions-inventory", activeOrgId, businessId, setIds.join(",")],
+    enabled: !!activeOrgId && setIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("questions")
+        .select("id, intent_type, active, data_class, question_set_id")
+        .in("question_set_id", setIds);
       if (error) throw error;
       return data ?? [];
     },
@@ -159,6 +202,19 @@ function QuestionsPage() {
       return (data ?? []) as Question[];
     },
   });
+
+  useEffect(() => {
+    if (setId && !setIds.includes(setId)) setSetId("");
+  }, [setId, setIds]);
+
+  const activeQuestions = allQuestions.filter((q) => q.active);
+  const intentCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const q of activeQuestions) {
+      map.set(q.intent_type, (map.get(q.intent_type) ?? 0) + 1);
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [activeQuestions]);
 
   const createSet = useMutation({
     mutationFn: async () => {
@@ -207,6 +263,7 @@ function QuestionsPage() {
       toast.success("저장되었습니다.");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["questions", activeOrgId, setId] });
+      qc.invalidateQueries({ queryKey: ["questions-inventory", activeOrgId, businessId] });
     },
     onError: (e: Error) => toast.error(`저장 실패: ${e.message}`),
   });
@@ -216,18 +273,26 @@ function QuestionsPage() {
       const { error } = await supabase.from("questions").update({ active: !q.active }).eq("id", q.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["questions", activeOrgId, setId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["questions", activeOrgId, setId] });
+      qc.invalidateQueries({ queryKey: ["questions-inventory", activeOrgId, businessId] });
+    },
     onError: (e: Error) => toast.error(`변경 실패: ${e.message}`),
   });
 
   const suggestAi = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("suggest-questions", {
-        body: { orgId: activeOrgId, businessId, count: Number(aiCount) || 10 },
+        body: { orgId: activeOrgId, businessId, count: Number(aiCount) || 48 },
       });
       if (error) throw new Error(error.message);
       return data as {
         suggestions?: unknown;
+        mode?: string;
+        requestedCount?: number;
+        suggestionCount?: number;
+        batchCount?: number;
+        intentCounts?: Record<string, number>;
         model?: string;
         costStatus?: string;
         usage?: { inputTokens?: number; outputTokens?: number };
@@ -257,10 +322,16 @@ function QuestionsPage() {
               }
             : null,
         estimatedCostUsd: typeof data?.estimatedCostUsd === "number" ? data.estimatedCostUsd : null,
+        requestedCount: typeof data?.requestedCount === "number" ? data.requestedCount : null,
+        suggestionCount: typeof data?.suggestionCount === "number" ? data.suggestionCount : null,
+        batchCount: typeof data?.batchCount === "number" ? data.batchCount : null,
+        mode: typeof data?.mode === "string" ? data.mode : null,
       });
-      setTargetSetMode(setId ? "existing" : "new");
+      setShowAiDetails(false);
+      setTargetSetMode("new");
       setTargetSetId(setId);
-      setNewSetName(`${selectedBusiness?.name ?? "업체"} AI 추천 v1`);
+      const today = new Date().toISOString().slice(0, 10);
+      setNewSetName(`${selectedBusiness?.name ?? "업체"} 질문 인벤토리 ${today}`);
       setOpenConfirmAi(false);
       setOpenReview(true);
     },
@@ -307,95 +378,117 @@ function QuestionsPage() {
       return { destSetId, inserted: kept.length, skipped };
     },
     onSuccess: (res) => {
-      toast.success(`${res.inserted}개 질문을 등록했습니다.`);
+      toast.success(`${res.inserted}개 질문을 인벤토리에 저장했습니다.`);
       if (res.skipped > 0) toast.message(`중복 ${res.skipped}개는 제외했습니다.`);
       setOpenReview(false);
       setCandidates([]);
       setSetId(res.destSetId);
       qc.invalidateQueries({ queryKey: ["question-sets", activeOrgId, businessId] });
+      qc.invalidateQueries({ queryKey: ["questions-inventory", activeOrgId, businessId] });
       qc.invalidateQueries({ queryKey: ["questions", activeOrgId, res.destSetId] });
     },
     onError: (e: Error) => {
       if (e.message === "ALL_DUPLICATE") {
-        toast.error("선택한 질문이 모두 기존 질문과 중복되어 등록하지 않았습니다.");
+        toast.error("선택한 질문이 모두 기존 질문과 중복되어 저장하지 않았습니다.");
         return;
       }
       if (e.message === "NO_SELECTION") {
-        toast.error("등록할 질문을 선택해 주세요.");
+        toast.error("저장할 질문을 선택해 주세요.");
         return;
       }
-      toast.error(`등록 실패: ${e.message}`);
+      toast.error(`저장 실패: ${e.message}`);
     },
   });
 
   const selectedCount = candidates.filter((c) => c.selected).length;
-  const nonPublic = questions.filter((q) => q.data_class !== "public");
-
+  const candidateIntentCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of candidates) map.set(c.intentType, (map.get(c.intentType) ?? 0) + 1);
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [candidates]);
+  const nonPublic = allQuestions.filter((q) => q.data_class !== "public");
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">질문 관리</h1>
-        <p className="mt-1 text-sm text-muted-foreground">업체별 질문 세트를 만들고 점검 질문을 등록합니다.</p>
+        <h1 className="text-xl font-semibold tracking-tight">질문 인벤토리</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          업체 선택 → AI 질문 인벤토리 생성 → 검토·저장 순서로 진행합니다.
+        </p>
       </div>
 
       <Card>
-        <CardContent className="flex flex-wrap items-end gap-3 pt-6">
-          <div className="space-y-2">
-            <Label>업체</Label>
-            <Select
-              value={businessId}
-              onValueChange={(v) => {
-                setBusinessId(v);
-                setSetId("");
-              }}
-            >
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="업체 선택" />
+        <CardContent className="flex flex-wrap items-center gap-4 pt-6">
+          <BusinessSelector
+            options={businessSelection.options}
+            value={businessSelection.selectedBusinessId}
+            onChange={businessSelection.select}
+            isLoading={businessSelection.isLoading}
+            isError={businessSelection.isError}
+          />
+          <div className="ml-auto flex items-center gap-3">
+            <Select value={aiCount} onValueChange={setAiCount}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {businesses.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
+                {COUNT_PRESETS.map((n) => (
+                  <SelectItem key={n} value={n}>
+                    {n}개
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>질문 세트</Label>
-            <Select value={setId} onValueChange={setSetId} disabled={!businessId}>
-              <SelectTrigger className="w-[240px]">
-                <SelectValue placeholder="질문 세트 선택" />
-              </SelectTrigger>
-              <SelectContent>
-                {sets.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {canWrite && (
-            <>
-              <Button variant="outline" disabled={!businessId} onClick={() => setOpenSet(true)}>
-                질문 세트 추가
+            {canWrite ? (
+              <Button disabled={!businessId} onClick={() => setOpenConfirmAi(true)}>
+                AI 질문 인벤토리 생성
               </Button>
-              <Button variant="outline" disabled={!businessId} onClick={() => setOpenConfirmAi(true)}>
-                AI 질문 추천
-              </Button>
+            ) : (
+              <Badge variant="secondary">조회 전용 권한</Badge>
+            )}
+          </div>
+          <p className="w-full text-xs text-muted-foreground">
+            실제 고객이 AI에 물을 법한 질문을 여러 질문군으로 생성합니다.
+          </p>
+        </CardContent>
+      </Card>
 
-              <Button
-                disabled={!setId}
-                onClick={() => {
-                  setForm({ ...EMPTY_Q });
-                  setOpen(true);
-                }}
-              >
-                질문 추가
-              </Button>
-            </>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">질문 세트</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold tabular-nums">{sets.length}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">활성 질문</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold tabular-nums">{activeQuestions.length}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">질문군</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold tabular-nums">{intentCounts.length}</CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">질문군별 활성 질문 수</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {intentCounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              아직 질문이 없습니다. AI 질문 인벤토리를 생성해 시작하세요.
+            </p>
+          ) : (
+            intentCounts.map(([intent, count]) => (
+              <Badge key={intent} variant="secondary">
+                {intentLabel(intent)} {count}
+              </Badge>
+            ))
           )}
         </CardContent>
       </Card>
@@ -409,85 +502,134 @@ function QuestionsPage() {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">질문 {questions.length}건</CardTitle>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>질문 문구</TableHead>
-                <TableHead>의도</TableHead>
-                <TableHead>언어/국가</TableHead>
-                <TableHead>지역</TableHead>
-                <TableHead>가중치</TableHead>
-                <TableHead>데이터 등급</TableHead>
-                <TableHead>상태</TableHead>
-                {canWrite && <TableHead className="text-right">작업</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {questions.map((q) => (
-                <TableRow key={q.id}>
-                  <TableCell className="max-w-[360px] text-sm">{q.prompt_text}</TableCell>
-                  <TableCell className="text-sm">{q.intent_type}</TableCell>
-                  <TableCell className="text-sm">
-                    {q.language}/{q.country_code}
-                  </TableCell>
-                  <TableCell className="text-sm">{[q.region, q.city].filter(Boolean).join(" ") || "-"}</TableCell>
-                  <TableCell className="text-sm tabular-nums">{q.weight}</TableCell>
-                  <TableCell>
-                    {q.data_class === "public" ? (
-                      <Badge variant="secondary">{DATA_CLASS_LABELS[q.data_class]}</Badge>
-                    ) : (
-                      <Badge variant="destructive">{DATA_CLASS_LABELS[q.data_class]}</Badge>
+      <Collapsible>
+        <Card>
+          <CardHeader className="pb-2">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="px-0 text-sm font-medium">
+                고급 관리 (질문 세트·개별 질문 직접 편집)
+              </Button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-2">
+                  <Label>질문 세트</Label>
+                  <Select value={setId} onValueChange={setSetId} disabled={!businessId}>
+                    <SelectTrigger className="w-[240px]">
+                      <SelectValue placeholder="질문 세트 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sets.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {canWrite && (
+                  <>
+                    <Button variant="outline" disabled={!businessId} onClick={() => setOpenSet(true)}>
+                      질문 세트 추가
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={!setId}
+                      onClick={() => {
+                        setForm({ ...EMPTY_Q });
+                        setOpen(true);
+                      }}
+                    >
+                      질문 추가
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>질문</TableHead>
+                      <TableHead>질문군</TableHead>
+                      <TableHead>언어/국가</TableHead>
+                      <TableHead>지역</TableHead>
+                      <TableHead>가중치</TableHead>
+                      <TableHead>데이터 등급</TableHead>
+                      <TableHead>상태</TableHead>
+                      {canWrite && <TableHead className="text-right">작업</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {questions.map((q) => (
+                      <TableRow key={q.id}>
+                        <TableCell className="max-w-[360px] text-sm">{q.prompt_text}</TableCell>
+                        <TableCell className="text-sm">{intentLabel(q.intent_type)}</TableCell>
+                        <TableCell className="text-sm">
+                          {q.language}/{q.country_code}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {[q.region, q.city].filter(Boolean).join(" ") || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums">{q.weight}</TableCell>
+                        <TableCell>
+                          {q.data_class === "public" ? (
+                            <Badge variant="secondary">{DATA_CLASS_LABELS[q.data_class]}</Badge>
+                          ) : (
+                            <Badge variant="destructive">{DATA_CLASS_LABELS[q.data_class]}</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={q.active ? "secondary" : "outline"}>
+                            {q.active ? "활성" : "비활성"}
+                          </Badge>
+                        </TableCell>
+                        {canWrite && (
+                          <TableCell className="space-x-2 text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setForm({
+                                  id: q.id,
+                                  prompt_text: q.prompt_text,
+                                  intent_type: q.intent_type,
+                                  language: q.language,
+                                  country_code: q.country_code,
+                                  region: q.region ?? "",
+                                  city: q.city ?? "",
+                                  weight: String(q.weight),
+                                  data_class: q.data_class,
+                                  active: q.active,
+                                });
+                                setOpen(true);
+                              }}
+                            >
+                              수정
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => toggleActive.mutate(q)}>
+                              {q.active ? "비활성화" : "활성화"}
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                    {questions.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                          질문 세트를 선택하면 질문 목록이 표시됩니다.
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={q.active ? "secondary" : "outline"}>{q.active ? "활성" : "비활성"}</Badge>
-                  </TableCell>
-                  {canWrite && (
-                    <TableCell className="space-x-2 text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setForm({
-                            id: q.id,
-                            prompt_text: q.prompt_text,
-                            intent_type: q.intent_type,
-                            language: q.language,
-                            country_code: q.country_code,
-                            region: q.region ?? "",
-                            city: q.city ?? "",
-                            weight: String(q.weight),
-                            data_class: q.data_class,
-                            active: q.active,
-                          });
-                          setOpen(true);
-                        }}
-                      >
-                        수정
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => toggleActive.mutate(q)}>
-                        {q.active ? "비활성화" : "활성화"}
-                      </Button>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-              {questions.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
-                    업체와 질문 세트를 선택한 뒤 질문을 추가하세요.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <Dialog open={openSet} onOpenChange={setOpenSet}>
         <DialogContent className="sm:max-w-md">
@@ -530,7 +672,7 @@ function QuestionsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="q-intent">의도 유형</Label>
+              <Label htmlFor="q-intent">질문군(intent)</Label>
               <Input
                 id="q-intent"
                 value={form.intent_type}
@@ -604,74 +746,68 @@ function QuestionsPage() {
       <Dialog open={openConfirmAi} onOpenChange={(v) => !suggestAi.isPending && setOpenConfirmAi(v)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>AI로 질문 후보를 만들까요?</DialogTitle>
+            <DialogTitle>AI 질문 인벤토리를 생성할까요?</DialogTitle>
+            <DialogDescription>
+              실제 고객이 AI에 물을 법한 질문을 여러 질문군으로 {aiCount}개 생성합니다.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              대상 업체의 공개 기본 정보(업체명·업종·지역·도시)만 사용합니다. 내부 측정·분석 데이터는 AI에 보내지
-              않습니다.
-            </p>
-            <p className="font-medium text-foreground">AI 추천 생성 시 소액 API 비용이 발생합니다.</p>
             <div className="space-y-2">
-              <Label htmlFor="ai-count">추천 개수</Label>
+              <Label htmlFor="ai-count">생성 개수</Label>
               <Select value={aiCount} onValueChange={setAiCount}>
                 <SelectTrigger id="ai-count" className="w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[6, 7, 8, 9, 10, 11, 12].map((n) => (
-                    <SelectItem key={n} value={String(n)}>
+                  {COUNT_PRESETS.map((n) => (
+                    <SelectItem key={n} value={n}>
                       {n}개
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            <p className="text-xs">
+              공개 기본 정보(업체명·업종·국가·지역·도시)만 사용합니다. 기존 질문과 내부 측정·분석 데이터는 AI에
+              보내지 않습니다. 생성 시 소액 API 비용이 발생할 수 있습니다.
+            </p>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setOpenConfirmAi(false)}
-              disabled={suggestAi.isPending}
-            >
+            <Button variant="outline" onClick={() => setOpenConfirmAi(false)} disabled={suggestAi.isPending}>
               취소
             </Button>
             <Button onClick={() => suggestAi.mutate()} disabled={suggestAi.isPending || !businessId}>
-              {suggestAi.isPending ? "생성 중…" : "질문 후보 생성"}
+              {suggestAi.isPending ? "생성 중…" : "생성"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={openReview} onOpenChange={(v) => !saveSuggestions.isPending && setOpenReview(v)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>AI 추천 질문 검토</DialogTitle>
+            <DialogTitle>생성된 질문 검토 ({candidates.length}개)</DialogTitle>
           </DialogHeader>
 
-          <p className="text-xs text-muted-foreground">
-            {aiMeta.model ? `모델 ${aiMeta.model} · ` : ""}후보 {candidates.length}개
-            {aiMeta.costStatus === "unpriced" && aiMeta.usage
-              ? ` · 비용 미확정 · 입력 ${aiMeta.usage.inputTokens ?? 0}토큰 · 출력 ${aiMeta.usage.outputTokens ?? 0}토큰`
-              : aiMeta.estimatedCostUsd !== null
-                ? ` · 설정상 요청당 상한 추정 $${aiMeta.estimatedCostUsd.toFixed(4)}`
-                : ""}
-          </p>
+          <div className="flex flex-wrap gap-2">
+            {candidateIntentCounts.map(([intent, count]) => (
+              <Badge key={intent} variant="secondary">
+                {intentLabel(intent)} {count}
+              </Badge>
+            ))}
+          </div>
 
           <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
             <div className="space-y-2">
               <Label>저장 대상</Label>
-              <Select
-                value={targetSetMode}
-                onValueChange={(v) => setTargetSetMode(v as "existing" | "new")}
-              >
+              <Select value={targetSetMode} onValueChange={(v) => setTargetSetMode(v as "existing" | "new")}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="new">새 질문 세트 생성</SelectItem>
                   <SelectItem value="existing" disabled={sets.length === 0}>
-                    기존 질문 세트에 추가
+                    기존 세트에 추가
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -721,59 +857,47 @@ function QuestionsPage() {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="divide-y rounded-md border">
             {candidates.map((c, i) => (
-              <div key={c.id} className="space-y-2 rounded-md border p-3">
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    checked={c.selected}
-                    onCheckedChange={(v) =>
-                      setCandidates((cs) =>
-                        cs.map((x, xi) => (xi === i ? { ...x, selected: v === true } : x)),
-                      )
-                    }
-                  />
-                  <div className="flex-1 space-y-2">
-                    <Textarea
-                      rows={2}
-                      value={c.promptText}
-                      onChange={(e) =>
-                        setCandidates((cs) =>
-                          cs.map((x, xi) => (xi === i ? { ...x, promptText: e.target.value } : x)),
-                        )
-                      }
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Select
-                        value={c.intentType}
-                        onValueChange={(v) =>
-                          setCandidates((cs) =>
-                            cs.map((x, xi) =>
-                              xi === i ? { ...x, intentType: v as SuggestionCandidate["intentType"] } : x,
-                            ),
-                          )
-                        }
-                      >
-                        <SelectTrigger className="w-[200px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ALLOWED_INTENTS.map((it) => (
-                            <SelectItem key={it} value={it}>
-                              {INTENT_LABELS[it]} ({it})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {c.containsBusinessName && (
-                        <Badge variant="destructive">업체명 포함 · 수정 권장</Badge>
-                      )}
-                    </div>
+              <div key={c.id} className="flex items-start gap-3 p-3">
+                <Checkbox
+                  checked={c.selected}
+                  onCheckedChange={(v) =>
+                    setCandidates((cs) => cs.map((x, xi) => (xi === i ? { ...x, selected: v === true } : x)))
+                  }
+                />
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm">{c.promptText}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{INTENT_LABELS[c.intentType]}</span>
+                    {c.containsBusinessName && <Badge variant="destructive">업체명 포함 · 수정 권장</Badge>}
                   </div>
                 </div>
               </div>
             ))}
           </div>
+
+          <Collapsible open={showAiDetails} onOpenChange={setShowAiDetails}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="px-0 text-xs text-muted-foreground">
+                세부 정보
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <p className="text-xs text-muted-foreground">
+                {aiMeta.model ? `모델 ${aiMeta.model}` : "모델 정보 없음"}
+                {aiMeta.mode ? ` · 모드 ${aiMeta.mode}` : ""}
+                {aiMeta.requestedCount !== null ? ` · 요청 ${aiMeta.requestedCount}개` : ""}
+                {aiMeta.suggestionCount !== null ? ` · 응답 ${aiMeta.suggestionCount}개` : ""}
+                {aiMeta.batchCount !== null ? ` · batch ${aiMeta.batchCount}회` : ""}
+                {aiMeta.costStatus === "unpriced" && aiMeta.usage
+                  ? ` · 비용 미확정 · 입력 ${aiMeta.usage.inputTokens ?? 0}토큰 · 출력 ${aiMeta.usage.outputTokens ?? 0}토큰`
+                  : aiMeta.estimatedCostUsd !== null
+                    ? ` · 요청당 상한 추정 $${aiMeta.estimatedCostUsd.toFixed(4)}`
+                    : ""}
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
 
           <DialogFooter>
             <Button
@@ -784,12 +908,11 @@ function QuestionsPage() {
                 (targetSetMode === "new" ? !newSetName.trim() : !targetSetId)
               }
             >
-              {saveSuggestions.isPending ? "등록 중…" : `선택 질문 등록 (${selectedCount})`}
+              {saveSuggestions.isPending ? "저장 중…" : `선택 질문 저장 (${selectedCount})`}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-
   );
 }
