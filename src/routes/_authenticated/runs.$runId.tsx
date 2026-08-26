@@ -119,7 +119,7 @@ function RunDetailPage() {
       return s && TERMINAL.has(s) ? false : 5000;
     },
     queryFn: async () => {
-      const [run, jobs, measurements, overall, byProvider, qMetrics] = await Promise.all([
+      const [run, jobs, measurements, overall, byProvider, qMetrics, latestEvent] = await Promise.all([
         supabase
           .from("measurement_runs")
           .select("*")
@@ -142,7 +142,20 @@ function RunDetailPage() {
         supabase.from("run_metrics_overall").select("*").eq("run_id", runId).maybeSingle(),
         supabase.from("run_metrics").select("*").eq("run_id", runId),
         supabase.from("question_metrics").select("*").eq("run_id", runId),
-
+        supabase
+          .from("system_events")
+          .select("event_type, created_at, message, severity")
+          .eq("org_id", activeOrgId!)
+          .eq("run_id", runId)
+          .in("event_type", [
+            "visibility_postprocess_triggered",
+            "visibility_postprocess_started",
+            "visibility_postprocess_completed",
+            "visibility_postprocess_failed",
+          ])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
       ]);
       if (run.error) throw run.error;
       if (jobs.error) throw jobs.error;
