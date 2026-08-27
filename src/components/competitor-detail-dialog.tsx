@@ -356,7 +356,7 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">한눈에 보는 차이</h3>
         <p className="text-xs text-muted-foreground">
-          같은 측정에서 관찰된 차이이며 원인 분석이 아닙니다.
+          관찰된 차이이며 원인 분석이 아닙니다.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <DiffCard title="경쟁업체만 등장한 질문" questions={competitorOnly} />
