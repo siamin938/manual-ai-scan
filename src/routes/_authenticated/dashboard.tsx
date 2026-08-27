@@ -8,6 +8,8 @@ import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
 import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
+import { ActionRecommendationsSection } from "@/components/action-recommendations-section";
+
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -183,7 +185,10 @@ function DashboardPage() {
             </p>
           )}
 
+          <ActionRecommendationsSection orgId={activeOrgId ?? null} businessId={businessId ?? null} />
+
           <div className="grid gap-4 lg:grid-cols-2">
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">질문군 경쟁력</CardTitle>
