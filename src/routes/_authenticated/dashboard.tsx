@@ -426,7 +426,15 @@ function DashboardPage() {
           </p>
         </>
       )}
+
+      <CompetitorDetailDialog
+        orgId={activeOrgId ?? null}
+        businessId={businessId ?? null}
+        competitorName={selectedCompetitor}
+        onClose={() => setSelectedCompetitor(null)}
+      />
     </div>
+
   );
 }
 
