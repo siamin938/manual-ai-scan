@@ -16,6 +16,15 @@ function badgeVariant(
   return "outline";
 }
 
+/** actionType은 Badge variant 선택에만 쓰고, 어떤 판정/문구 생성에도 쓰지 않는다. */
+function channelBadgeVariant(
+  type: ActionRecommendationDTO["channelSuggestions"][number]["actionType"],
+): "default" | "secondary" | "outline" {
+  if (type === "observe_only") return "outline";
+  if (type === "publish_candidate") return "default";
+  return "secondary";
+}
+
 export function ActionRecommendationsSection({
   orgId,
   businessId,
@@ -114,6 +123,37 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             </ul>
           </div>
         )}
+
+        <div>
+          <p className="text-sm font-medium">어디에 반영할까요?</p>
+          {rec.channelSuggestions.length === 0 ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              현재 관련 질문의 실제 인용 데이터만으로는 특정 채널을 권할 근거가 부족합니다.
+            </p>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {rec.channelSuggestions.map((c) => (
+                <div key={c.key} className="rounded-md border p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold">{c.name}</span>
+                    <Badge variant={channelBadgeVariant(c.actionType)}>{c.actionLabel}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">{c.reason}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    관련 경쟁업체 답변 {c.responseCount}/{c.relatedResponseTotal} · 인용{" "}
+                    {c.citationCount}회 · 경쟁업체 {c.distinctCompetitorCount}곳
+                  </p>
+                  {c.domains.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      관찰 도메인: {c.domains.join(", ")}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
 
         <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
           <p className="font-medium text-foreground">데이터 근거</p>
