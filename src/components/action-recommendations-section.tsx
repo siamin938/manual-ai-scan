@@ -161,6 +161,8 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
       </CardContent>
     </Card>
   );
+}
+
 function ChannelGroups({
   channels,
 }: {
