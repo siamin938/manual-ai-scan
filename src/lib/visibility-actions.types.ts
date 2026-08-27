@@ -33,6 +33,31 @@ export type ActionChannelSuggestionDTO = {
   domains: string[];
 };
 
+export type ActionSourcePlatformDTO = {
+  key: string;
+  name: string;
+  actionType: ActionChannelActionType;
+  actionLabel: string;
+  responseCount: number;
+  relatedResponseTotal: number;
+  citationCount: number;
+  distinctCompetitorCount: number;
+  domains: string[];
+};
+
+export type ActionSourceGroupDTO = {
+  key: string;
+  name: string;
+  actionType: ActionChannelActionType;
+  actionLabel: string;
+  reason: string;
+  responseCount: number;
+  relatedResponseTotal: number;
+  citationCount: number;
+  distinctCompetitorCount: number;
+  platforms: ActionSourcePlatformDTO[];
+};
+
 export type ActionRecommendationDTO = {
   id: string;
   rank: number;
@@ -45,7 +70,9 @@ export type ActionRecommendationDTO = {
   sampleQuestions: string[];
   evidence: ActionRecommendationEvidenceDTO;
   channelSuggestions: ActionChannelSuggestionDTO[];
+  sourceGroups: ActionSourceGroupDTO[];
 };
+
 
 export type ActionScopeDTO = {
   runId: string;
