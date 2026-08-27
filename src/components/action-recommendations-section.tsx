@@ -126,7 +126,9 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
 
         <div>
           <p className="text-sm font-medium">어디에 반영할까요?</p>
-          {rec.channelSuggestions.length === 0 ? (
+          {rec.sourceGroups.length > 0 ? (
+            <SourceGroups groups={rec.sourceGroups} />
+          ) : rec.channelSuggestions.length === 0 ? (
             <p className="mt-1 text-sm text-muted-foreground">
               현재 관련 질문의 실제 인용 데이터만으로는 특정 채널을 권할 근거가 부족합니다.
             </p>
@@ -134,6 +136,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             <ChannelGroups channels={rec.channelSuggestions} />
           )}
         </div>
+
 
 
         <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
