@@ -6,11 +6,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import type {
   CompetitorBusinessDTO,
+  CompetitorCompareObservedIn,
+  CompetitorCompareOverviewDTO,
+  CompetitorCompareQuestionDTO,
+  CompetitorCompareQuestionGroupDTO,
+  CompetitorCompareResponseDTO,
+  CompetitorCompareSourceDTO,
   CompetitorDetailDTO,
   CompetitorDetailResponseDTO,
   CompetitorErrorCode,
   CompetitorQuestionDTO,
   CompetitorQuestionGroupDTO,
+  CompetitorRefDTO,
   CompetitorResolveResponseDTO,
   CompetitorScopeDTO,
   CompetitorSourceDTO,
@@ -22,6 +29,7 @@ type Obj = Record<string, unknown>;
 
 const RESOLVE_FUNCTION = "visibility-competitor-resolve";
 const DETAIL_FUNCTION = "visibility-competitor-detail";
+const COMPARE_FUNCTION = "visibility-competitor-compare";
 
 function isObj(value: unknown): value is Obj {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -301,4 +309,218 @@ export async function fetchVisibilityCompetitorDetail(args: {
   });
   if (!res.ok) return res;
   return parseCompetitorDetailPayload(res.payload);
+}
+
+function parseCompareOverview(value: unknown): CompetitorCompareOverviewDTO | null {
+  if (!isObj(value)) return null;
+  const validCount = num(value["validCount"]);
+  const clientResponseCount = num(value["clientResponseCount"]);
+  const clientResponseRatePct = nullableNum(value["clientResponseRatePct"]);
+  const clientTop3ResponseCount = num(value["clientTop3ResponseCount"]);
+  const clientTop3RatePct = nullableNum(value["clientTop3RatePct"]);
+  const competitorResponseCount = num(value["competitorResponseCount"]);
+  const competitorResponseRatePct = nullableNum(value["competitorResponseRatePct"]);
+  const competitorTop3ResponseCount = num(value["competitorTop3ResponseCount"]);
+  const competitorTop3RatePct = nullableNum(value["competitorTop3RatePct"]);
+  if (
+    validCount === null ||
+    clientResponseCount === null ||
+    !clientResponseRatePct.ok ||
+    clientTop3ResponseCount === null ||
+    !clientTop3RatePct.ok ||
+    competitorResponseCount === null ||
+    !competitorResponseRatePct.ok ||
+    competitorTop3ResponseCount === null ||
+    !competitorTop3RatePct.ok
+  ) {
+    return null;
+  }
+  return {
+    validCount,
+    clientResponseCount,
+    clientResponseRatePct: clientResponseRatePct.value,
+    clientTop3ResponseCount,
+    clientTop3RatePct: clientTop3RatePct.value,
+    competitorResponseCount,
+    competitorResponseRatePct: competitorResponseRatePct.value,
+    competitorTop3ResponseCount,
+    competitorTop3RatePct: competitorTop3RatePct.value,
+  };
+}
+
+function parseCompareGroup(o: Obj): CompetitorCompareQuestionGroupDTO | null {
+  const intentType = str(o["intentType"]);
+  const questionCount = num(o["questionCount"]);
+  const measurementCount = num(o["measurementCount"]);
+  const clientResponseCount = num(o["clientResponseCount"]);
+  const clientResponseRatePct = nullableNum(o["clientResponseRatePct"]);
+  const clientTop3ResponseCount = num(o["clientTop3ResponseCount"]);
+  const clientTop3RatePct = nullableNum(o["clientTop3RatePct"]);
+  const competitorResponseCount = num(o["competitorResponseCount"]);
+  const competitorResponseRatePct = nullableNum(o["competitorResponseRatePct"]);
+  const competitorTop3ResponseCount = num(o["competitorTop3ResponseCount"]);
+  const competitorTop3RatePct = nullableNum(o["competitorTop3RatePct"]);
+  if (
+    intentType === null ||
+    questionCount === null ||
+    measurementCount === null ||
+    clientResponseCount === null ||
+    !clientResponseRatePct.ok ||
+    clientTop3ResponseCount === null ||
+    !clientTop3RatePct.ok ||
+    competitorResponseCount === null ||
+    !competitorResponseRatePct.ok ||
+    competitorTop3ResponseCount === null ||
+    !competitorTop3RatePct.ok
+  ) {
+    return null;
+  }
+  return {
+    intentType,
+    questionCount,
+    measurementCount,
+    clientResponseCount,
+    clientResponseRatePct: clientResponseRatePct.value,
+    clientTop3ResponseCount,
+    clientTop3RatePct: clientTop3RatePct.value,
+    competitorResponseCount,
+    competitorResponseRatePct: competitorResponseRatePct.value,
+    competitorTop3ResponseCount,
+    competitorTop3RatePct: competitorTop3RatePct.value,
+  };
+}
+
+function parseCompareQuestion(o: Obj): CompetitorCompareQuestionDTO | null {
+  const base = parseCompareGroup({ ...o, questionCount: 0 });
+  const questionId = str(o["questionId"]);
+  const questionText = str(o["questionText"]);
+  const clientBestPosition = nullableNum(o["clientBestPosition"]);
+  const competitorBestPosition = nullableNum(o["competitorBestPosition"]);
+  const bothResponseCount = num(o["bothResponseCount"]);
+  if (
+    base === null ||
+    questionId === null ||
+    questionText === null ||
+    !clientBestPosition.ok ||
+    !competitorBestPosition.ok ||
+    bothResponseCount === null
+  ) {
+    return null;
+  }
+  return {
+    questionId,
+    questionText,
+    intentType: base.intentType,
+    measurementCount: base.measurementCount,
+    clientResponseCount: base.clientResponseCount,
+    clientResponseRatePct: base.clientResponseRatePct,
+    clientTop3ResponseCount: base.clientTop3ResponseCount,
+    clientTop3RatePct: base.clientTop3RatePct,
+    clientBestPosition: clientBestPosition.value,
+    competitorResponseCount: base.competitorResponseCount,
+    competitorResponseRatePct: base.competitorResponseRatePct,
+    competitorTop3ResponseCount: base.competitorTop3ResponseCount,
+    competitorTop3RatePct: base.competitorTop3RatePct,
+    competitorBestPosition: competitorBestPosition.value,
+    bothResponseCount,
+  };
+}
+
+function parseCompareSource(o: Obj): CompetitorCompareSourceDTO | null {
+  const domain = str(o["domain"]);
+  const observedInRaw = str(o["observedIn"]);
+  const observedIn: CompetitorCompareObservedIn | null =
+    observedInRaw === "both" || observedInRaw === "client_only" || observedInRaw === "competitor_only"
+      ? observedInRaw
+      : null;
+  const clientCitationCount = num(o["clientCitationCount"]);
+  const clientResponseCount = num(o["clientResponseCount"]);
+  const clientResponseRatePct = nullableNum(o["clientResponseRatePct"]);
+  const competitorCitationCount = num(o["competitorCitationCount"]);
+  const competitorResponseCount = num(o["competitorResponseCount"]);
+  const competitorResponseRatePct = nullableNum(o["competitorResponseRatePct"]);
+  const sampleTitle = nullableStr(o["sampleTitle"]);
+  if (
+    domain === null ||
+    observedIn === null ||
+    clientCitationCount === null ||
+    clientResponseCount === null ||
+    !clientResponseRatePct.ok ||
+    competitorCitationCount === null ||
+    competitorResponseCount === null ||
+    !competitorResponseRatePct.ok ||
+    !sampleTitle.ok
+  ) {
+    return null;
+  }
+  return {
+    domain,
+    observedIn,
+    clientCitationCount,
+    clientResponseCount,
+    clientResponseRatePct: clientResponseRatePct.value,
+    competitorCitationCount,
+    competitorResponseCount,
+    competitorResponseRatePct: competitorResponseRatePct.value,
+    sampleTitle: sampleTitle.value,
+  };
+}
+
+function parseCompetitorRef(value: unknown): CompetitorRefDTO | null {
+  if (!isObj(value)) return null;
+  const name = str(value["name"]);
+  const ref = str(value["ref"]);
+  if (name === null || ref === null) return null;
+  return { name, ref };
+}
+
+export function parseCompetitorComparePayload(payload: Obj): CompetitorCompareResponseDTO {
+  const generatedAt = str(payload["generatedAt"]);
+  const scope = parseScope(payload["scope"]);
+  const business = parseBusiness(payload["business"]);
+  const competitor = parseCompetitorRef(payload["competitor"]);
+  const overview = parseCompareOverview(payload["overview"]);
+  const questionGroups = strictArray(payload["questionGroups"], parseCompareGroup);
+  const questions = strictArray(payload["questions"], parseCompareQuestion);
+  const sources = strictArray(payload["sources"], parseCompareSource);
+  if (
+    generatedAt === null ||
+    scope === null ||
+    business === null ||
+    competitor === null ||
+    overview === null ||
+    questionGroups === null ||
+    questions === null ||
+    sources === null
+  ) {
+    return { ok: false, error: "INVALID_DTO" };
+  }
+  return {
+    ok: true,
+    compare: {
+      generatedAt,
+      scope,
+      business,
+      competitor,
+      overview,
+      questionGroups,
+      questions,
+      sources,
+    },
+  };
+}
+
+export async function fetchVisibilityCompetitorCompare(args: {
+  supabase: UserClient;
+  orgId: string;
+  businessId: string;
+  competitorRef: string;
+}): Promise<CompetitorCompareResponseDTO> {
+  const res = await invokeFunction(args.supabase, COMPARE_FUNCTION, {
+    orgId: args.orgId,
+    businessId: args.businessId,
+    competitorRef: args.competitorRef,
+  });
+  if (!res.ok) return res;
+  return parseCompetitorComparePayload(res.payload);
 }
