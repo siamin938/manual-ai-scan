@@ -1,10 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  fetchVisibilityCompetitorCompare,
   fetchVisibilityCompetitorDetail,
   resolveVisibilityCompetitor,
 } from "./visibility-competitor.server";
 import type {
+  CompetitorCompareResponseDTO,
   CompetitorDetailResponseDTO,
   CompetitorResolveResponseDTO,
 } from "./visibility-competitor.types";
@@ -50,6 +52,30 @@ export const getCompetitorDetail = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }): Promise<CompetitorDetailResponseDTO> => {
     return fetchVisibilityCompetitorDetail({
+      supabase: context.supabase,
+      orgId: data.orgId,
+      businessId: data.businessId,
+      competitorRef: data.competitorRef,
+    });
+  });
+
+/** `visibility-competitor-compare` 호출용 얇은 authenticated wrapper. */
+export const getCompetitorCompare = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { orgId: string; businessId: string; competitorRef: string }) => {
+    if (!input?.orgId || typeof input.orgId !== "string") throw new Error("INVALID_INPUT");
+    if (!input?.businessId || typeof input.businessId !== "string") throw new Error("INVALID_INPUT");
+    if (!input?.competitorRef || typeof input.competitorRef !== "string") {
+      throw new Error("INVALID_INPUT");
+    }
+    return {
+      orgId: input.orgId,
+      businessId: input.businessId,
+      competitorRef: input.competitorRef,
+    };
+  })
+  .handler(async ({ data, context }): Promise<CompetitorCompareResponseDTO> => {
+    return fetchVisibilityCompetitorCompare({
       supabase: context.supabase,
       orgId: data.orgId,
       businessId: data.businessId,
