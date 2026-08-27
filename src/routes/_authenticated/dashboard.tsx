@@ -71,6 +71,8 @@ function DashboardPage() {
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
   const fetchDiagnostic = useServerFn(getVisibilityDiagnostic);
+  const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
+
 
   const businessId = businesses.selectedBusinessId;
 
