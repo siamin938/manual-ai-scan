@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -6,7 +7,9 @@ import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
+import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,6 +71,8 @@ function DashboardPage() {
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
   const fetchDiagnostic = useServerFn(getVisibilityDiagnostic);
+  const [selectedCompetitor, setSelectedCompetitor] = useState<string | null>(null);
+
 
   const businessId = businesses.selectedBusinessId;
 
@@ -235,7 +240,9 @@ function DashboardPage() {
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
                   같은 질문에 반복 측정된 AI 답변에서 내 업체와 함께 실제로 발견된 업체입니다.
-                  직접 경쟁관계나 노출 차이의 원인을 단정하는 것은 아닙니다.
+                  업체를 클릭하면 어떤 질문에서 자주 등장했고 그 답변에 어떤 출처가 함께
+                  인용됐는지 볼 수 있습니다. 직접 경쟁관계나 노출 차이의 원인을 단정하는 것은
+                  아닙니다.
                 </p>
                 {d.competitors.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
@@ -254,7 +261,16 @@ function DashboardPage() {
                     <TableBody>
                       {d.competitors.map((c) => (
                         <TableRow key={c.name}>
-                          <TableCell className="text-sm">{c.name}</TableCell>
+                          <TableCell className="text-sm">
+                            <button
+                              type="button"
+                              className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              onClick={() => setSelectedCompetitor(c.name)}
+                            >
+                              {c.name}
+                              <span className="sr-only"> 상세 보기</span>
+                            </button>
+                          </TableCell>
                           <TableCell className="text-sm tabular-nums">{c.responseCount}</TableCell>
                           <TableCell className="text-sm tabular-nums">{c.mentionCount}</TableCell>
                           <TableCell className="text-sm tabular-nums">
@@ -265,6 +281,7 @@ function DashboardPage() {
                     </TableBody>
                   </Table>
                 )}
+
               </CardContent>
             </Card>
 
@@ -409,7 +426,15 @@ function DashboardPage() {
           </p>
         </>
       )}
+
+      <CompetitorDetailDialog
+        orgId={activeOrgId ?? null}
+        businessId={businessId ?? null}
+        competitorName={selectedCompetitor}
+        onClose={() => setSelectedCompetitor(null)}
+      />
     </div>
+
   );
 }
 
