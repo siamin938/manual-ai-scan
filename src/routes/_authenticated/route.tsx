@@ -32,10 +32,10 @@ export const Route = createFileRoute("/_authenticated")({
 
 const NAV = [
   { to: "/dashboard", label: "진단" },
-  { to: "/questions", label: "질문 인벤토리" },
-  { to: "/runs", label: "측정" },
+  { to: "/businesses", label: "내 업체" },
+  { to: "/questions", label: "질문" },
+  { to: "/runs", label: "AI 측정" },
   { to: "/reports/customer", label: "보고서" },
-  { to: "/businesses", label: "업체" },
 ] as const;
 
 const ADVANCED_NAV = [
