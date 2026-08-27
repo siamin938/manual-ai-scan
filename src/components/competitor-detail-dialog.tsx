@@ -356,7 +356,7 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">한눈에 보는 차이</h3>
         <p className="text-xs text-muted-foreground">
-          같은 측정에서 관찰된 차이이며 원인 분석이 아닙니다.
+          관찰된 차이이며 원인 분석이 아닙니다.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <DiffCard title="경쟁업체만 등장한 질문" questions={competitorOnly} />
@@ -589,14 +589,14 @@ function CompareColumn({ title, rows }: { title: string; rows: Array<[string, st
   return (
     <div className="min-w-0 rounded-md border p-3">
       <p className="truncate text-base font-semibold">{title}</p>
-      <dl className="mt-2 space-y-1.5">
+      <div className="mt-2 space-y-1">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-2">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="text-sm font-semibold tabular-nums">{value}</dd>
-          </div>
+          <p key={label} className="text-sm tabular-nums">
+            <span className="text-muted-foreground">{label}</span>{" "}
+            <span className="font-semibold">{value}</span>
+          </p>
         ))}
-      </dl>
+      </div>
     </div>
   );
 }
