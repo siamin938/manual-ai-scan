@@ -5,12 +5,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import type {
+  ActionChannelActionType,
   ActionChannelSuggestionDTO,
   ActionRecommendationDTO,
   ActionRecommendationEvidenceDTO,
   ActionRecommendationsErrorCode,
   ActionRecommendationsResponseDTO,
   ActionScopeDTO,
+  ActionSourceGroupDTO,
+  ActionSourcePlatformDTO,
 } from "./visibility-actions.types";
 
 type UserClient = SupabaseClient<Database>;
@@ -116,6 +119,94 @@ function parseChannelSuggestion(value: unknown): ActionChannelSuggestionDTO | nu
   };
 }
 
+function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
+  if (!isObj(value)) return null;
+  const key = str(value["key"]);
+  const name = str(value["name"]);
+  const actionTypeRaw = value["actionType"];
+  const actionLabel = str(value["actionLabel"]);
+  const responseCount = num(value["responseCount"]);
+  const relatedResponseTotal = num(value["relatedResponseTotal"]);
+  const citationCount = num(value["citationCount"]);
+  const distinctCompetitorCount = num(value["distinctCompetitorCount"]);
+  const domains = strArray(value["domains"]);
+  const isActionType = (CHANNEL_ACTION_TYPES as readonly string[]).includes(
+    actionTypeRaw as string,
+  );
+  if (
+    key === null ||
+    name === null ||
+    !isActionType ||
+    actionLabel === null ||
+    responseCount === null ||
+    relatedResponseTotal === null ||
+    citationCount === null ||
+    distinctCompetitorCount === null ||
+    domains === null
+  ) {
+    return null;
+  }
+  return {
+    key,
+    name,
+    actionType: actionTypeRaw as ActionChannelActionType,
+    actionLabel,
+    responseCount,
+    relatedResponseTotal,
+    citationCount,
+    distinctCompetitorCount,
+    domains,
+  };
+}
+
+function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
+  if (!isObj(value)) return null;
+  const key = str(value["key"]);
+  const name = str(value["name"]);
+  const actionTypeRaw = value["actionType"];
+  const actionLabel = str(value["actionLabel"]);
+  const reason = str(value["reason"]);
+  const responseCount = num(value["responseCount"]);
+  const relatedResponseTotal = num(value["relatedResponseTotal"]);
+  const citationCount = num(value["citationCount"]);
+  const distinctCompetitorCount = num(value["distinctCompetitorCount"]);
+  const isActionType = (CHANNEL_ACTION_TYPES as readonly string[]).includes(
+    actionTypeRaw as string,
+  );
+  if (
+    key === null ||
+    name === null ||
+    !isActionType ||
+    actionLabel === null ||
+    reason === null ||
+    responseCount === null ||
+    relatedResponseTotal === null ||
+    citationCount === null ||
+    distinctCompetitorCount === null ||
+    !Array.isArray(value["platforms"])
+  ) {
+    return null;
+  }
+  const platforms: ActionSourcePlatformDTO[] = [];
+  for (const item of value["platforms"]) {
+    const parsed = parseSourcePlatform(item);
+    if (parsed === null) return null;
+    platforms.push(parsed);
+  }
+  return {
+    key,
+    name,
+    actionType: actionTypeRaw as ActionChannelActionType,
+    actionLabel,
+    reason,
+    responseCount,
+    relatedResponseTotal,
+    citationCount,
+    distinctCompetitorCount,
+    platforms,
+  };
+}
+
 function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
   if (!isObj(value)) return null;
   const id = str(value["id"]);
@@ -151,6 +242,16 @@ function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
     if (parsed === null) return null;
     channelSuggestions.push(parsed);
   }
+  const sourceGroupsRaw = value["sourceGroups"];
+  const sourceGroups: ActionSourceGroupDTO[] = [];
+  if (sourceGroupsRaw !== undefined && sourceGroupsRaw !== null) {
+    if (!Array.isArray(sourceGroupsRaw)) return null;
+    for (const item of sourceGroupsRaw) {
+      const parsed = parseSourceGroup(item);
+      if (parsed === null) return null;
+      sourceGroups.push(parsed);
+    }
+  }
   return {
     id,
     rank,
@@ -163,8 +264,10 @@ function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
     sampleQuestions,
     evidence,
     channelSuggestions,
+    sourceGroups,
   };
 }
+
 
 function parseScope(value: unknown): { ok: true; value: ActionScopeDTO | null } | { ok: false } {
   if (value === null) return { ok: true, value: null };
