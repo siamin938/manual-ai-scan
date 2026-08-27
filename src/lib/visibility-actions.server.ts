@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import type {
+  ActionChannelSuggestionDTO,
   ActionRecommendationDTO,
   ActionRecommendationEvidenceDTO,
   ActionRecommendationsErrorCode,
@@ -63,6 +64,58 @@ function parseEvidence(value: unknown): ActionRecommendationEvidenceDTO | null {
   };
 }
 
+const CHANNEL_ACTION_TYPES = [
+  "publish_candidate",
+  "profile_check",
+  "platform_check",
+  "community_check",
+  "conditional_pr",
+  "observe_only",
+] as const;
+
+function parseChannelSuggestion(value: unknown): ActionChannelSuggestionDTO | null {
+  if (!isObj(value)) return null;
+  const key = str(value["key"]);
+  const name = str(value["name"]);
+  const actionTypeRaw = value["actionType"];
+  const actionLabel = str(value["actionLabel"]);
+  const reason = str(value["reason"]);
+  const responseCount = num(value["responseCount"]);
+  const relatedResponseTotal = num(value["relatedResponseTotal"]);
+  const citationCount = num(value["citationCount"]);
+  const distinctCompetitorCount = num(value["distinctCompetitorCount"]);
+  const domains = strArray(value["domains"]);
+  const isActionType = (CHANNEL_ACTION_TYPES as readonly string[]).includes(
+    actionTypeRaw as string,
+  );
+  if (
+    key === null ||
+    name === null ||
+    !isActionType ||
+    actionLabel === null ||
+    reason === null ||
+    responseCount === null ||
+    relatedResponseTotal === null ||
+    citationCount === null ||
+    distinctCompetitorCount === null ||
+    domains === null
+  ) {
+    return null;
+  }
+  return {
+    key,
+    name,
+    actionType: actionTypeRaw as ActionChannelSuggestionDTO["actionType"],
+    actionLabel,
+    reason,
+    responseCount,
+    relatedResponseTotal,
+    citationCount,
+    distinctCompetitorCount,
+    domains,
+  };
+}
+
 function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
   if (!isObj(value)) return null;
   const id = str(value["id"]);
@@ -91,6 +144,13 @@ function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
   ) {
     return null;
   }
+  if (!Array.isArray(value["channelSuggestions"])) return null;
+  const channelSuggestions: ActionChannelSuggestionDTO[] = [];
+  for (const item of value["channelSuggestions"]) {
+    const parsed = parseChannelSuggestion(item);
+    if (parsed === null) return null;
+    channelSuggestions.push(parsed);
+  }
   return {
     id,
     rank,
@@ -102,6 +162,7 @@ function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
     steps,
     sampleQuestions,
     evidence,
+    channelSuggestions,
   };
 }
 
