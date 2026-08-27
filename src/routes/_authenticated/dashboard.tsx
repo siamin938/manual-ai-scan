@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
+import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
@@ -146,17 +147,17 @@ function DashboardPage() {
             <MetricCard
               label="전체 AI 노출률"
               value={pct(d.overview.visibilityRatePct)}
-              note={`노출 ${d.overview.mentionCount}회 / 유효 ${d.overview.validCount}회`}
+              note={`반복 측정한 AI 답변 ${d.overview.validCount}건 중 내 업체가 추천된 ${d.overview.mentionCount}건`}
             />
             <MetricCard
               label="Top3 노출률"
               value={pct(d.overview.top3RatePct)}
-              note={`Top3 ${d.overview.top3Count}회`}
+              note={`추천 순위 3위 안에 든 답변 ${d.overview.top3Count}건`}
             />
             <MetricCard
-              label="노출 질문 비율"
+              label="노출된 질문 비율"
               value={pct(d.overview.questionCoverageRatePct)}
-              note={`질문 ${d.overview.coveredQuestionCount} / ${d.overview.questionCount}개`}
+              note={`질문 ${d.overview.questionCount}개 중 내 업체가 한 번 이상 노출된 ${d.overview.coveredQuestionCount}개`}
             />
             <MetricCard
               label="유효 측정 수"
