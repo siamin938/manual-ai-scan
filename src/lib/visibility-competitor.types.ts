@@ -80,3 +80,77 @@ export type CompetitorResolveResponseDTO =
 export type CompetitorDetailResponseDTO =
   | { ok: true; detail: CompetitorDetailDTO }
   | { ok: false; error: CompetitorErrorCode };
+
+/** `visibility-competitor-compare` Edge Function 응답 계약. */
+export type CompetitorCompareOverviewDTO = {
+  validCount: number;
+  clientResponseCount: number;
+  clientResponseRatePct: number | null;
+  clientTop3ResponseCount: number;
+  clientTop3RatePct: number | null;
+  competitorResponseCount: number;
+  competitorResponseRatePct: number | null;
+  competitorTop3ResponseCount: number;
+  competitorTop3RatePct: number | null;
+};
+
+export type CompetitorCompareQuestionGroupDTO = {
+  intentType: string;
+  questionCount: number;
+  measurementCount: number;
+  clientResponseCount: number;
+  clientResponseRatePct: number | null;
+  clientTop3ResponseCount: number;
+  clientTop3RatePct: number | null;
+  competitorResponseCount: number;
+  competitorResponseRatePct: number | null;
+  competitorTop3ResponseCount: number;
+  competitorTop3RatePct: number | null;
+};
+
+export type CompetitorCompareQuestionDTO = {
+  questionId: string;
+  questionText: string;
+  intentType: string;
+  measurementCount: number;
+  clientResponseCount: number;
+  clientResponseRatePct: number | null;
+  clientTop3ResponseCount: number;
+  clientTop3RatePct: number | null;
+  clientBestPosition: number | null;
+  competitorResponseCount: number;
+  competitorResponseRatePct: number | null;
+  competitorTop3ResponseCount: number;
+  competitorTop3RatePct: number | null;
+  competitorBestPosition: number | null;
+  bothResponseCount: number;
+};
+
+export type CompetitorCompareObservedIn = "both" | "client_only" | "competitor_only";
+
+export type CompetitorCompareSourceDTO = {
+  domain: string;
+  observedIn: CompetitorCompareObservedIn;
+  clientCitationCount: number;
+  clientResponseCount: number;
+  clientResponseRatePct: number | null;
+  competitorCitationCount: number;
+  competitorResponseCount: number;
+  competitorResponseRatePct: number | null;
+  sampleTitle: string | null;
+};
+
+export type CompetitorCompareDTO = {
+  generatedAt: string;
+  scope: CompetitorScopeDTO;
+  business: CompetitorBusinessDTO;
+  competitor: CompetitorRefDTO;
+  overview: CompetitorCompareOverviewDTO;
+  questionGroups: CompetitorCompareQuestionGroupDTO[];
+  questions: CompetitorCompareQuestionDTO[];
+  sources: CompetitorCompareSourceDTO[];
+};
+
+export type CompetitorCompareResponseDTO =
+  | { ok: true; compare: CompetitorCompareDTO }
+  | { ok: false; error: CompetitorErrorCode };
