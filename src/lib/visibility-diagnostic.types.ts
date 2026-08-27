@@ -1,5 +1,5 @@
 /**
- * `visibility-diagnostic` Edge Function v1 응답 계약 (camelCase 그대로).
+ * `visibility-diagnostic` Edge Function 응답 계약 (camelCase 그대로).
  * 계산/판정 규칙은 포함하지 않는다 (Core Engine Isolation).
  */
 
