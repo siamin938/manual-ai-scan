@@ -44,3 +44,27 @@ export function normalizeAliasList(aliases: readonly string[]): string[] {
   }
   return out;
 }
+
+/** UI 중복 감지용 식별 키. 표기 정규화 후 영문 대소문자 차이를 무시한다. */
+export function businessNameIdentityKey(name: string): string {
+  return normalizeBusinessName(name).toLocaleLowerCase("en-US");
+}
+
+const DUPLICATE_NAME_MESSAGE =
+  "이미 등록된 업체명입니다. 지점이 다른 업체라면 공식 업체명에 지점명을 포함해 주세요.";
+const GENERIC_SAVE_ERROR_MESSAGE = "업체 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+
+/** 저장 오류를 고객용 메시지로 변환한다. 내부 constraint/details는 노출하지 않는다. */
+export function getBusinessSaveErrorMessage(error: unknown): string {
+  const e = (error ?? {}) as { code?: unknown; message?: unknown; details?: unknown };
+  const code = typeof e.code === "string" ? e.code : "";
+  const text = `${typeof e.message === "string" ? e.message : ""} ${
+    typeof e.details === "string" ? e.details : ""
+  }`;
+  if (code === "23505" || text.includes("businesses_org_id_name_key")) {
+    return DUPLICATE_NAME_MESSAGE;
+  }
+  return GENERIC_SAVE_ERROR_MESSAGE;
+}
+
+export const BUSINESS_DUPLICATE_NAME_MESSAGE = DUPLICATE_NAME_MESSAGE;

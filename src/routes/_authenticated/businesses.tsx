@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import {
+  businessNameIdentityKey,
   generateSafeAliasCandidates,
+  getBusinessSaveErrorMessage,
   normalizeAliasList,
   normalizeBusinessName,
 } from "@/lib/business-registration.helpers";
@@ -164,6 +166,11 @@ function BusinessesPage() {
   const autoTargetId = clientBusinesses.length === 1 ? clientBusinesses[0]!.id : "";
 
   const normalizedName = normalizeBusinessName(form.name);
+  const duplicateBusiness = useMemo(() => {
+    const key = businessNameIdentityKey(form.name);
+    if (!key) return null;
+    return businesses.find((b) => b.id !== form.id && businessNameIdentityKey(b.name) === key) ?? null;
+  }, [businesses, form.id, form.name]);
   const aliasCandidates = useMemo(() => {
     const existing = new Set([
       ...normalizeAliasList(form.existingAliases),
@@ -232,7 +239,7 @@ function BusinessesPage() {
       qc.invalidateQueries({ queryKey: ["businesses", activeOrgId] });
       qc.invalidateQueries({ queryKey: ["business-competitor-links", activeOrgId] });
     },
-    onError: (e: Error) => toast.error(`저장 실패: ${e.message}`),
+    onError: (e: unknown) => toast.error(getBusinessSaveErrorMessage(e)),
   });
 
   const toggleActive = useMutation({
@@ -312,6 +319,12 @@ function BusinessesPage() {
     }
     if (form.categorySelect === CUSTOM_CATEGORY && !form.categoryCustom.trim()) {
       toast.error("업종을 직접 입력해 주세요.");
+      return;
+    }
+    if (duplicateBusiness) {
+      toast.error(
+        "이미 등록된 업체명입니다. 지점이 다른 업체라면 공식 업체명에 지점명을 포함해 주세요.",
+      );
       return;
     }
     save.mutate();
@@ -416,6 +429,14 @@ function BusinessesPage() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
+                {duplicateBusiness && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs">
+                    <p className="font-medium">이미 등록된 업체입니다: {duplicateBusiness.name}</p>
+                    <p className="mt-1 text-muted-foreground">
+                      같은 업체라면 기존 업체를 수정하고, 지점이 다른 업체라면 공식 업체명에 지점명을 포함해 주세요.
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">대한민국 기준으로 등록됩니다.</p>
               </div>
 
@@ -665,7 +686,7 @@ function BusinessesPage() {
             <Button
               type="submit"
               form="biz-form"
-              disabled={save.isPending || !normalizedName || !form.categorySelect}
+              disabled={save.isPending || !normalizedName || !form.categorySelect || !!duplicateBusiness}
             >
               저장
             </Button>
