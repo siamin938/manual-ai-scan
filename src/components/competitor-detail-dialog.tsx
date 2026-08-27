@@ -589,14 +589,14 @@ function CompareColumn({ title, rows }: { title: string; rows: Array<[string, st
   return (
     <div className="min-w-0 rounded-md border p-3">
       <p className="truncate text-base font-semibold">{title}</p>
-      <dl className="mt-2 space-y-1.5">
+      <div className="mt-2 space-y-1">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-2">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="text-sm font-semibold tabular-nums">{value}</dd>
-          </div>
+          <p key={label} className="text-sm tabular-nums">
+            <span className="text-muted-foreground">{label}</span>{" "}
+            <span className="font-semibold">{value}</span>
+          </p>
         ))}
-      </dl>
+      </div>
     </div>
   );
 }
