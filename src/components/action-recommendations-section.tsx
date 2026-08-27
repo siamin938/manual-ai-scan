@@ -161,4 +161,64 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
       </CardContent>
     </Card>
   );
+function ChannelGroups({
+  channels,
+}: {
+  channels: ActionRecommendationDTO["channelSuggestions"];
+}) {
+  const actionable = channels.filter((c) => c.actionType !== "observe_only");
+  const observedOnly = channels.filter((c) => c.actionType === "observe_only");
+
+  return (
+    <div className="mt-2 space-y-4">
+      {actionable.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">우선 반영·점검할 채널</p>
+          {actionable.map((c) => (
+            <ChannelCard key={c.key} channel={c} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          현재 데이터에서 직접 반영할 채널은 확인되지 않았습니다.
+        </p>
+      )}
+
+      {observedOnly.length > 0 && (
+        <div className="space-y-2 rounded-md border border-dashed bg-muted/20 p-3">
+          <p className="text-xs font-medium text-muted-foreground">함께 관찰된 출처</p>
+          <p className="text-xs text-muted-foreground">
+            직접 반영 가능한 채널인지 확인되지 않아 행동 추천이 아닌 관찰 정보로만 표시합니다.
+          </p>
+          {observedOnly.map((c) => (
+            <ChannelCard key={c.key} channel={c} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
+
+function ChannelCard({
+  channel: c,
+}: {
+  channel: ActionRecommendationDTO["channelSuggestions"][number];
+}) {
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold">{c.name}</span>
+        <Badge variant={channelBadgeVariant(c.actionType)}>{c.actionLabel}</Badge>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{c.reason}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        관련 경쟁업체 답변 {c.responseCount}/{c.relatedResponseTotal} · 인용 {c.citationCount}회 ·
+        경쟁업체 {c.distinctCompetitorCount}곳
+      </p>
+      {c.domains.length > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">관찰 도메인: {c.domains.join(", ")}</p>
+      )}
+    </div>
+  );
+}
+
