@@ -1,15 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
+import {
+  generateSafeAliasCandidates,
+  normalizeAliasList,
+  normalizeBusinessName,
+} from "@/lib/business-registration.helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -56,11 +63,53 @@ type Business = {
   active: boolean;
 };
 
-const EMPTY = {
+const CATEGORY_OPTIONS = [
+  "자동차 튜닝",
+  "자동차 정비",
+  "자동차 디테일링/세차",
+  "썬팅/신차패키지",
+  "자동차 용품/전장",
+  "타이어/휠",
+  "렌터카/자동차 서비스",
+  "음식점",
+  "카페/베이커리",
+  "병원/의료",
+  "미용/뷰티",
+  "교육",
+  "숙박/여행",
+  "전문 서비스",
+] as const;
+
+const CUSTOM_CATEGORY = "기타/직접 입력";
+
+type FormState = {
+  id: string;
+  name: string;
+  existingAliases: string[];
+  manualAliases: string[];
+  acceptedCandidates: string[];
+  categorySelect: string;
+  categoryCustom: string;
+  website_url: string;
+  naver_place_url: string;
+  google_maps_url: string;
+  address: string;
+  country_code: string;
+  region: string;
+  city: string;
+  is_client_business: boolean;
+  active: boolean;
+  competitor_of: string;
+};
+
+const EMPTY: FormState = {
   id: "",
   name: "",
-  aliases: "",
-  category: "",
+  existingAliases: [],
+  manualAliases: [],
+  acceptedCandidates: [],
+  categorySelect: "",
+  categoryCustom: "",
   website_url: "",
   naver_place_url: "",
   google_maps_url: "",
@@ -77,7 +126,9 @@ function BusinessesPage() {
   const { activeOrgId, canWrite } = useOrg();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ ...EMPTY });
+  const [form, setForm] = useState<FormState>({ ...EMPTY });
+  const [manualInput, setManualInput] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const { data: businesses = [], isLoading } = useQuery({
     queryKey: ["businesses", activeOrgId],
@@ -112,21 +163,39 @@ function BusinessesPage() {
   const clientBusinesses = businesses.filter((b) => b.is_client_business);
   const autoTargetId = clientBusinesses.length === 1 ? clientBusinesses[0]!.id : "";
 
+  const normalizedName = normalizeBusinessName(form.name);
+  const aliasCandidates = useMemo(() => {
+    const existing = new Set([
+      ...normalizeAliasList(form.existingAliases),
+      ...normalizeAliasList(form.manualAliases),
+    ]);
+    return generateSafeAliasCandidates(form.name).filter((c) => !existing.has(c));
+  }, [form.name, form.existingAliases, form.manualAliases]);
+
+  const resolvedCategory =
+    form.categorySelect === CUSTOM_CATEGORY
+      ? form.categoryCustom.trim()
+      : form.categorySelect.trim();
+
+  function buildAliases(): string[] {
+    const accepted = aliasCandidates.filter((c) => form.acceptedCandidates.includes(c));
+    return normalizeAliasList([...form.existingAliases, ...form.manualAliases, ...accepted]).filter(
+      (a) => a !== normalizedName,
+    );
+  }
+
   const save = useMutation({
     mutationFn: async () => {
       const payload = {
         org_id: activeOrgId!,
-        name: form.name.trim(),
-        aliases: form.aliases
-          .split(",")
-          .map((a) => a.trim())
-          .filter(Boolean),
-        category: form.category.trim() || "기타",
+        name: normalizedName,
+        aliases: buildAliases(),
+        category: resolvedCategory,
         website_url: form.website_url.trim() || null,
         naver_place_url: form.naver_place_url.trim() || null,
         google_maps_url: form.google_maps_url.trim() || null,
         address: form.address.trim() || null,
-        country_code: form.country_code.trim() || "KR",
+        country_code: form.id ? form.country_code || "KR" : "KR",
         region: form.region.trim() || null,
         city: form.city.trim() || null,
         is_client_business: form.is_client_business,
@@ -177,15 +246,22 @@ function BusinessesPage() {
 
   function openNew() {
     setForm({ ...EMPTY });
+    setManualInput("");
+    setAdvancedOpen(false);
     setOpen(true);
   }
 
   function openEdit(b: Business) {
+    const category = b.category ?? "";
+    const isKnown = (CATEGORY_OPTIONS as readonly string[]).includes(category);
     setForm({
       id: b.id,
       name: b.name,
-      aliases: (b.aliases ?? []).join(", "),
-      category: b.category ?? "",
+      existingAliases: normalizeAliasList(b.aliases ?? []),
+      manualAliases: [],
+      acceptedCandidates: [],
+      categorySelect: category ? (isKnown ? category : CUSTOM_CATEGORY) : "",
+      categoryCustom: category && !isKnown ? category : "",
       website_url: b.website_url ?? "",
       naver_place_url: b.naver_place_url ?? "",
       google_maps_url: b.google_maps_url ?? "",
@@ -198,7 +274,47 @@ function BusinessesPage() {
       competitor_of:
         links.find((l) => l.competitor_business_id === b.id)?.target_business_id ?? "",
     });
+    setManualInput("");
+    setAdvancedOpen(false);
     setOpen(true);
+  }
+
+  function addManualAlias() {
+    const value = normalizeBusinessName(manualInput);
+    if (!value) {
+      toast.error("추가할 이름을 입력해 주세요.");
+      return;
+    }
+    if (value === normalizedName) {
+      toast.error("공식 업체명과 같은 이름은 추가할 필요가 없습니다.");
+      return;
+    }
+    const already = new Set([
+      ...normalizeAliasList(form.existingAliases),
+      ...normalizeAliasList(form.manualAliases),
+    ]);
+    if (already.has(value)) {
+      toast.error("이미 등록된 이름입니다.");
+      return;
+    }
+    setForm((f) => ({ ...f, manualAliases: [...f.manualAliases, value] }));
+    setManualInput("");
+  }
+
+  function submit() {
+    if (!normalizedName) {
+      toast.error("공식 업체명을 입력해 주세요.");
+      return;
+    }
+    if (!form.categorySelect) {
+      toast.error("업종을 선택해 주세요.");
+      return;
+    }
+    if (form.categorySelect === CUSTOM_CATEGORY && !form.categoryCustom.trim()) {
+      toast.error("업종을 직접 입력해 주세요.");
+      return;
+    }
+    save.mutate();
   }
 
   return (
@@ -223,7 +339,7 @@ function BusinessesPage() {
                 <TableHead>구분</TableHead>
                 <TableHead>업종</TableHead>
                 <TableHead>지역</TableHead>
-                <TableHead>별칭</TableHead>
+                <TableHead>다른 이름</TableHead>
                 <TableHead>상태</TableHead>
                 {canWrite && <TableHead className="text-right">작업</TableHead>}
               </TableRow>
@@ -275,113 +391,282 @@ function BusinessesPage() {
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{form.id ? "업체 수정" : "업체 추가"}</DialogTitle>
-            <DialogDescription>공식 업체명과 별칭을 정확히 입력하면 언급 판별이 쉬워집니다.</DialogDescription>
+            <DialogDescription>
+              업체 기본 정보를 등록하면 질문 추천과 AI 측정을 시작할 수 있습니다. 이름 인식 후보는 시스템이 안전한
+              범위에서만 제안합니다.
+            </DialogDescription>
           </DialogHeader>
+
           <form
             id="biz-form"
-            className="grid gap-4 sm:grid-cols-2"
+            className="space-y-6"
             onSubmit={(e) => {
               e.preventDefault();
-              save.mutate();
+              submit();
             }}
           >
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="b-name">공식 업체명</Label>
-              <Input id="b-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="b-alias">별칭 (쉼표로 구분)</Label>
-              <Input
-                id="b-alias"
-                value={form.aliases}
-                onChange={(e) => setForm({ ...form, aliases: e.target.value })}
-                placeholder="예: 강남모터스, 강남 모터스 정비소"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="b-cat">업종</Label>
-              <Input id="b-cat" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="b-web">홈페이지</Label>
-              <Input id="b-web" value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="b-naver">네이버 플레이스</Label>
-              <Input
-                id="b-naver"
-                value={form.naver_place_url}
-                onChange={(e) => setForm({ ...form, naver_place_url: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="b-gmap">구글 지도</Label>
-              <Input
-                id="b-gmap"
-                value={form.google_maps_url}
-                onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="b-addr">주소</Label>
-              <Input id="b-addr" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="b-country">국가 코드</Label>
-              <Input
-                id="b-country"
-                value={form.country_code}
-                onChange={(e) => setForm({ ...form, country_code: e.target.value.toUpperCase() })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="b-region">지역(시/도)</Label>
-              <Input id="b-region" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="b-city">도시(시/군/구)</Label>
-              <Input id="b-city" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-3 sm:col-span-2">
-              <div>
-                <p className="text-sm font-medium">대상 업체</p>
-                <p className="text-xs text-muted-foreground">끄면 경쟁업체로 등록됩니다.</p>
+            {/* 기본 정보 */}
+            <section className="space-y-4">
+              <h3 className="text-sm font-semibold">기본 정보</h3>
+              <div className="space-y-2">
+                <Label htmlFor="b-name">공식 업체명</Label>
+                <Input
+                  id="b-name"
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">대한민국 기준으로 등록됩니다.</p>
               </div>
-              <Switch
-                checked={form.is_client_business}
-                onCheckedChange={(v) => setForm({ ...form, is_client_business: v })}
-              />
-            </div>
-            {!form.is_client_business && (
-              <div className="space-y-2 sm:col-span-2">
-                <Label>어느 대상 업체의 경쟁업체인가요?</Label>
+
+              <div className="space-y-2">
+                <Label>업종 선택</Label>
                 <Select
-                  value={form.competitor_of || autoTargetId}
-                  onValueChange={(v) => setForm({ ...form, competitor_of: v })}
+                  {...(form.categorySelect ? { value: form.categorySelect } : {})}
+                  onValueChange={(v) => setForm({ ...form, categorySelect: v })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="대상 업체 선택" />
+                    <SelectValue placeholder="업종을 선택해 주세요" />
                   </SelectTrigger>
                   <SelectContent>
-                    {clientBusinesses.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}
+                    {CATEGORY_OPTIONS.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
                       </SelectItem>
                     ))}
+                    <SelectItem value={CUSTOM_CATEGORY}>{CUSTOM_CATEGORY}</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  선택한 대상 업체와의 관계가 business_competitors에 저장되어 보고서 분석에 반영됩니다.
+                {form.categorySelect === CUSTOM_CATEGORY && (
+                  <Input
+                    aria-label="업종 직접 입력"
+                    placeholder="업종을 직접 입력해 주세요"
+                    value={form.categoryCustom}
+                    onChange={(e) => setForm({ ...form, categoryCustom: e.target.value })}
+                  />
+                )}
+                {!form.categorySelect && (
+                  <p className="text-xs text-muted-foreground">업종을 선택해 주세요.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="b-addr">주소</Label>
+                <Input id="b-addr" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="b-region">지역(시/도)</Label>
+                  <Input id="b-region" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="b-city">도시(시/군/구)</Label>
+                  <Input id="b-city" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                </div>
+              </div>
+            </section>
+
+            {/* 공개 정보 */}
+            <section className="space-y-4">
+              <h3 className="text-sm font-semibold">공개 정보 (권장)</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="b-naver">네이버 플레이스</Label>
+                  <Input
+                    id="b-naver"
+                    value={form.naver_place_url}
+                    onChange={(e) => setForm({ ...form, naver_place_url: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="b-web">홈페이지</Label>
+                  <Input id="b-web" value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="b-gmap">구글 지도</Label>
+                  <Input
+                    id="b-gmap"
+                    value={form.google_maps_url}
+                    onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })}
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* 업체 이름 인식 */}
+            <section className="space-y-4 rounded-md border p-4">
+              <div>
+                <h3 className="text-sm font-semibold">업체 이름 인식</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  AI 답변에서 같은 업체로 볼 수 있는 이름을 확인합니다. 잘못된 이름을 추가하면 다른 업체를 내 업체로
+                  오인할 수 있습니다.
                 </p>
               </div>
-            )}
-            <div className="flex items-center justify-between rounded-md border p-3 sm:col-span-2">
-              <p className="text-sm font-medium">활성 상태</p>
-              <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
-            </div>
+
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">공식 업체명</p>
+                <p className="text-sm font-medium">{normalizedName || "-"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium">안전한 자동 후보</p>
+                {aliasCandidates.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">추가로 필요한 안전한 표기 변형이 없습니다.</p>
+                ) : (
+                  aliasCandidates.map((c) => (
+                    <label key={c} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={form.acceptedCandidates.includes(c)}
+                        onCheckedChange={(v) =>
+                          setForm((f) => ({
+                            ...f,
+                            acceptedCandidates: v
+                              ? [...f.acceptedCandidates, c]
+                              : f.acceptedCandidates.filter((x) => x !== c),
+                          }))
+                        }
+                      />
+                      <span>{c}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+
+              {(form.existingAliases.length > 0 || form.manualAliases.length > 0) && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium">등록된 다른 이름</p>
+                  <div className="flex flex-wrap gap-2">
+                    {form.existingAliases.map((a) => (
+                      <Badge key={`e-${a}`} variant="secondary" className="gap-2">
+                        {a}
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              existingAliases: f.existingAliases.filter((x) => x !== a),
+                            }))
+                          }
+                        >
+                          삭제
+                        </button>
+                      </Badge>
+                    ))}
+                    {form.manualAliases.map((a) => (
+                      <Badge key={`m-${a}`} variant="outline" className="gap-2">
+                        {a}
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              manualAliases: f.manualAliases.filter((x) => x !== a),
+                            }))
+                          }
+                        >
+                          삭제
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm">
+                    다른 이름 직접 추가
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    공식적으로 실제 사용되는 다른 이름만 추가하세요. 지점명·지역명을 임의로 빼면 다른 업체와 혼동될 수
+                    있습니다.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      aria-label="다른 이름 입력"
+                      value={manualInput}
+                      onChange={(e) => setManualInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addManualAlias();
+                        }
+                      }}
+                      placeholder="한 번에 한 개씩 입력"
+                    />
+                    <Button type="button" variant="outline" onClick={addManualAlias}>
+                      추가
+                    </Button>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </section>
+
+            {/* 고급 설정 */}
+            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+              <CollapsibleTrigger asChild>
+                <Button type="button" variant="ghost" size="sm">
+                  고급 설정
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  일반적인 첫 등록에서는 변경할 필요가 없습니다. 경쟁업체는 측정 결과에서 자동 발견됩니다.
+                </p>
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <div>
+                    <p className="text-sm font-medium">대상 업체</p>
+                    <p className="text-xs text-muted-foreground">끄면 경쟁업체로 등록됩니다.</p>
+                  </div>
+                  <Switch
+                    checked={form.is_client_business}
+                    onCheckedChange={(v) => setForm({ ...form, is_client_business: v })}
+                  />
+                </div>
+                {!form.is_client_business && (
+                  <div className="space-y-2">
+                    <Label>어느 대상 업체의 경쟁업체인가요?</Label>
+                    <Select
+                      {...(form.competitor_of || autoTargetId
+                        ? { value: form.competitor_of || autoTargetId }
+                        : {})}
+                      onValueChange={(v) => setForm({ ...form, competitor_of: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="대상 업체 선택" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clientBusinesses.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      선택한 대상 업체와의 관계가 저장되어 보고서 분석에 반영됩니다.
+                    </p>
+                  </div>
+                )}
+                <div className="flex items-center justify-between rounded-md border p-3">
+                  <p className="text-sm font-medium">활성 상태</p>
+                  <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </form>
+
           <DialogFooter>
-            <Button type="submit" form="biz-form" disabled={save.isPending}>
+            <Button
+              type="submit"
+              form="biz-form"
+              disabled={save.isPending || !normalizedName || !form.categorySelect}
+            >
               저장
             </Button>
           </DialogFooter>
