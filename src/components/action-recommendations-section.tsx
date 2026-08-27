@@ -166,7 +166,88 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
   );
 }
 
+function SourceGroups({ groups }: { groups: ActionRecommendationDTO["sourceGroups"] }) {
+  const actionable = groups.filter((g) => g.actionType !== "observe_only");
+  const observedOnly = groups.filter((g) => g.actionType === "observe_only");
+
+  return (
+    <div className="mt-2 space-y-4">
+      {actionable.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">우선 반영·점검할 출처군</p>
+          {actionable.map((g) => (
+            <SourceGroupCard key={g.key} group={g} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          현재 데이터에서 직접 반영할 출처군은 확인되지 않았습니다.
+        </p>
+      )}
+
+      {observedOnly.length > 0 && (
+        <div className="space-y-2 rounded-md border border-dashed bg-muted/20 p-3">
+          <p className="text-xs font-medium text-muted-foreground">함께 관찰된 출처군</p>
+          <p className="text-xs text-muted-foreground">
+            직접 반영 가능한 출처군인지 확인되지 않아 행동 추천이 아닌 관찰 정보로만 표시합니다.
+          </p>
+          {observedOnly.map((g) => (
+            <SourceGroupCard key={g.key} group={g} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SourceGroupCard({
+  group: g,
+}: {
+  group: ActionRecommendationDTO["sourceGroups"][number];
+}) {
+  return (
+    <div className="rounded-md border bg-background p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-base font-semibold">{g.name}</span>
+        <Badge variant={channelBadgeVariant(g.actionType)}>{g.actionLabel}</Badge>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        관련 경쟁업체 답변 {g.responseCount}/{g.relatedResponseTotal}에서 관찰 · 인용{" "}
+        {g.citationCount}회 · 경쟁업체 {g.distinctCompetitorCount}곳
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{g.reason}</p>
+
+      {g.platforms.length > 0 && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">실제 관찰 플랫폼</p>
+          <p className="text-xs text-muted-foreground">
+            플랫폼별 수치는 같은 답변에서 함께 관찰될 수 있어 서로 더하지 않습니다.
+          </p>
+          <ul className="space-y-1">
+            {g.platforms.map((p) => (
+              <li key={p.key} className="rounded-md border bg-muted/20 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium">{p.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {p.responseCount}/{p.relatedResponseTotal} · 인용 {p.citationCount}회 ·
+                    경쟁업체 {p.distinctCompetitorCount}곳
+                  </span>
+                  <Badge variant={channelBadgeVariant(p.actionType)}>{p.actionLabel}</Badge>
+                </div>
+                {p.domains.length > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">{p.domains.join(", ")}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChannelGroups({
+
   channels,
 }: {
   channels: ActionRecommendationDTO["channelSuggestions"];
