@@ -181,9 +181,14 @@ function DashboardPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">질문군별 노출 상태</CardTitle>
+                <CardTitle className="text-base">질문군 경쟁력</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  질문을 의도별로 묶은 뒤, 각 질문군에서 내 업체가 얼마나 추천됐는지 관찰값을
+                  비교한 표입니다. 값은 낮은 순이 아닌 측정된 그대로이며, 상대적으로 낮은
+                  질문군부터 살펴보세요.
+                </p>
                 {d.questionGroups.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     질문군 요약이 아직 없습니다.
@@ -203,7 +208,7 @@ function DashboardPage() {
                     <TableBody>
                       {d.questionGroups.map((g) => (
                         <TableRow key={g.intentType}>
-                          <TableCell className="text-sm">{g.intentType}</TableCell>
+                          <TableCell className="text-sm">{intentLabel(g.intentType)}</TableCell>
                           <TableCell className="text-sm tabular-nums">{g.questionCount}</TableCell>
                           <TableCell className="text-sm tabular-nums">
                             {g.measurementCount}
@@ -225,12 +230,16 @@ function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">대신 등장한 경쟁업체</CardTitle>
+                <CardTitle className="text-base">AI 추천시장에 함께 등장한 업체</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  같은 질문에 반복 측정된 AI 답변에서 내 업체와 함께 실제로 발견된 업체입니다.
+                  직접 경쟁관계나 노출 차이의 원인을 단정하는 것은 아닙니다.
+                </p>
                 {d.competitors.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    확정된 경쟁업체 언급이 없습니다.
+                    함께 등장한 다른 업체가 없습니다.
                   </p>
                 ) : (
                   <Table>
@@ -261,9 +270,13 @@ function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">자주 인용된 출처 도메인</CardTitle>
+                <CardTitle className="text-base">AI 답변에 자주 인용된 출처</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  AI가 검색 중 검토한 모든 URL이 아니라, 최종 답변에 실제로 인용된 출처만
+                  모았습니다.
+                </p>
                 {d.sources.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     인용 출처 정보가 없습니다.
@@ -304,12 +317,16 @@ function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">우선 점검 질문</CardTitle>
+                <CardTitle className="text-base">노출이 약한 질문</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  반복 측정에서 내 업체 노출이 관찰되지 않았거나 일부만 관찰된 질문입니다.
+                  원인 분석이 아니라 우선 확인해 볼 약한 영역입니다.
+                </p>
                 {d.priorityAreas.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    우선 점검 항목이 없습니다.
+                    노출이 약한 질문이 없습니다.
                   </p>
                 ) : (
                   d.priorityAreas.map((p) => (
@@ -321,8 +338,8 @@ function DashboardPage() {
                         </Badge>
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {p.intentType} · 측정 {p.measurementCount}회 · 노출 {p.mentionCount}회 ·
-                        노출률 {pct(p.visibilityRatePct)}
+                        {intentLabel(p.intentType)} · 측정 {p.measurementCount}회 · 노출{" "}
+                        {p.mentionCount}회 · 노출률 {pct(p.visibilityRatePct)}
                       </p>
                     </div>
                   ))
