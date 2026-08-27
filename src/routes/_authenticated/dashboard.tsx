@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
+import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
@@ -53,6 +54,11 @@ function pct(value: number | null): string {
   return value === null ? "–" : `${value.toFixed(1)}%`;
 }
 
+/** 내부 intent 값은 노출하지 않고 기존 공용 라벨만 재사용한다. */
+function intentLabel(intentType: string): string {
+  return (INTENT_LABELS as Record<string, string>)[intentType] ?? "기타";
+}
+
 const STATUS_LABEL: Record<"missing" | "partial", string> = {
   missing: "미노출",
   partial: "부분 노출",
@@ -84,8 +90,9 @@ function DashboardPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">AI 노출 진단</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            동일 조건으로 반복 측정한 AI 검색 결과에서 관찰된 노출 상태를 요약합니다. 특정 작업이
-            노출을 올린다는 의미는 아니며, 관찰된 값과 우선 점검 대상만 보여줍니다.
+            실제 고객이 물을 법한 질문들을 반복 측정해, AI 답변에서 내 업체가 얼마나 추천되는지와
+            함께 등장한 업체·인용 출처를 정리해 보여줍니다. 특정 작업이 노출을 올렸다는 인과관계는
+            주장하지 않으며, 관찰된 값만 표시합니다.
           </p>
         </div>
         <BusinessSelector
@@ -96,6 +103,7 @@ function DashboardPage() {
           isError={businesses.isError}
         />
       </div>
+
 
       {!businessId && !businesses.isLoading && (
         <Card>
@@ -139,17 +147,17 @@ function DashboardPage() {
             <MetricCard
               label="전체 AI 노출률"
               value={pct(d.overview.visibilityRatePct)}
-              note={`노출 ${d.overview.mentionCount}회 / 유효 ${d.overview.validCount}회`}
+              note={`반복 측정한 AI 답변 ${d.overview.validCount}건 중 내 업체가 추천된 ${d.overview.mentionCount}건`}
             />
             <MetricCard
               label="Top3 노출률"
               value={pct(d.overview.top3RatePct)}
-              note={`Top3 ${d.overview.top3Count}회`}
+              note={`추천 순위 3위 안에 든 답변 ${d.overview.top3Count}건`}
             />
             <MetricCard
-              label="노출 질문 비율"
+              label="노출된 질문 비율"
               value={pct(d.overview.questionCoverageRatePct)}
-              note={`질문 ${d.overview.coveredQuestionCount} / ${d.overview.questionCount}개`}
+              note={`질문 ${d.overview.questionCount}개 중 내 업체가 한 번 이상 노출된 ${d.overview.coveredQuestionCount}개`}
             />
             <MetricCard
               label="유효 측정 수"
@@ -173,9 +181,14 @@ function DashboardPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">질문군별 노출 상태</CardTitle>
+                <CardTitle className="text-base">질문군 경쟁력</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  질문을 의도별로 묶은 뒤, 각 질문군에서 내 업체가 얼마나 추천됐는지 관찰값을
+                  비교한 표입니다. 값은 낮은 순이 아닌 측정된 그대로이며, 상대적으로 낮은
+                  질문군부터 살펴보세요.
+                </p>
                 {d.questionGroups.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     질문군 요약이 아직 없습니다.
@@ -195,7 +208,7 @@ function DashboardPage() {
                     <TableBody>
                       {d.questionGroups.map((g) => (
                         <TableRow key={g.intentType}>
-                          <TableCell className="text-sm">{g.intentType}</TableCell>
+                          <TableCell className="text-sm">{intentLabel(g.intentType)}</TableCell>
                           <TableCell className="text-sm tabular-nums">{g.questionCount}</TableCell>
                           <TableCell className="text-sm tabular-nums">
                             {g.measurementCount}
@@ -217,12 +230,16 @@ function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">대신 등장한 경쟁업체</CardTitle>
+                <CardTitle className="text-base">AI 추천시장에 함께 등장한 업체</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  같은 질문에 반복 측정된 AI 답변에서 내 업체와 함께 실제로 발견된 업체입니다.
+                  직접 경쟁관계나 노출 차이의 원인을 단정하는 것은 아닙니다.
+                </p>
                 {d.competitors.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    확정된 경쟁업체 언급이 없습니다.
+                    함께 등장한 다른 업체가 없습니다.
                   </p>
                 ) : (
                   <Table>
@@ -253,9 +270,13 @@ function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">자주 인용된 출처 도메인</CardTitle>
+                <CardTitle className="text-base">AI 답변에 자주 인용된 출처</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
+                <p className="mb-3 text-xs text-muted-foreground">
+                  AI가 검색 중 검토한 모든 URL이 아니라, 최종 답변에 실제로 인용된 출처만
+                  모았습니다.
+                </p>
                 {d.sources.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     인용 출처 정보가 없습니다.
@@ -296,12 +317,16 @@ function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">우선 점검 질문</CardTitle>
+                <CardTitle className="text-base">노출이 약한 질문</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  반복 측정에서 내 업체 노출이 관찰되지 않았거나 일부만 관찰된 질문입니다.
+                  원인 분석이 아니라 우선 확인해 볼 약한 영역입니다.
+                </p>
                 {d.priorityAreas.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    우선 점검 항목이 없습니다.
+                    노출이 약한 질문이 없습니다.
                   </p>
                 ) : (
                   d.priorityAreas.map((p) => (
@@ -313,8 +338,8 @@ function DashboardPage() {
                         </Badge>
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {p.intentType} · 측정 {p.measurementCount}회 · 노출 {p.mentionCount}회 ·
-                        노출률 {pct(p.visibilityRatePct)}
+                        {intentLabel(p.intentType)} · 측정 {p.measurementCount}회 · 노출{" "}
+                        {p.mentionCount}회 · 노출률 {pct(p.visibilityRatePct)}
                       </p>
                     </div>
                   ))
@@ -377,8 +402,10 @@ function DashboardPage() {
           </Card>
 
           <p className="text-xs text-muted-foreground">
-            표시된 값은 반복 측정된 AI 검색 결과에서 관찰된 상태이며, 모든 사용자가 같은 답변을
-            보게 된다는 뜻은 아닙니다. 개선 효과를 보장하지 않습니다.
+            변화 추적은 비교 가능한 동일 질문 세트에서의 관찰값 비교일 뿐, 특정 작업의 개선
+            효과를 의미하지 않습니다. 표시된 모든 값은 반복 측정된 AI 검색 결과에서 관찰된
+            상태이며, 모든 사용자가 같은 답변을 보게 된다는 뜻은 아니고 개선 효과를 보장하지도
+            않습니다.
           </p>
         </>
       )}
