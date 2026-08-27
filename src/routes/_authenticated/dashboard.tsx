@@ -186,8 +186,8 @@ function DashboardPage() {
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
                   질문을 의도별로 묶은 뒤, 각 질문군에서 내 업체가 얼마나 추천됐는지 관찰값을
-                  비교한 표입니다. 값은 낮은 순이 아닌 측정된 그대로이며, 상대적으로 낮은
-                  질문군부터 살펴보세요.
+                  비교한 표입니다. 표는 실제 측정된 값만 보여주며, 노출률과 Top3 값을 기준으로
+                  질문군별 차이를 확인하세요.
                 </p>
                 {d.questionGroups.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
