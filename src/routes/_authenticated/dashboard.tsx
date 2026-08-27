@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -6,7 +7,9 @@ import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
+import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
