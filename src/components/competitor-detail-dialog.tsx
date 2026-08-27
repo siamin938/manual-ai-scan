@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -308,6 +309,20 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
   const myName = compare.business.name;
   const theirName = compare.competitor.name;
 
+  const competitorOnly = compare.questions.filter(
+    (q) => q.competitorResponseCount > 0 && q.clientResponseCount === 0,
+  );
+  const clientOnly = compare.questions.filter(
+    (q) => q.clientResponseCount > 0 && q.competitorResponseCount === 0,
+  );
+  const bothQuestions = compare.questions.filter((q) => q.bothResponseCount > 0);
+
+  const sourcesBoth = compare.sources.filter((s) => s.observedIn === "both").length;
+  const sourcesClientOnly = compare.sources.filter((s) => s.observedIn === "client_only").length;
+  const sourcesCompetitorOnly = compare.sources.filter(
+    (s) => s.observedIn === "competitor_only",
+  ).length;
+
   return (
     <div className="space-y-6">
       <p className="text-xs text-muted-foreground">{COMPARE_NOTE}</p>
@@ -321,22 +336,34 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
         <CompareColumn
           title={myName}
           rows={[
-            ["등장 답변 수 / 전체 유효 측정", `${o.clientResponseCount} / ${o.validCount}`],
-            ["등장 답변 비율", pct(o.clientResponseRatePct)],
-            ["Top3 답변 수", String(o.clientTop3ResponseCount)],
+            ["등장 답변", `${o.clientResponseCount} / ${o.validCount}`],
+            ["등장 비율", pct(o.clientResponseRatePct)],
+            ["Top3 답변", String(o.clientTop3ResponseCount)],
             ["Top3 비율", pct(o.clientTop3RatePct)],
           ]}
         />
         <CompareColumn
           title={theirName}
           rows={[
-            ["등장 답변 수 / 전체 유효 측정", `${o.competitorResponseCount} / ${o.validCount}`],
-            ["등장 답변 비율", pct(o.competitorResponseRatePct)],
-            ["Top3 답변 수", String(o.competitorTop3ResponseCount)],
+            ["등장 답변", `${o.competitorResponseCount} / ${o.validCount}`],
+            ["등장 비율", pct(o.competitorResponseRatePct)],
+            ["Top3 답변", String(o.competitorTop3ResponseCount)],
             ["Top3 비율", pct(o.competitorTop3RatePct)],
           ]}
         />
       </div>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold">한눈에 보는 차이</h3>
+        <p className="text-xs text-muted-foreground">
+          같은 측정에서 관찰된 차이이며 원인 분석이 아닙니다.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <DiffCard title="경쟁업체만 등장한 질문" questions={competitorOnly} />
+          <DiffCard title="내 업체만 등장한 질문" questions={clientOnly} />
+          <DiffCard title="함께 등장한 질문" questions={bothQuestions} />
+        </div>
+      </section>
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">질문군별 비교</h3>
@@ -349,12 +376,8 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
                 <TableRow>
                   <TableHead>질문군</TableHead>
                   <TableHead>측정</TableHead>
-                  <TableHead>{myName} 등장</TableHead>
-                  <TableHead>{myName} 비율</TableHead>
-                  <TableHead>{myName} Top3</TableHead>
-                  <TableHead>{theirName} 등장</TableHead>
-                  <TableHead>{theirName} 비율</TableHead>
-                  <TableHead>{theirName} Top3</TableHead>
+                  <TableHead className="min-w-[140px]">{myName}</TableHead>
+                  <TableHead className="min-w-[140px]">{theirName}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -364,21 +387,21 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
                       {intentLabel(g.intentType)}
                     </TableCell>
                     <TableCell className="text-sm tabular-nums">{g.measurementCount}</TableCell>
-                    <TableCell className="text-sm tabular-nums">{g.clientResponseCount}</TableCell>
-                    <TableCell className="text-sm tabular-nums">
-                      {pct(g.clientResponseRatePct)}
+                    <TableCell className="whitespace-nowrap text-sm tabular-nums">
+                      <span className="block">
+                        등장 {g.clientResponseCount} · {pct(g.clientResponseRatePct)}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Top3 {g.clientTop3ResponseCount} · {pct(g.clientTop3RatePct)}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-sm tabular-nums">
-                      {g.clientTop3ResponseCount} · {pct(g.clientTop3RatePct)}
-                    </TableCell>
-                    <TableCell className="text-sm tabular-nums">
-                      {g.competitorResponseCount}
-                    </TableCell>
-                    <TableCell className="text-sm tabular-nums">
-                      {pct(g.competitorResponseRatePct)}
-                    </TableCell>
-                    <TableCell className="text-sm tabular-nums">
-                      {g.competitorTop3ResponseCount} · {pct(g.competitorTop3RatePct)}
+                    <TableCell className="whitespace-nowrap text-sm tabular-nums">
+                      <span className="block">
+                        등장 {g.competitorResponseCount} · {pct(g.competitorResponseRatePct)}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Top3 {g.competitorTop3ResponseCount} · {pct(g.competitorTop3RatePct)}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -401,24 +424,22 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
                   {intentLabel(q.intentType)} · 함께 등장 {q.bothResponseCount}회
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div className="rounded-md bg-muted/40 p-2">
-                    <p className="text-xs font-medium">{myName}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      등장 {q.clientResponseCount}/{q.measurementCount} · 비율{" "}
-                      {pct(q.clientResponseRatePct)} · 최고 순위{" "}
-                      {q.clientBestPosition === null ? "–" : `${q.clientBestPosition}위`} · Top3{" "}
-                      {pct(q.clientTop3RatePct)}
-                    </p>
-                  </div>
-                  <div className="rounded-md bg-muted/40 p-2">
-                    <p className="text-xs font-medium">{theirName}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      등장 {q.competitorResponseCount}/{q.measurementCount} · 비율{" "}
-                      {pct(q.competitorResponseRatePct)} · 최고 순위{" "}
-                      {q.competitorBestPosition === null ? "–" : `${q.competitorBestPosition}위`} ·
-                      Top3 {pct(q.competitorTop3RatePct)}
-                    </p>
-                  </div>
+                  <QuestionMiniCard
+                    name={myName}
+                    responseCount={q.clientResponseCount}
+                    measurementCount={q.measurementCount}
+                    responseRatePct={q.clientResponseRatePct}
+                    bestPosition={q.clientBestPosition}
+                    top3ResponseCount={q.clientTop3ResponseCount}
+                  />
+                  <QuestionMiniCard
+                    name={theirName}
+                    responseCount={q.competitorResponseCount}
+                    measurementCount={q.measurementCount}
+                    responseRatePct={q.competitorResponseRatePct}
+                    bestPosition={q.competitorBestPosition}
+                    top3ResponseCount={q.competitorTop3ResponseCount}
+                  />
                 </div>
               </div>
             ))}
@@ -428,6 +449,11 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">실제 인용 출처 비교</h3>
+        <div className="grid grid-cols-3 gap-2">
+          <Metric label="양쪽에서 관찰" value={String(sourcesBoth)} />
+          <Metric label="내 업체 답변만" value={String(sourcesClientOnly)} />
+          <Metric label="경쟁업체 답변만" value={String(sourcesCompetitorOnly)} />
+        </div>
         {compare.sources.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">인용 출처 정보가 없습니다.</p>
         ) : (
@@ -437,8 +463,8 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
                 <TableRow>
                   <TableHead>도메인</TableHead>
                   <TableHead>관찰 위치</TableHead>
-                  <TableHead>{myName} 등장/인용/비율</TableHead>
-                  <TableHead>{theirName} 등장/인용/비율</TableHead>
+                  <TableHead className="min-w-[120px]">{myName}</TableHead>
+                  <TableHead className="min-w-[120px]">{theirName}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -453,15 +479,21 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm">
-                      {OBSERVED_IN_LABELS[s.observedIn]}
+                      <Badge variant="secondary">{OBSERVED_IN_LABELS[s.observedIn]}</Badge>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                      {s.clientResponseCount} / {s.clientCitationCount} /{" "}
-                      {pct(s.clientResponseRatePct)}
+                      <SourceCell
+                        responseCount={s.clientResponseCount}
+                        citationCount={s.clientCitationCount}
+                        responseRatePct={s.clientResponseRatePct}
+                      />
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                      {s.competitorResponseCount} / {s.competitorCitationCount} /{" "}
-                      {pct(s.competitorResponseRatePct)}
+                      <SourceCell
+                        responseCount={s.competitorResponseCount}
+                        citationCount={s.competitorCitationCount}
+                        responseRatePct={s.competitorResponseRatePct}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -470,21 +502,98 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
           </div>
         )}
       </section>
-
-      <p className="text-xs text-muted-foreground">{COMPARE_NOTE}</p>
     </div>
+  );
+}
+
+function DiffCard({
+  title,
+  questions,
+}: {
+  title: string;
+  questions: CompetitorCompareDTO["questions"];
+}) {
+  return (
+    <div className="rounded-md border p-3">
+      <p className="text-xs text-muted-foreground">{title}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums">{questions.length}</p>
+      {questions.length === 0 ? (
+        <p className="mt-1 text-xs text-muted-foreground">없음</p>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {questions.slice(0, 2).map((q) => (
+            <li key={q.questionId} className="truncate text-xs text-muted-foreground">
+              {q.questionText}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function QuestionMiniCard({
+  name,
+  responseCount,
+  measurementCount,
+  responseRatePct,
+  bestPosition,
+  top3ResponseCount,
+}: {
+  name: string;
+  responseCount: number;
+  measurementCount: number;
+  responseRatePct: number | null;
+  bestPosition: number | null;
+  top3ResponseCount: number;
+}) {
+  return (
+    <div className="min-w-0 rounded-md bg-muted/40 p-2">
+      <p className="truncate text-xs font-medium">{name}</p>
+      <p className="mt-1 text-xs tabular-nums">
+        등장 {responseCount}/{measurementCount} ({pct(responseRatePct)})
+      </p>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        최고 {bestPosition === null ? "–" : `${bestPosition}위`}
+      </p>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        Top3 {top3ResponseCount}/{measurementCount}
+      </p>
+    </div>
+  );
+}
+
+function SourceCell({
+  responseCount,
+  citationCount,
+  responseRatePct,
+}: {
+  responseCount: number;
+  citationCount: number;
+  responseRatePct: number | null;
+}) {
+  if (responseCount === 0 && citationCount === 0) {
+    return <span className="text-muted-foreground">–</span>;
+  }
+  return (
+    <>
+      <span className="block">
+        답변 {responseCount} · 인용 {citationCount}
+      </span>
+      <span className="block text-xs text-muted-foreground">비율 {pct(responseRatePct)}</span>
+    </>
   );
 }
 
 function CompareColumn({ title, rows }: { title: string; rows: Array<[string, string]> }) {
   return (
-    <div className="rounded-md border p-3">
-      <p className="truncate text-sm font-semibold">{title}</p>
-      <dl className="mt-2 space-y-2">
+    <div className="min-w-0 rounded-md border p-3">
+      <p className="truncate text-base font-semibold">{title}</p>
+      <dl className="mt-2 space-y-1.5">
         {rows.map(([label, value]) => (
-          <div key={label}>
+          <div key={label} className="flex items-baseline justify-between gap-2">
             <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="text-base font-semibold tabular-nums">{value}</dd>
+            <dd className="text-sm font-semibold tabular-nums">{value}</dd>
           </div>
         ))}
       </dl>
