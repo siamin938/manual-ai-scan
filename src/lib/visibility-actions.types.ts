@@ -12,6 +12,27 @@ export type ActionRecommendationEvidenceDTO = {
   domains: string[];
 };
 
+export type ActionChannelActionType =
+  | "publish_candidate"
+  | "profile_check"
+  | "platform_check"
+  | "community_check"
+  | "conditional_pr"
+  | "observe_only";
+
+export type ActionChannelSuggestionDTO = {
+  key: string;
+  name: string;
+  actionType: ActionChannelActionType;
+  actionLabel: string;
+  reason: string;
+  responseCount: number;
+  relatedResponseTotal: number;
+  citationCount: number;
+  distinctCompetitorCount: number;
+  domains: string[];
+};
+
 export type ActionRecommendationDTO = {
   id: string;
   rank: number;
@@ -23,6 +44,7 @@ export type ActionRecommendationDTO = {
   steps: string[];
   sampleQuestions: string[];
   evidence: ActionRecommendationEvidenceDTO;
+  channelSuggestions: ActionChannelSuggestionDTO[];
 };
 
 export type ActionScopeDTO = {
