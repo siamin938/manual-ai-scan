@@ -53,6 +53,11 @@ function pct(value: number | null): string {
   return value === null ? "–" : `${value.toFixed(1)}%`;
 }
 
+/** 내부 intent 값은 노출하지 않고 기존 공용 라벨만 재사용한다. */
+function intentLabel(intentType: string): string {
+  return (INTENT_LABELS as Record<string, string>)[intentType] ?? "기타";
+}
+
 const STATUS_LABEL: Record<"missing" | "partial", string> = {
   missing: "미노출",
   partial: "부분 노출",
@@ -84,8 +89,9 @@ function DashboardPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">AI 노출 진단</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            동일 조건으로 반복 측정한 AI 검색 결과에서 관찰된 노출 상태를 요약합니다. 특정 작업이
-            노출을 올린다는 의미는 아니며, 관찰된 값과 우선 점검 대상만 보여줍니다.
+            실제 고객이 물을 법한 질문들을 반복 측정해, AI 답변에서 내 업체가 얼마나 추천되는지와
+            함께 등장한 업체·인용 출처를 정리해 보여줍니다. 특정 작업이 노출을 올렸다는 인과관계는
+            주장하지 않으며, 관찰된 값만 표시합니다.
           </p>
         </div>
         <BusinessSelector
@@ -96,6 +102,7 @@ function DashboardPage() {
           isError={businesses.isError}
         />
       </div>
+
 
       {!businessId && !businesses.isLoading && (
         <Card>
