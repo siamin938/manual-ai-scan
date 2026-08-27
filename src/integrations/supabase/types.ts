@@ -856,6 +856,51 @@ export type Database = {
           },
         ]
       }
+      measurement_citations: {
+        Row: {
+          created_at: string
+          domain: string | null
+          id: string
+          measurement_id: string
+          org_id: string
+          title: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          domain?: string | null
+          id?: string
+          measurement_id: string
+          org_id: string
+          title?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string | null
+          id?: string
+          measurement_id?: string
+          org_id?: string
+          title?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_citations_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_entity_canonicalizations: {
         Row: {
           business_id: string
