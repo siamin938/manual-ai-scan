@@ -50,7 +50,9 @@ function AuthedLayout() {
   const { session } = useSession();
   return (
     <OrgProvider session={session}>
-      <Shell />
+      <ActiveTargetBusinessProvider>
+        <Shell />
+      </ActiveTargetBusinessProvider>
     </OrgProvider>
   );
 }
