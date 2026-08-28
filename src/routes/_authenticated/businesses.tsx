@@ -124,6 +124,17 @@ const EMPTY: FormState = {
   competitor_of: "",
 };
 
+const IME_TEXT_FIELDS = [
+  "name",
+  "categoryCustom",
+  "address",
+  "region",
+  "city",
+  "naver_place_url",
+  "website_url",
+  "google_maps_url",
+] as const;
+
 function BusinessesPage() {
   const { activeOrgId, canWrite } = useOrg();
   const qc = useQueryClient();
@@ -131,6 +142,9 @@ function BusinessesPage() {
   const [form, setForm] = useState<FormState>({ ...EMPTY });
   const [manualInput, setManualInput] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const { formRef, resolveLatest, compositionProps, isComposing } = useImeSafeForm(IME_TEXT_FIELDS);
+  const manualInputRef = useRef<HTMLInputElement | null>(null);
+
 
   const { data: businesses = [], isLoading } = useQuery({
     queryKey: ["businesses", activeOrgId],
