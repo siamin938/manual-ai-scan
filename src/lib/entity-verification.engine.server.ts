@@ -379,7 +379,7 @@ export function verifyEntityMention(
     return result("confirmed_business", "specific_business", true, "high", reasonCodes);
   }
   if (strongSignal) {
-    return result("confirmed_business", "specific_business", true, "high", reasonCodes);
+    return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
   }
 
   if (shortName) {
@@ -387,7 +387,7 @@ export function verifyEntityMention(
     const repeated = repeatCount >= MIN_REPEAT_FOR_CONFIRM;
     if (repeated) reasonCodes.push("REPEATED_ACROSS_RESPONSES");
     if (parserSpecific && repeated) {
-      return result("confirmed_business", "specific_business", true, "high", reasonCodes);
+      return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
     }
     reasonCodes.push("PROBABLE_ONLY");
     if (parserSpecific) {
