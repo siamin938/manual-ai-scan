@@ -245,8 +245,8 @@ function SourceGroupCard({
   return (
     <div className="rounded-md border bg-background p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-base font-semibold">{g.name}</span>
-        <Badge variant={channelBadgeVariant(g.actionType)}>{g.actionLabel}</Badge>
+        <span className="text-base font-semibold">{customerLabel(g.name)}</span>
+        <Badge variant={channelBadgeVariant(g.actionType)}>{customerLabel(g.actionLabel)}</Badge>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         관련 경쟁업체 답변 {g.responseCount}/{g.relatedResponseTotal}에서 관찰 · 인용{" "}
@@ -264,12 +264,12 @@ function SourceGroupCard({
             {g.platforms.map((p) => (
               <li key={p.key} className="rounded-md border bg-muted/20 px-3 py-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium">{p.name}</span>
+                  <span className="text-sm font-medium">{customerLabel(p.name)}</span>
                   <span className="text-xs text-muted-foreground">
                     {p.responseCount}/{p.relatedResponseTotal} · 인용 {p.citationCount}회 ·
                     경쟁업체 {p.distinctCompetitorCount}곳
                   </span>
-                  <Badge variant={channelBadgeVariant(p.actionType)}>{p.actionLabel}</Badge>
+                  <Badge variant={channelBadgeVariant(p.actionType)}>{customerLabel(p.actionLabel)}</Badge>
                 </div>
                 {p.domains.length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">{p.domains.join(", ")}</p>
@@ -330,8 +330,8 @@ function ChannelCard({
   return (
     <div className="rounded-md border bg-background p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold">{c.name}</span>
-        <Badge variant={channelBadgeVariant(c.actionType)}>{c.actionLabel}</Badge>
+        <span className="text-sm font-semibold">{customerLabel(c.name)}</span>
+        <Badge variant={channelBadgeVariant(c.actionType)}>{customerLabel(c.actionLabel)}</Badge>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{c.reason}</p>
       <p className="mt-1 text-xs text-muted-foreground">
