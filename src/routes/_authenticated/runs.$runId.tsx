@@ -38,6 +38,16 @@ export const Route = createFileRoute("/_authenticated/runs/$runId")({
 });
 
 const usd = (n: number | string | null | undefined) => `$${Number(n ?? 0).toFixed(2)}`;
+
+const formatPositionLabel = (position: number | null | undefined) =>
+  typeof position === "number" && Number.isInteger(position) && position > 0
+    ? `${position}위`
+    : "순위 없음";
+
+const formatMentionPosition = (
+  mentioned: boolean | null | undefined,
+  position: number | null | undefined,
+) => (mentioned ? `예 (${formatPositionLabel(position)})` : "아니오");
 const pct = (n: number | string | null | undefined) =>
   n === null || n === undefined ? "-" : `${Number(n).toFixed(1)}%`;
 
@@ -475,7 +485,7 @@ function RunDetailPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm">
-                            {m ? (m.was_client_mentioned ? `예 (${m.client_position ?? "-"}위)` : "아니오") : "-"}
+                            {m ? formatMentionPosition(m.was_client_mentioned, m.client_position) : "-"}
                           </TableCell>
                           <TableCell>
                             {needsReview ? <Badge variant="destructive">검토 필요</Badge> : null}
@@ -673,7 +683,7 @@ function JobDetail({
               대상 업체 노출: {measurement.was_client_mentioned ? "예" : "아니오"}
             </Badge>
             <Badge variant="secondary">
-              추천/언급 순위: {measurement.client_position ? `${measurement.client_position}위` : "-"}
+              추천/언급 순위: {formatPositionLabel(measurement.client_position)}
             </Badge>
             <Badge variant="secondary">
               공식 도메인 인용: {measurement.client_domain_cited ? "예" : "아니오"}
