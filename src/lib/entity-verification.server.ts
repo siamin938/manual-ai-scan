@@ -138,7 +138,7 @@ export async function verifyAndPersistBusinessEntities(args: {
 
   // Scope-level pass: repetition counts must be computed over the whole scope
   // before any single candidate is judged.
-  const mentions = await loadMentions({ orgId, businessId, runId });
+  const mentions = await loadMentions(runId ? { orgId, businessId, runId } : { orgId, businessId });
   const repeatCounts = buildRepeatCounts(mentions);
 
   let insertedCount = 0;
