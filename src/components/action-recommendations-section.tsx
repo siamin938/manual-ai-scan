@@ -73,11 +73,20 @@ export function ActionRecommendationsSection({
 
   const result = query.data;
   const payload = result && result.ok ? result.data : null;
+  const topRec = payload?.recommendations
+    ? [...payload.recommendations].sort((a, b) => a.rank - b.rank)[0]
+    : undefined;
+  const headline = gapHeadline(topRec);
 
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">AI 노출을 높이기 위해 먼저 해볼 것</h2>
+        {headline && (
+          <p className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
+            {headline}
+          </p>
+        )}
         <p className="mt-1 text-sm text-muted-foreground">
           반복 측정에서 경쟁업체와 실제 인용 출처·질문군의 차이를 바탕으로, 지금 우선 시도해볼
           항목을 정리했습니다.
