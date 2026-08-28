@@ -16,7 +16,7 @@ export function useImeSafeForm<Name extends string>(fieldNames: readonly Name[])
   const composingRef = useRef(false);
 
   const snapshot = useCallback(
-    () => readTextFieldSnapshot(formRef.current, fieldNames),
+    () => readTextFieldSnapshot(formRef.current as FormElementsLike, fieldNames),
     [fieldNames],
   );
 
