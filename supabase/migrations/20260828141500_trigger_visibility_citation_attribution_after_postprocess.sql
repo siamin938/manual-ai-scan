@@ -1,89 +1,88 @@
 -- Repo sync for the citation-attribution trigger already applied in production.
--- Idempotent: safe to re-apply.
+-- Idempotent: create or replace function / drop trigger if exists / create trigger.
 --
--- Fires only right after a `visibility_postprocess_completed` event is inserted
--- into public.system_events. Skips when the same run already has a
--- `visibility_citation_attribution_completed` event with
--- metadata.attribution_version = '0.1.0'.
--- The active postprocess token is read server-side only and is never logged
--- or hardcoded.
+-- Fires right after a `visibility_postprocess_completed` event is inserted into
+-- public.system_events and calls the Supabase `visibility-citation-attribution`
+-- Edge Function through net.http_post. The active postprocess token is read
+-- inside the database only; it is never hardcoded or logged.
 
-CREATE OR REPLACE FUNCTION public.trigger_visibility_citation_attribution()
+CREATE OR REPLACE FUNCTION public.trigger_visibility_citation_attribution_after_postprocess()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path TO 'public'
 AS $$
-DECLARE
+declare
   v_token text;
-  v_url text := 'https://qoirkwmnyolquvsgbian.supabase.co/functions/v1/visibility-citation-attribution';
-BEGIN
-  IF NEW.event_type IS DISTINCT FROM 'visibility_postprocess_completed' THEN
-    RETURN NEW;
-  END IF;
+  v_request_id bigint;
+  v_attribution_version constant text := '0.1.0';
+begin
+  if new.event_type <> 'visibility_postprocess_completed' then
+    return new;
+  end if;
 
-  IF NEW.run_id IS NULL THEN
-    RETURN NEW;
-  END IF;
+  if new.run_id is null then
+    return new;
+  end if;
 
   -- Already attributed for this run at the current attribution version.
-  IF EXISTS (
-    SELECT 1
-    FROM public.system_events se
-    WHERE se.run_id = NEW.run_id
-      AND se.event_type = 'visibility_citation_attribution_completed'
-      AND se.metadata->>'attribution_version' = '0.1.0'
-  ) THEN
-    RETURN NEW;
-  END IF;
+  if exists (
+    select 1
+    from public.system_events se
+    where se.org_id = new.org_id
+      and se.run_id = new.run_id
+      and se.event_type = 'visibility_citation_attribution_completed'
+      and se.metadata->>'attribution_version' = v_attribution_version
+  ) then
+    return new;
+  end if;
 
-  SELECT t.token
-    INTO v_token
-  FROM public.visibility_postprocess_tokens t
-  WHERE t.active
-  ORDER BY t.created_at DESC
-  LIMIT 1;
+  select token into v_token
+  from public.visibility_postprocess_tokens
+  where active = true
+  order by created_at asc
+  limit 1;
 
-  IF v_token IS NULL THEN
-    INSERT INTO public.system_events (org_id, run_id, event_type, severity, message, metadata)
-    VALUES (
-      NEW.org_id,
-      NEW.run_id,
-      'visibility_citation_attribution_skipped',
-      'warning',
-      'No active postprocess token; citation attribution was not requested.',
-      jsonb_build_object('attribution_version', '0.1.0')
+  if v_token is null then
+    insert into public.system_events(org_id, run_id, event_type, severity, message, metadata)
+    values (
+      new.org_id,
+      new.run_id,
+      'visibility_citation_attribution_trigger_failed',
+      'error',
+      'Citation attribution trigger token unavailable.',
+      jsonb_build_object('attribution_version', v_attribution_version, 'error_code', 'TOKEN_UNAVAILABLE')
     );
-    RETURN NEW;
-  END IF;
+    return new;
+  end if;
 
-  PERFORM net.http_post(
-    url := v_url,
+  select net.http_post(
+    url := 'https://qoirkwmnyolquvsgbian.supabase.co/functions/v1/visibility-citation-attribution',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-postprocess-token', v_token
+      'x-visibility-postprocess-token', v_token
     ),
-    body := jsonb_build_object('run_id', NEW.run_id)
-  );
+    body := jsonb_build_object('runId', new.run_id::text)
+  ) into v_request_id;
 
-  INSERT INTO public.system_events (org_id, run_id, event_type, severity, message, metadata)
-  VALUES (
-    NEW.org_id,
-    NEW.run_id,
+  insert into public.system_events(org_id, run_id, event_type, severity, message, metadata)
+  values (
+    new.org_id,
+    new.run_id,
     'visibility_citation_attribution_triggered',
     'info',
-    'Citation attribution requested for the completed postprocess run.',
-    jsonb_build_object('attribution_version', '0.1.0')
+    'Citation attribution queued after visibility postprocess completion.',
+    jsonb_build_object('attribution_version', v_attribution_version, 'request_id', v_request_id)
   );
 
-  RETURN NEW;
-END;
+  return new;
+end;
 $$;
 
-DROP TRIGGER IF EXISTS trigger_visibility_citation_attribution_after_postprocess ON public.system_events;
+DROP TRIGGER IF EXISTS trg_visibility_citation_attribution_after_postprocess ON public.system_events;
 
-CREATE TRIGGER trigger_visibility_citation_attribution_after_postprocess
+CREATE TRIGGER trg_visibility_citation_attribution_after_postprocess
 AFTER INSERT ON public.system_events
 FOR EACH ROW
 WHEN (NEW.event_type = 'visibility_postprocess_completed')
-EXECUTE FUNCTION public.trigger_visibility_citation_attribution();
+EXECUTE FUNCTION public.trigger_visibility_citation_attribution_after_postprocess();

@@ -20,26 +20,20 @@ could inherit the previous business's section.
   `CITATION_ATTRIBUTION_VERSION = "0.1.0"`).
 - `src/lib/citation-attribution.server.ts` — scoped persistence (idempotent upsert).
 - `src/lib/citation-attribution.functions.ts` — authenticated server function.
-- `src/routes/api/public/citation-attribution.ts` — postprocess-token endpoint
-  (`POST { run_id }`, header `x-postprocess-token`) for the Supabase pipeline.
 - `supabase/migrations/20260828140000_measurement_citation_attributions.sql` —
   idempotent repo copy of the production table/indexes/grants/RLS.
 
-## visibility-postprocess change still required (Supabase side)
-This project cannot create or deploy Edge Function sources from the repo.
-Inside `visibility-postprocess/index.ts`, after the existing citation-sync step
-and only for standalone audit runs, add:
-
-```ts
-await fetch(`${APP_BASE_URL}/api/public/citation-attribution`, {
-  method: "POST",
-  headers: { "content-type": "application/json", "x-postprocess-token": POSTPROCESS_TOKEN },
-  body: JSON.stringify({ run_id: runId }),
-});
-```
-
-Keep the existing pipeline order, experiment exclusions and
-`PIPELINE_VERSION` gate. The endpoint is idempotent, so retries are safe.
+## Production automation (already applied in Supabase)
+The pipeline runs automatically via the DB trigger
+`trg_visibility_citation_attribution_after_postprocess` on
+`public.system_events`, mirrored in
+`supabase/migrations/20260828141500_trigger_visibility_citation_attribution_after_postprocess.sql`.
+On a `visibility_postprocess_completed` insert it calls the Supabase Edge
+Function `visibility-citation-attribution` with header
+`x-visibility-postprocess-token` and body `{ "runId": ... }`, skipping runs that
+already have a completed event at `attribution_version = '0.1.0'`.
+No separate app endpoint is used; manual reprocessing goes through the
+authenticated server function in `citation-attribution.functions.ts`.
 
 ## Not used for decisions
 Attribution rows are display/verification only in 0.1.0. Insight, action
