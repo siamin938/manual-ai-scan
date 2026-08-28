@@ -689,16 +689,20 @@ function BusinessesPage() {
                   <div className="flex gap-2">
                     <Input
                       aria-label="다른 이름 입력"
+                      ref={manualInputRef}
                       value={manualInput}
                       onChange={(e) => setManualInput(e.target.value)}
+                      {...compositionProps((v) => setManualInput(v))}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addManualAlias();
-                        }
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        // 조합 중 Enter는 조합 확정용이므로 별칭 추가를 실행하지 않는다.
+                        if (isComposing(e)) return;
+                        addManualAlias();
                       }}
                       placeholder="한 번에 한 개씩 입력"
                     />
+
                     <Button type="button" variant="outline" onClick={addManualAlias}>
                       추가
                     </Button>
