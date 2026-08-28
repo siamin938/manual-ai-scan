@@ -326,6 +326,11 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
 
   async function submit() {
     if (blockers.length > 0 || submitting) return;
+    // fail-closed: 클라이언트 상태가 조작되어도 허용 범위를 벗어나면 실행하지 않는다.
+    if (!Number.isInteger(reps) || reps < 1 || reps > 3) {
+      toast.error("반복 횟수는 1~3회만 실행할 수 있습니다.");
+      return;
+    }
     setSubmitting(true);
     try {
       let runId = draftRunId;
