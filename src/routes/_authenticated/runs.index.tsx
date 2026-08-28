@@ -58,7 +58,7 @@ export const Route = createFileRoute("/_authenticated/runs/")({
   component: RunsPage,
 });
 
-export const ENGINE_LABEL = "OpenAI Web Search API 벤치마크";
+export const ENGINE_LABEL = "AI 경쟁 분석 측정";
 
 export const RUN_STATUS_LABELS: Record<string, string> = {
   draft: "준비",
@@ -77,11 +77,6 @@ export function runStatusVariant(status: string): "default" | "secondary" | "des
   return "secondary";
 }
 
-const usd = (n: number | string | null | undefined) =>
-  `$${Number(n ?? 0).toFixed(2)}`;
-
-/** standalone audit 새 측정 모달에서 사용자가 입력할 수 있는 실행 최대 비용 상한 (USD). */
-const MAX_ALLOWED_COST_USD = 1.5;
 
 type RunRow = {
   id: string;
