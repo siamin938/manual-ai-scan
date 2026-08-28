@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { OrgProvider, useOrg, useSession } from "@/lib/org";
+import { ActiveTargetBusinessProvider } from "@/lib/active-business";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { ROLE_LABELS } from "@/lib/format";
 import { Button } from "@/components/ui/button";
