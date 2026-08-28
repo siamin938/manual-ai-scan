@@ -485,7 +485,7 @@ function RunDetailPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm">
-                            {m ? (m.was_client_mentioned ? `예 (${m.client_position ?? "-"}위)` : "아니오") : "-"}
+                            {m ? formatMentionPosition(m.was_client_mentioned, m.client_position) : "-"}
                           </TableCell>
                           <TableCell>
                             {needsReview ? <Badge variant="destructive">검토 필요</Badge> : null}
@@ -683,7 +683,7 @@ function JobDetail({
               대상 업체 노출: {measurement.was_client_mentioned ? "예" : "아니오"}
             </Badge>
             <Badge variant="secondary">
-              추천/언급 순위: {measurement.client_position ? `${measurement.client_position}위` : "-"}
+              추천/언급 순위: {formatPositionLabel(measurement.client_position)}
             </Badge>
             <Badge variant="secondary">
               공식 도메인 인용: {measurement.client_domain_cited ? "예" : "아니오"}
