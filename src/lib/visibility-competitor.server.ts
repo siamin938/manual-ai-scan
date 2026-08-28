@@ -22,7 +22,15 @@ import type {
   CompetitorScopeDTO,
   CompetitorSourceDTO,
   CompetitorSummaryDTO,
+  CompetitorAttributedSourceDTO,
 } from "./visibility-competitor.types";
+import {
+  aggregateAttributedSources,
+  type AttributionAggregateRow,
+} from "./citation-attribution.aggregate";
+
+/** 고객 화면에 노출할 attribution 계약 버전 (엔진 규칙은 서버 전용 모듈에만 있다). */
+const CITATION_ATTRIBUTION_DISPLAY_VERSION = "0.1.0";
 
 type UserClient = SupabaseClient<Database>;
 type Obj = Record<string, unknown>;
@@ -506,8 +514,39 @@ export function parseCompetitorComparePayload(payload: Obj): CompetitorCompareRe
       questionGroups,
       questions,
       sources,
+      attributedSources: [],
     },
   };
+}
+
+/**
+ * 저장된 attribution row(`measurement_citation_attributions`)를 도메인 단위로
+ * 세기만 한다. 판정 규칙은 attribution 파이프라인에만 존재하며, RLS가 적용된
+ * 사용자 클라이언트로 읽으므로 조직 범위를 벗어나지 않는다.
+ * 실패하면 조용히 빈 배열을 돌려 기존 co-occurrence 표시만 유지한다.
+ */
+async function loadAttributedSources(args: {
+  supabase: UserClient;
+  orgId: string;
+  businessId: string;
+  runId: string;
+  competitorRef: string;
+  competitorName: string;
+}): Promise<CompetitorAttributedSourceDTO[]> {
+  const { data, error } = await args.supabase
+    .from("measurement_citation_attributions")
+    .select("domain, title, measurement_id, canonical_key, canonical_display_name, attribution_level")
+    .eq("org_id", args.orgId)
+    .eq("business_id", args.businessId)
+    .eq("source_run_id", args.runId)
+    .eq("attribution_version", CITATION_ATTRIBUTION_DISPLAY_VERSION);
+  if (error || !data) return [];
+  return aggregateAttributedSources({
+    rows: data as AttributionAggregateRow[],
+    clientKey: `business:${args.businessId}`,
+    competitorKey: args.competitorRef,
+    competitorName: args.competitorName,
+  });
 }
 
 export async function fetchVisibilityCompetitorCompare(args: {
@@ -522,5 +561,15 @@ export async function fetchVisibilityCompetitorCompare(args: {
     competitorRef: args.competitorRef,
   });
   if (!res.ok) return res;
-  return parseCompetitorComparePayload(res.payload);
+  const parsed = parseCompetitorComparePayload(res.payload);
+  if (!parsed.ok) return parsed;
+  const attributedSources = await loadAttributedSources({
+    supabase: args.supabase,
+    orgId: args.orgId,
+    businessId: args.businessId,
+    runId: parsed.compare.scope.runId,
+    competitorRef: args.competitorRef,
+    competitorName: parsed.compare.competitor.name,
+  });
+  return { ok: true, compare: { ...parsed.compare, attributedSources } };
 }

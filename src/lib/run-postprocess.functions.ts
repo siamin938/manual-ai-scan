@@ -77,6 +77,8 @@ export const runPostprocess = createServerFn({ method: "POST" })
       entityNeedsReview: 0,
       canonicalMerged: 0,
       canonicalStandalone: 0,
+      citationDirect: 0,
+      citationSection: 0,
       classifiedSources: 0,
       firstPartySources: 0,
       summarizedMeasurements: 0,
@@ -128,6 +130,21 @@ export const runPostprocess = createServerFn({ method: "POST" })
       return fail(steps, "entityCanonicalization", "ENTITY_CANONICALIZATION_FAILED");
     }
     steps.entityCanonicalization = "ok";
+
+    // 3a-4) citation attribution (stored payload indices only; no provider call)
+    try {
+      const { attributeAndPersistRunCitations } = await import("./citation-attribution.server");
+      const summary = await attributeAndPersistRunCitations({
+        orgId: data.orgId,
+        businessId,
+        runId: data.runId,
+      });
+      counts.citationDirect = summary.directCount;
+      counts.citationSection = summary.sectionCount;
+    } catch {
+      return fail(steps, "citationAttribution", "CITATION_ATTRIBUTION_FAILED");
+    }
+    steps.citationAttribution = "ok";
 
     // 3b) first-party source classification
     try {

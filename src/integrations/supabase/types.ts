@@ -856,6 +856,108 @@ export type Database = {
           },
         ]
       }
+      measurement_citation_attributions: {
+        Row: {
+          attribution_level: string
+          attribution_version: string
+          business_id: string
+          canonical_display_name: string
+          canonical_key: string
+          citation_end_index: number
+          citation_start_index: number
+          citation_url: string
+          created_at: string
+          domain: string | null
+          entity_end_index: number | null
+          entity_start_index: number | null
+          evidence: Json
+          id: string
+          measurement_id: string
+          measurement_mention_id: string | null
+          org_id: string
+          source_run_id: string
+          title: string | null
+        }
+        Insert: {
+          attribution_level: string
+          attribution_version: string
+          business_id: string
+          canonical_display_name: string
+          canonical_key: string
+          citation_end_index: number
+          citation_start_index: number
+          citation_url: string
+          created_at?: string
+          domain?: string | null
+          entity_end_index?: number | null
+          entity_start_index?: number | null
+          evidence?: Json
+          id?: string
+          measurement_id: string
+          measurement_mention_id?: string | null
+          org_id: string
+          source_run_id: string
+          title?: string | null
+        }
+        Update: {
+          attribution_level?: string
+          attribution_version?: string
+          business_id?: string
+          canonical_display_name?: string
+          canonical_key?: string
+          citation_end_index?: number
+          citation_start_index?: number
+          citation_url?: string
+          created_at?: string
+          domain?: string | null
+          entity_end_index?: number | null
+          entity_start_index?: number | null
+          evidence?: Json
+          id?: string
+          measurement_id?: string
+          measurement_mention_id?: string | null
+          org_id?: string
+          source_run_id?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_citation_attributions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citation_attributions_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citation_attributions_measurement_mention_id_fkey"
+            columns: ["measurement_mention_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_mentions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citation_attributions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citation_attributions_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_citations: {
         Row: {
           created_at: string
