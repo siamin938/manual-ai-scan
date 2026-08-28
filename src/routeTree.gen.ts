@@ -24,7 +24,6 @@ import { Route as AuthenticatedReportsCustomerRouteImport } from './routes/_auth
 import { Route as AuthenticatedReportsManualRouteImport } from './routes/_authenticated/reports.manual'
 import { Route as AuthenticatedRunsIndexRouteImport } from './routes/_authenticated/runs.index'
 import { Route as AuthenticatedRunsRunIdRouteImport } from './routes/_authenticated/runs.$runId'
-import { Route as ApiPublicCitationAttributionRouteImport } from './routes/api/public/citation-attribution'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -106,12 +105,6 @@ const AuthenticatedRunsRunIdRoute = AuthenticatedRunsRunIdRouteImport.update({
   path: '/runs/$runId',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ApiPublicCitationAttributionRoute =
-  ApiPublicCitationAttributionRouteImport.update({
-    id: '/api/public/citation-attribution',
-    path: '/api/public/citation-attribution',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -126,7 +119,6 @@ export interface FileRoutesByFullPath {
   '/reports/customer': typeof AuthenticatedReportsCustomerRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
   '/runs/$runId': typeof AuthenticatedRunsRunIdRoute
-  '/api/public/citation-attribution': typeof ApiPublicCitationAttributionRoute
   '/experiments/': typeof AuthenticatedExperimentsIndexRoute
   '/runs/': typeof AuthenticatedRunsIndexRoute
 }
@@ -143,7 +135,6 @@ export interface FileRoutesByTo {
   '/reports/customer': typeof AuthenticatedReportsCustomerRoute
   '/reports/manual': typeof AuthenticatedReportsManualRoute
   '/runs/$runId': typeof AuthenticatedRunsRunIdRoute
-  '/api/public/citation-attribution': typeof ApiPublicCitationAttributionRoute
   '/experiments': typeof AuthenticatedExperimentsIndexRoute
   '/runs': typeof AuthenticatedRunsIndexRoute
 }
@@ -162,7 +153,6 @@ export interface FileRoutesById {
   '/_authenticated/reports/customer': typeof AuthenticatedReportsCustomerRoute
   '/_authenticated/reports/manual': typeof AuthenticatedReportsManualRoute
   '/_authenticated/runs/$runId': typeof AuthenticatedRunsRunIdRoute
-  '/api/public/citation-attribution': typeof ApiPublicCitationAttributionRoute
   '/_authenticated/experiments/': typeof AuthenticatedExperimentsIndexRoute
   '/_authenticated/runs/': typeof AuthenticatedRunsIndexRoute
 }
@@ -181,7 +171,6 @@ export interface FileRouteTypes {
     | '/reports/customer'
     | '/reports/manual'
     | '/runs/$runId'
-    | '/api/public/citation-attribution'
     | '/experiments/'
     | '/runs/'
   fileRoutesByTo: FileRoutesByTo
@@ -198,7 +187,6 @@ export interface FileRouteTypes {
     | '/reports/customer'
     | '/reports/manual'
     | '/runs/$runId'
-    | '/api/public/citation-attribution'
     | '/experiments'
     | '/runs'
   id:
@@ -216,7 +204,6 @@ export interface FileRouteTypes {
     | '/_authenticated/reports/customer'
     | '/_authenticated/reports/manual'
     | '/_authenticated/runs/$runId'
-    | '/api/public/citation-attribution'
     | '/_authenticated/experiments/'
     | '/_authenticated/runs/'
   fileRoutesById: FileRoutesById
@@ -225,7 +212,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
-  ApiPublicCitationAttributionRoute: typeof ApiPublicCitationAttributionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -335,13 +321,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRunsRunIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/public/citation-attribution': {
-      id: '/api/public/citation-attribution'
-      path: '/api/public/citation-attribution'
-      fullPath: '/api/public/citation-attribution'
-      preLoaderRoute: typeof ApiPublicCitationAttributionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -383,7 +362,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
-  ApiPublicCitationAttributionRoute: ApiPublicCitationAttributionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
