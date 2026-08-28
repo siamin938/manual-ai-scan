@@ -407,6 +407,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               onValueChange={(v) => {
                 setBusinessId(v);
                 setQuestionSetId("");
+                if (activeOrgId) shared.select(activeOrgId, v);
               }}
             >
               <SelectTrigger>
