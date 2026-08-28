@@ -80,6 +80,9 @@ export function runStatusVariant(status: string): "default" | "secondary" | "des
 const usd = (n: number | string | null | undefined) =>
   `$${Number(n ?? 0).toFixed(2)}`;
 
+/** standalone audit 새 측정 모달에서 사용자가 입력할 수 있는 실행 최대 비용 상한 (USD). */
+const MAX_ALLOWED_COST_USD = 1.5;
+
 type RunRow = {
   id: string;
   name: string;
