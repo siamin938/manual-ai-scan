@@ -34,3 +34,11 @@
    `entity-canonical-resolver` → `compute-insights-v024` → 진단/추천 조회.
 
 업체명·UUID 기반 예외나 화이트리스트는 어느 단계에도 추가하지 않습니다.
+
+## 추가 실험 (2026-08-28)
+
+resolver 게이트가 `confidence='high'` 조건 때문일 가능성을 검증하기 위해
+v0.1.2 confirmed 행의 confidence를 일시적으로 `high`로 올려 재실행했으나
+`candidateCount`는 동일하게 13이었습니다. 따라서 게이트는 confidence가 아니라
+`verifier_version` 상수(`0.1.1`) 고정이 원인입니다. (실험 후 confidence는 원래
+값(medium)으로 되돌렸습니다.)
