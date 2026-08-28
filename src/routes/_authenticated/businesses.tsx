@@ -200,33 +200,44 @@ function BusinessesPage() {
       ? form.categoryCustom.trim()
       : form.categorySelect.trim();
 
-  function buildAliases(): string[] {
-    const accepted = aliasCandidates.filter((c) => form.acceptedCandidates.includes(c));
-    return normalizeAliasList([...form.existingAliases, ...form.manualAliases, ...accepted]).filter(
-      (a) => a !== normalizedName,
+  function resolveCategoryOf(f: FormState): string {
+    return f.categorySelect === CUSTOM_CATEGORY ? f.categoryCustom.trim() : f.categorySelect.trim();
+  }
+
+  function buildAliases(f: FormState, canonicalName: string): string[] {
+    const existing = new Set([
+      ...normalizeAliasList(f.existingAliases),
+      ...normalizeAliasList(f.manualAliases),
+    ]);
+    const accepted = generateSafeAliasCandidates(f.name)
+      .filter((c) => !existing.has(c))
+      .filter((c) => f.acceptedCandidates.includes(c));
+    return normalizeAliasList([...f.existingAliases, ...f.manualAliases, ...accepted]).filter(
+      (a) => a !== canonicalName,
     );
   }
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (f: FormState) => {
+      const canonicalName = normalizeBusinessName(f.name);
       const payload = {
         org_id: activeOrgId!,
-        name: normalizedName,
-        aliases: buildAliases(),
-        category: resolvedCategory,
-        website_url: form.website_url.trim() || null,
-        naver_place_url: form.naver_place_url.trim() || null,
-        google_maps_url: form.google_maps_url.trim() || null,
-        address: form.address.trim() || null,
-        country_code: form.id ? form.country_code || "KR" : "KR",
-        region: form.region.trim() || null,
-        city: form.city.trim() || null,
-        is_client_business: form.is_client_business,
-        active: form.active,
+        name: canonicalName,
+        aliases: buildAliases(f, canonicalName),
+        category: resolveCategoryOf(f),
+        website_url: f.website_url.trim() || null,
+        naver_place_url: f.naver_place_url.trim() || null,
+        google_maps_url: f.google_maps_url.trim() || null,
+        address: f.address.trim() || null,
+        country_code: f.id ? f.country_code || "KR" : "KR",
+        region: f.region.trim() || null,
+        city: f.city.trim() || null,
+        is_client_business: f.is_client_business,
+        active: f.active,
       };
-      let businessId = form.id;
-      if (form.id) {
-        const { error } = await supabase.from("businesses").update(payload).eq("id", form.id);
+      let businessId = f.id;
+      if (f.id) {
+        const { error } = await supabase.from("businesses").update(payload).eq("id", f.id);
         if (error) throw error;
       } else {
         const { data, error } = await supabase.from("businesses").insert(payload).select("id").single();
@@ -235,8 +246,8 @@ function BusinessesPage() {
       }
 
       // 경쟁업체로 등록하면 대상 업체와의 관계를 business_competitors에 저장
-      const targetId = form.is_client_business ? "" : form.competitor_of || autoTargetId;
-      if (!form.is_client_business && targetId) {
+      const targetId = f.is_client_business ? "" : f.competitor_of || autoTargetId;
+      if (!f.is_client_business && targetId) {
         const { error } = await supabase.from("business_competitors").upsert(
           {
             org_id: activeOrgId!,
@@ -249,6 +260,7 @@ function BusinessesPage() {
         if (error) throw error;
       }
     },
+
     onSuccess: () => {
       toast.success("저장되었습니다.");
       setOpen(false);
