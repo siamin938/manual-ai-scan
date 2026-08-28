@@ -42,9 +42,9 @@ function intentLabel(intentType: string): string {
 }
 
 const OBSERVED_IN_LABELS: Record<CompetitorCompareObservedIn, string> = {
-  both: "양쪽",
-  client_only: "내 업체 답변만",
-  competitor_only: "경쟁업체 답변만",
+  both: "양쪽 답변",
+  client_only: "내 업체 쪽",
+  competitor_only: "경쟁업체 쪽",
 };
 
 const COMPARE_NOTE =
