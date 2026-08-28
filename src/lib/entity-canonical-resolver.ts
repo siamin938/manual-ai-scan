@@ -12,6 +12,13 @@
 /** Resolver version contract used to read back stored canonical rows. */
 export const RESOLVER_VERSION = "0.1.0";
 
+/**
+ * Verifier version the deployed resolver consumes as candidate input.
+ * Kept in sync with `ENTITY_VERIFIER_VERSION` (v0.1.2). Documentation-only:
+ * the gate itself lives in the private Edge Function, never in the client.
+ */
+export const RESOLVER_INPUT_VERIFIER_VERSION = "0.1.2";
+
 export type CanonicalResolutionStatus =
   | "matched_business"
   | "merged"
