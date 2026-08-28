@@ -257,6 +257,17 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     },
   });
 
+  /** 공유된 대상 업체 선택을 현재 org의 유효 목록과 대조한 뒤에만 폼에 반영한다. */
+  const metaBusinesses = meta.data?.businesses;
+  useEffect(() => {
+    if (!open || !metaBusinesses) return;
+    const sharedId = shared.getSelectedId(activeOrgId);
+    if (!sharedId || !metaBusinesses.some((b) => b.id === sharedId)) return;
+    setBusinessId((prev) => (prev ? prev : sharedId));
+  }, [open, metaBusinesses, shared, activeOrgId]);
+
+
+
   const questions = useQuery({
     queryKey: ["run-form-questions", questionSetId],
     enabled: !!questionSetId,
