@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useOrg } from "@/lib/org";
+import { useActiveTargetBusiness } from "@/lib/active-business";
 import { formatSeoul } from "@/lib/format";
 import {
   getCustomerReport,
