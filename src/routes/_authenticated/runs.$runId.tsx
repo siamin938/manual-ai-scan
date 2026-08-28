@@ -38,6 +38,16 @@ export const Route = createFileRoute("/_authenticated/runs/$runId")({
 });
 
 const usd = (n: number | string | null | undefined) => `$${Number(n ?? 0).toFixed(2)}`;
+
+const formatPositionLabel = (position: number | null | undefined) =>
+  typeof position === "number" && Number.isInteger(position) && position > 0
+    ? `${position}위`
+    : "순위 없음";
+
+const formatMentionPosition = (
+  mentioned: boolean | null | undefined,
+  position: number | null | undefined,
+) => (mentioned ? `예 (${formatPositionLabel(position)})` : "아니오");
 const pct = (n: number | string | null | undefined) =>
   n === null || n === undefined ? "-" : `${Number(n).toFixed(1)}%`;
 
