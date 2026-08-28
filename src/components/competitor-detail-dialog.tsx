@@ -42,9 +42,9 @@ function intentLabel(intentType: string): string {
 }
 
 const OBSERVED_IN_LABELS: Record<CompetitorCompareObservedIn, string> = {
-  both: "양쪽",
-  client_only: "내 업체 답변만",
-  competitor_only: "경쟁업체 답변만",
+  both: "양쪽 답변",
+  client_only: "내 업체 쪽",
+  competitor_only: "경쟁업체 쪽",
 };
 
 const COMPARE_NOTE =
@@ -448,21 +448,29 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">실제 인용 출처 비교</h3>
+        <h3 className="text-sm font-semibold">AI 답변에 함께 인용된 출처 비교</h3>
+        <p className="text-xs text-muted-foreground">
+          각 업체가 등장한 AI 답변에서 함께 인용된 출처를 비교합니다. 해당 웹페이지가 그 업체를
+          직접 언급하거나 소개했다는 뜻은 아닙니다.
+        </p>
         <div className="grid grid-cols-3 gap-2">
-          <Metric label="양쪽에서 관찰" value={String(sourcesBoth)} />
-          <Metric label="내 업체 답변만" value={String(sourcesClientOnly)} />
-          <Metric label="경쟁업체 답변만" value={String(sourcesCompetitorOnly)} />
+          <Metric label="양쪽 업체 등장 답변에서 인용" value={String(sourcesBoth)} />
+          <Metric label="내 업체 등장 답변에서만 인용" value={String(sourcesClientOnly)} />
+          <Metric label="경쟁업체 등장 답변에서만 인용" value={String(sourcesCompetitorOnly)} />
         </div>
         {compare.sources.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">인용 출처 정보가 없습니다.</p>
         ) : (
           <div className="overflow-x-auto">
+            <p className="mb-2 text-xs text-muted-foreground">
+              답변 = 해당 업체가 등장하면서 이 도메인이 함께 인용된 AI 답변 수 / 인용 = 그 답변들에
+              기록된 실제 citation 수 / 비율 = 해당 업체 등장 답변 중 이 도메인이 함께 인용된 비율
+            </p>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>도메인</TableHead>
-                  <TableHead>관찰 위치</TableHead>
+                  <TableHead>함께 인용된 범위</TableHead>
                   <TableHead className="min-w-[120px]">{myName}</TableHead>
                   <TableHead className="min-w-[120px]">{theirName}</TableHead>
                 </TableRow>
