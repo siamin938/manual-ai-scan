@@ -25,6 +25,34 @@ function channelBadgeVariant(
   return "secondary";
 }
 
+/**
+ * 서버 DTO의 라벨 문자열을 고객이 이해하기 쉬운 표현으로만 바꾼다.
+ * 내부 enum/key/수치는 그대로 두고 표시 문구만 치환한다.
+ */
+const CUSTOMER_LABEL_OVERRIDES: Record<string, string> = {
+  "콘텐츠 보강 후보": "우선 개선 채널",
+  "작성·보강 후보": "콘텐츠 개선",
+  관찰만: "참고용",
+  "기타 제3자 정보": "기타 웹사이트",
+};
+
+function customerLabel(label: string): string {
+  return CUSTOMER_LABEL_OVERRIDES[label] ?? label;
+}
+
+/** 최우선 액션의 근거 수치를 그대로 사용한 한 줄 격차 요약(계산 규칙 없음). */
+function gapHeadline(rec: ActionRecommendationDTO | undefined): string | null {
+  if (!rec) return null;
+  const e = rec.evidence;
+  const total = e.measurementCount;
+  if (!total || total <= 0) return null;
+  if (e.clientResponseCount == null || e.competitorResponseCount == null) return null;
+  if (e.clientResponseCount >= e.competitorResponseCount) return null;
+  const label = rec.title?.trim();
+  if (!label) return null;
+  return `가장 큰 차이: ${label} — 내 업체 ${e.clientResponseCount}/${total} vs 경쟁업체 ${e.competitorResponseCount}/${total}`;
+}
+
 export function ActionRecommendationsSection({
   orgId,
   businessId,
