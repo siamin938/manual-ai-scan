@@ -584,9 +584,12 @@ function BusinessesPage() {
                   <Label htmlFor="b-gmap">구글 지도</Label>
                   <Input
                     id="b-gmap"
+                    name="google_maps_url"
                     value={form.google_maps_url}
                     onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, google_maps_url: v })))}
                   />
+
                 </div>
               </div>
             </section>
