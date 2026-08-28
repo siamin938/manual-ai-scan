@@ -452,7 +452,12 @@ function BusinessesPage() {
 
           <form
             id="biz-form"
+            ref={formRef}
             className="space-y-6"
+            onKeyDown={(e) => {
+              // 조합 중 Enter로 폼이 먼저 제출되지 않도록 막는다.
+              if (e.key === "Enter" && isComposing(e)) e.preventDefault();
+            }}
             onSubmit={(e) => {
               e.preventDefault();
               submit();
@@ -465,9 +470,11 @@ function BusinessesPage() {
                 <Label htmlFor="b-name">공식 업체명</Label>
                 <Input
                   id="b-name"
+                  name="name"
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  {...compositionProps((v) => setForm((f) => ({ ...f, name: v })))}
                 />
                 {duplicateBusiness && (
                   <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs">
@@ -501,9 +508,11 @@ function BusinessesPage() {
                 {form.categorySelect === CUSTOM_CATEGORY && (
                   <Input
                     aria-label="업종 직접 입력"
+                    name="categoryCustom"
                     placeholder="업종을 직접 입력해 주세요"
                     value={form.categoryCustom}
                     onChange={(e) => setForm({ ...form, categoryCustom: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, categoryCustom: v })))}
                   />
                 )}
                 {!form.categorySelect && (
@@ -513,17 +522,35 @@ function BusinessesPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="b-addr">주소</Label>
-                <Input id="b-addr" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                <Input
+                  id="b-addr"
+                  name="address"
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  {...compositionProps((v) => setForm((f) => ({ ...f, address: v })))}
+                />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="b-region">지역(시/도)</Label>
-                  <Input id="b-region" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} />
+                  <Input
+                    id="b-region"
+                    name="region"
+                    value={form.region}
+                    onChange={(e) => setForm({ ...form, region: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, region: v })))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="b-city">도시(시/군/구)</Label>
-                  <Input id="b-city" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                  <Input
+                    id="b-city"
+                    name="city"
+                    value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, city: v })))}
+                  />
                 </div>
               </div>
             </section>
@@ -536,14 +563,23 @@ function BusinessesPage() {
                   <Label htmlFor="b-naver">네이버 플레이스</Label>
                   <Input
                     id="b-naver"
+                    name="naver_place_url"
                     value={form.naver_place_url}
                     onChange={(e) => setForm({ ...form, naver_place_url: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, naver_place_url: v })))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="b-web">홈페이지</Label>
-                  <Input id="b-web" value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} />
+                  <Input
+                    id="b-web"
+                    name="website_url"
+                    value={form.website_url}
+                    onChange={(e) => setForm({ ...form, website_url: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, website_url: v })))}
+                  />
                 </div>
+
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="b-gmap">구글 지도</Label>
                   <Input
