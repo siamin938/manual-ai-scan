@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { useActiveTargetBusiness } from "@/lib/active-business";
 import { formatSeoul } from "@/lib/format";
+import { startCustomerMeasurement } from "@/lib/customer-measurement.functions";
+import { customerErrorMessage } from "@/lib/customer-measurement.helpers";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,21 +38,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 export const Route = createFileRoute("/_authenticated/runs/")({
   head: () => ({
     meta: [
-      { title: "측정 · AI Visibility Lab" },
+      { title: "AI 측정 · AI Visibility Lab" },
       {
         name: "description",
-        content: "관찰된 노출 상태를 확인하기 위한 측정 실행을 생성하고 진행 상태를 확인합니다.",
+        content: "AI 답변에서 관찰된 추천·경쟁업체·출처를 확인하기 위한 AI 측정을 시작하고 진행 상태를 확인합니다.",
       },
-      { property: "og:title", content: "측정 · AI Visibility Lab" },
+      { property: "og:title", content: "AI 측정 · AI Visibility Lab" },
       { property: "og:description", content: "AI 노출 측정 실행 목록" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -58,7 +56,7 @@ export const Route = createFileRoute("/_authenticated/runs/")({
   component: RunsPage,
 });
 
-export const ENGINE_LABEL = "OpenAI Web Search API 벤치마크";
+export const ENGINE_LABEL = "AI 경쟁 분석 측정";
 
 export const RUN_STATUS_LABELS: Record<string, string> = {
   draft: "준비",
@@ -77,12 +75,6 @@ export function runStatusVariant(status: string): "default" | "secondary" | "des
   return "secondary";
 }
 
-const usd = (n: number | string | null | undefined) =>
-  `$${Number(n ?? 0).toFixed(2)}`;
-
-/** standalone audit 새 측정 모달에서 사용자가 입력할 수 있는 실행 최대 비용 상한 (USD). */
-const MAX_ALLOWED_COST_USD = 1.5;
-
 type RunRow = {
   id: string;
   name: string;
@@ -90,17 +82,14 @@ type RunRow = {
   phase: string;
   business_id: string;
   status: string;
-  selected_providers: string[];
   total_jobs: number;
   completed_jobs: number;
   failed_jobs: number;
-  estimated_cost_usd: number;
-  actual_cost_usd: number;
   created_at: string;
 };
 
 function RunsPage() {
-  const { activeOrgId, session, canWrite } = useOrg();
+  const { activeOrgId, canWrite } = useOrg();
 
   const runsQuery = useQuery({
     queryKey: ["runs", activeOrgId],
@@ -110,7 +99,7 @@ function RunsPage() {
         supabase
           .from("measurement_runs")
           .select(
-            "id, name, business_id, status, selected_providers, run_type, phase, total_jobs, completed_jobs, failed_jobs, estimated_cost_usd, actual_cost_usd, created_at",
+            "id, name, business_id, status, run_type, phase, total_jobs, completed_jobs, failed_jobs, created_at",
           )
           .eq("org_id", activeOrgId!)
           .eq("run_type", "audit")
@@ -130,10 +119,10 @@ function RunsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">측정</h1>
+          <h1 className="text-xl font-semibold tracking-tight">AI 측정</h1>
           <p className="text-sm text-muted-foreground">
-            관찰된 노출 상태를 확인하기 위한 측정 실행 목록입니다. Change Impact용 baseline·follow-up 실행은 별도
-            화면에서 관리합니다.
+            AI 답변에서 관찰된 추천·경쟁업체·출처를 확인하기 위한 측정 목록입니다. Change Impact용 baseline·follow-up
+            실행은 별도 화면에서 관리합니다.
           </p>
         </div>
         <div className="ml-auto">
@@ -147,7 +136,7 @@ function RunsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">실행 목록</CardTitle>
+          <CardTitle className="text-base">측정 목록</CardTitle>
         </CardHeader>
         <CardContent>
           {runsQuery.isLoading ? (
@@ -161,15 +150,12 @@ function RunsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>실행명</TableHead>
+                    <TableHead>측정명</TableHead>
                     <TableHead>대상 업체</TableHead>
-                    <TableHead>엔진</TableHead>
                     <TableHead>상태</TableHead>
-                    <TableHead className="text-right">총 작업</TableHead>
+                    <TableHead className="text-right">측정 질문</TableHead>
                     <TableHead className="text-right">완료</TableHead>
                     <TableHead className="text-right">실패</TableHead>
-                    <TableHead className="text-right">예상 비용</TableHead>
-                    <TableHead className="text-right">실제 기록 비용</TableHead>
                     <TableHead>생성 시각</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -186,9 +172,6 @@ function RunsPage() {
                         </Link>
                       </TableCell>
                       <TableCell>{runsQuery.data!.names.get(r.business_id) ?? "-"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {r.selected_providers?.includes("openai") ? ENGINE_LABEL : r.selected_providers?.join(", ")}
-                      </TableCell>
                       <TableCell>
                         <Badge variant={runStatusVariant(r.status)}>
                           {RUN_STATUS_LABELS[r.status] ?? r.status}
@@ -197,8 +180,6 @@ function RunsPage() {
                       <TableCell className="text-right">{r.total_jobs}</TableCell>
                       <TableCell className="text-right">{r.completed_jobs}</TableCell>
                       <TableCell className="text-right">{r.failed_jobs}</TableCell>
-                      <TableCell className="text-right">{usd(r.estimated_cost_usd)}</TableCell>
-                      <TableCell className="text-right">{usd(r.actual_cost_usd)}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatSeoul(r.created_at)}
                       </TableCell>
@@ -218,20 +199,18 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const { activeOrgId, session } = useOrg();
   const shared = useActiveTargetBusiness();
   const navigate = useNavigate();
+  const startMeasurement = useServerFn(startCustomerMeasurement);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [businessId, setBusinessId] = useState("");
   const [questionSetId, setQuestionSetId] = useState("");
-  const [repetitions, setRepetitions] = useState("1");
-  const [maxCost, setMaxCost] = useState("0.50");
   const [submitting, setSubmitting] = useState(false);
-  const [draftRunId, setDraftRunId] = useState<string | null>(null);
 
   const meta = useQuery({
     queryKey: ["run-form-meta", activeOrgId],
     enabled: !!activeOrgId && open,
     queryFn: async () => {
-      const [biz, sets, settings] = await Promise.all([
+      const [biz, sets] = await Promise.all([
         supabase
           .from("businesses")
           .select("id, name")
@@ -245,19 +224,10 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
           .eq("org_id", activeOrgId!)
           .eq("active", true)
           .order("created_at", { ascending: false }),
-        supabase
-          .from("provider_settings")
-          .select(
-            "provider, enabled, model_name, estimated_cost_per_request_usd, paid_account_confirmed, terms_reviewed, automated_benchmark_approved",
-          )
-          .eq("org_id", activeOrgId!)
-          .eq("provider", "openai")
-          .maybeSingle(),
       ]);
       if (biz.error) throw biz.error;
       if (sets.error) throw sets.error;
-      if (settings.error) throw settings.error;
-      return { businesses: biz.data ?? [], sets: sets.data ?? [], openai: settings.data };
+      return { businesses: biz.data ?? [], sets: sets.data ?? [] };
     },
   });
 
@@ -270,15 +240,13 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     setBusinessId((prev) => (prev ? prev : sharedId));
   }, [open, metaBusinesses, shared, activeOrgId]);
 
-
-
   const questions = useQuery({
     queryKey: ["run-form-questions", questionSetId],
     enabled: !!questionSetId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("questions")
-        .select("id, data_class")
+        .select("id")
         .eq("question_set_id", questionSetId)
         .eq("active", true);
       if (error) throw error;
@@ -289,117 +257,48 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const sets = (meta.data?.sets ?? []).filter((s) => s.business_id === businessId);
   const selectedBusinessName = (meta.data?.businesses ?? []).find((b) => b.id === businessId)?.name ?? "";
 
-  /** 실행명 기본값 제안: 업체명 + 날짜. 사용자가 직접 수정할 수 있다. */
+  /** 측정명 기본값 제안: 업체명 + 날짜. 사용자가 직접 수정할 수 있다. */
   useEffect(() => {
     if (!selectedBusinessName) return;
     const suggestion = `${selectedBusinessName} 측정 ${new Date().toISOString().slice(0, 10)}`;
     setName((prev) => (prev.trim() ? prev : suggestion));
   }, [selectedBusinessName]);
+
   const activeCount = questions.data?.length ?? 0;
-  const nonPublicCount = (questions.data ?? []).filter((q) => q.data_class !== "public").length;
-  const reps = Number(repetitions);
-  const maxCostValue = Number(maxCost);
-  const plannedJobs = activeCount * (Number.isFinite(reps) ? reps : 0) * 1;
-  const perRequest = Number(meta.data?.openai?.estimated_cost_per_request_usd ?? 0);
-  const estimatedCost = perRequest * plannedJobs;
 
   const blockers = useMemo(() => {
-    const s = meta.data?.openai;
     const list: string[] = [];
     if (!session) list.push("로그인 세션이 없습니다.");
-    if (meta.data && !s) list.push("OpenAI 엔진 설정(provider_settings)이 없습니다.");
-    if (s && !s.enabled) list.push("OpenAI 엔진이 비활성화되어 있습니다.");
-    if (s && !s.paid_account_confirmed) list.push("유료 계정 확인이 완료되지 않았습니다.");
-    if (s && !s.terms_reviewed) list.push("이용약관 검토가 완료되지 않았습니다.");
-    if (s && !s.automated_benchmark_approved) list.push("자동 벤치마크 승인이 완료되지 않았습니다.");
-    if (!name.trim()) list.push("실행명을 입력하세요.");
     if (!businessId) list.push("대상 업체를 선택하세요.");
     if (!questionSetId) list.push("질문 세트를 선택하세요.");
-    if (questionSetId && activeCount === 0) list.push("활성 질문이 0개입니다.");
-    if (nonPublicCount > 0)
-      list.push(`data_class가 public이 아닌 활성 질문이 ${nonPublicCount}개 있어 실행할 수 없습니다.`);
-    if (!Number.isInteger(reps) || reps < 1 || reps > 3) list.push("반복 횟수는 1~3회 중에서 선택하세요.");
-    if (!Number.isFinite(maxCostValue) || maxCostValue <= 0)
-      list.push("실행 최대 비용은 0보다 커야 합니다.");
-    if (Number.isFinite(maxCostValue) && maxCostValue > MAX_ALLOWED_COST_USD)
-      list.push(`실행 최대 비용은 ${usd(MAX_ALLOWED_COST_USD)}를 초과할 수 없습니다.`);
-    if (plannedJobs > 0 && estimatedCost > maxCostValue)
-      list.push(
-        `예상 비용 ${usd(estimatedCost)}이 실행 최대 비용 ${usd(maxCostValue)}을 초과합니다. 고급 설정에서 실행 최대 비용을 직접 조정하세요.`,
-      );
-
+    if (questionSetId && !questions.isLoading && activeCount === 0)
+      list.push("측정할 활성 질문이 없습니다.");
     return list;
-  }, [
-    meta.data,
-    session,
-    name,
-    businessId,
-    questionSetId,
-    activeCount,
-    nonPublicCount,
-    reps,
-    maxCostValue,
-    plannedJobs,
-    estimatedCost,
-  ]);
+  }, [session, businessId, questionSetId, activeCount, questions.isLoading]);
 
   async function submit() {
-    if (blockers.length > 0 || submitting) return;
-    // fail-closed: 클라이언트 상태가 조작되어도 허용 범위를 벗어나면 실행하지 않는다.
-    if (!Number.isInteger(reps) || reps < 1 || reps > 3) {
-      toast.error("반복 횟수는 1~3회만 실행할 수 있습니다.");
-      return;
-    }
-    if (!Number.isFinite(maxCostValue) || maxCostValue <= 0 || maxCostValue > MAX_ALLOWED_COST_USD) {
-      toast.error(`실행 최대 비용은 ${usd(MAX_ALLOWED_COST_USD)}를 초과할 수 없습니다.`);
-      return;
-    }
-    if (plannedJobs > 0 && estimatedCost > maxCostValue) {
-      toast.error(
-        `예상 비용 ${usd(estimatedCost)}이 실행 최대 비용 ${usd(maxCostValue)}을 초과합니다.`,
-      );
-      return;
-    }
+    if (blockers.length > 0 || submitting || !activeOrgId) return;
     setSubmitting(true);
     try {
-      let runId = draftRunId;
-      if (!runId) {
-        const { data, error } = await supabase
-          .from("measurement_runs")
-          .insert({
-            org_id: activeOrgId!,
-            business_id: businessId,
-            question_set_id: questionSetId,
-            name: name.trim(),
-            run_type: "audit",
-            phase: "standalone",
-            status: "draft",
-            selected_providers: ["openai"],
-            repetitions: reps,
-            max_cost_usd: maxCostValue,
-            scheduled_at: new Date().toISOString(),
-            created_by: session?.user.id ?? null,
-          })
-          .select("id")
-          .single();
-        if (error) throw error;
-        runId = data.id;
-        setDraftRunId(runId);
-      }
-
-      const { error: fnError } = await supabase.functions.invoke("enqueue-run", {
-        body: { runId },
+      const result = await startMeasurement({
+        data: {
+          orgId: activeOrgId,
+          businessId,
+          questionSetId,
+          name: name.trim(),
+        },
       });
-      if (fnError) throw fnError;
-
-      toast.success("측정 실행을 대기열에 등록했습니다.");
+      if (!result.ok) {
+        toast.error(customerErrorMessage(result.error));
+        return;
+      }
+      toast.success("AI 경쟁 분석을 시작했습니다.");
       setOpen(false);
       onCreated();
-      navigate({ to: "/runs/$runId", params: { runId: runId! } });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "실행 등록에 실패했습니다.";
-      toast.error(`실행 등록 실패: ${message}`, {
-        description: "같은 실행으로 다시 시도할 수 있습니다. 동일 실행을 다시 등록해도 중복 작업은 생성되지 않습니다.",
+      navigate({ to: "/runs/$runId", params: { runId: result.runId } });
+    } catch {
+      toast.error("AI 측정을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요.", {
+        description: "같은 조건으로 다시 시도해도 중복 측정은 생성되지 않습니다.",
       });
     } finally {
       setSubmitting(false);
@@ -407,26 +306,27 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (!o) setDraftRunId(null);
-      }}
-    >
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">새 측정</Button>
+        <Button size="sm">새 AI 측정</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>새 측정</DialogTitle>
-          <DialogDescription>{ENGINE_LABEL}</DialogDescription>
+          <DialogTitle>새 AI 측정</DialogTitle>
+          <DialogDescription>
+            AI가 같은 질문으로 시장의 추천·경쟁업체·출처를 확인합니다.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="run-name">실행명</Label>
-            <Input id="run-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 2026-08 판교 벤치마크" />
+            <Label htmlFor="run-name">측정명</Label>
+            <Input
+              id="run-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="예: 판교 매장 8월 측정"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -467,70 +367,27 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               </SelectContent>
             </Select>
             {questionSetId && (
-              <p className="text-xs text-muted-foreground">
-                활성 질문 수: {activeCount}개
-                {nonPublicCount > 0 && ` · public이 아닌 활성 질문 ${nonPublicCount}개`}
-              </p>
+              <p className="text-xs text-muted-foreground">활성 질문 {activeCount}개</p>
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            엔진: {ENGINE_LABEL} (고정) · 모델 {meta.data?.openai?.model_name ?? "-"}
-          </p>
-
-          <Collapsible>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="px-0 text-xs text-muted-foreground">
-                고급 설정
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="reps">반복 횟수</Label>
-                  <Select value={repetitions} onValueChange={setRepetitions}>
-                    <SelectTrigger id="reps">
-                      <SelectValue placeholder="반복 횟수 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1회</SelectItem>
-                      <SelectItem value="2">2회</SelectItem>
-                      <SelectItem value="3">3회</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="maxcost">실행 최대 비용 (USD)</Label>
-                  <Input
-                    id="maxcost"
-                    type="number"
-                    min={0.01}
-                    max={MAX_ALLOWED_COST_USD}
-                    step={0.01}
-                    value={maxCost}
-                    onChange={(e) => setMaxCost(e.target.value)}
-                  />
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-
           <div className="rounded-md border bg-muted/40 p-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">예정 작업 수</span>
-              <span className="font-medium">{plannedJobs}건</span>
+              <span className="text-muted-foreground">측정 질문</span>
+              <span className="font-medium">{activeCount}개</span>
             </div>
             <div className="mt-1 flex justify-between">
-              <span className="text-muted-foreground">예상 비용</span>
-              <span className="font-medium">{usd(estimatedCost)}</span>
+              <span className="text-muted-foreground">측정 방식</span>
+              <span className="font-medium">기본 측정</span>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              활성 public 질문 {activeCount}개 × 반복 {Number.isFinite(reps) ? reps : 0}회 × 엔진 1개
-            </p>
+            <div className="mt-1 flex justify-between">
+              <span className="text-muted-foreground">예상 사용량</span>
+              <span className="font-medium">{activeCount}회</span>
+            </div>
           </div>
 
           {blockers.length > 0 && (
-            <ul className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+            <ul className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
               {blockers.map((b) => (
                 <li key={b}>· {b}</li>
               ))}
@@ -538,7 +395,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
           )}
 
           <p className="text-xs text-muted-foreground">
-            동일 실행을 다시 등록해도 중복 작업은 생성되지 않습니다.
+            같은 조건으로 다시 시작해도 중복 측정은 생성되지 않습니다.
           </p>
         </div>
 
@@ -547,7 +404,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             취소
           </Button>
           <Button onClick={submit} disabled={blockers.length > 0 || submitting}>
-            {submitting ? "등록 중…" : draftRunId ? "다시 시도" : "실행"}
+            {submitting ? "시작하는 중…" : "AI 경쟁 분석 시작"}
           </Button>
         </DialogFooter>
       </DialogContent>
