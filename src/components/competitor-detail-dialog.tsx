@@ -565,10 +565,26 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
             </Table>
           </div>
         )}
-      </section>
+        </section>
+      </details>
     </div>
   );
 }
+
+function AttributedCell({ direct, section }: { direct: number; section: number }) {
+  if (direct === 0 && section === 0) {
+    return <span className="text-xs text-muted-foreground">연결 없음</span>;
+  }
+  return (
+    <div className="space-y-0.5">
+      {direct > 0 && <div className="text-sm font-medium">직접 연결 {direct}답변</div>}
+      {section > 0 && (
+        <div className="text-xs text-muted-foreground">관련 구간 {section}답변</div>
+      )}
+    </div>
+  );
+}
+
 
 function DiffCard({
   title,
