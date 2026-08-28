@@ -212,6 +212,7 @@ function RunsPage() {
 
 function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const { activeOrgId, session } = useOrg();
+  const shared = useActiveTargetBusiness();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
