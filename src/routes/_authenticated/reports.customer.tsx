@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useOrg } from "@/lib/org";
+import { useActiveTargetBusiness } from "@/lib/active-business";
 import { formatSeoul } from "@/lib/format";
 import {
   getCustomerReport,
@@ -201,7 +201,8 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 
 function CustomerReportPage() {
   const { activeOrgId } = useOrg();
-  const [businessId, setBusinessId] = useState<string | null>(null);
+  const shared = useActiveTargetBusiness();
+  const businessId = shared.getSelectedId(activeOrgId);
   const fetchReport = useServerFn(getCustomerReport);
 
   const { data, isLoading, isError } = useQuery({
@@ -239,7 +240,11 @@ function CustomerReportPage() {
         {data.businesses.length > 0 && (
           <Select
             value={business?.id ?? ""}
-            onValueChange={(v) => setBusinessId(v)}
+            onValueChange={(v) => {
+              // 목록에 있는 업체만 공유 선택 상태에 반영한다.
+              if (activeOrgId && data.businesses.some((b) => b.id === v))
+                shared.select(activeOrgId, v);
+            }}
           >
             <SelectTrigger className="h-9 w-[240px] text-sm">
               <SelectValue placeholder="고객 업체 선택" />

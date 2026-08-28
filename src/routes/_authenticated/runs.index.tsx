@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
+import { useActiveTargetBusiness } from "@/lib/active-business";
 import { formatSeoul } from "@/lib/format";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -212,6 +213,7 @@ function RunsPage() {
 
 function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const { activeOrgId, session } = useOrg();
+  const shared = useActiveTargetBusiness();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -255,6 +257,17 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
       return { businesses: biz.data ?? [], sets: sets.data ?? [], openai: settings.data };
     },
   });
+
+  /** 공유된 대상 업체 선택을 현재 org의 유효 목록과 대조한 뒤에만 폼에 반영한다. */
+  const metaBusinesses = meta.data?.businesses;
+  useEffect(() => {
+    if (!open || !metaBusinesses) return;
+    const sharedId = shared.getSelectedId(activeOrgId);
+    if (!sharedId || !metaBusinesses.some((b) => b.id === sharedId)) return;
+    setBusinessId((prev) => (prev ? prev : sharedId));
+  }, [open, metaBusinesses, shared, activeOrgId]);
+
+
 
   const questions = useQuery({
     queryKey: ["run-form-questions", questionSetId],
@@ -407,6 +420,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               onValueChange={(v) => {
                 setBusinessId(v);
                 setQuestionSetId("");
+                if (activeOrgId) shared.select(activeOrgId, v);
               }}
             >
               <SelectTrigger>

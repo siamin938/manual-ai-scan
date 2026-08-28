@@ -1,14 +1,12 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getClientBusinessOptions,
   type ClientBusinessOptionDTO,
 } from "@/lib/client-business-options.functions";
-import {
-  resolveSelectedBusinessId,
-  type BusinessSelection,
-} from "@/lib/client-business-selection";
+import { resolveSelectedBusinessId } from "@/lib/client-business-selection";
+import { useActiveTargetBusiness } from "@/lib/active-business";
 import {
   Select,
   SelectContent,
@@ -20,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function useClientBusinessSelection(activeOrgId: string | null | undefined) {
   const fetchOptions = useServerFn(getClientBusinessOptions);
-  const [selection, setSelection] = useState<BusinessSelection>(null);
+  const shared = useActiveTargetBusiness();
 
   const query = useQuery({
     queryKey: ["client-business-options", activeOrgId],
@@ -33,7 +31,12 @@ export function useClientBusinessSelection(activeOrgId: string | null | undefine
     [query.data],
   );
 
-  const selectedBusinessId = resolveSelectedBusinessId(activeOrgId, options, selection);
+  // 저장된 선택값은 항상 현재 org의 유효한 대상 업체 목록과 대조한 뒤에만 사용한다.
+  const selectedBusinessId = resolveSelectedBusinessId(
+    activeOrgId,
+    options,
+    shared.getSelection(activeOrgId),
+  );
 
   return {
     options,
@@ -42,10 +45,11 @@ export function useClientBusinessSelection(activeOrgId: string | null | undefine
     isError: query.isError,
     select: (businessId: string) => {
       if (!activeOrgId) return;
-      setSelection({ orgId: activeOrgId, businessId });
+      shared.select(activeOrgId, businessId);
     },
   };
 }
+
 
 export function BusinessSelector({
   options,
