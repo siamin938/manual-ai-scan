@@ -163,8 +163,11 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
 
         <div>
           <p className="text-sm font-medium">어디에 반영할까요?</p>
-          {rec.sourceGroups.length > 0 ? (
-            <SourceGroups groups={rec.sourceGroups} />
+          {rec.sourceGroups.length > 0 || (rec.referenceSourceGroups?.length ?? 0) > 0 ? (
+            <SourceGroups
+              groups={rec.sourceGroups}
+              referenceGroups={rec.referenceSourceGroups ?? []}
+            />
           ) : rec.channelSuggestions.length === 0 ? (
             <p className="mt-1 text-sm text-muted-foreground">
               현재 관련 질문의 실제 인용 데이터만으로는 특정 채널을 권할 근거가 부족합니다.
@@ -173,6 +176,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             <ChannelGroups channels={rec.channelSuggestions} />
           )}
         </div>
+
 
 
 
@@ -203,16 +207,26 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
   );
 }
 
-function SourceGroups({ groups }: { groups: ActionRecommendationDTO["sourceGroups"] }) {
-  const actionable = groups.filter((g) => g.actionType !== "observe_only");
-  const observedOnly = groups.filter((g) => g.actionType === "observe_only");
+function SourceGroups({
+  groups,
+  referenceGroups,
+}: {
+  groups: ActionRecommendationDTO["sourceGroups"];
+  referenceGroups: ActionRecommendationDTO["sourceGroups"];
+}) {
+  const main = groups.filter(
+    (g) => g.actionType !== "observe_only" && g.evidenceGrade !== "reference",
+  );
+  const reference = [
+    ...groups.filter((g) => g.actionType === "observe_only" || g.evidenceGrade === "reference"),
+    ...referenceGroups,
+  ];
 
   return (
     <div className="mt-2 space-y-4">
-      {actionable.length > 0 ? (
+      {main.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">우선 반영·점검할 출처군</p>
-          {actionable.map((g) => (
+          {main.map((g) => (
             <SourceGroupCard key={g.key} group={g} />
           ))}
         </div>
@@ -222,16 +236,17 @@ function SourceGroups({ groups }: { groups: ActionRecommendationDTO["sourceGroup
         </p>
       )}
 
-      {observedOnly.length > 0 && (
-        <div className="space-y-2 rounded-md border border-dashed bg-muted/20 p-3">
-          <p className="text-xs font-medium text-muted-foreground">함께 관찰된 출처군</p>
-          <p className="text-xs text-muted-foreground">
-            직접 반영 가능한 출처군인지 확인되지 않아 행동 추천이 아닌 관찰 정보로만 표시합니다.
-          </p>
-          {observedOnly.map((g) => (
-            <SourceGroupCard key={g.key} group={g} />
-          ))}
-        </div>
+      {reference.length > 0 && (
+        <details className="rounded-md border border-dashed bg-muted/20 p-3">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+            참고 출처 보기 ({reference.length})
+          </summary>
+          <div className="mt-2 space-y-2">
+            {reference.map((g) => (
+              <SourceGroupCard key={g.key} group={g} referenceOnly />
+            ))}
+          </div>
+        </details>
       )}
     </div>
   );
@@ -239,20 +254,47 @@ function SourceGroups({ groups }: { groups: ActionRecommendationDTO["sourceGroup
 
 function SourceGroupCard({
   group: g,
+  referenceOnly = false,
 }: {
   group: ActionRecommendationDTO["sourceGroups"][number];
+  referenceOnly?: boolean;
 }) {
+  const isPriority = g.evidenceGrade === "priority";
+  const badgeText = referenceOnly
+    ? "참고"
+    : isPriority
+      ? customerLabel(g.evidenceLabel ?? g.actionLabel)
+      : g.evidenceGrade === "candidate"
+        ? "관찰 후보"
+        : customerLabel(g.actionLabel);
+  const badgeVariantForGroup: "default" | "secondary" | "outline" = referenceOnly
+    ? "outline"
+    : isPriority
+      ? "default"
+      : g.evidenceGrade === "candidate"
+        ? "outline"
+        : channelBadgeVariant(g.actionType);
+
   return (
     <div className="rounded-md border bg-background p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-base font-semibold">{customerLabel(g.name)}</span>
-        <Badge variant={channelBadgeVariant(g.actionType)}>{customerLabel(g.actionLabel)}</Badge>
+        <Badge variant={badgeVariantForGroup}>{badgeText}</Badge>
+        {g.scopeLabel && (
+          <span className="text-xs text-muted-foreground">{g.scopeLabel}</span>
+        )}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         관련 경쟁업체 답변 {g.responseCount}/{g.relatedResponseTotal}에서 관찰 · 인용{" "}
         {g.citationCount}회 · 경쟁업체 {g.distinctCompetitorCount}곳
       </p>
       <p className="mt-1 text-sm text-muted-foreground">{g.reason}</p>
+      {!referenceOnly && g.evidenceGrade === "candidate" && (g.clientOverallResponseCount ?? 0) > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          전체 측정에서는 내 업체도 이 출처군이 {g.clientOverallResponseCount}개 답변에서 함께
+          관찰됐습니다.
+        </p>
+      )}
 
       {g.platforms.length > 0 && (
         <div className="mt-3 space-y-2">
@@ -269,7 +311,25 @@ function SourceGroupCard({
                     {p.responseCount}/{p.relatedResponseTotal} · 인용 {p.citationCount}회 ·
                     경쟁업체 {p.distinctCompetitorCount}곳
                   </span>
-                  <Badge variant={channelBadgeVariant(p.actionType)}>{customerLabel(p.actionLabel)}</Badge>
+                  <Badge
+                    variant={
+                      referenceOnly
+                        ? "outline"
+                        : p.evidenceGrade === "priority"
+                          ? "default"
+                          : p.evidenceGrade === "candidate"
+                            ? "outline"
+                            : channelBadgeVariant(p.actionType)
+                    }
+                  >
+                    {referenceOnly
+                      ? "참고"
+                      : p.evidenceGrade === "priority"
+                        ? customerLabel(p.evidenceLabel ?? p.actionLabel)
+                        : p.evidenceGrade === "candidate"
+                          ? "관찰 후보"
+                          : customerLabel(p.actionLabel)}
+                  </Badge>
                 </div>
                 {p.domains.length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">{p.domains.join(", ")}</p>
@@ -282,6 +342,7 @@ function SourceGroupCard({
     </div>
   );
 }
+
 
 function ChannelGroups({
 

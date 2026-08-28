@@ -33,6 +33,8 @@ export type ActionChannelSuggestionDTO = {
   domains: string[];
 };
 
+export type ActionSourceEvidenceGrade = "priority" | "candidate" | "reference";
+
 export type ActionSourcePlatformDTO = {
   key: string;
   name: string;
@@ -43,6 +45,10 @@ export type ActionSourcePlatformDTO = {
   citationCount: number;
   distinctCompetitorCount: number;
   domains: string[];
+  evidenceGrade?: ActionSourceEvidenceGrade;
+  evidenceLabel?: string;
+  scopeLabel?: string;
+  clientOverallResponseCount?: number;
 };
 
 export type ActionSourceGroupDTO = {
@@ -56,6 +62,10 @@ export type ActionSourceGroupDTO = {
   citationCount: number;
   distinctCompetitorCount: number;
   platforms: ActionSourcePlatformDTO[];
+  evidenceGrade?: ActionSourceEvidenceGrade;
+  evidenceLabel?: string;
+  scopeLabel?: string;
+  clientOverallResponseCount?: number;
 };
 
 export type ActionRecommendationDTO = {
@@ -71,7 +81,9 @@ export type ActionRecommendationDTO = {
   evidence: ActionRecommendationEvidenceDTO;
   channelSuggestions: ActionChannelSuggestionDTO[];
   sourceGroups: ActionSourceGroupDTO[];
+  referenceSourceGroups?: ActionSourceGroupDTO[];
 };
+
 
 
 export type ActionScopeDTO = {
