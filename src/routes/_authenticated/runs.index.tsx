@@ -217,7 +217,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
   const [businessId, setBusinessId] = useState("");
   const [questionSetId, setQuestionSetId] = useState("");
-  const [repetitions, setRepetitions] = useState("2");
+  const [repetitions, setRepetitions] = useState("1");
   const [maxCost, setMaxCost] = useState("0.50");
   const [submitting, setSubmitting] = useState(false);
   const [draftRunId, setDraftRunId] = useState<string | null>(null);
@@ -302,7 +302,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     if (questionSetId && activeCount === 0) list.push("활성 질문이 0개입니다.");
     if (nonPublicCount > 0)
       list.push(`data_class가 public이 아닌 활성 질문이 ${nonPublicCount}개 있어 실행할 수 없습니다.`);
-    if (!Number.isFinite(reps) || reps < 1 || reps > 5) list.push("반복 횟수는 1~5 사이여야 합니다.");
+    if (!Number.isInteger(reps) || reps < 1 || reps > 3) list.push("반복 횟수는 1~3회 중에서 선택하세요.");
     if (!Number.isFinite(maxCostValue) || maxCostValue <= 0)
       list.push("실행 최대 비용은 0보다 커야 합니다.");
     if (Number.isFinite(maxCostValue) && maxCostValue > 1)
@@ -326,6 +326,11 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
 
   async function submit() {
     if (blockers.length > 0 || submitting) return;
+    // fail-closed: 클라이언트 상태가 조작되어도 허용 범위를 벗어나면 실행하지 않는다.
+    if (!Number.isInteger(reps) || reps < 1 || reps > 3) {
+      toast.error("반복 횟수는 1~3회만 실행할 수 있습니다.");
+      return;
+    }
     setSubmitting(true);
     try {
       let runId = draftRunId;
@@ -452,16 +457,17 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             <CollapsibleContent>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="reps">반복 횟수 (1~5)</Label>
-                  <Input
-                    id="reps"
-                    type="number"
-                    min={1}
-                    max={5}
-                    step={1}
-                    value={repetitions}
-                    onChange={(e) => setRepetitions(e.target.value)}
-                  />
+                  <Label htmlFor="reps">반복 횟수</Label>
+                  <Select value={repetitions} onValueChange={setRepetitions}>
+                    <SelectTrigger id="reps">
+                      <SelectValue placeholder="반복 횟수 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1회</SelectItem>
+                      <SelectItem value="2">2회</SelectItem>
+                      <SelectItem value="3">3회</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="maxcost">실행 최대 비용 (USD)</Label>
