@@ -318,10 +318,13 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     if (!Number.isInteger(reps) || reps < 1 || reps > 3) list.push("반복 횟수는 1~3회 중에서 선택하세요.");
     if (!Number.isFinite(maxCostValue) || maxCostValue <= 0)
       list.push("실행 최대 비용은 0보다 커야 합니다.");
-    if (Number.isFinite(maxCostValue) && maxCostValue > 1)
-      list.push("실행 최대 비용은 1.00 USD를 초과할 수 없습니다.");
+    if (Number.isFinite(maxCostValue) && maxCostValue > MAX_ALLOWED_COST_USD)
+      list.push(`실행 최대 비용은 ${usd(MAX_ALLOWED_COST_USD)}를 초과할 수 없습니다.`);
     if (plannedJobs > 0 && estimatedCost > maxCostValue)
-      list.push("예상 비용이 실행 최대 비용을 초과합니다.");
+      list.push(
+        `예상 비용 ${usd(estimatedCost)}이 실행 최대 비용 ${usd(maxCostValue)}을 초과합니다. 고급 설정에서 실행 최대 비용을 직접 조정하세요.`,
+      );
+
     return list;
   }, [
     meta.data,
