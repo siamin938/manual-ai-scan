@@ -201,7 +201,8 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 
 function CustomerReportPage() {
   const { activeOrgId } = useOrg();
-  const [businessId, setBusinessId] = useState<string | null>(null);
+  const shared = useActiveTargetBusiness();
+  const businessId = shared.getSelectedId(activeOrgId);
   const fetchReport = useServerFn(getCustomerReport);
 
   const { data, isLoading, isError } = useQuery({
