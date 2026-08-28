@@ -149,8 +149,27 @@ export type CompetitorCompareDTO = {
   questionGroups: CompetitorCompareQuestionGroupDTO[];
   questions: CompetitorCompareQuestionDTO[];
   sources: CompetitorCompareSourceDTO[];
+  attributedSources: CompetitorAttributedSourceDTO[];
 };
 
 export type CompetitorCompareResponseDTO =
   | { ok: true; compare: CompetitorCompareDTO }
   | { ok: false; error: CompetitorErrorCode };
+
+/**
+ * 업체 ↔ citation attribution 집계 (`measurement_citation_attributions` 기반).
+ * `direct` = 업체 설명 문장/행에 붙은 citation, `section` = 같은 업체 설명 구간.
+ * attribution row가 없으면 0이며, 기존 answer-level `sources`는 그대로 유지된다.
+ */
+export type CompetitorAttributedSourceDTO = {
+  domain: string;
+  sampleTitle: string | null;
+  clientDirectResponseCount: number;
+  clientSectionResponseCount: number;
+  clientDirectCitationCount: number;
+  clientSectionCitationCount: number;
+  competitorDirectResponseCount: number;
+  competitorSectionResponseCount: number;
+  competitorDirectCitationCount: number;
+  competitorSectionCitationCount: number;
+};
