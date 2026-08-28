@@ -240,7 +240,11 @@ function CustomerReportPage() {
         {data.businesses.length > 0 && (
           <Select
             value={business?.id ?? ""}
-            onValueChange={(v) => setBusinessId(v)}
+            onValueChange={(v) => {
+              // 목록에 있는 업체만 공유 선택 상태에 반영한다.
+              if (activeOrgId && data.businesses.some((b) => b.id === v))
+                shared.select(activeOrgId, v);
+            }}
           >
             <SelectTrigger className="h-9 w-[240px] text-sm">
               <SelectValue placeholder="고객 업체 선택" />
