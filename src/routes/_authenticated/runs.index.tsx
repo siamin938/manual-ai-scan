@@ -350,6 +350,16 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
       toast.error("반복 횟수는 1~3회만 실행할 수 있습니다.");
       return;
     }
+    if (!Number.isFinite(maxCostValue) || maxCostValue <= 0 || maxCostValue > MAX_ALLOWED_COST_USD) {
+      toast.error(`실행 최대 비용은 ${usd(MAX_ALLOWED_COST_USD)}를 초과할 수 없습니다.`);
+      return;
+    }
+    if (plannedJobs > 0 && estimatedCost > maxCostValue) {
+      toast.error(
+        `예상 비용 ${usd(estimatedCost)}이 실행 최대 비용 ${usd(maxCostValue)}을 초과합니다.`,
+      );
+      return;
+    }
     setSubmitting(true);
     try {
       let runId = draftRunId;
