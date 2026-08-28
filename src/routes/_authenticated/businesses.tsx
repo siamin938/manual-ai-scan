@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
+import { useImeSafeForm } from "@/hooks/use-ime-safe-form";
+
 import {
   businessNameIdentityKey,
   generateSafeAliasCandidates,
@@ -124,6 +126,17 @@ const EMPTY: FormState = {
   competitor_of: "",
 };
 
+const IME_TEXT_FIELDS = [
+  "name",
+  "categoryCustom",
+  "address",
+  "region",
+  "city",
+  "naver_place_url",
+  "website_url",
+  "google_maps_url",
+] as const;
+
 function BusinessesPage() {
   const { activeOrgId, canWrite } = useOrg();
   const qc = useQueryClient();
@@ -131,6 +144,9 @@ function BusinessesPage() {
   const [form, setForm] = useState<FormState>({ ...EMPTY });
   const [manualInput, setManualInput] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const { formRef, resolveLatest, compositionProps, isComposing } = useImeSafeForm(IME_TEXT_FIELDS);
+  const manualInputRef = useRef<HTMLInputElement | null>(null);
+
 
   const { data: businesses = [], isLoading } = useQuery({
     queryKey: ["businesses", activeOrgId],
@@ -184,33 +200,44 @@ function BusinessesPage() {
       ? form.categoryCustom.trim()
       : form.categorySelect.trim();
 
-  function buildAliases(): string[] {
-    const accepted = aliasCandidates.filter((c) => form.acceptedCandidates.includes(c));
-    return normalizeAliasList([...form.existingAliases, ...form.manualAliases, ...accepted]).filter(
-      (a) => a !== normalizedName,
+  function resolveCategoryOf(f: FormState): string {
+    return f.categorySelect === CUSTOM_CATEGORY ? f.categoryCustom.trim() : f.categorySelect.trim();
+  }
+
+  function buildAliases(f: FormState, canonicalName: string): string[] {
+    const existing = new Set([
+      ...normalizeAliasList(f.existingAliases),
+      ...normalizeAliasList(f.manualAliases),
+    ]);
+    const accepted = generateSafeAliasCandidates(f.name)
+      .filter((c) => !existing.has(c))
+      .filter((c) => f.acceptedCandidates.includes(c));
+    return normalizeAliasList([...f.existingAliases, ...f.manualAliases, ...accepted]).filter(
+      (a) => a !== canonicalName,
     );
   }
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (f: FormState) => {
+      const canonicalName = normalizeBusinessName(f.name);
       const payload = {
         org_id: activeOrgId!,
-        name: normalizedName,
-        aliases: buildAliases(),
-        category: resolvedCategory,
-        website_url: form.website_url.trim() || null,
-        naver_place_url: form.naver_place_url.trim() || null,
-        google_maps_url: form.google_maps_url.trim() || null,
-        address: form.address.trim() || null,
-        country_code: form.id ? form.country_code || "KR" : "KR",
-        region: form.region.trim() || null,
-        city: form.city.trim() || null,
-        is_client_business: form.is_client_business,
-        active: form.active,
+        name: canonicalName,
+        aliases: buildAliases(f, canonicalName),
+        category: resolveCategoryOf(f),
+        website_url: f.website_url.trim() || null,
+        naver_place_url: f.naver_place_url.trim() || null,
+        google_maps_url: f.google_maps_url.trim() || null,
+        address: f.address.trim() || null,
+        country_code: f.id ? f.country_code || "KR" : "KR",
+        region: f.region.trim() || null,
+        city: f.city.trim() || null,
+        is_client_business: f.is_client_business,
+        active: f.active,
       };
-      let businessId = form.id;
-      if (form.id) {
-        const { error } = await supabase.from("businesses").update(payload).eq("id", form.id);
+      let businessId = f.id;
+      if (f.id) {
+        const { error } = await supabase.from("businesses").update(payload).eq("id", f.id);
         if (error) throw error;
       } else {
         const { data, error } = await supabase.from("businesses").insert(payload).select("id").single();
@@ -219,8 +246,8 @@ function BusinessesPage() {
       }
 
       // 경쟁업체로 등록하면 대상 업체와의 관계를 business_competitors에 저장
-      const targetId = form.is_client_business ? "" : form.competitor_of || autoTargetId;
-      if (!form.is_client_business && targetId) {
+      const targetId = f.is_client_business ? "" : f.competitor_of || autoTargetId;
+      if (!f.is_client_business && targetId) {
         const { error } = await supabase.from("business_competitors").upsert(
           {
             org_id: activeOrgId!,
@@ -233,6 +260,7 @@ function BusinessesPage() {
         if (error) throw error;
       }
     },
+
     onSuccess: () => {
       toast.success("저장되었습니다.");
       setOpen(false);
@@ -287,12 +315,14 @@ function BusinessesPage() {
   }
 
   function addManualAlias() {
-    const value = normalizeBusinessName(manualInput);
+    // 조합 중 마지막 글자가 state에 반영되지 않았을 수 있으므로 DOM 최신값을 우선 사용한다.
+    const raw = manualInputRef.current?.value ?? manualInput;
+    const value = normalizeBusinessName(raw);
     if (!value) {
       toast.error("추가할 이름을 입력해 주세요.");
       return;
     }
-    if (value === normalizedName) {
+    if (value === normalizeBusinessName(resolveLatest(form).name)) {
       toast.error("공식 업체명과 같은 이름은 추가할 필요가 없습니다.");
       return;
     }
@@ -306,29 +336,39 @@ function BusinessesPage() {
     }
     setForm((f) => ({ ...f, manualAliases: [...f.manualAliases, value] }));
     setManualInput("");
+    if (manualInputRef.current) manualInputRef.current.value = "";
   }
 
   function submit() {
-    if (!normalizedName) {
+    // 저장 직전 폼 DOM의 최신 값을 확정해 IME 조합 중 마지막 글자 누락을 방지한다.
+    const latest = resolveLatest(form);
+    setForm(latest);
+
+    const latestName = normalizeBusinessName(latest.name);
+    if (!latestName) {
       toast.error("공식 업체명을 입력해 주세요.");
       return;
     }
-    if (!form.categorySelect) {
+    if (!latest.categorySelect) {
       toast.error("업종을 선택해 주세요.");
       return;
     }
-    if (form.categorySelect === CUSTOM_CATEGORY && !form.categoryCustom.trim()) {
+    if (latest.categorySelect === CUSTOM_CATEGORY && !latest.categoryCustom.trim()) {
       toast.error("업종을 직접 입력해 주세요.");
       return;
     }
-    if (duplicateBusiness) {
+    const latestKey = businessNameIdentityKey(latestName);
+    const latestDuplicate =
+      businesses.find((b) => b.id !== latest.id && businessNameIdentityKey(b.name) === latestKey) ?? null;
+    if (latestDuplicate) {
       toast.error(
         "이미 등록된 업체명입니다. 지점이 다른 업체라면 공식 업체명에 지점명을 포함해 주세요.",
       );
       return;
     }
-    save.mutate();
+    save.mutate(latest);
   }
+
 
   return (
     <div className="space-y-6">
@@ -412,7 +452,12 @@ function BusinessesPage() {
 
           <form
             id="biz-form"
+            ref={formRef}
             className="space-y-6"
+            onKeyDown={(e) => {
+              // 조합 중 Enter로 폼이 먼저 제출되지 않도록 막는다.
+              if (e.key === "Enter" && isComposing(e)) e.preventDefault();
+            }}
             onSubmit={(e) => {
               e.preventDefault();
               submit();
@@ -425,9 +470,11 @@ function BusinessesPage() {
                 <Label htmlFor="b-name">공식 업체명</Label>
                 <Input
                   id="b-name"
+                  name="name"
                   required
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  {...compositionProps((v) => setForm((f) => ({ ...f, name: v })))}
                 />
                 {duplicateBusiness && (
                   <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs">
@@ -461,9 +508,11 @@ function BusinessesPage() {
                 {form.categorySelect === CUSTOM_CATEGORY && (
                   <Input
                     aria-label="업종 직접 입력"
+                    name="categoryCustom"
                     placeholder="업종을 직접 입력해 주세요"
                     value={form.categoryCustom}
                     onChange={(e) => setForm({ ...form, categoryCustom: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, categoryCustom: v })))}
                   />
                 )}
                 {!form.categorySelect && (
@@ -473,17 +522,35 @@ function BusinessesPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="b-addr">주소</Label>
-                <Input id="b-addr" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                <Input
+                  id="b-addr"
+                  name="address"
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  {...compositionProps((v) => setForm((f) => ({ ...f, address: v })))}
+                />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="b-region">지역(시/도)</Label>
-                  <Input id="b-region" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} />
+                  <Input
+                    id="b-region"
+                    name="region"
+                    value={form.region}
+                    onChange={(e) => setForm({ ...form, region: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, region: v })))}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="b-city">도시(시/군/구)</Label>
-                  <Input id="b-city" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                  <Input
+                    id="b-city"
+                    name="city"
+                    value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, city: v })))}
+                  />
                 </div>
               </div>
             </section>
@@ -496,21 +563,33 @@ function BusinessesPage() {
                   <Label htmlFor="b-naver">네이버 플레이스</Label>
                   <Input
                     id="b-naver"
+                    name="naver_place_url"
                     value={form.naver_place_url}
                     onChange={(e) => setForm({ ...form, naver_place_url: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, naver_place_url: v })))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="b-web">홈페이지</Label>
-                  <Input id="b-web" value={form.website_url} onChange={(e) => setForm({ ...form, website_url: e.target.value })} />
+                  <Input
+                    id="b-web"
+                    name="website_url"
+                    value={form.website_url}
+                    onChange={(e) => setForm({ ...form, website_url: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, website_url: v })))}
+                  />
                 </div>
+
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="b-gmap">구글 지도</Label>
                   <Input
                     id="b-gmap"
+                    name="google_maps_url"
                     value={form.google_maps_url}
                     onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })}
+                    {...compositionProps((v) => setForm((f) => ({ ...f, google_maps_url: v })))}
                   />
+
                 </div>
               </div>
             </section>
@@ -610,16 +689,20 @@ function BusinessesPage() {
                   <div className="flex gap-2">
                     <Input
                       aria-label="다른 이름 입력"
+                      ref={manualInputRef}
                       value={manualInput}
                       onChange={(e) => setManualInput(e.target.value)}
+                      {...compositionProps((v) => setManualInput(v))}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addManualAlias();
-                        }
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        // 조합 중 Enter는 조합 확정용이므로 별칭 추가를 실행하지 않는다.
+                        if (isComposing(e)) return;
+                        addManualAlias();
                       }}
                       placeholder="한 번에 한 개씩 입력"
                     />
+
                     <Button type="button" variant="outline" onClick={addManualAlias}>
                       추가
                     </Button>
