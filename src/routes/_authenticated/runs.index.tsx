@@ -80,6 +80,9 @@ export function runStatusVariant(status: string): "default" | "secondary" | "des
 const usd = (n: number | string | null | undefined) =>
   `$${Number(n ?? 0).toFixed(2)}`;
 
+/** standalone audit 새 측정 모달에서 사용자가 입력할 수 있는 실행 최대 비용 상한 (USD). */
+const MAX_ALLOWED_COST_USD = 1.5;
+
 type RunRow = {
   id: string;
   name: string;
@@ -318,10 +321,13 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     if (!Number.isInteger(reps) || reps < 1 || reps > 3) list.push("반복 횟수는 1~3회 중에서 선택하세요.");
     if (!Number.isFinite(maxCostValue) || maxCostValue <= 0)
       list.push("실행 최대 비용은 0보다 커야 합니다.");
-    if (Number.isFinite(maxCostValue) && maxCostValue > 1)
-      list.push("실행 최대 비용은 1.00 USD를 초과할 수 없습니다.");
+    if (Number.isFinite(maxCostValue) && maxCostValue > MAX_ALLOWED_COST_USD)
+      list.push(`실행 최대 비용은 ${usd(MAX_ALLOWED_COST_USD)}를 초과할 수 없습니다.`);
     if (plannedJobs > 0 && estimatedCost > maxCostValue)
-      list.push("예상 비용이 실행 최대 비용을 초과합니다.");
+      list.push(
+        `예상 비용 ${usd(estimatedCost)}이 실행 최대 비용 ${usd(maxCostValue)}을 초과합니다. 고급 설정에서 실행 최대 비용을 직접 조정하세요.`,
+      );
+
     return list;
   }, [
     meta.data,
@@ -342,6 +348,16 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     // fail-closed: 클라이언트 상태가 조작되어도 허용 범위를 벗어나면 실행하지 않는다.
     if (!Number.isInteger(reps) || reps < 1 || reps > 3) {
       toast.error("반복 횟수는 1~3회만 실행할 수 있습니다.");
+      return;
+    }
+    if (!Number.isFinite(maxCostValue) || maxCostValue <= 0 || maxCostValue > MAX_ALLOWED_COST_USD) {
+      toast.error(`실행 최대 비용은 ${usd(MAX_ALLOWED_COST_USD)}를 초과할 수 없습니다.`);
+      return;
+    }
+    if (plannedJobs > 0 && estimatedCost > maxCostValue) {
+      toast.error(
+        `예상 비용 ${usd(estimatedCost)}이 실행 최대 비용 ${usd(maxCostValue)}을 초과합니다.`,
+      );
       return;
     }
     setSubmitting(true);
@@ -489,7 +505,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
                     id="maxcost"
                     type="number"
                     min={0.01}
-                    max={1}
+                    max={MAX_ALLOWED_COST_USD}
                     step={0.01}
                     value={maxCost}
                     onChange={(e) => setMaxCost(e.target.value)}
