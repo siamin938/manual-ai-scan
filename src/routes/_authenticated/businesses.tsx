@@ -315,12 +315,14 @@ function BusinessesPage() {
   }
 
   function addManualAlias() {
-    const value = normalizeBusinessName(manualInput);
+    // 조합 중 마지막 글자가 state에 반영되지 않았을 수 있으므로 DOM 최신값을 우선 사용한다.
+    const raw = manualInputRef.current?.value ?? manualInput;
+    const value = normalizeBusinessName(raw);
     if (!value) {
       toast.error("추가할 이름을 입력해 주세요.");
       return;
     }
-    if (value === normalizedName) {
+    if (value === normalizeBusinessName(resolveLatest(form).name)) {
       toast.error("공식 업체명과 같은 이름은 추가할 필요가 없습니다.");
       return;
     }
@@ -334,29 +336,39 @@ function BusinessesPage() {
     }
     setForm((f) => ({ ...f, manualAliases: [...f.manualAliases, value] }));
     setManualInput("");
+    if (manualInputRef.current) manualInputRef.current.value = "";
   }
 
   function submit() {
-    if (!normalizedName) {
+    // 저장 직전 폼 DOM의 최신 값을 확정해 IME 조합 중 마지막 글자 누락을 방지한다.
+    const latest = resolveLatest(form);
+    setForm(latest);
+
+    const latestName = normalizeBusinessName(latest.name);
+    if (!latestName) {
       toast.error("공식 업체명을 입력해 주세요.");
       return;
     }
-    if (!form.categorySelect) {
+    if (!latest.categorySelect) {
       toast.error("업종을 선택해 주세요.");
       return;
     }
-    if (form.categorySelect === CUSTOM_CATEGORY && !form.categoryCustom.trim()) {
+    if (latest.categorySelect === CUSTOM_CATEGORY && !latest.categoryCustom.trim()) {
       toast.error("업종을 직접 입력해 주세요.");
       return;
     }
-    if (duplicateBusiness) {
+    const latestKey = businessNameIdentityKey(latestName);
+    const latestDuplicate =
+      businesses.find((b) => b.id !== latest.id && businessNameIdentityKey(b.name) === latestKey) ?? null;
+    if (latestDuplicate) {
       toast.error(
         "이미 등록된 업체명입니다. 지점이 다른 업체라면 공식 업체명에 지점명을 포함해 주세요.",
       );
       return;
     }
-    save.mutate();
+    save.mutate(latest);
   }
+
 
   return (
     <div className="space-y-6">
