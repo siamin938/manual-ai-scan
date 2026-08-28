@@ -209,18 +209,29 @@ export function buildEntitySections(
     if (prev && prev.canonicalKey === owner) continue;
     starts.push({ canonicalKey: owner, start: line.start });
   }
+  // Any later heading or top-level numbered item closes the current section,
+  // even when no entity was recognized inside it. This keeps a section from
+  // swallowing the next business block when its name could not be matched.
+  const hardBoundaries = lines
+    .filter((l) => /^\s*(#{1,6}\s|\d+[.)]\s)/.test(l.text))
+    .map((l) => l.start);
+
   const sections: EntitySection[] = [];
   for (let i = 0; i < starts.length; i += 1) {
     const cur = starts[i]!;
     const next = starts[i + 1];
+    const boundary = hardBoundaries.find((b) => b > cur.start);
+    const ends = [next ? next.start : responseText.length];
+    if (boundary !== undefined) ends.push(boundary);
     sections.push({
       canonicalKey: cur.canonicalKey,
       start: cur.start,
-      end: next ? next.start : responseText.length,
+      end: Math.min(...ends),
     });
   }
   return sections;
 }
+
 
 const SENTENCE_END_RE = /[.!?。！？\n]/;
 
