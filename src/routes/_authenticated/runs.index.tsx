@@ -495,7 +495,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
                     id="maxcost"
                     type="number"
                     min={0.01}
-                    max={1}
+                    max={MAX_ALLOWED_COST_USD}
                     step={0.01}
                     value={maxCost}
                     onChange={(e) => setMaxCost(e.target.value)}
