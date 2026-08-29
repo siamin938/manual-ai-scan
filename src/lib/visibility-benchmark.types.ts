@@ -6,6 +6,11 @@ export type BenchmarkDataStatus = "early" | "ready";
 /** "early"는 초기 표본, 그 외(emerging 이상)는 반복 관찰 단계로만 해석한다. */
 export type BenchmarkPatternStrength = "early" | "emerging" | "established";
 
+export interface BenchmarkSourceSiteDTO {
+  label: string;
+  domain?: string;
+}
+
 export interface BenchmarkSourceGroupDTO {
   key: string;
   label: string;
@@ -14,7 +19,9 @@ export interface BenchmarkSourceGroupDTO {
   /** 대상 업체가 이 출처 그룹과 연결 관찰됐는지 여부(관찰값, 인과 아님). */
   targetConnected: boolean;
   patternStrength: BenchmarkPatternStrength;
+  sites: BenchmarkSourceSiteDTO[];
 }
+
 
 export interface VisibilityBenchmarkDTO {
   windowDays: number;
