@@ -465,6 +465,28 @@ export function buildRepeatCounts(
   return counts;
 }
 
+
+/**
+ * Distinct-measurement repetition counts restricted to parser rows classified
+ * as `ambiguous` + `probable` (v0.1.4).
+ */
+export function buildProbableRepeatCounts(
+  mentions: readonly EntityVerificationInput[],
+): Map<string, number> {
+  const seen = new Map<string, Set<string>>();
+  for (const mention of mentions) {
+    if (mention.entityKind !== "ambiguous" || mention.specificity !== "probable") continue;
+    const key = candidateRepeatKey(mention.displayName);
+    if (key.length === 0) continue;
+    const bucket = seen.get(key) ?? new Set<string>();
+    bucket.add(mention.measurementId);
+    seen.set(key, bucket);
+  }
+  const counts = new Map<string, number>();
+  for (const [key, ids] of seen) counts.set(key, ids.size);
+  return counts;
+}
+
 /** Deterministic + idempotent: mentions already verified at this version are skipped. */
 export function buildEntityVerificationRows(args: {
   orgId: string;
@@ -472,6 +494,7 @@ export function buildEntityVerificationRows(args: {
   mentions: readonly EntityVerificationInput[];
   existingMentionIds: ReadonlySet<string>;
   repeatCounts?: ReadonlyMap<string, number>;
+  probableRepeatCounts?: ReadonlyMap<string, number>;
 }): { rows: EntityVerificationRow[]; skippedCount: number } {
   const rows: EntityVerificationRow[] = [];
   let skippedCount = 0;
@@ -480,8 +503,10 @@ export function buildEntityVerificationRows(args: {
       skippedCount += 1;
       continue;
     }
-    const repeatCount = args.repeatCounts?.get(candidateRepeatKey(mention.displayName)) ?? 1;
-    const verdict = verifyEntityMention(mention, { repeatCount });
+    const key = candidateRepeatKey(mention.displayName);
+    const repeatCount = args.repeatCounts?.get(key) ?? 1;
+    const probableRepeatCount = args.probableRepeatCounts?.get(key) ?? 1;
+    const verdict = verifyEntityMention(mention, { repeatCount, probableRepeatCount });
     rows.push({
       org_id: args.orgId,
       business_id: args.businessId,
