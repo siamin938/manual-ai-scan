@@ -2778,6 +2778,27 @@ export type Database = {
         Args: { p_name: string; p_slug: string }
         Returns: string
       }
+      get_competitor_significance_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          canonical_key: string
+          citation_response_count: number
+          compatible_run_count: number
+          compatible_run_presence_count: number
+          direct_citation_response_count: number
+          intent_count: number
+          is_new: boolean
+          mention_count: number
+          name: string
+          prior_run_presence_count: number
+          question_count: number
+          repeat_response_count: number
+          response_count: number
+          significance_score: number
+          tier: string
+          top3_response_count: number
+        }[]
+      }
       get_org_usage: {
         Args: { p_org_id: string }
         Returns: {

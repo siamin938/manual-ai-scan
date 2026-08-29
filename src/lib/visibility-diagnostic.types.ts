@@ -51,6 +51,21 @@ export type VisibilityCompetitorDTO = {
   mentionCount: number;
   responseCount: number;
   responseRatePct: number | null;
+  /** Competitor Significance Gate v0.1 — 계산 규칙은 서버에만 존재 */
+  tier: "core" | "notable";
+  tierLabel: string;
+  questionCount: number;
+  top3ResponseCount: number;
+  priorRunPresenceCount: number;
+  isNew: boolean;
+};
+
+/** Competitor Significance Gate v0.1 집계 요약 (watchCount는 목록 미노출). */
+export type VisibilityCompetitorGateDTO = {
+  version: "0.1";
+  coreCount: number;
+  notableCount: number;
+  watchCount: number;
 };
 
 export type VisibilitySourceDTO = {
@@ -81,6 +96,7 @@ export type VisibilityDiagnosticBodyDTO = {
   overview: VisibilityOverviewDTO;
   questionGroups: VisibilityQuestionGroupDTO[];
   competitors: VisibilityCompetitorDTO[];
+  competitorGate: VisibilityCompetitorGateDTO;
   sources: VisibilitySourceDTO[];
   priorityAreas: VisibilityPriorityAreaDTO[];
   dataQuality: VisibilityDataQualityDTO;
