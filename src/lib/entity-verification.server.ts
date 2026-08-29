@@ -141,6 +141,7 @@ export async function verifyAndPersistBusinessEntities(args: {
   // before any single candidate is judged.
   const mentions = await loadMentions(runId ? { orgId, businessId, runId } : { orgId, businessId });
   const repeatCounts = buildRepeatCounts(mentions);
+  const probableRepeatCounts = buildProbableRepeatCounts(mentions);
 
   let insertedCount = 0;
   let skippedCount = 0;
