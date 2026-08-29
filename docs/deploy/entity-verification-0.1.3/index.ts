@@ -1,0 +1,733 @@
+/**
+ * Supabase Edge Function: `entity-verification`
+ * Deploy source snapshot — verifier 0.1.3.
+ *
+ * Keeps the deployed v3 auth / scope / persistence structure and only re-syncs
+ * the inline verdict rules with the canonical rule source
+ * (`src/lib/entity-verification.engine.server.ts`, v0.1.3).
+ *
+ * HARD CONSTRAINTS
+ * - No provider / OpenAI / measurement API calls. Zero measurement cost.
+ * - org_id + business_id scope enforced; run scope validated against both.
+ * - Never reads response_text, resolution_evidence, provider payloads, aliases
+ *   or secrets; returns a safe aggregate summary only (no ids, names, reasons).
+ * - Rows already written at this verifier_version are skipped, never updated.
+ * - Generic rules only: no business names, UUIDs or whitelists.
+ */
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const VERIFIER_VERSION = "0.1.3";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const BATCH_SIZE = 200;
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+/* ================================================================== */
+/* INLINE VERIFIER — byte-equivalent copy of the repository engine     */
+/* src/lib/entity-verification.engine.server.ts @ v0.1.3               */
+/* ================================================================== */
+/**
+ * Entity Verification v0.1.3 rule engine (server-only, pure).
+ *
+ * CORE ENGINE ISOLATION
+ * - `*.server.ts` is blocked from client bundles: these rules never reach the browser.
+ * - Pure functions only: no Supabase, no secrets, no network, no provider calls.
+ * - Inputs are limited to mention metadata + run-scoped repetition counts.
+ *   response_text, resolution_evidence, aliases and insight weights are NEVER inputs.
+ * - reasonCodes are internal only and must not be surfaced to the browser.
+ *
+ * v0.1.2 CHANGES (generic — never business-specific)
+ * - `PROBABLE_ONLY` is no longer an absolute downgrade. It is only a
+ *   needs_review reason when neither strong nor repeated evidence exists.
+ * - Strong intrinsic evidence (BRANCH_MARKER / STRONG_BUSINESS_DESCRIPTOR /
+ *   REGISTERED_BUSINESS_MATCH) on a short proper-name phrase confirms.
+ * - Parser-side `specific_business` candidates without a strong signal confirm
+ *   when the same normalized candidate repeats across >= 2 distinct
+ *   measurements of the same scope (`REPEATED_ACROSS_RESPONSES`).
+ * - Only `specific_business` can be auto-confirmed. Repetition never promotes
+ *   ambiguous / generic / service / list / non-business candidates, and low
+ *   confidence candidates are never confirmed by repetition alone.
+ */
+
+const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.3";
+
+type VerificationStatus =
+  | "confirmed_business"
+  | "rejected_non_business"
+  | "needs_review";
+
+type VerifiedEntityKind =
+  | "specific_business"
+  | "brand_network"
+  | "generic_category"
+  | "platform"
+  | "advice"
+  | "ambiguous";
+
+type VerificationConfidence = "high" | "medium" | "low";
+
+type EntityVerificationInput = {
+  mentionId: string;
+  measurementId: string;
+  matchedBusinessId: string | null;
+  displayName: string;
+  entityKind?: string | null;
+  specificity?: string | null;
+  countAsConfirmedBusiness?: boolean | null;
+  resolutionConfidence?: string | null;
+};
+
+type EntityVerificationResult = {
+  verificationStatus: VerificationStatus;
+  verifiedEntityKind: VerifiedEntityKind;
+  verifiedCountAsBusiness: boolean;
+  confidence: VerificationConfidence;
+  reasonCodes: string[];
+};
+
+/* ------------------------------------------------------------------ */
+/* structural patterns (grammar-level, not brand blacklists)           */
+/* ------------------------------------------------------------------ */
+
+const SENTENCE_MIN_LENGTH = 12;
+
+const SENTENCE_MARKERS = [
+  "?",
+  "나요",
+  "까요",
+  "습니까",
+  "인가요",
+  "있나요",
+  "없나요",
+  "어떻게",
+  "무엇",
+  "왜 ",
+  "여부",
+  "가능한지",
+  "하는지",
+  "되는지",
+  "인지",
+  "습니다",
+  "합니다",
+  "됩니다",
+];
+
+const HEADING_SUFFIXES = [
+  "기준",
+  "사항",
+  "유형별",
+  "유형별추천",
+  "위주",
+  "고려할곳",
+  "고려할것",
+  "추천순위",
+  "추천",
+  "순위",
+  "정리",
+  "요약",
+  "결론",
+  "비교",
+  "체크리스트",
+];
+
+const NETWORK_SUFFIXES = ["네트워크", "서비스망", "정비망", "협력망", "지정정비망", "딜러망"];
+
+const STRONG_DESCRIPTORS = [
+  "모터스",
+  "모터",
+  "개러지",
+  "거라지",
+  "garage",
+  "팩토리",
+  "factory",
+  "정비센터",
+  "정비소",
+  "정비공장",
+  "공업사",
+  "카센터",
+  "카센타",
+  "카케어",
+  "오토",
+  "auto",
+  "바디샵",
+  "공임나라",
+  "협력점",
+  "상사",
+];
+
+const BRANCH_SUFFIXES = ["본점", "지점", "직영점", "분점", "협력점", "대리점"];
+
+const SENTENCE_ENDING_RE =
+  /(나요|가요|까요|습니까|습니다|입니다|합니다|됩니다|는지|은지|는가|은가|인가|이라면|라면)[\s.?!*)\]:_"'`~-]*$/;
+
+const ENUMERATION_SEPARATOR_RE = /[·ㆍ・,、/]/;
+const ENUMERATION_CONJUNCTION_RE = /(^|\s)(및|또는|등)(\s|$)/;
+const LABEL_CONSTRUCT_RE = /[:：]|→|=>/;
+const QUANTIFIED_PLACES_RE = /(\d+\s*[~\-–]\s*\d+\s*곳|\d+\s*곳|(몇|여러|두세|서너)\s*곳)/;
+
+const CLAUSE_PARTICLES = [
+  "에서",
+  "에게",
+  "으로",
+  "에는",
+  "까지",
+  "부터",
+  "와",
+  "과",
+  "을",
+  "를",
+  "이나",
+  "거나",
+];
+
+const OFFICIAL_MARKERS = ["공식", "지정", "인증"];
+const SERVICE_CATEGORY_WORDS = [
+  "정비사업소",
+  "사업소",
+  "정비소",
+  "정비센터",
+  "서비스센터",
+  "서비스",
+  "정비",
+  "협력업체",
+];
+
+const NON_BUSINESS_ORIGINAL_KINDS = new Set([
+  "advice",
+  "platform",
+  "generic_category",
+  "brand_network",
+]);
+
+function normalize(text: string): string {
+  return (text ?? "").replace(/\s+/g, " ").trim();
+}
+
+function compact(text: string): string {
+  return normalize(text).replace(/\s+/g, "").toLowerCase();
+}
+
+/** Run-level repetition key. Conservative: whitespace/case normalization only. */
+function candidateRepeatKey(displayName: string): string {
+  return compact(displayName);
+}
+
+function tokenCount(displayName: string): number {
+  const text = normalize(displayName);
+  return text.length === 0 ? 0 : text.split(" ").length;
+}
+
+function isSentenceLike(displayName: string): boolean {
+  const text = normalize(displayName);
+  if (text.includes("?")) return true;
+  if (SENTENCE_ENDING_RE.test(text)) return true;
+  if (text.length < SENTENCE_MIN_LENGTH) return false;
+  return SENTENCE_MARKERS.some((marker) => text.includes(marker));
+}
+
+const CATEGORY_STORE_SUFFIXES = ["전문점", "취급점", "판매점", "대행점"];
+
+function hasBranchMarker(displayName: string): boolean {
+  const c = compact(displayName);
+  if (CATEGORY_STORE_SUFFIXES.some((s) => c.endsWith(s))) return false;
+  if (BRANCH_SUFFIXES.some((s) => c.endsWith(s))) return true;
+  if (c.includes("서비스센터") && tokenCount(displayName) >= 3) return true;
+  if (/[가-힣a-z0-9]{2,}점$/.test(c) && !c.endsWith("지점없음")) return true;
+  return false;
+}
+
+function hasStrongDescriptor(displayName: string): boolean {
+  const c = compact(displayName);
+  return STRONG_DESCRIPTORS.some((d) => c.includes(d));
+}
+
+function isHeadingLike(displayName: string): boolean {
+  const c = compact(displayName);
+  if (c.length === 0) return true;
+  if (hasStrongDescriptor(displayName)) return false;
+  return HEADING_SUFFIXES.some((suffix) => c === suffix || c.endsWith(suffix));
+}
+
+function isGenericNetworkName(displayName: string): boolean {
+  const c = compact(displayName);
+  if (c.length === 0) return false;
+  if (!NETWORK_SUFFIXES.some((s) => c.endsWith(s))) return false;
+  return !hasBranchMarker(displayName);
+}
+
+function isDescriptiveCriteriaLike(displayName: string): boolean {
+  const text = normalize(displayName);
+  const c = compact(text);
+  if (c.length === 0) return false;
+
+  if (LABEL_CONSTRUCT_RE.test(text)) return true;
+  if (QUANTIFIED_PLACES_RE.test(text)) return true;
+
+  if (c.endsWith("경우") || c.endsWith("할때") || c.endsWith("일때")) return true;
+  if (c.includes("할때") || c.includes("인경우") || c.includes("는경우")) return true;
+  if (c.includes("계열") || c.includes("위주") || c.includes("종류별") || c.includes("유형별"))
+    return true;
+
+  const tokens = text.split(" ");
+  if (tokens.length >= 3) {
+    const hasParticleToken = tokens.some((token, index) => {
+      if (index === tokens.length - 1) return false;
+      const t = token.replace(/[*_"'`~()[\]]/g, "");
+      return t.length >= 3 && CLAUSE_PARTICLES.some((p) => t.endsWith(p));
+    });
+    if (hasParticleToken) return true;
+  }
+  return false;
+}
+
+function isServiceOrCriteriaEnumeration(displayName: string): boolean {
+  const text = normalize(displayName);
+  if (text.length === 0) return false;
+  if (ENUMERATION_SEPARATOR_RE.test(text)) return true;
+  if (ENUMERATION_CONJUNCTION_RE.test(text)) return true;
+  return false;
+}
+
+function isGenericOfficialServiceCategory(displayName: string): boolean {
+  const c = compact(displayName);
+  if (c.length === 0) return false;
+  if (!OFFICIAL_MARKERS.some((m) => c.includes(m))) return false;
+  if (!SERVICE_CATEGORY_WORDS.some((w) => c.includes(w))) return false;
+  return !hasBranchMarker(displayName);
+}
+
+function isShortProperNamePhrase(displayName: string): boolean {
+  const tokens = tokenCount(displayName);
+  if (tokens < 1 || tokens > 8) return false;
+  if (isSentenceLike(displayName)) return false;
+  return normalize(displayName).length <= 40;
+}
+
+/* ------------------------------------------------------------------ */
+/* verifier                                                            */
+/* ------------------------------------------------------------------ */
+
+function result(
+  verificationStatus: VerificationStatus,
+  verifiedEntityKind: VerifiedEntityKind,
+  verifiedCountAsBusiness: boolean,
+  confidence: VerificationConfidence,
+  reasonCodes: string[],
+): EntityVerificationResult {
+  return {
+    verificationStatus,
+    verifiedEntityKind,
+    verifiedCountAsBusiness,
+    confidence,
+    reasonCodes,
+  };
+}
+
+type VerificationContext = {
+  /** distinct measurement count of this normalized candidate inside the scope */
+  repeatCount?: number;
+};
+
+const MIN_REPEAT_FOR_CONFIRM = 2;
+
+function verifyEntityMention(
+  input: EntityVerificationInput,
+  context: VerificationContext = {},
+): EntityVerificationResult {
+  const name = normalize(input.displayName);
+  const originalKind = input.entityKind ?? null;
+  const originalSpecificity = input.specificity ?? null;
+  const originalConfirmed =
+    originalKind === "specific_business" &&
+    originalSpecificity === "confirmed" &&
+    input.countAsConfirmedBusiness === true;
+  const repeatCount =
+    typeof context.repeatCount === "number" && Number.isFinite(context.repeatCount)
+      ? context.repeatCount
+      : 1;
+
+  // A. exact linkage to a registered business wins
+  if (input.matchedBusinessId && originalConfirmed) {
+    return result("confirmed_business", "specific_business", true, "high", [
+      "REGISTERED_BUSINESS_MATCH",
+    ]);
+  }
+
+  // B. respect original non-business classifications
+  if (originalKind && NON_BUSINESS_ORIGINAL_KINDS.has(originalKind)) {
+    const kind = originalKind as VerifiedEntityKind;
+    return result("rejected_non_business", kind, false, "high", ["ORIGINAL_NON_BUSINESS_KIND"]);
+  }
+
+  if (name.length === 0) {
+    return result("rejected_non_business", "ambiguous", false, "high", ["SENTENCE_LIKE"]);
+  }
+
+  // C. candidate-intrinsic non-business structure (unchanged from v0.1.1)
+  if (isSentenceLike(name)) {
+    return result("rejected_non_business", "advice", false, "high", ["SENTENCE_LIKE"]);
+  }
+  if (isGenericNetworkName(name)) {
+    return result("rejected_non_business", "brand_network", false, "high", ["GENERIC_NETWORK"]);
+  }
+  if (isServiceOrCriteriaEnumeration(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "SERVICE_ENUMERATION",
+    ]);
+  }
+  if (isDescriptiveCriteriaLike(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "DESCRIPTIVE_CRITERIA",
+    ]);
+  }
+  if (isGenericOfficialServiceCategory(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "GENERIC_OFFICIAL_CATEGORY",
+    ]);
+  }
+  if (isHeadingLike(name)) {
+    return result("rejected_non_business", "generic_category", false, "high", [
+      "HEADING_CRITERIA_PHRASE",
+    ]);
+  }
+
+  // D. positive intrinsic evidence
+  const reasonCodes: string[] = [];
+  const matched = Boolean(input.matchedBusinessId);
+  const descriptor = hasStrongDescriptor(name);
+  const branch = hasBranchMarker(name);
+  const shortName = isShortProperNamePhrase(name);
+  if (matched) reasonCodes.push("REGISTERED_BUSINESS_MATCH");
+  if (descriptor) reasonCodes.push("STRONG_BUSINESS_DESCRIPTOR");
+  if (branch) reasonCodes.push("BRANCH_MARKER");
+
+  const strongSignal = (matched || descriptor || branch) && shortName;
+  const parserSpecific = originalKind === "specific_business";
+  const repeated = repeatCount >= MIN_REPEAT_FOR_CONFIRM;
+
+  // Auto-confirm via strong intrinsic evidence is limited to parser-side
+  // specific_business candidates. Ambiguous candidates are never confirmed
+  // by a strong signal alone.
+  if (originalConfirmed && strongSignal) {
+    return result("confirmed_business", "specific_business", true, "high", reasonCodes);
+  }
+  if (strongSignal && parserSpecific) {
+    return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
+  }
+
+  if (shortName) {
+    if (repeated) reasonCodes.push("REPEATED_ACROSS_RESPONSES");
+    if (parserSpecific && repeated) {
+      return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
+    }
+    // New in v0.1.3: ambiguous candidates confirm ONLY via the combination of
+    // a short proper-name shape, a branch marker, and repetition across
+    // distinct measurements. Descriptor-only or repetition-only ambiguous
+    // candidates stay in review.
+    if (originalKind === "ambiguous" && branch && repeated) {
+      reasonCodes.push("AMBIGUOUS_BRANCH_REPEATED");
+      return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
+    }
+    reasonCodes.push("PROBABLE_ONLY");
+    if (parserSpecific) {
+      return result("needs_review", "specific_business", false, "medium", reasonCodes);
+    }
+    reasonCodes.push("INTRINSIC_PROPER_NAME");
+    return result("needs_review", "ambiguous", false, "low", reasonCodes);
+  }
+
+  return result("rejected_non_business", "ambiguous", false, "medium", ["SENTENCE_LIKE"]);
+}
+
+/* ------------------------------------------------------------------ */
+/* persistence mapping helpers (pure)                                  */
+/* ------------------------------------------------------------------ */
+
+type EntityVerificationRow = {
+  org_id: string;
+  business_id: string;
+  measurement_id: string;
+  measurement_mention_id: string;
+  verifier_version: string;
+  verification_status: VerificationStatus;
+  verified_entity_kind: VerifiedEntityKind;
+  verified_count_as_business: boolean;
+  confidence: VerificationConfidence;
+  reason_codes: string[];
+};
+
+/** Distinct-measurement repetition counts per normalized candidate (scope level). */
+function buildRepeatCounts(
+  mentions: readonly EntityVerificationInput[],
+): Map<string, number> {
+  const seen = new Map<string, Set<string>>();
+  for (const mention of mentions) {
+    const key = candidateRepeatKey(mention.displayName);
+    if (key.length === 0) continue;
+    const bucket = seen.get(key) ?? new Set<string>();
+    bucket.add(mention.measurementId);
+    seen.set(key, bucket);
+  }
+  const counts = new Map<string, number>();
+  for (const [key, ids] of seen) counts.set(key, ids.size);
+  return counts;
+}
+
+/** Deterministic + idempotent: mentions already verified at this version are skipped. */
+function buildEntityVerificationRows(args: {
+  orgId: string;
+  businessId: string;
+  mentions: readonly EntityVerificationInput[];
+  existingMentionIds: ReadonlySet<string>;
+  repeatCounts?: ReadonlyMap<string, number>;
+}): { rows: EntityVerificationRow[]; skippedCount: number } {
+  const rows: EntityVerificationRow[] = [];
+  let skippedCount = 0;
+  for (const mention of args.mentions) {
+    if (args.existingMentionIds.has(mention.mentionId)) {
+      skippedCount += 1;
+      continue;
+    }
+    const repeatCount = args.repeatCounts?.get(candidateRepeatKey(mention.displayName)) ?? 1;
+    const verdict = verifyEntityMention(mention, { repeatCount });
+    rows.push({
+      org_id: args.orgId,
+      business_id: args.businessId,
+      measurement_id: mention.measurementId,
+      measurement_mention_id: mention.mentionId,
+      verifier_version: ENTITY_VERIFIER_ENGINE_VERSION,
+      verification_status: verdict.verificationStatus,
+      verified_entity_kind: verdict.verifiedEntityKind,
+      verified_count_as_business: verdict.verifiedCountAsBusiness,
+      confidence: verdict.confidence,
+      reason_codes: verdict.reasonCodes,
+    });
+  }
+  return { rows, skippedCount };
+}
+
+function summarizeEntityVerificationRows(args: {
+  mentionCount: number;
+  insertedRows: readonly EntityVerificationRow[];
+  skippedCount: number;
+}): {
+  verifierVersion: string;
+  mentionCount: number;
+  insertedCount: number;
+  skippedCount: number;
+  confirmedBusinessCount: number;
+  rejectedCount: number;
+  needsReviewCount: number;
+} {
+  let confirmedBusinessCount = 0;
+  let rejectedCount = 0;
+  let needsReviewCount = 0;
+  for (const row of args.insertedRows) {
+    if (row.verification_status === "confirmed_business") confirmedBusinessCount += 1;
+    else if (row.verification_status === "rejected_non_business") rejectedCount += 1;
+    else needsReviewCount += 1;
+  }
+  return {
+    verifierVersion: ENTITY_VERIFIER_ENGINE_VERSION,
+    mentionCount: args.mentionCount,
+    insertedCount: args.insertedRows.length,
+    skippedCount: args.skippedCount,
+    confirmedBusinessCount,
+    rejectedCount,
+    needsReviewCount,
+  };
+}
+
+/* ================================================================== */
+/* persistence pipeline (structure identical to deployed v3)           */
+/* ================================================================== */
+
+const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+async function assertBusinessInOrg(orgId: string, businessId: string): Promise<void> {
+  const { data, error } = await admin
+    .from("businesses")
+    .select("id")
+    .eq("id", businessId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw new Error("BUSINESS_SCOPE_LOOKUP_FAILED");
+  if (!data) throw new Error("BUSINESS_NOT_IN_ORG");
+}
+
+async function assertRunInScope(orgId: string, businessId: string, runId: string): Promise<void> {
+  const { data, error } = await admin
+    .from("measurement_runs")
+    .select("id")
+    .eq("id", runId)
+    .eq("org_id", orgId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+  if (error) throw new Error("RUN_SCOPE_LOOKUP_FAILED");
+  if (!data) throw new Error("RUN_NOT_IN_SCOPE");
+}
+
+async function loadMentions(args: {
+  orgId: string;
+  businessId: string;
+  runId?: string;
+}): Promise<EntityVerificationInput[]> {
+  const mentions: EntityVerificationInput[] = [];
+  let offset = 0;
+  for (;;) {
+    let measurementQuery = admin
+      .from("measurements")
+      .select("id, measurement_runs!inner(id, org_id, business_id)")
+      .eq("org_id", args.orgId)
+      .eq("measurement_runs.org_id", args.orgId)
+      .eq("measurement_runs.business_id", args.businessId);
+    if (args.runId) measurementQuery = measurementQuery.eq("run_id", args.runId);
+
+    const { data: measurementRows, error: measurementError } = await measurementQuery
+      .order("id", { ascending: true })
+      .range(offset, offset + BATCH_SIZE - 1);
+    if (measurementError) throw new Error("MEASUREMENT_READ_FAILED");
+
+    const measurementIds = (measurementRows ?? []).map((m: { id: string }) => m.id);
+    if (measurementIds.length === 0) break;
+
+    const { data: mentionRows, error: mentionError } = await admin
+      .from("measurement_mentions")
+      .select(
+        "id, measurement_id, matched_business_id, display_name, entity_kind, specificity, count_as_confirmed_business, resolution_confidence",
+      )
+      .eq("org_id", args.orgId)
+      .in("measurement_id", measurementIds);
+    if (mentionError) throw new Error("MENTION_READ_FAILED");
+
+    for (const m of mentionRows ?? []) {
+      mentions.push({
+        mentionId: m.id as string,
+        measurementId: m.measurement_id as string,
+        matchedBusinessId: (m.matched_business_id as string | null) ?? null,
+        displayName: (m.display_name as string) ?? "",
+        entityKind: (m.entity_kind as string | null) ?? null,
+        specificity: (m.specificity as string | null) ?? null,
+        countAsConfirmedBusiness: (m.count_as_confirmed_business as boolean | null) ?? null,
+        resolutionConfidence: (m.resolution_confidence as string | null) ?? null,
+      });
+    }
+
+    if (measurementIds.length < BATCH_SIZE) break;
+    offset += BATCH_SIZE;
+  }
+  return mentions;
+}
+
+async function loadExistingVerifiedMentionIds(
+  orgId: string,
+  businessId: string,
+  mentionIds: readonly string[],
+): Promise<Set<string>> {
+  const existing = new Set<string>();
+  for (let i = 0; i < mentionIds.length; i += BATCH_SIZE) {
+    const slice = mentionIds.slice(i, i + BATCH_SIZE);
+    const { data, error } = await admin
+      .from("measurement_entity_verifications")
+      .select("measurement_mention_id")
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("verifier_version", VERIFIER_VERSION)
+      .in("measurement_mention_id", slice);
+    if (error) throw new Error("VERIFICATION_READ_FAILED");
+    for (const row of data ?? []) existing.add(row.measurement_mention_id as string);
+  }
+  return existing;
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return json({ error: "UNAUTHORIZED" }, 401);
+  const {
+    data: { user },
+    error: userError,
+  } = await admin.auth.getUser(authHeader.replace("Bearer ", ""));
+  if (userError || !user) return json({ error: "UNAUTHORIZED" }, 401);
+
+  let orgId = "";
+  let businessId = "";
+  let runId: string | undefined;
+  try {
+    const body = (await req.json()) as { orgId?: string; businessId?: string; runId?: string };
+    orgId = String(body.orgId ?? "");
+    businessId = String(body.businessId ?? "");
+    runId = body.runId ? String(body.runId) : undefined;
+  } catch {
+    return json({ error: "INVALID_BODY" }, 400);
+  }
+  if (!orgId || !businessId) return json({ error: "SCOPE_REQUIRED" }, 400);
+
+  // caller must be a member of the org
+  const { data: membership, error: membershipError } = await admin
+    .from("org_members")
+    .select("org_id")
+    .eq("org_id", orgId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (membershipError) return json({ error: "MEMBERSHIP_LOOKUP_FAILED" }, 500);
+  if (!membership) return json({ error: "FORBIDDEN" }, 403);
+
+  try {
+    await assertBusinessInOrg(orgId, businessId);
+    if (runId) await assertRunInScope(orgId, businessId, runId);
+
+    const mentions = await loadMentions({ orgId, businessId, runId });
+    const existingMentionIds = await loadExistingVerifiedMentionIds(
+      orgId,
+      businessId,
+      mentions.map((m) => m.mentionId),
+    );
+    const repeatCounts = buildRepeatCounts(mentions);
+    const { rows, skippedCount } = buildEntityVerificationRows({
+      orgId,
+      businessId,
+      mentions,
+      existingMentionIds,
+      repeatCounts,
+    });
+
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      const { error } = await admin.from("measurement_entity_verifications").insert(batch);
+      if (error && error.code !== "23505") throw new Error("VERIFICATION_WRITE_FAILED");
+    }
+
+    return json({
+      ok: true,
+      summary: summarizeEntityVerificationRows({
+        mentionCount: mentions.length,
+        insertedRows: rows,
+        skippedCount,
+      }),
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "VERIFICATION_FAILED";
+    const status = code === "FORBIDDEN" ? 403 : 500;
+    return json({ error: code }, status);
+  }
+});
