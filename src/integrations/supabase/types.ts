@@ -2799,6 +2799,10 @@ export type Database = {
           top3_response_count: number
         }[]
       }
+      get_high_visibility_source_patterns_v01: {
+        Args: { p_business_id: string; p_org_id: string }
+        Returns: Json
+      }
       get_org_usage: {
         Args: { p_org_id: string }
         Returns: {
