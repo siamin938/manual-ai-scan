@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEntityVerificationRows,
+  buildProbableRepeatCounts,
   buildRepeatCounts,
   verifyEntityMention,
   type EntityVerificationInput,
@@ -19,7 +20,51 @@ function mention(over: Partial<EntityVerificationInput> = {}): EntityVerificatio
   };
 }
 
-describe("entity verification v0.1.3", () => {
+describe("entity verification v0.1.4", () => {
+  it("v0.1.4-a) ambiguous+probable repeated across 2 measurements => confirmed", () => {
+    const mentions = [
+      mention({ mentionId: "a", measurementId: "m1", displayName: "일산하이테크", entityKind: "ambiguous", specificity: "probable" }),
+      mention({ mentionId: "b", measurementId: "m2", displayName: "일산하이테크", entityKind: "ambiguous", specificity: "probable" }),
+    ];
+    const probable = buildProbableRepeatCounts(mentions);
+    const r = verifyEntityMention(mentions[0]!, {
+      repeatCount: buildRepeatCounts(mentions).get("일산하이테크") ?? 1,
+      probableRepeatCount: probable.get("일산하이테크") ?? 1,
+    });
+    expect(r.verificationStatus).toBe("confirmed_business");
+    expect(r.verifiedEntityKind).toBe("specific_business");
+    expect(r.verifiedCountAsBusiness).toBe(true);
+    expect(r.confidence).toBe("medium");
+    expect(r.reasonCodes).toContain("REPEATED_PROBABLE_ACROSS_RESPONSES");
+    expect(r.reasonCodes).toContain("AMBIGUOUS_PROBABLE_REPEATED");
+  });
+
+  it("v0.1.4-b) name repeats twice but probable only once => needs_review", () => {
+    const mentions = [
+      mention({ mentionId: "a", measurementId: "m1", displayName: "일산하이테크", entityKind: "ambiguous", specificity: "probable" }),
+      mention({ mentionId: "b", measurementId: "m2", displayName: "일산하이테크", entityKind: "ambiguous", specificity: "ambiguous" }),
+    ];
+    const probable = buildProbableRepeatCounts(mentions);
+    expect(probable.get("일산하이테크")).toBe(1);
+    const r = verifyEntityMention(mentions[0]!, {
+      repeatCount: buildRepeatCounts(mentions).get("일산하이테크") ?? 1,
+      probableRepeatCount: probable.get("일산하이테크") ?? 1,
+    });
+    expect(r.verificationStatus).toBe("needs_review");
+  });
+
+  it("v0.1.4-c) ambiguous+ambiguous repeated => needs_review", () => {
+    const mentions = [
+      mention({ mentionId: "a", measurementId: "m1", displayName: "PPF 부위", entityKind: "ambiguous", specificity: "ambiguous" }),
+      mention({ mentionId: "b", measurementId: "m2", displayName: "PPF 부위", entityKind: "ambiguous", specificity: "ambiguous" }),
+    ];
+    const r = verifyEntityMention(mentions[0]!, {
+      repeatCount: 2,
+      probableRepeatCount: buildProbableRepeatCounts(mentions).get("ppf부위") ?? 1,
+    });
+    expect(r.verificationStatus).toBe("needs_review");
+  });
+
   it("1) medium specific_business + BRANCH_MARKER => confirmed", () => {
     const r = verifyEntityMention(mention({ displayName: "블루핸즈 서현지점" }));
     expect(r.verificationStatus).toBe("confirmed_business");
@@ -160,7 +205,7 @@ describe("entity verification v0.1.3", () => {
     });
     expect(skippedCount).toBe(1);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.verifier_version).toBe("0.1.3");
+    expect(rows[0]!.verifier_version).toBe("0.1.4");
     expect(rows[0]!.verification_status).toBe("confirmed_business");
   });
 });

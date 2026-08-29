@@ -1,5 +1,5 @@
 /**
- * Entity Verification v0.1.3 rule engine (server-only, pure).
+ * Entity Verification v0.1.4 rule engine (server-only, pure).
  *
  * CORE ENGINE ISOLATION
  * - `*.server.ts` is blocked from client bundles: these rules never reach the browser.
@@ -21,7 +21,7 @@
  *   confidence candidates are never confirmed by repetition alone.
  */
 
-export const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.3";
+export const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.4";
 
 export type VerificationStatus =
   | "confirmed_business"
@@ -298,6 +298,11 @@ function result(
 export type VerificationContext = {
   /** distinct measurement count of this normalized candidate inside the scope */
   repeatCount?: number;
+  /**
+   * distinct measurement count restricted to rows the parser classified as
+   * `ambiguous` + `probable` (v0.1.4).
+   */
+  probableRepeatCount?: number;
 };
 
 const MIN_REPEAT_FOR_CONFIRM = 2;
@@ -316,6 +321,10 @@ export function verifyEntityMention(
   const repeatCount =
     typeof context.repeatCount === "number" && Number.isFinite(context.repeatCount)
       ? context.repeatCount
+      : 1;
+  const probableRepeatCount =
+    typeof context.probableRepeatCount === "number" && Number.isFinite(context.probableRepeatCount)
+      ? context.probableRepeatCount
       : 1;
 
   // A. exact linkage to a registered business wins
@@ -400,6 +409,17 @@ export function verifyEntityMention(
       reasonCodes.push("AMBIGUOUS_BRANCH_REPEATED");
       return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
     }
+    // New in v0.1.4: an ambiguous + probable candidate confirms when the same
+    // candidate repeats as ambiguous + probable across >= 2 distinct
+    // measurements. General name repetition is not enough.
+    if (
+      originalKind === "ambiguous" &&
+      originalSpecificity === "probable" &&
+      probableRepeatCount >= MIN_REPEAT_FOR_CONFIRM
+    ) {
+      reasonCodes.push("REPEATED_PROBABLE_ACROSS_RESPONSES", "AMBIGUOUS_PROBABLE_REPEATED");
+      return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
+    }
     reasonCodes.push("PROBABLE_ONLY");
     if (parserSpecific) {
       return result("needs_review", "specific_business", false, "medium", reasonCodes);
@@ -445,6 +465,28 @@ export function buildRepeatCounts(
   return counts;
 }
 
+
+/**
+ * Distinct-measurement repetition counts restricted to parser rows classified
+ * as `ambiguous` + `probable` (v0.1.4).
+ */
+export function buildProbableRepeatCounts(
+  mentions: readonly EntityVerificationInput[],
+): Map<string, number> {
+  const seen = new Map<string, Set<string>>();
+  for (const mention of mentions) {
+    if (mention.entityKind !== "ambiguous" || mention.specificity !== "probable") continue;
+    const key = candidateRepeatKey(mention.displayName);
+    if (key.length === 0) continue;
+    const bucket = seen.get(key) ?? new Set<string>();
+    bucket.add(mention.measurementId);
+    seen.set(key, bucket);
+  }
+  const counts = new Map<string, number>();
+  for (const [key, ids] of seen) counts.set(key, ids.size);
+  return counts;
+}
+
 /** Deterministic + idempotent: mentions already verified at this version are skipped. */
 export function buildEntityVerificationRows(args: {
   orgId: string;
@@ -452,6 +494,7 @@ export function buildEntityVerificationRows(args: {
   mentions: readonly EntityVerificationInput[];
   existingMentionIds: ReadonlySet<string>;
   repeatCounts?: ReadonlyMap<string, number>;
+  probableRepeatCounts?: ReadonlyMap<string, number>;
 }): { rows: EntityVerificationRow[]; skippedCount: number } {
   const rows: EntityVerificationRow[] = [];
   let skippedCount = 0;
@@ -460,8 +503,10 @@ export function buildEntityVerificationRows(args: {
       skippedCount += 1;
       continue;
     }
-    const repeatCount = args.repeatCounts?.get(candidateRepeatKey(mention.displayName)) ?? 1;
-    const verdict = verifyEntityMention(mention, { repeatCount });
+    const key = candidateRepeatKey(mention.displayName);
+    const repeatCount = args.repeatCounts?.get(key) ?? 1;
+    const probableRepeatCount = args.probableRepeatCounts?.get(key) ?? 1;
+    const verdict = verifyEntityMention(mention, { repeatCount, probableRepeatCount });
     rows.push({
       org_id: args.orgId,
       business_id: args.businessId,
