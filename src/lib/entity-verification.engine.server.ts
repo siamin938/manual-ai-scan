@@ -433,6 +433,13 @@ export function verifyEntityMention(
       reasonCodes.push("REPEATED_PROBABLE_ACROSS_RESPONSES", "AMBIGUOUS_PROBABLE_REPEATED");
       return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
     }
+    // New in v0.1.5: an ambiguous candidate confirms when the exact same
+    // normalized name was parser-confirmed at least once within the scope.
+    // Exact-name match only; no substring/fuzzy/core-name matching.
+    if (originalKind === "ambiguous" && context.hasParserConfirmedExactName === true) {
+      reasonCodes.push("PARSER_CONFIRMED_EXACT_NAME_IN_SCOPE");
+      return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
+    }
     reasonCodes.push("PROBABLE_ONLY");
     if (parserSpecific) {
       return result("needs_review", "specific_business", false, "medium", reasonCodes);

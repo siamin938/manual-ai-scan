@@ -1,5 +1,5 @@
 /**
- * Entity Verification persistence pipeline v0.1.4 (server-only).
+ * Entity Verification persistence pipeline v0.1.5 (server-only).
  *
  * CORE ENGINE ISOLATION / SAFETY CONTRACT
  * - Rules live in `entity-verification.engine.server.ts`; `*.server.ts` is
@@ -17,6 +17,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   buildEntityVerificationRows,
+  buildParserConfirmedNameKeys,
   buildProbableRepeatCounts,
   buildRepeatCounts,
   summarizeEntityVerificationRows,
@@ -142,6 +143,7 @@ export async function verifyAndPersistBusinessEntities(args: {
   const mentions = await loadMentions(runId ? { orgId, businessId, runId } : { orgId, businessId });
   const repeatCounts = buildRepeatCounts(mentions);
   const probableRepeatCounts = buildProbableRepeatCounts(mentions);
+  const parserConfirmedNameKeys = buildParserConfirmedNameKeys(mentions);
 
   let insertedCount = 0;
   let skippedCount = 0;
@@ -171,6 +173,7 @@ export async function verifyAndPersistBusinessEntities(args: {
       existingMentionIds,
       repeatCounts,
       probableRepeatCounts,
+      parserConfirmedNameKeys,
     });
 
     let insertedRows: EntityVerificationRow[] = rows;
