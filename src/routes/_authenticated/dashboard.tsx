@@ -311,10 +311,12 @@ function DashboardPage() {
                   표시합니다. 1회성 관찰 후보는 내부에만 보관되며 목록에는 나오지 않습니다.
                   업체를 클릭하면 등장 질문과 함께 인용된 출처를 볼 수 있습니다.
                 </p>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  핵심 {d.competitorGate.coreCount}곳 · 주목 {d.competitorGate.notableCount}곳 ·
-                  관찰 후보 {d.competitorGate.watchCount}곳
-                </p>
+                {d.competitorGate ? (
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    핵심 {d.competitorGate.coreCount}곳 · 주목 {d.competitorGate.notableCount}곳 ·
+                    관찰 후보 {d.competitorGate.watchCount}곳
+                  </p>
+                ) : null}
                 {d.competitors.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     함께 등장한 다른 업체가 없습니다.
