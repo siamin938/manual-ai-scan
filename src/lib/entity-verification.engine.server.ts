@@ -409,6 +409,17 @@ export function verifyEntityMention(
       reasonCodes.push("AMBIGUOUS_BRANCH_REPEATED");
       return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
     }
+    // New in v0.1.4: an ambiguous + probable candidate confirms when the same
+    // candidate repeats as ambiguous + probable across >= 2 distinct
+    // measurements. General name repetition is not enough.
+    if (
+      originalKind === "ambiguous" &&
+      originalSpecificity === "probable" &&
+      probableRepeatCount >= MIN_REPEAT_FOR_CONFIRM
+    ) {
+      reasonCodes.push("REPEATED_PROBABLE_ACROSS_RESPONSES", "AMBIGUOUS_PROBABLE_REPEATED");
+      return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
+    }
     reasonCodes.push("PROBABLE_ONLY");
     if (parserSpecific) {
       return result("needs_review", "specific_business", false, "medium", reasonCodes);
