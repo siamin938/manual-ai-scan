@@ -1,5 +1,5 @@
 /**
- * Entity Verification v0.1.3 rule engine (server-only, pure).
+ * Entity Verification v0.1.4 rule engine (server-only, pure).
  *
  * CORE ENGINE ISOLATION
  * - `*.server.ts` is blocked from client bundles: these rules never reach the browser.

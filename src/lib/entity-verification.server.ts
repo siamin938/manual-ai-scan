@@ -1,5 +1,5 @@
 /**
- * Entity Verification persistence pipeline v0.1.3 (server-only).
+ * Entity Verification persistence pipeline v0.1.4 (server-only).
  *
  * CORE ENGINE ISOLATION / SAFETY CONTRACT
  * - Rules live in `entity-verification.engine.server.ts`; `*.server.ts` is
@@ -17,6 +17,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   buildEntityVerificationRows,
+  buildProbableRepeatCounts,
   buildRepeatCounts,
   summarizeEntityVerificationRows,
   type EntityVerificationInput,
