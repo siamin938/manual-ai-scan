@@ -374,19 +374,30 @@ export function verifyEntityMention(
   if (branch) reasonCodes.push("BRANCH_MARKER");
 
   const strongSignal = (matched || descriptor || branch) && shortName;
+  const parserSpecific = originalKind === "specific_business";
+  const repeated = repeatCount >= MIN_REPEAT_FOR_CONFIRM;
 
+  // Auto-confirm via strong intrinsic evidence is limited to parser-side
+  // specific_business candidates. Ambiguous candidates are never confirmed
+  // by a strong signal alone.
   if (originalConfirmed && strongSignal) {
     return result("confirmed_business", "specific_business", true, "high", reasonCodes);
   }
-  if (strongSignal) {
+  if (strongSignal && parserSpecific) {
     return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
   }
 
   if (shortName) {
-    const parserSpecific = originalKind === "specific_business";
-    const repeated = repeatCount >= MIN_REPEAT_FOR_CONFIRM;
     if (repeated) reasonCodes.push("REPEATED_ACROSS_RESPONSES");
     if (parserSpecific && repeated) {
+      return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
+    }
+    // New in v0.1.3: ambiguous candidates confirm ONLY via the combination of
+    // a short proper-name shape, a branch marker, and repetition across
+    // distinct measurements. Descriptor-only or repetition-only ambiguous
+    // candidates stay in review.
+    if (originalKind === "ambiguous" && branch && repeated) {
+      reasonCodes.push("AMBIGUOUS_BRANCH_REPEATED");
       return result("confirmed_business", "specific_business", true, "medium", reasonCodes);
     }
     reasonCodes.push("PROBABLE_ONLY");
