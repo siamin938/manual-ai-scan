@@ -170,6 +170,7 @@ export async function verifyAndPersistBusinessEntities(args: {
       mentions: chunk,
       existingMentionIds,
       repeatCounts,
+      probableRepeatCounts,
     });
 
     let insertedRows: EntityVerificationRow[] = rows;
