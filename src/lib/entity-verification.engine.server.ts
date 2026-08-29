@@ -1,5 +1,5 @@
 /**
- * Entity Verification v0.1.2 rule engine (server-only, pure).
+ * Entity Verification v0.1.3 rule engine (server-only, pure).
  *
  * CORE ENGINE ISOLATION
  * - `*.server.ts` is blocked from client bundles: these rules never reach the browser.
@@ -21,7 +21,7 @@
  *   confidence candidates are never confirmed by repetition alone.
  */
 
-export const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.2";
+export const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.3";
 
 export type VerificationStatus =
   | "confirmed_business"
