@@ -267,53 +267,69 @@ function DashboardPage() {
                 <CardTitle className="text-base">고노출 업체 공통 출처 패턴</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  최근 {benchmark.windowDays}일 · 고노출 기준 {benchmark.thresholdPct}% 이상 ·
-                  고노출 업체 {benchmark.highVisibilityEntityCount}곳
+                <p className="text-sm">
+                  AI 노출률 {benchmark.thresholdPct}% 이상인 업체 {benchmark.highVisibilityEntityCount}곳에서
+                  자주 연결된 출처를 모았습니다.
                 </p>
-                {benchmark.dataStatus === "early" && (
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    최근 {benchmark.windowDays}일
+                  </Badge>
+                  {benchmark.dataStatus === "early" && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                       표본 축적 중
                     </Badge>
-                    <p className="text-xs text-muted-foreground">
+                  )}
+                  {benchmark.dataStatus === "early" && (
+                    <span className="text-xs text-muted-foreground">
                       현재는 초기 패턴입니다. 데이터가 쌓이면 고노출 기준과 출처 패턴이 자동으로
                       다시 계산됩니다.
-                    </p>
-                  </div>
-                )}
+                    </span>
+                  )}
+                </div>
                 {benchmark.sourceGroups.length === 0 ? (
                   <p className="py-4 text-center text-sm text-muted-foreground">
                     아직 공통 출처 패턴을 판단할 표본이 부족합니다.
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {benchmark.sourceGroups.slice(0, 4).map((g) => (
-                      <div
-                        key={g.key}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{g.label}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            고노출 업체 {g.highEntityCount}곳
-                            {g.highEntitySharePct !== null
-                              ? ` (${g.highEntitySharePct.toFixed(1)}%)`
-                              : ""}
-                            {g.patternStrength !== "early" ? " · 반복 관찰" : ""}
-                          </p>
+                    {benchmark.sourceGroups.slice(0, 4).map((g) => {
+                      const siteLabels = g.sites
+                        .slice(0, 3)
+                        .map((s) => s.label)
+                        .join(" · ");
+                      return (
+                        <div
+                          key={g.key}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">{g.label}</p>
+                            {siteLabels && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{siteLabels}</p>
+                            )}
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              고노출 업체 {benchmark.highVisibilityEntityCount}곳 중 {g.highEntityCount}곳에서
+                              관찰
+                              {g.highEntitySharePct !== null
+                                ? ` (${g.highEntitySharePct.toFixed(1)}%)`
+                                : ""}
+                              {g.patternStrength !== "early" ? " · 반복 관찰" : ""}
+                            </p>
+                          </div>
+                          <Badge variant={g.targetConnected ? "default" : "secondary"}>
+                            {g.targetConnected ? "연결 있음" : "미관찰"}
+                          </Badge>
                         </div>
-                        <Badge variant={g.targetConnected ? "default" : "secondary"}>
-                          {g.targetConnected ? "연결 있음" : "미관찰"}
-                        </Badge>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">{benchmark.disclaimer}</p>
               </CardContent>
             </Card>
           )}
+
 
           <ActionRecommendationsSection orgId={activeOrgId ?? null} businessId={businessId ?? null} />
 
