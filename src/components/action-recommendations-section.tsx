@@ -41,7 +41,10 @@ function customerLabel(label: string): string {
 }
 
 /** 최우선 액션의 근거 수치를 그대로 사용한 한 줄 격차 요약(계산 규칙 없음). */
-function gapHeadline(rec: ActionRecommendationDTO | undefined): string | null {
+function gapHeadline(
+  rec: ActionRecommendationDTO | undefined,
+  prefix: string,
+): string | null {
   if (!rec) return null;
   const e = rec.evidence;
   const total = e.measurementCount;
@@ -50,7 +53,7 @@ function gapHeadline(rec: ActionRecommendationDTO | undefined): string | null {
   if (e.clientResponseCount >= e.competitorResponseCount) return null;
   const label = rec.title?.trim();
   if (!label) return null;
-  return `가장 큰 차이: ${label} — 내 업체 ${e.clientResponseCount}/${total} vs 경쟁업체 ${e.competitorResponseCount}/${total}`;
+  return `${prefix} ${label} — 내 업체 ${e.clientResponseCount}/${total} vs 경쟁업체 ${e.competitorResponseCount}/${total}`;
 }
 
 export function ActionRecommendationsSection({
