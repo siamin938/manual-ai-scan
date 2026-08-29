@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEntityVerificationRows,
+  buildProbableRepeatCounts,
   buildRepeatCounts,
   verifyEntityMention,
   type EntityVerificationInput,
