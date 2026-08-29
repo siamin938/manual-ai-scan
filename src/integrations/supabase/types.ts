@@ -2778,6 +2778,14 @@ export type Database = {
         Args: { p_name: string; p_slug: string }
         Returns: string
       }
+      get_compatible_audit_runs_v01: {
+        Args: { p_business_id: string; p_limit?: number; p_org_id: string }
+        Returns: {
+          completed_at: string
+          created_at: string
+          run_id: string
+        }[]
+      }
       get_competitor_significance_v01: {
         Args: { p_business_id: string; p_org_id: string; p_run_id: string }
         Returns: {

@@ -41,7 +41,10 @@ function customerLabel(label: string): string {
 }
 
 /** 최우선 액션의 근거 수치를 그대로 사용한 한 줄 격차 요약(계산 규칙 없음). */
-function gapHeadline(rec: ActionRecommendationDTO | undefined): string | null {
+function gapHeadline(
+  rec: ActionRecommendationDTO | undefined,
+  prefix: string,
+): string | null {
   if (!rec) return null;
   const e = rec.evidence;
   const total = e.measurementCount;
@@ -50,7 +53,7 @@ function gapHeadline(rec: ActionRecommendationDTO | undefined): string | null {
   if (e.clientResponseCount >= e.competitorResponseCount) return null;
   const label = rec.title?.trim();
   if (!label) return null;
-  return `가장 큰 차이: ${label} — 내 업체 ${e.clientResponseCount}/${total} vs 경쟁업체 ${e.competitorResponseCount}/${total}`;
+  return `${prefix} ${label} — 내 업체 ${e.clientResponseCount}/${total} vs 경쟁업체 ${e.competitorResponseCount}/${total}`;
 }
 
 export function ActionRecommendationsSection({
@@ -76,20 +79,24 @@ export function ActionRecommendationsSection({
   const topRec = payload?.recommendations
     ? [...payload.recommendations].sort((a, b) => a.rank - b.rank)[0]
     : undefined;
-  const headline = gapHeadline(topRec);
+  const isPreliminary = (payload?.scope?.repetitions ?? 0) < 2;
+  const headline = gapHeadline(topRec, isPreliminary ? "1차 관찰 차이:" : "가장 큰 차이:");
 
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">AI 노출을 높이기 위해 먼저 해볼 것</h2>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {isPreliminary ? "AI 노출 1차 관찰" : "AI 노출을 높이기 위해 먼저 해볼 것"}
+        </h2>
         {headline && (
           <p className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
             {headline}
           </p>
         )}
         <p className="mt-1 text-sm text-muted-foreground">
-          반복 측정에서 경쟁업체와 실제 인용 출처·질문군의 차이를 바탕으로, 지금 우선 시도해볼
-          항목을 정리했습니다.
+          {isPreliminary
+            ? "첫 측정에서 경쟁업체와 차이가 비교적 크게 관찰된 질문군입니다. 아직 실행 권고가 아니라, 동일 조건 재측정 후 우선순위를 확인할 후보입니다."
+            : "반복 측정에서 경쟁업체와 실제 인용 출처·질문군의 차이를 바탕으로, 지금 우선 시도해볼 항목을 정리했습니다."}
         </p>
       </div>
 
@@ -106,8 +113,9 @@ export function ActionRecommendationsSection({
       {payload && payload.recommendations.length === 0 && (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            아직 행동을 권할 만큼 반복적으로 확인된 격차가 없습니다. 측정 데이터가 더 쌓이면
-            우선순위를 제안합니다.
+            {isPreliminary
+              ? "첫 측정에서 표시할 만큼 뚜렷한 경쟁업체 격차가 아직 없습니다. 동일 조건으로 한 번 더 측정하면 반복 여부를 확인합니다."
+              : "아직 행동을 권할 만큼 반복적으로 확인된 격차가 없습니다. 측정 데이터가 더 쌓이면 우선순위를 제안합니다."}
           </CardContent>
         </Card>
       )}
