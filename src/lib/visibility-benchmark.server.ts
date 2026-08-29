@@ -37,6 +37,26 @@ function parseStrength(value: unknown): BenchmarkPatternStrength {
   return value === "emerging" || value === "established" ? value : "early";
 }
 
+function parseSite(item: unknown): BenchmarkSourceSiteDTO | null {
+  if (!isObj(item)) return null;
+  const label = str(item["label"]);
+  if (label === null) return null;
+  const domain = str(item["domain"]);
+  return domain === null ? { label } : { label, domain };
+}
+
+function parseSites(value: unknown): BenchmarkSourceSiteDTO[] | null {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) return null;
+  const sites: BenchmarkSourceSiteDTO[] = [];
+  for (const item of value) {
+    const parsed = parseSite(item);
+    if (parsed === null) return null;
+    sites.push(parsed);
+  }
+  return sites;
+}
+
 function parseSourceGroup(item: unknown, index: number): BenchmarkSourceGroupDTO | null {
   if (!isObj(item)) return null;
   const label = str(item["label"]) ?? str(item["groupLabel"]) ?? str(item["name"]);
@@ -44,6 +64,8 @@ function parseSourceGroup(item: unknown, index: number): BenchmarkSourceGroupDTO
   if (label === null || highEntityCount === null) return null;
   const key = str(item["key"]) ?? str(item["groupKey"]) ?? `${label}-${index}`;
   const targetRaw = item["targetConnected"] ?? item["targetLinked"] ?? item["hasTargetConnection"];
+  const sites = parseSites(item["sites"]);
+  if (sites === null) return null;
   return {
     key,
     label,
@@ -51,8 +73,10 @@ function parseSourceGroup(item: unknown, index: number): BenchmarkSourceGroupDTO
     highEntitySharePct: nullableNum(item["highEntitySharePct"]),
     targetConnected: targetRaw === true,
     patternStrength: parseStrength(item["patternStrength"]),
+    sites,
   };
 }
+
 
 function parseBenchmark(value: unknown): VisibilityBenchmarkDTO | null {
   if (!isObj(value)) return null;
