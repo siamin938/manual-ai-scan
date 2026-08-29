@@ -8,6 +8,13 @@
  *   response_text, resolution_evidence, aliases and insight weights are NEVER inputs.
  * - reasonCodes are internal only and must not be surfaced to the browser.
  *
+ * v0.1.5 CHANGES (generic — never business-specific)
+ * - Within the same scope, if the exact normalized candidate name was parser-
+ *   confirmed at least once (specific_business + confirmed +
+ *   countAsConfirmedBusiness), other `ambiguous` occurrences with the same
+ *   exact name are auto-confirmed (`PARSER_CONFIRMED_EXACT_NAME_IN_SCOPE`).
+ * - Exact normalized name only: no substring/fuzzy/core-name matching.
+ *
  * v0.1.2 CHANGES (generic — never business-specific)
  * - `PROBABLE_ONLY` is no longer an absolute downgrade. It is only a
  *   needs_review reason when neither strong nor repeated evidence exists.
@@ -21,7 +28,7 @@
  *   confidence candidates are never confirmed by repetition alone.
  */
 
-export const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.4";
+export const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.5";
 
 export type VerificationStatus =
   | "confirmed_business"
@@ -303,6 +310,12 @@ export type VerificationContext = {
    * `ambiguous` + `probable` (v0.1.4).
    */
   probableRepeatCount?: number;
+  /**
+   * v0.1.5: the exact normalized candidate name was parser-confirmed at least
+   * once inside the same scope (specific_business + confirmed +
+   * countAsConfirmedBusiness). Exact-name match only.
+   */
+  hasParserConfirmedExactName?: boolean;
 };
 
 const MIN_REPEAT_FOR_CONFIRM = 2;
@@ -465,6 +478,26 @@ export function buildRepeatCounts(
   return counts;
 }
 
+/**
+ * v0.1.5: normalized keys of candidates the parser itself confirmed at least
+ * once in the scope (specific_business + confirmed + countAsConfirmedBusiness).
+ */
+export function buildParserConfirmedNameKeys(
+  mentions: readonly EntityVerificationInput[],
+): Set<string> {
+  const keys = new Set<string>();
+  for (const mention of mentions) {
+    if (
+      mention.entityKind === "specific_business" &&
+      mention.specificity === "confirmed" &&
+      mention.countAsConfirmedBusiness === true
+    ) {
+      const key = candidateRepeatKey(mention.displayName);
+      if (key.length > 0) keys.add(key);
+    }
+  }
+  return keys;
+}
 
 /**
  * Distinct-measurement repetition counts restricted to parser rows classified
@@ -495,6 +528,7 @@ export function buildEntityVerificationRows(args: {
   existingMentionIds: ReadonlySet<string>;
   repeatCounts?: ReadonlyMap<string, number>;
   probableRepeatCounts?: ReadonlyMap<string, number>;
+  parserConfirmedNameKeys?: ReadonlySet<string>;
 }): { rows: EntityVerificationRow[]; skippedCount: number } {
   const rows: EntityVerificationRow[] = [];
   let skippedCount = 0;
@@ -506,7 +540,11 @@ export function buildEntityVerificationRows(args: {
     const key = candidateRepeatKey(mention.displayName);
     const repeatCount = args.repeatCounts?.get(key) ?? 1;
     const probableRepeatCount = args.probableRepeatCounts?.get(key) ?? 1;
-    const verdict = verifyEntityMention(mention, { repeatCount, probableRepeatCount });
+    const verdict = verifyEntityMention(mention, {
+      repeatCount,
+      probableRepeatCount,
+      hasParserConfirmedExactName: args.parserConfirmedNameKeys?.has(key) === true,
+    });
     rows.push({
       org_id: args.orgId,
       business_id: args.businessId,
