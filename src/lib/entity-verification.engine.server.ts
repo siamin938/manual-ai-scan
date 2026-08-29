@@ -21,7 +21,7 @@
  *   confidence candidates are never confirmed by repetition alone.
  */
 
-export const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.3";
+export const ENTITY_VERIFIER_ENGINE_VERSION = "0.1.4";
 
 export type VerificationStatus =
   | "confirmed_business"
@@ -298,6 +298,11 @@ function result(
 export type VerificationContext = {
   /** distinct measurement count of this normalized candidate inside the scope */
   repeatCount?: number;
+  /**
+   * distinct measurement count restricted to rows the parser classified as
+   * `ambiguous` + `probable` (v0.1.4).
+   */
+  probableRepeatCount?: number;
 };
 
 const MIN_REPEAT_FOR_CONFIRM = 2;
@@ -316,6 +321,10 @@ export function verifyEntityMention(
   const repeatCount =
     typeof context.repeatCount === "number" && Number.isFinite(context.repeatCount)
       ? context.repeatCount
+      : 1;
+  const probableRepeatCount =
+    typeof context.probableRepeatCount === "number" && Number.isFinite(context.probableRepeatCount)
+      ? context.probableRepeatCount
       : 1;
 
   // A. exact linkage to a registered business wins
