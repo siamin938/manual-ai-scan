@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEntityVerificationRows,
+  buildParserConfirmedNameKeys,
   buildProbableRepeatCounts,
   buildRepeatCounts,
   verifyEntityMention,
@@ -191,7 +192,7 @@ describe("entity verification v0.1.4", () => {
     expect(counts.get("세종하이테크")).toBe(2);
   });
 
-  it("builds rows at version 0.1.3 and skips already-verified mentions", () => {
+  it("builds rows at version 0.1.5 and skips already-verified mentions", () => {
     const mentions = [
       mention({ mentionId: "a", measurementId: "m1", displayName: "세종하이테크" }),
       mention({ mentionId: "b", measurementId: "m2", displayName: "세종하이테크" }),
@@ -205,7 +206,143 @@ describe("entity verification v0.1.4", () => {
     });
     expect(skippedCount).toBe(1);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.verifier_version).toBe("0.1.4");
+    expect(rows[0]!.verifier_version).toBe("0.1.5");
     expect(rows[0]!.verification_status).toBe("confirmed_business");
+  });
+});
+
+describe("entity verification v0.1.5", () => {
+  it("v0.1.5-a) parser-confirmed exact name in scope promotes ambiguous sibling", () => {
+    const mentions = [
+      mention({
+        mentionId: "a",
+        measurementId: "m1",
+        displayName: "한빛모터스 일산",
+        entityKind: "specific_business",
+        specificity: "confirmed",
+        countAsConfirmedBusiness: true,
+      }),
+      mention({
+        mentionId: "b",
+        measurementId: "m2",
+        displayName: "한빛모터스 일산",
+        entityKind: "ambiguous",
+        specificity: "ambiguous",
+      }),
+    ];
+    const keys = buildParserConfirmedNameKeys(mentions);
+    expect(keys.has("한빛모터스일산")).toBe(true);
+    const r = verifyEntityMention(mentions[1]!, {
+      repeatCount: buildRepeatCounts(mentions).get("한빛모터스일산") ?? 1,
+      hasParserConfirmedExactName: keys.has("한빛모터스일산"),
+    });
+    expect(r.verificationStatus).toBe("confirmed_business");
+    expect(r.verifiedEntityKind).toBe("specific_business");
+    expect(r.verifiedCountAsBusiness).toBe(true);
+    expect(r.confidence).toBe("medium");
+    expect(r.reasonCodes).toContain("PARSER_CONFIRMED_EXACT_NAME_IN_SCOPE");
+  });
+
+  it("v0.1.5-b) similar but not exact name is not promoted", () => {
+    const mentions = [
+      mention({
+        mentionId: "a",
+        measurementId: "m1",
+        displayName: "J.ONE 제이원 썬팅자동차",
+        entityKind: "specific_business",
+        specificity: "confirmed",
+        countAsConfirmedBusiness: true,
+      }),
+    ];
+    const keys = buildParserConfirmedNameKeys(mentions);
+    const r = verifyEntityMention(
+      mention({
+        mentionId: "b",
+        measurementId: "m2",
+        displayName: "J.ONE 제이원",
+        entityKind: "ambiguous",
+        specificity: "ambiguous",
+      }),
+      { hasParserConfirmedExactName: keys.has("j.one제이원") },
+    );
+    expect(keys.has("j.one제이원")).toBe(false);
+    expect(r.verificationStatus).toBe("needs_review");
+  });
+
+  it("v0.1.5-c) parser-confirmed key exists but current kind is generic_category => still rejected", () => {
+    const mentions = [
+      mention({
+        mentionId: "a",
+        measurementId: "m1",
+        displayName: "동네 카센터 추천",
+        entityKind: "specific_business",
+        specificity: "confirmed",
+        countAsConfirmedBusiness: true,
+      }),
+    ];
+    const keys = buildParserConfirmedNameKeys(mentions);
+    const r = verifyEntityMention(
+      mention({
+        mentionId: "b",
+        measurementId: "m2",
+        displayName: "동네 카센터 추천",
+        entityKind: "generic_category",
+        specificity: "ambiguous",
+      }),
+      { hasParserConfirmedExactName: keys.has("동네카센터추천") },
+    );
+    expect(r.verificationStatus).toBe("rejected_non_business");
+    expect(r.verifiedEntityKind).toBe("generic_category");
+  });
+
+  it("v0.1.5-d) buildEntityVerificationRows wires parserConfirmedNameKeys through", () => {
+    const mentions = [
+      mention({
+        mentionId: "a",
+        measurementId: "m1",
+        displayName: "한빛모터스 일산",
+        entityKind: "specific_business",
+        specificity: "confirmed",
+        countAsConfirmedBusiness: true,
+      }),
+      mention({
+        mentionId: "b",
+        measurementId: "m2",
+        displayName: "한빛모터스 일산",
+        entityKind: "ambiguous",
+        specificity: "ambiguous",
+      }),
+    ];
+    const { rows } = buildEntityVerificationRows({
+      orgId: "o1",
+      businessId: "b1",
+      mentions,
+      existingMentionIds: new Set(),
+      repeatCounts: buildRepeatCounts(mentions),
+      probableRepeatCounts: buildProbableRepeatCounts(mentions),
+      parserConfirmedNameKeys: buildParserConfirmedNameKeys(mentions),
+    });
+    expect(rows).toHaveLength(2);
+    const ambiguousRow = rows.find((r) => r.measurement_mention_id === "b")!;
+    expect(ambiguousRow.verification_status).toBe("confirmed_business");
+    expect(ambiguousRow.verifier_version).toBe("0.1.5");
+    expect(ambiguousRow.reason_codes).toContain("PARSER_CONFIRMED_EXACT_NAME_IN_SCOPE");
+  });
+
+  it("v0.1.5-e) ambiguous without parser-confirmed sibling stays needs_review", () => {
+    const mentions = [
+      mention({
+        mentionId: "a",
+        measurementId: "m1",
+        displayName: "한빛모터스 일산",
+        entityKind: "ambiguous",
+        specificity: "ambiguous",
+      }),
+    ];
+    const keys = buildParserConfirmedNameKeys(mentions);
+    const r = verifyEntityMention(mentions[0]!, {
+      hasParserConfirmedExactName: keys.has("한빛모터스일산"),
+    });
+    expect(r.verificationStatus).toBe("needs_review");
   });
 });
