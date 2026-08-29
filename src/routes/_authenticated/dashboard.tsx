@@ -7,6 +7,7 @@ import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
 import { getVisibilityRepeatAggregate } from "@/lib/visibility-repeat-aggregate.functions";
+import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
 import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
 import { ActionRecommendationsSection } from "@/components/action-recommendations-section";
@@ -99,6 +100,18 @@ function DashboardPage() {
   });
   const repeatResult = repeatQuery.data;
   const aggregate = repeatResult && repeatResult.ok ? repeatResult.aggregate : null;
+
+  const fetchBenchmark = useServerFn(getVisibilityBenchmark);
+  const benchmarkQuery = useQuery({
+    queryKey: ["visibility-benchmark", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: () =>
+      fetchBenchmark({
+        data: { orgId: activeOrgId as string, businessId: businessId as string },
+      }),
+  });
+  const benchmarkResult = benchmarkQuery.data;
+  const benchmark = benchmarkResult && benchmarkResult.ok ? benchmarkResult.benchmark : null;
 
   const result = query.data;
   const payload: VisibilityDiagnosticDTO | null = result && result.ok ? result.diagnostic : null;
