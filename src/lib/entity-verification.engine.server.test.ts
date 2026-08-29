@@ -28,8 +28,8 @@ describe("entity verification v0.1.4", () => {
     ];
     const probable = buildProbableRepeatCounts(mentions);
     const r = verifyEntityMention(mentions[0]!, {
-      repeatCount: buildRepeatCounts(mentions).get("일산하이테크"),
-      probableRepeatCount: probable.get("일산하이테크"),
+      repeatCount: buildRepeatCounts(mentions).get("일산하이테크") ?? 1,
+      probableRepeatCount: probable.get("일산하이테크") ?? 1,
     });
     expect(r.verificationStatus).toBe("confirmed_business");
     expect(r.verifiedEntityKind).toBe("specific_business");
@@ -47,8 +47,8 @@ describe("entity verification v0.1.4", () => {
     const probable = buildProbableRepeatCounts(mentions);
     expect(probable.get("일산하이테크")).toBe(1);
     const r = verifyEntityMention(mentions[0]!, {
-      repeatCount: buildRepeatCounts(mentions).get("일산하이테크"),
-      probableRepeatCount: probable.get("일산하이테크"),
+      repeatCount: buildRepeatCounts(mentions).get("일산하이테크") ?? 1,
+      probableRepeatCount: probable.get("일산하이테크") ?? 1,
     });
     expect(r.verificationStatus).toBe("needs_review");
   });
