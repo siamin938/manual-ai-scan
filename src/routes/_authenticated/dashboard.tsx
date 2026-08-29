@@ -294,7 +294,7 @@ function DashboardPage() {
                 ) : (
                   <div className="space-y-2">
                     {benchmark.sourceGroups.slice(0, 4).map((g) => {
-                      const siteLabels = g.sites
+                      const siteLabels = (g.sites ?? [])
                         .slice(0, 3)
                         .map((s) => s.label)
                         .join(" · ");
