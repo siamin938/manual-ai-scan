@@ -6,9 +6,11 @@ import type { Database } from "@/integrations/supabase/types";
 import type {
   BenchmarkPatternStrength,
   BenchmarkSourceGroupDTO,
+  BenchmarkSourceSiteDTO,
   VisibilityBenchmarkDTO,
   VisibilityBenchmarkResponseDTO,
 } from "./visibility-benchmark.types";
+
 
 type UserClient = SupabaseClient<Database>;
 
