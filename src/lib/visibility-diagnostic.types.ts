@@ -115,3 +115,32 @@ export type VisibilityDiagnosticResponseDTO =
       /** NO_DATA일 때만 채워지는 업체 표시용 최소 정보 */
       business?: VisibilityBusinessDTO;
     };
+
+/** `visibility-repeat-aggregate` Edge Function 응답 계약 (계산 규칙은 서버에만 존재). */
+export type VisibilityRepeatAggregateDTO = {
+  compatibilityMode: "strict_same_conditions";
+  compatibleRunCount: number;
+  measurementCount: number;
+  validCount: number;
+  mentionCount: number;
+  visibilityRatePct: number | null;
+  top3Count: number;
+  top3RatePct: number | null;
+  questionCount: number;
+  alwaysVisibleQuestionCount: number;
+  sometimesVisibleQuestionCount: number;
+  neverVisibleQuestionCount: number;
+  windowStart: string;
+  windowEnd: string;
+  latestRunId: string;
+};
+
+export type VisibilityRepeatAggregateResponseDTO =
+  | {
+      ok: true;
+      generatedAt: string;
+      business: { id: string; name: string };
+      aggregate: VisibilityRepeatAggregateDTO | null;
+    }
+  | { ok: false; error: string };
+

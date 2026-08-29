@@ -6,6 +6,7 @@ import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
+import { getVisibilityRepeatAggregate } from "@/lib/visibility-repeat-aggregate.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
 import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
 import { ActionRecommendationsSection } from "@/components/action-recommendations-section";
@@ -87,9 +88,22 @@ function DashboardPage() {
       }),
   });
 
+  const fetchRepeatAggregate = useServerFn(getVisibilityRepeatAggregate);
+  const repeatQuery = useQuery({
+    queryKey: ["visibility-repeat-aggregate", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: () =>
+      fetchRepeatAggregate({
+        data: { orgId: activeOrgId as string, businessId: businessId as string },
+      }),
+  });
+  const repeatResult = repeatQuery.data;
+  const aggregate = repeatResult && repeatResult.ok ? repeatResult.aggregate : null;
+
   const result = query.data;
   const payload: VisibilityDiagnosticDTO | null = result && result.ok ? result.diagnostic : null;
   const d = payload?.diagnostic ?? null;
+
 
   return (
     <div className="space-y-6">
@@ -178,6 +192,55 @@ function DashboardPage() {
             {d.scope.repetitions}회 · 완료 {d.scope.completedJobs}/{d.scope.totalJobs}
             {d.overview.invalidCount > 0 ? ` · 제외 ${d.overview.invalidCount}건` : ""}
           </p>
+
+          {aggregate && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">반복 측정 통합</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  최신 상태 진단과 별개이며, 동일 조건 반복 측정의 표본을 합친 신뢰도 참고값입니다.
+                </p>
+                <p className="text-sm">
+                  동일 조건 측정 {aggregate.compatibleRunCount}회 · 유효 답변{" "}
+                  {aggregate.validCount}건
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">통합 노출률</p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums">
+                      {pct(aggregate.visibilityRatePct)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      노출 {aggregate.mentionCount}건
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">통합 Top3 노출률</p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums">
+                      {pct(aggregate.top3RatePct)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Top3 {aggregate.top3Count}건
+                    </p>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  질문 안정성 · 질문 {aggregate.questionCount}개 중 항상 노출{" "}
+                  {aggregate.alwaysVisibleQuestionCount}개 · 일부 노출{" "}
+                  {aggregate.sometimesVisibleQuestionCount}개 · 미노출{" "}
+                  {aggregate.neverVisibleQuestionCount}개
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  집계 기간 {formatSeoul(aggregate.windowStart)} ~{" "}
+                  {formatSeoul(aggregate.windowEnd)}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+
 
           {(d.dataQuality.measurementRowsCapped || d.dataQuality.sourceRowsCapped) && (
             <p className="text-xs text-muted-foreground">
