@@ -8,7 +8,7 @@
  */
 
 /** 저장된 verification row와 대조할 계약 버전. 판정 규칙은 포함하지 않는다. */
-export const ENTITY_VERIFIER_VERSION = "0.1.2";
+export const ENTITY_VERIFIER_VERSION = "0.1.3";
 
 export type VerificationStatus =
   | "confirmed_business"

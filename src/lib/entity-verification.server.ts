@@ -1,5 +1,5 @@
 /**
- * Entity Verification persistence pipeline v0.1.2 (server-only).
+ * Entity Verification persistence pipeline v0.1.3 (server-only).
  *
  * CORE ENGINE ISOLATION / SAFETY CONTRACT
  * - Rules live in `entity-verification.engine.server.ts`; `*.server.ts` is

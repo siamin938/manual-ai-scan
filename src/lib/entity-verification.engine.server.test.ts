@@ -19,7 +19,7 @@ function mention(over: Partial<EntityVerificationInput> = {}): EntityVerificatio
   };
 }
 
-describe("entity verification v0.1.2", () => {
+describe("entity verification v0.1.3", () => {
   it("1) medium specific_business + BRANCH_MARKER => confirmed", () => {
     const r = verifyEntityMention(mention({ displayName: "블루핸즈 서현지점" }));
     expect(r.verificationStatus).toBe("confirmed_business");
@@ -69,6 +69,45 @@ describe("entity verification v0.1.2", () => {
     expect(ambiguous.verificationStatus).not.toBe("confirmed_business");
   });
 
+  it("6b) ambiguous + BRANCH_MARKER + repeated across 2 responses => confirmed", () => {
+    const r = verifyEntityMention(
+      mention({ displayName: "루마썬팅 일산고일로점", entityKind: "ambiguous" }),
+      { repeatCount: 2 },
+    );
+    expect(r.verificationStatus).toBe("confirmed_business");
+    expect(r.verifiedEntityKind).toBe("specific_business");
+    expect(r.verifiedCountAsBusiness).toBe(true);
+    expect(r.confidence).toBe("medium");
+    expect(r.reasonCodes).toContain("BRANCH_MARKER");
+    expect(r.reasonCodes).toContain("REPEATED_ACROSS_RESPONSES");
+    expect(r.reasonCodes).toContain("AMBIGUOUS_BRANCH_REPEATED");
+  });
+
+  it("6c) ambiguous + BRANCH_MARKER seen only once => needs_review", () => {
+    const r = verifyEntityMention(
+      mention({ displayName: "루마썬팅 일산고일로점", entityKind: "ambiguous" }),
+      { repeatCount: 1 },
+    );
+    expect(r.verificationStatus).toBe("needs_review");
+    expect(r.reasonCodes).not.toContain("AMBIGUOUS_BRANCH_REPEATED");
+  });
+
+  it("6d) ambiguous + descriptor + repeated => needs_review (new rule does not apply)", () => {
+    const r = verifyEntityMention(
+      mention({ displayName: "비랩팩토리", entityKind: "ambiguous" }),
+      { repeatCount: 3 },
+    );
+    expect(r.verificationStatus).toBe("needs_review");
+  });
+
+  it("6e) ambiguous + repeated only => needs_review", () => {
+    const r = verifyEntityMention(
+      mention({ displayName: "세종하이테크", entityKind: "ambiguous" }),
+      { repeatCount: 3 },
+    );
+    expect(r.verificationStatus).toBe("needs_review");
+  });
+
   it("7) registered business match with confirmed parser output stays high confirmed", () => {
     const r = verifyEntityMention(
       mention({
@@ -107,7 +146,7 @@ describe("entity verification v0.1.2", () => {
     expect(counts.get("세종하이테크")).toBe(2);
   });
 
-  it("builds rows at version 0.1.2 and skips already-verified mentions", () => {
+  it("builds rows at version 0.1.3 and skips already-verified mentions", () => {
     const mentions = [
       mention({ mentionId: "a", measurementId: "m1", displayName: "세종하이테크" }),
       mention({ mentionId: "b", measurementId: "m2", displayName: "세종하이테크" }),
@@ -121,7 +160,7 @@ describe("entity verification v0.1.2", () => {
     });
     expect(skippedCount).toBe(1);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.verifier_version).toBe("0.1.2");
+    expect(rows[0]!.verifier_version).toBe("0.1.3");
     expect(rows[0]!.verification_status).toBe("confirmed_business");
   });
 });
