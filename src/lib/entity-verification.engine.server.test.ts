@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEntityVerificationRows,
+  buildParserConfirmedNameKeys,
   buildProbableRepeatCounts,
   buildRepeatCounts,
   verifyEntityMention,
@@ -191,7 +192,7 @@ describe("entity verification v0.1.4", () => {
     expect(counts.get("세종하이테크")).toBe(2);
   });
 
-  it("builds rows at version 0.1.3 and skips already-verified mentions", () => {
+  it("builds rows at version 0.1.5 and skips already-verified mentions", () => {
     const mentions = [
       mention({ mentionId: "a", measurementId: "m1", displayName: "세종하이테크" }),
       mention({ mentionId: "b", measurementId: "m2", displayName: "세종하이테크" }),
@@ -205,7 +206,7 @@ describe("entity verification v0.1.4", () => {
     });
     expect(skippedCount).toBe(1);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.verifier_version).toBe("0.1.4");
+    expect(rows[0]!.verifier_version).toBe("0.1.5");
     expect(rows[0]!.verification_status).toBe("confirmed_business");
   });
 });
