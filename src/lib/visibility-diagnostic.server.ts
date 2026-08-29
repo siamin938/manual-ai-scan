@@ -195,10 +195,47 @@ function parseCompetitor(o: Obj): VisibilityCompetitorDTO | null {
   const mentionCount = num(o["mentionCount"]);
   const responseCount = num(o["responseCount"]);
   const responseRatePct = nullableNum(o["responseRatePct"]);
-  if (name === null || mentionCount === null || responseCount === null || !responseRatePct.ok) {
+  const tier = o["tier"];
+  const tierLabel = str(o["tierLabel"]);
+  const questionCount = num(o["questionCount"]);
+  const top3ResponseCount = num(o["top3ResponseCount"]);
+  const priorRunPresenceCount = num(o["priorRunPresenceCount"]);
+  const isNew = bool(o["isNew"]);
+  if (
+    name === null ||
+    mentionCount === null ||
+    responseCount === null ||
+    !responseRatePct.ok ||
+    (tier !== "core" && tier !== "notable") ||
+    tierLabel === null ||
+    questionCount === null ||
+    top3ResponseCount === null ||
+    priorRunPresenceCount === null ||
+    isNew === null
+  ) {
     return null;
   }
-  return { name, mentionCount, responseCount, responseRatePct: responseRatePct.value };
+  return {
+    name,
+    mentionCount,
+    responseCount,
+    responseRatePct: responseRatePct.value,
+    tier,
+    tierLabel,
+    questionCount,
+    top3ResponseCount,
+    priorRunPresenceCount,
+    isNew,
+  };
+}
+
+function parseCompetitorGate(value: unknown): VisibilityCompetitorGateDTO | null {
+  if (!isObj(value) || value["version"] !== "0.1") return null;
+  const coreCount = num(value["coreCount"]);
+  const notableCount = num(value["notableCount"]);
+  const watchCount = num(value["watchCount"]);
+  if (coreCount === null || notableCount === null || watchCount === null) return null;
+  return { version: "0.1", coreCount, notableCount, watchCount };
 }
 
 function parseSource(o: Obj): VisibilitySourceDTO | null {
