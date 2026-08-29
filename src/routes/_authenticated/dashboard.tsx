@@ -6,6 +6,7 @@ import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
+import { getVisibilityRepeatAggregate } from "@/lib/visibility-repeat-aggregate.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
 import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
 import { ActionRecommendationsSection } from "@/components/action-recommendations-section";
