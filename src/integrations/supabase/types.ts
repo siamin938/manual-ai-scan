@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -2486,6 +2486,66 @@ export type Database = {
         ]
       }
       measurement_citation_attributions_actionable_v1: {
+        Row: {
+          attribution_level: string | null
+          attribution_version: string | null
+          business_id: string | null
+          canonical_display_name: string | null
+          canonical_key: string | null
+          citation_end_index: number | null
+          citation_start_index: number | null
+          citation_url: string | null
+          created_at: string | null
+          domain: string | null
+          entity_end_index: number | null
+          entity_start_index: number | null
+          evidence: Json | null
+          id: string | null
+          measurement_id: string | null
+          measurement_mention_id: string | null
+          org_id: string | null
+          source_run_id: string | null
+          title: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_citation_attributions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citation_attributions_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citation_attributions_measurement_mention_id_fkey"
+            columns: ["measurement_mention_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_mentions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citation_attributions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_citation_attributions_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      measurement_citation_attributions_actionable_v2: {
         Row: {
           attribution_level: string | null
           attribution_version: string | null
