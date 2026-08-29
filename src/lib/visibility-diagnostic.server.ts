@@ -311,7 +311,6 @@ function parseDiagnosticBody(value: unknown): VisibilityDiagnosticBodyDTO | null
     overview === null ||
     questionGroups === null ||
     competitors === null ||
-    competitorGate === null ||
     sources === null ||
     priorityAreas === null ||
     dataQuality === null

@@ -96,7 +96,7 @@ export type VisibilityDiagnosticBodyDTO = {
   overview: VisibilityOverviewDTO;
   questionGroups: VisibilityQuestionGroupDTO[];
   competitors: VisibilityCompetitorDTO[];
-  competitorGate: VisibilityCompetitorGateDTO;
+  competitorGate: VisibilityCompetitorGateDTO | null;
   sources: VisibilitySourceDTO[];
   priorityAreas: VisibilityPriorityAreaDTO[];
   dataQuality: VisibilityDataQualityDTO;
