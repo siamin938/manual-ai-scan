@@ -88,9 +88,22 @@ function DashboardPage() {
       }),
   });
 
+  const fetchRepeatAggregate = useServerFn(getVisibilityRepeatAggregate);
+  const repeatQuery = useQuery({
+    queryKey: ["visibility-repeat-aggregate", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: () =>
+      fetchRepeatAggregate({
+        data: { orgId: activeOrgId as string, businessId: businessId as string },
+      }),
+  });
+  const repeatResult = repeatQuery.data;
+  const aggregate = repeatResult && repeatResult.ok ? repeatResult.aggregate : null;
+
   const result = query.data;
   const payload: VisibilityDiagnosticDTO | null = result && result.ok ? result.diagnostic : null;
   const d = payload?.diagnostic ?? null;
+
 
   return (
     <div className="space-y-6">
