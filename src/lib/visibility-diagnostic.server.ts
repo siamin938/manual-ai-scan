@@ -8,6 +8,7 @@ import type { Database } from "@/integrations/supabase/types";
 import type {
   VisibilityBusinessDTO,
   VisibilityCompetitorDTO,
+  VisibilityCompetitorGateDTO,
   VisibilityDataQualityDTO,
   VisibilityDiagnosticBodyDTO,
   VisibilityDiagnosticDTO,
@@ -301,6 +302,7 @@ function parseDiagnosticBody(value: unknown): VisibilityDiagnosticBodyDTO | null
   const overview = parseOverview(value["overview"]);
   const questionGroups = strictArray(value["questionGroups"], parseQuestionGroup);
   const competitors = strictArray(value["competitors"], parseCompetitor);
+  const competitorGate = parseCompetitorGate(value["competitorGate"]);
   const sources = strictArray(value["sources"], parseSource);
   const priorityAreas = strictArray(value["priorityAreas"], parsePriorityArea);
   const dataQuality = parseDataQuality(value["dataQuality"]);
@@ -309,13 +311,23 @@ function parseDiagnosticBody(value: unknown): VisibilityDiagnosticBodyDTO | null
     overview === null ||
     questionGroups === null ||
     competitors === null ||
+    competitorGate === null ||
     sources === null ||
     priorityAreas === null ||
     dataQuality === null
   ) {
     return null;
   }
-  return { scope, overview, questionGroups, competitors, sources, priorityAreas, dataQuality };
+  return {
+    scope,
+    overview,
+    questionGroups,
+    competitors,
+    competitorGate,
+    sources,
+    priorityAreas,
+    dataQuality,
+  };
 }
 
 function parseTrendPoint(o: Obj): VisibilityTrendPointDTO | null {

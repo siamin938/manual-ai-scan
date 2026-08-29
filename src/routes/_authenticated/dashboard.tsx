@@ -306,11 +306,14 @@ function DashboardPage() {
                 <CardTitle className="text-base">AI 추천시장에 함께 등장한 업체</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
+                <p className="mb-1 text-xs text-muted-foreground">
+                  반복 노출·질문 다양성·동일 조건 재현성을 바탕으로 확인할 가치가 있는 업체만
+                  표시합니다. 1회성 관찰 후보는 내부에만 보관되며 목록에는 나오지 않습니다.
+                  업체를 클릭하면 등장 질문과 함께 인용된 출처를 볼 수 있습니다.
+                </p>
                 <p className="mb-3 text-xs text-muted-foreground">
-                  같은 질문에 반복 측정된 AI 답변에서 내 업체와 함께 실제로 발견된 업체입니다.
-                  업체를 클릭하면 어떤 질문에서 자주 등장했고 그 답변에 어떤 출처가 함께
-                  인용됐는지 볼 수 있습니다. 직접 경쟁관계나 노출 차이의 원인을 단정하는 것은
-                  아닙니다.
+                  핵심 {d.competitorGate.coreCount}곳 · 주목 {d.competitorGate.notableCount}곳 ·
+                  관찰 후보 {d.competitorGate.watchCount}곳
                 </p>
                 {d.competitors.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
@@ -321,8 +324,8 @@ function DashboardPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>업체</TableHead>
+                        <TableHead>질문 수</TableHead>
                         <TableHead>등장 답변 수</TableHead>
-                        <TableHead>언급 수</TableHead>
                         <TableHead>답변 비율</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -330,17 +333,30 @@ function DashboardPage() {
                       {d.competitors.map((c) => (
                         <TableRow key={c.name}>
                           <TableCell className="text-sm">
-                            <button
-                              type="button"
-                              className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              onClick={() => setSelectedCompetitor(c.name)}
-                            >
-                              {c.name}
-                              <span className="sr-only"> 상세 보기</span>
-                            </button>
+                            <span className="flex flex-wrap items-center gap-1.5">
+                              <button
+                                type="button"
+                                className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                onClick={() => setSelectedCompetitor(c.name)}
+                              >
+                                {c.name}
+                                <span className="sr-only"> 상세 보기</span>
+                              </button>
+                              <Badge
+                                variant={c.tier === "core" ? "default" : "secondary"}
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                {c.tierLabel}
+                              </Badge>
+                              {c.isNew && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  신규
+                                </Badge>
+                              )}
+                            </span>
                           </TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.questionCount}</TableCell>
                           <TableCell className="text-sm tabular-nums">{c.responseCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{c.mentionCount}</TableCell>
                           <TableCell className="text-sm tabular-nums">
                             {pct(c.responseRatePct)}
                           </TableCell>
