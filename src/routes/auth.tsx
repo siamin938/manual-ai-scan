@@ -132,6 +132,18 @@ function AuthPage() {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pw3">비밀번호 확인</Label>
+                    <Input
+                      id="pw3"
+                      type="password"
+                      required
+                      minLength={6}
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                    />
+                  </div>
+
                   <Button type="submit" className="w-full" disabled={busy}>
                     회원가입
                   </Button>
