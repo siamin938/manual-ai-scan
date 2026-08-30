@@ -266,6 +266,9 @@ function BusinessesPage() {
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["businesses", activeOrgId] });
       qc.invalidateQueries({ queryKey: ["business-competitor-links", activeOrgId] });
+      if (activeOrgId) {
+        qc.invalidateQueries({ queryKey: ["client-business-options", activeOrgId] });
+      }
     },
     onError: (e: unknown) => toast.error(getBusinessSaveErrorMessage(e)),
   });
@@ -275,7 +278,12 @@ function BusinessesPage() {
       const { error } = await supabase.from("businesses").update({ active: !b.active }).eq("id", b.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["businesses", activeOrgId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["businesses", activeOrgId] });
+      if (activeOrgId) {
+        qc.invalidateQueries({ queryKey: ["client-business-options", activeOrgId] });
+      }
+    },
     onError: (e: Error) => toast.error(`변경 실패: ${e.message}`),
   });
 

@@ -23,6 +23,7 @@ export function useClientBusinessSelection(activeOrgId: string | null | undefine
   const query = useQuery({
     queryKey: ["client-business-options", activeOrgId],
     enabled: !!activeOrgId,
+    staleTime: 5 * 60_000,
     queryFn: () => fetchOptions({ data: { orgId: activeOrgId as string } }),
   });
 
