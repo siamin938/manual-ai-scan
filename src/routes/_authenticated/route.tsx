@@ -5,13 +5,6 @@ import { ActiveTargetBusinessProvider } from "@/lib/active-business";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
 import { ROLE_LABELS } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -36,14 +29,6 @@ const NAV = [
   { to: "/businesses", label: "내 업체" },
   { to: "/questions", label: "질문" },
   { to: "/runs", label: "AI 측정" },
-  { to: "/reports/customer", label: "보고서" },
-] as const;
-
-const ADVANCED_NAV = [
-  { to: "/insights", label: "AI 인사이트" },
-  { to: "/profile-coverage", label: "프로필 커버리지" },
-  { to: "/experiments", label: "Change Impact" },
-  { to: "/manual-checks", label: "수동 UI 점검" },
 ] as const;
 
 
@@ -85,20 +70,6 @@ function Shell() {
                 {n.label}
               </Link>
             ))}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-sm text-muted-foreground">
-                  고급/운영
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {ADVANCED_NAV.map((n) => (
-                  <DropdownMenuItem key={n.to} asChild>
-                    <Link to={n.to}>{n.label}</Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
