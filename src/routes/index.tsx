@@ -97,10 +97,10 @@ const PREVIEW_CARDS: {
   rank: string;
 }[] = [
   { title: "내 AI 노출 상태", labels: ["노출 비율", "상위 추천 비율", "반복 확인"], tone: "primary", rank: "01" },
-  { title: "지금 먼저 확인할 것", labels: ["우선 확인 질문군", "관찰된 차이"], tone: "primary", rank: "02" },
+  { title: "지금 먼저 확인할 것", labels: ["AI 노출 개선 우선 항목", "경쟁업체와 반복된 차이", "먼저 확인할 곳"], tone: "primary", rank: "02" },
   {
     title: "AI에서 내 업체 대신 자주 보이는 곳",
-    labels: ["주요 경쟁업체", "함께 등장한 질문 수"],
+    labels: ["주요 경쟁업체", "경쟁업체가 자주 나온 질문"],
     tone: "muted",
     rank: "03",
   },
@@ -111,8 +111,8 @@ const PREVIEW_CARDS: {
     rank: "04",
   },
   {
-    title: "AI에 자주 추천되는 업체들의 공통 출처 패턴",
-    labels: ["반복 관찰 출처", "연결 여부"],
+    title: "AI 추천시장에서 반복되는 패턴",
+    labels: ["고노출 업체 공통 출처", "내 업체 연결 여부"],
     tone: "muted",
     rank: "05",
   },
@@ -429,7 +429,7 @@ function LandingPage() {
             <div className="max-w-3xl">
               <p className="mb-3 text-[11px] font-semibold tracking-[0.2em] text-primary">REPORT</p>
               <h2 className="text-2xl font-bold tracking-tight sm:text-[1.85rem]">
-                사장님이 알아야 할 핵심만 먼저 보여드립니다.
+                복잡한 AI 분석, 사장님에게 필요한 결과만 보여드립니다.
               </h2>
               <p className="mt-4 text-sm leading-[1.75] text-muted-foreground sm:text-base">
                 복잡한 분석은 시스템이 처리하고, 화면에서는 이해하기 쉬운 결과부터 순서대로
