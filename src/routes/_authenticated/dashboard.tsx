@@ -386,6 +386,79 @@ function DashboardPage() {
             </Card>
           </div>
 
+          {benchmark && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">AI에 자주 추천되는 업체들은 어디에서 많이 보일까요?</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm">
+                  최근 자동차 업체 측정 데이터를 모아, AI에 자주 노출되는 업체들과 반복적으로
+                  연결되는 출처를 확인합니다.
+                </p>
+                <p className="text-sm">
+                  AI 노출률 {benchmark.thresholdPct}% 이상인 업체{" "}
+                  {benchmark.highVisibilityEntityCount}곳에서 자주 연결된 출처를 모았습니다.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    최근 {benchmark.windowDays}일
+                  </Badge>
+                  {benchmark.dataStatus === "early" && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      표본 축적 중
+                    </Badge>
+                  )}
+                  {benchmark.dataStatus === "early" && (
+                    <span className="text-xs text-muted-foreground">
+                      현재는 초기 패턴입니다. 데이터가 쌓이면 고노출 기준과 출처 패턴이 자동으로
+                      다시 계산됩니다.
+                    </span>
+                  )}
+                </div>
+                {benchmark.sourceGroups.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">
+                    아직 공통 출처 패턴을 판단할 표본이 부족합니다.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {benchmark.sourceGroups.slice(0, 4).map((g) => {
+                      const siteLabels = (g.sites ?? [])
+                        .slice(0, 3)
+                        .map((s) => s.label)
+                        .join(" · ");
+                      return (
+                        <div
+                          key={g.key}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">{g.label}</p>
+                            {siteLabels && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{siteLabels}</p>
+                            )}
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              고노출 업체 {benchmark.highVisibilityEntityCount}곳 중{" "}
+                              {g.highEntityCount}곳에서 관찰
+                              {g.highEntitySharePct !== null
+                                ? ` (${g.highEntitySharePct.toFixed(1)}%)`
+                                : ""}
+                              {g.patternStrength !== "early" ? " · 반복 관찰" : ""}
+                            </p>
+                          </div>
+                          <Badge variant={g.targetConnected ? "default" : "secondary"}>
+                            {g.targetConnected ? "연결 있음" : "미관찰"}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">{benchmark.disclaimer}</p>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">어떤 검색 상황에서 강하고 약한가요?</CardTitle>
