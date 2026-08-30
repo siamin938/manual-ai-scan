@@ -141,8 +141,11 @@ function DashboardPage() {
 
       {!businessId && !businesses.isLoading && (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            진단할 대상 업체가 없습니다. 업체 관리에서 대상 업체를 먼저 등록하세요.
+          <CardContent className="space-y-3 py-10 text-center text-sm text-muted-foreground">
+            <p>진단할 대상 업체가 없습니다. 내 업체를 먼저 등록하세요.</p>
+            <Button asChild>
+              <Link to="/businesses">내 업체 등록하기</Link>
+            </Button>
           </CardContent>
         </Card>
       )}
