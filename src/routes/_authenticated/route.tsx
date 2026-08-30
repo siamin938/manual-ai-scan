@@ -29,14 +29,6 @@ const NAV = [
   { to: "/businesses", label: "내 업체" },
   { to: "/questions", label: "질문" },
   { to: "/runs", label: "AI 측정" },
-  { to: "/reports/customer", label: "보고서" },
-] as const;
-
-const ADVANCED_NAV = [
-  { to: "/insights", label: "AI 인사이트" },
-  { to: "/profile-coverage", label: "프로필 커버리지" },
-  { to: "/experiments", label: "Change Impact" },
-  { to: "/manual-checks", label: "수동 UI 점검" },
 ] as const;
 
 
