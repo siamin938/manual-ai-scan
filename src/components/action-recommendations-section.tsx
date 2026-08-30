@@ -189,7 +189,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
 
 
         <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">데이터 근거</p>
+          <p className="font-medium text-foreground">이 판단의 근거</p>
           <p className="mt-1">
             내 업체 등장 답변 {e.clientResponseCount} · 경쟁업체 등장 답변{" "}
             {e.competitorResponseCount} · 함께 관찰된 경쟁업체 {e.distinctCompetitorCount}곳
@@ -202,7 +202,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
 
         {rec.sampleQuestions.length > 0 && (
           <div>
-            <p className="text-sm font-medium">관련 질문 예시</p>
+            <p className="text-sm font-medium">실제로 측정한 질문 예시</p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
               {rec.sampleQuestions.slice(0, 2).map((q, i) => (
                 <li key={i}>{q}</li>

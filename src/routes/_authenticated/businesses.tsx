@@ -382,15 +382,15 @@ function BusinessesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">업체 관리</h1>
-          <p className="mt-1 text-sm text-muted-foreground">대상 업체와 경쟁업체를 등록하고 관리합니다.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">내 업체</h1>
+          <p className="mt-1 text-sm text-muted-foreground">AI에서 확인할 내 업체 정보를 등록하고 관리합니다.</p>
         </div>
-        {canWrite && <Button onClick={openNew}>업체 추가</Button>}
+        {canWrite && <Button onClick={openNew}>내 업체 추가</Button>}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">등록 업체 {businesses.length}곳</CardTitle>
+          <CardTitle className="text-base">등록된 업체 {businesses.length}곳</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
