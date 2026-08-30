@@ -17,18 +17,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "AI Visibility Lab | 자동차 업체 AI 노출 분석" },
+      { title: "차보임 CHABOIM | 자동차 업체 AI 추천시장 분석" },
       {
         name: "description",
         content:
-          "실제 고객이 물어볼 만한 질문을 반복 측정해 자동차 업체의 AI 노출, 함께 등장하는 경쟁업체, 답변에 실제로 연결된 인용 출처를 분석합니다.",
+          "실제 고객 질문을 반복 측정해 자동차 업체의 AI 노출, 경쟁업체, 실제 인용 출처와 AI 추천시장의 반복 패턴을 분석합니다.",
       },
-      { property: "og:title", content: "AI Visibility Lab | 자동차 업체 AI 노출 분석" },
+      { property: "og:title", content: "차보임 CHABOIM | 자동차 업체 AI 추천시장 분석" },
       {
         property: "og:description",
         content:
-          "내 업체가 AI 답변에서 얼마나 추천되는지, 누가 대신 등장하는지, 어떤 출처가 연결되는지 반복 측정으로 확인합니다.",
+          "실제 고객 질문을 반복 측정해 자동차 업체의 AI 노출, 경쟁업체, 실제 인용 출처와 AI 추천시장의 반복 패턴을 분석합니다.",
       },
+
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://manual-ai-scan.lovable.app/" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -100,9 +101,13 @@ function LandingPage() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-          <span className="text-sm font-semibold tracking-tight sm:text-base">
-            AI Visibility Lab
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-base font-semibold tracking-tight sm:text-lg">차보임</span>
+            <span className="text-[10px] font-medium tracking-widest text-muted-foreground">
+              CHABOIM
+            </span>
           </span>
+
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
             <a href="#service" className="transition-colors hover:text-foreground">
               서비스 소개

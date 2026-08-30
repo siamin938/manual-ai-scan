@@ -12,10 +12,11 @@ export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "로그인 · AI Visibility Lab" },
-      { name: "description", content: "AI Visibility Lab 내부 운영 콘솔 로그인 및 회원가입 화면입니다." },
-      { property: "og:title", content: "로그인 · AI Visibility Lab" },
-      { property: "og:description", content: "AI Visibility Lab 내부 운영 콘솔 로그인 화면" },
+      { title: "로그인 · 차보임 CHABOIM" },
+      { name: "description", content: "차보임 CHABOIM 로그인 및 회원가입 화면입니다. 자동차 업체 AI 추천시장 분석 서비스." },
+      { property: "og:title", content: "로그인 · 차보임 CHABOIM" },
+      { property: "og:description", content: "자동차 업체 AI 추천시장 분석 서비스 로그인" },
+
     ],
   }),
   component: AuthPage,
@@ -70,10 +71,12 @@ function AuthPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">AI Visibility Lab</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">차보임</h1>
+          <p className="text-xs font-medium tracking-widest text-muted-foreground">CHABOIM</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            AI 답변 노출 수동 점검 · 내부 운영 콘솔
+            자동차 업체 AI 추천시장 분석
           </p>
+
         </div>
         <Card>
           <CardHeader>

@@ -56,9 +56,13 @@ function Shell() {
     <div className="min-h-screen bg-background">
       <header className="no-print sticky top-0 z-20 border-b bg-card">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link to="/dashboard" className="text-sm font-semibold tracking-tight">
-            AI Visibility Lab
+          <Link to="/dashboard" className="flex items-baseline gap-1.5">
+            <span className="text-sm font-semibold tracking-tight">차보임</span>
+            <span className="text-[10px] font-medium tracking-widest text-muted-foreground">
+              CHABOIM
+            </span>
           </Link>
+
           <nav className="order-3 flex w-full flex-wrap gap-1 md:order-none md:w-auto">
             {NAV.map((n) => (
               <Link
