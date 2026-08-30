@@ -51,8 +51,13 @@ function AuthPage() {
 
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
+    if (password !== passwordConfirm) {
+      toast.error("비밀번호가 일치하지 않습니다.");
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.auth.signUp({
+
       email,
       password,
       options: {
