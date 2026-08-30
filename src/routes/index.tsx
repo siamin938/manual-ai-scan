@@ -245,7 +245,8 @@ function LandingPage() {
         <section id="method" className="scroll-mt-20 border-b bg-muted/30">
           <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              AI Visibility Lab은 이렇게 분석합니다.
+              차보임은 이렇게 분석합니다.
+
             </h2>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {METHOD_STEPS.map((s) => (
@@ -362,8 +363,9 @@ function LandingPage() {
 
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span className="font-medium text-foreground">AI Visibility Lab</span>
-          <span className="text-xs">자동차 업체 AI 노출 분석</span>
+          <span className="font-medium text-foreground">차보임 CHABOIM</span>
+          <span className="text-xs">자동차 업체 AI 추천시장 분석</span>
+
         </div>
       </footer>
     </div>
