@@ -5,35 +5,90 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
+import {
+  getBusinessSaveErrorMessage,
+  normalizeBusinessName,
+} from "@/lib/business-registration.helpers";
 
-const ERRORS: Record<string, string> = {
-  INVALID_ORGANIZATION_NAME: "조직 이름은 2자 이상이어야 합니다.",
-  INVALID_SLUG: "슬러그는 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.",
-  SLUG_ALREADY_EXISTS: "이미 사용 중인 슬러그입니다.",
-  AUTH_REQUIRED: "로그인이 필요합니다.",
-};
+const AUTO_CATEGORY_OPTIONS = [
+  "자동차 튜닝",
+  "자동차 정비",
+  "자동차 디테일링/세차",
+  "썬팅/신차패키지",
+  "자동차 용품/전장",
+  "타이어/휠",
+  "렌터카/자동차 서비스",
+] as const;
+
+const SETUP_ERROR_MESSAGE = "업체 등록 중 오류가 발생했습니다. 다시 시도해 주세요.";
+
+function generateInternalSlug(): string {
+  return `biz-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+}
 
 export function OrgOnboarding() {
   const { refetch } = useOrg();
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
+  const [category, setCategory] = useState("");
+  const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
+  const [createdOrgId, setCreatedOrgId] = useState<string | null>(null);
 
-  async function create(e: React.FormEvent) {
+  const normalizedName = normalizeBusinessName(name);
+
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!normalizedName || !category) return;
     setBusy(true);
-    const { error } = await supabase.rpc("create_organization_with_owner", {
-      p_name: name,
-      p_slug: slug,
+
+    let orgId = createdOrgId;
+
+    if (!orgId) {
+      const { data, error } = await supabase.rpc("create_organization_with_owner", {
+        p_name: normalizedName,
+        p_slug: generateInternalSlug(),
+      });
+      if (error || !data) {
+        setBusy(false);
+        toast.error(SETUP_ERROR_MESSAGE);
+        return;
+      }
+      orgId = data as unknown as string;
+      setCreatedOrgId(orgId);
+    }
+
+    const { error: insertError } = await supabase.from("businesses").insert({
+      org_id: orgId,
+      name: normalizedName,
+      aliases: [],
+      category,
+      address: address.trim() || null,
+      country_code: "KR",
+      region: null,
+      city: null,
+      website_url: null,
+      naver_place_url: null,
+      google_maps_url: null,
+      is_client_business: true,
+      active: true,
     });
+
     setBusy(false);
-    if (error) {
-      const key = Object.keys(ERRORS).find((k) => error.message.includes(k));
-      toast.error(key ? ERRORS[key]! : `조직 생성 실패: ${error.message}`);
+
+    if (insertError) {
+      toast.error(getBusinessSaveErrorMessage(insertError));
       return;
     }
-    toast.success("조직이 생성되었습니다.");
+
+    toast.success("내 업체가 등록되었습니다.");
     refetch();
   }
 
@@ -41,38 +96,65 @@ export function OrgOnboarding() {
     <div className="mx-auto max-w-lg py-10">
       <Card>
         <CardHeader>
-          <CardTitle>조직 만들기</CardTitle>
+          <CardTitle>분석할 내 업체를 등록해주세요</CardTitle>
           <CardDescription>
-            소속된 조직이 없습니다. 새 조직을 만들면 소유자(owner) 권한이 부여됩니다.
+            업체 기본 정보를 등록하면 검색 질문을 만들고 AI 노출 측정을 시작할 수 있습니다.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={create}>
+          <form className="space-y-4" onSubmit={submit}>
             <div className="space-y-2">
-              <Label htmlFor="org-name">조직 이름</Label>
+              <Label htmlFor="biz-name">업체명</Label>
               <Input
-                id="org-name"
+                id="biz-name"
                 required
                 value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                }}
-                placeholder="예: 시아민 마케팅"
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 현대엑스티어 판교점"
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="org-slug">슬러그</Label>
-              <Input
-                id="org-slug"
-                required
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.toLowerCase())}
-                placeholder="예: siamin-marketing"
-              />
-              <p className="text-xs text-muted-foreground">영문 소문자, 숫자, 하이픈만 사용 가능합니다.</p>
+              <Label htmlFor="biz-category">업종</Label>
+              <Select
+                {...(category ? { value: category } : {})}
+                onValueChange={setCategory}
+              >
+                <SelectTrigger id="biz-category">
+                  <SelectValue placeholder="업종을 선택하세요" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUTO_CATEGORY_OPTIONS.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                엔진오일·윤활유 전문점은 「자동차 정비」를 선택해 주세요.
+              </p>
             </div>
-            <Button type="submit" className="w-full" disabled={busy}>
-              조직 생성
+
+            <div className="space-y-2">
+              <Label htmlFor="biz-address">주소 (권장)</Label>
+              <Input
+                id="biz-address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="예: 경기도 성남시 분당구 …"
+              />
+              <p className="text-xs text-muted-foreground">
+                주소를 입력하면 지역 기반 검색 질문을 더 정확하게 만들 수 있습니다.
+              </p>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={busy || !normalizedName || !category}
+            >
+              내 업체 등록하고 시작하기
             </Button>
           </form>
         </CardContent>
