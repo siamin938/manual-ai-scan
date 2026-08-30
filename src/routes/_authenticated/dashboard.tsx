@@ -122,11 +122,10 @@ function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">AI 노출 진단</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">내 AI 노출 진단</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            실제 고객이 물을 법한 질문들을 반복 측정해, AI 답변에서 내 업체가 얼마나 추천되는지와
-            함께 등장한 업체·인용 출처를 정리해 보여줍니다. 특정 작업이 노출을 올렸다는 인과관계는
-            주장하지 않으며, 관찰된 값만 표시합니다.
+            고객이 실제로 물을 법한 질문으로 AI 답변을 측정해, 내 업체의 노출과 경쟁업체·인용
+            출처를 확인합니다.
           </p>
         </div>
         <BusinessSelector
