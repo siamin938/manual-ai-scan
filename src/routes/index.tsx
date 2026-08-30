@@ -137,10 +137,7 @@ function LandingPage() {
     <div className="min-h-screen bg-background text-foreground [--grid-line:color-mix(in_oklab,var(--foreground)_7%,transparent)]">
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-          <span className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/25 bg-primary/8 text-[11px] font-bold tracking-tight text-primary">
-              CB
-            </span>
+          <span className="flex items-center">
             <span className="flex flex-col leading-none">
               <span className="text-base font-semibold tracking-tight sm:text-[17px]">차보임</span>
               <span className="mt-0.5 text-[9px] font-medium tracking-[0.22em] text-muted-foreground">
@@ -202,7 +199,7 @@ function LandingPage() {
               <div className="mt-8 flex flex-wrap gap-3">
                 <Button asChild size="lg">
                   <Link to="/auth">
-                    AI 노출 분석 시작하기
+                    내 업체 AI 노출 확인하기
                     <ArrowRight className="ml-1 h-4 w-4" />
                   </Link>
                 </Button>
