@@ -70,20 +70,6 @@ function Shell() {
                 {n.label}
               </Link>
             ))}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-sm text-muted-foreground">
-                  고급/운영
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {ADVANCED_NAV.map((n) => (
-                  <DropdownMenuItem key={n.to} asChild>
-                    <Link to={n.to}>{n.label}</Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
