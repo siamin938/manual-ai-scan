@@ -1,10 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import {
-  getClientBusinessOptions,
-  type ClientBusinessOptionDTO,
-} from "@/lib/client-business-options.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { type ClientBusinessOptionDTO } from "@/lib/client-business-options.functions";
 import { resolveSelectedBusinessId } from "@/lib/client-business-selection";
 import { useActiveTargetBusiness } from "@/lib/active-business";
 import {
@@ -17,14 +14,23 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function useClientBusinessSelection(activeOrgId: string | null | undefined) {
-  const fetchOptions = useServerFn(getClientBusinessOptions);
   const shared = useActiveTargetBusiness();
 
   const query = useQuery({
     queryKey: ["client-business-options", activeOrgId],
     enabled: !!activeOrgId,
     staleTime: 5 * 60_000,
-    queryFn: () => fetchOptions({ data: { orgId: activeOrgId as string } }),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("businesses")
+        .select("id, name")
+        .eq("org_id", activeOrgId as string)
+        .eq("is_client_business", true)
+        .eq("active", true)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return { businesses: (data ?? []) as ClientBusinessOptionDTO[] };
+    },
   });
 
   const options: ClientBusinessOptionDTO[] = useMemo(
