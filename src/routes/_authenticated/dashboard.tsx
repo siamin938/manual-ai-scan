@@ -177,83 +177,54 @@ function DashboardPage() {
 
       {payload && d && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">이번 분석 한눈에 보기</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5 text-sm">
+              <p>
+                AI 답변 {d.overview.validCount}건을 분석했고, 그중 {d.overview.mentionCount}건에서 내
+                업체가 추천됐습니다.
+              </p>
+              <p>상위 3곳 안에 추천된 답변은 {d.overview.top3Count}건입니다.</p>
+              {aggregate && (
+                <p>
+                  동일 조건 {aggregate.compatibleRunCount}회 반복 측정으로 총{" "}
+                  {aggregate.validCount}건을 함께 확인했습니다.
+                </p>
+              )}
+              {(d.competitors.length > 0 || d.sources.length > 0) && (
+                <p className="text-muted-foreground">
+                  함께 등장한 업체 {d.competitors.length}곳과 AI가 참고한 출처 {d.sources.length}곳도
+                  같이 비교했습니다.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <MetricCard
-              label="전체 AI 노출률"
+              label="AI에서 내 업체가 추천된 비율"
               value={pct(d.overview.visibilityRatePct)}
-              note={`반복 측정한 AI 답변 ${d.overview.validCount}건 중 내 업체가 추천된 ${d.overview.mentionCount}건`}
+              note={`AI 답변 ${d.overview.validCount}건 중 ${d.overview.mentionCount}건에서 추천`}
             />
             <MetricCard
-              label="Top3 노출률"
+              label="상위 3곳 안에 추천된 비율"
               value={pct(d.overview.top3RatePct)}
-              note={`추천 순위 3위 안에 든 답변 ${d.overview.top3Count}건`}
+              note={`추천 순서 3번째 안에 든 답변 ${d.overview.top3Count}건`}
             />
             <MetricCard
-              label="노출된 질문 비율"
+              label="한 번 이상 노출된 검색 질문"
               value={pct(d.overview.questionCoverageRatePct)}
-              note={`질문 ${d.overview.questionCount}개 중 내 업체가 한 번 이상 노출된 ${d.overview.coveredQuestionCount}개`}
-            />
-            <MetricCard
-              label="유효 측정 수"
-              value={String(d.overview.validCount)}
-              note={`최근 측정 ${formatSeoul(d.scope.measuredAt)}`}
+              note={`질문 ${d.overview.questionCount}개 중 ${d.overview.coveredQuestionCount}개에서 노출`}
             />
           </div>
 
           <p className="text-xs text-muted-foreground">
-            기준 측정: {d.scope.runName} · {d.scope.providers.join(", ")} · 반복{" "}
-            {d.scope.repetitions}회 · 완료 {d.scope.completedJobs}/{d.scope.totalJobs}
+            분석에 사용한 AI 답변 {d.overview.validCount}건 · 최근 측정{" "}
+            {formatSeoul(d.scope.measuredAt)}
             {d.overview.invalidCount > 0 ? ` · 제외 ${d.overview.invalidCount}건` : ""}
           </p>
-
-          {aggregate && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">반복 측정 통합</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  최신 상태 진단과 별개이며, 동일 조건 반복 측정의 표본을 합친 신뢰도 참고값입니다.
-                </p>
-                <p className="text-sm">
-                  동일 조건 측정 {aggregate.compatibleRunCount}회 · 유효 답변{" "}
-                  {aggregate.validCount}건
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">통합 노출률</p>
-                    <p className="mt-1 text-2xl font-semibold tabular-nums">
-                      {pct(aggregate.visibilityRatePct)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      노출 {aggregate.mentionCount}건
-                    </p>
-                  </div>
-                  <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">통합 Top3 노출률</p>
-                    <p className="mt-1 text-2xl font-semibold tabular-nums">
-                      {pct(aggregate.top3RatePct)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Top3 {aggregate.top3Count}건
-                    </p>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  질문 안정성 · 질문 {aggregate.questionCount}개 중 항상 노출{" "}
-                  {aggregate.alwaysVisibleQuestionCount}개 · 일부 노출{" "}
-                  {aggregate.sometimesVisibleQuestionCount}개 · 미노출{" "}
-                  {aggregate.neverVisibleQuestionCount}개
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  집계 기간 {formatSeoul(aggregate.windowStart)} ~{" "}
-                  {formatSeoul(aggregate.windowEnd)}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-
 
           {(d.dataQuality.measurementRowsCapped || d.dataQuality.sourceRowsCapped) && (
             <p className="text-xs text-muted-foreground">
@@ -261,207 +232,116 @@ function DashboardPage() {
             </p>
           )}
 
-          {benchmark && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">고노출 업체 공통 출처 패턴</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm">
-                  AI 노출률 {benchmark.thresholdPct}% 이상인 업체 {benchmark.highVisibilityEntityCount}곳에서
-                  자주 연결된 출처를 모았습니다.
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    최근 {benchmark.windowDays}일
-                  </Badge>
-                  {benchmark.dataStatus === "early" && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                      표본 축적 중
-                    </Badge>
-                  )}
-                  {benchmark.dataStatus === "early" && (
-                    <span className="text-xs text-muted-foreground">
-                      현재는 초기 패턴입니다. 데이터가 쌓이면 고노출 기준과 출처 패턴이 자동으로
-                      다시 계산됩니다.
-                    </span>
-                  )}
-                </div>
-                {benchmark.sourceGroups.length === 0 ? (
-                  <p className="py-4 text-center text-sm text-muted-foreground">
-                    아직 공통 출처 패턴을 판단할 표본이 부족합니다.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {benchmark.sourceGroups.slice(0, 4).map((g) => {
-                      const siteLabels = (g.sites ?? [])
-                        .slice(0, 3)
-                        .map((s) => s.label)
-                        .join(" · ");
-                      return (
-                        <div
-                          key={g.key}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium">{g.label}</p>
-                            {siteLabels && (
-                              <p className="mt-0.5 text-xs text-muted-foreground">{siteLabels}</p>
-                            )}
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              고노출 업체 {benchmark.highVisibilityEntityCount}곳 중 {g.highEntityCount}곳에서
-                              관찰
-                              {g.highEntitySharePct !== null
-                                ? ` (${g.highEntitySharePct.toFixed(1)}%)`
-                                : ""}
-                              {g.patternStrength !== "early" ? " · 반복 관찰" : ""}
-                            </p>
-                          </div>
-                          <Badge variant={g.targetConnected ? "default" : "secondary"}>
-                            {g.targetConnected ? "연결 있음" : "미관찰"}
-                          </Badge>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">{benchmark.disclaimer}</p>
-              </CardContent>
-            </Card>
-          )}
-
-
           <ActionRecommendationsSection orgId={activeOrgId ?? null} businessId={businessId ?? null} />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">질문군 경쟁력</CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">AI에서 내 업체 대신 자주 보이는 곳</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <p className="mb-1 text-xs text-muted-foreground">
+                같은 질문에서 반복해서 함께 등장한 주요 경쟁업체입니다. 업체를 누르면 어떤 질문과
+                출처에서 등장했는지 확인할 수 있습니다.
+              </p>
+              {d.competitorGate ? (
                 <p className="mb-3 text-xs text-muted-foreground">
-                  질문을 의도별로 묶은 뒤, 각 질문군에서 내 업체가 얼마나 추천됐는지 관찰값을
-                  비교한 표입니다. 표는 실제 측정된 값만 보여주며, 노출률과 Top3 값을 기준으로
-                  질문군별 차이를 확인하세요.
+                  자주 등장 {d.competitorGate.coreCount}곳 · 가끔 등장{" "}
+                  {d.competitorGate.notableCount}곳
                 </p>
-                {d.questionGroups.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    질문군 요약이 아직 없습니다.
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>질문군</TableHead>
-                        <TableHead>질문</TableHead>
-                        <TableHead>측정</TableHead>
-                        <TableHead>노출</TableHead>
-                        <TableHead>노출률</TableHead>
-                        <TableHead>Top3</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {d.questionGroups.map((g) => (
-                        <TableRow key={g.intentType}>
-                          <TableCell className="text-sm">{intentLabel(g.intentType)}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{g.questionCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {g.measurementCount}
-                          </TableCell>
-                          <TableCell className="text-sm tabular-nums">{g.mentionCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {pct(g.visibilityRatePct)}
-                          </TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {pct(g.top3RatePct)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">AI 추천시장에 함께 등장한 업체</CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <p className="mb-1 text-xs text-muted-foreground">
-                  반복 노출·질문 다양성·동일 조건 재현성을 바탕으로 확인할 가치가 있는 업체만
-                  표시합니다. 1회성 관찰 후보는 내부에만 보관되며 목록에는 나오지 않습니다.
-                  업체를 클릭하면 등장 질문과 함께 인용된 출처를 볼 수 있습니다.
+              ) : null}
+              {d.competitors.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  함께 등장한 다른 업체가 없습니다.
                 </p>
-                {d.competitorGate ? (
-                  <p className="mb-3 text-xs text-muted-foreground">
-                    핵심 {d.competitorGate.coreCount}곳 · 주목 {d.competitorGate.notableCount}곳 ·
-                    관찰 후보 {d.competitorGate.watchCount}곳
-                  </p>
-                ) : null}
-                {d.competitors.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    함께 등장한 다른 업체가 없습니다.
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>업체</TableHead>
-                        <TableHead>질문 수</TableHead>
-                        <TableHead>등장 답변 수</TableHead>
-                        <TableHead>답변 비율</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {d.competitors.map((c) => (
-                        <TableRow key={c.name}>
-                          <TableCell className="text-sm">
-                            <span className="flex flex-wrap items-center gap-1.5">
-                              <button
-                                type="button"
-                                className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                onClick={() => setSelectedCompetitor(c.name)}
-                              >
-                                {c.name}
-                                <span className="sr-only"> 상세 보기</span>
-                              </button>
-                              <Badge
-                                variant={c.tier === "core" ? "default" : "secondary"}
-                                className="text-[10px] px-1.5 py-0"
-                              >
-                                {c.tierLabel}
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>업체</TableHead>
+                      <TableHead>질문 수</TableHead>
+                      <TableHead>등장 답변 수</TableHead>
+                      <TableHead>답변 비율</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {d.competitors.map((c) => (
+                      <TableRow key={c.name}>
+                        <TableCell className="text-sm">
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              onClick={() => setSelectedCompetitor(c.name)}
+                            >
+                              {c.name}
+                              <span className="sr-only"> 상세 보기</span>
+                            </button>
+                            <Badge
+                              variant={c.tier === "core" ? "default" : "secondary"}
+                              className="text-[10px] px-1.5 py-0"
+                            >
+                              {c.tierLabel}
+                            </Badge>
+                            {c.isNew && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                신규
                               </Badge>
-                              {c.isNew && (
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                  신규
-                                </Badge>
-                              )}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm tabular-nums">{c.questionCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{c.responseCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {pct(c.responseRatePct)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                            )}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums">{c.questionCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{c.responseCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">
+                          {pct(c.responseRatePct)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
 
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">내 업체가 잘 보이지 않는 검색 질문</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  측정에서 내 업체가 전혀 보이지 않았거나 가끔만 보인 질문입니다. 먼저 확인해 볼
+                  영역입니다.
+                </p>
+                {d.priorityAreas.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    노출이 약한 질문이 없습니다.
+                  </p>
+                ) : (
+                  d.priorityAreas.map((p) => (
+                    <div key={p.questionId} className="rounded-md border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-medium">{p.questionText}</p>
+                        <Badge variant={p.status === "missing" ? "destructive" : "secondary"}>
+                          {STATUS_LABEL[p.status]}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {intentLabel(p.intentType)} · 측정 {p.measurementCount}회 · 노출{" "}
+                        {p.mentionCount}회 · 노출률 {pct(p.visibilityRatePct)}
+                      </p>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">AI 답변에 자주 인용된 출처</CardTitle>
+                <CardTitle className="text-base">AI가 실제 답변에 참고한 출처</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
-                  AI가 검색 중 검토한 모든 URL이 아니라, 최종 답변에 실제로 인용된 출처만
-                  모았습니다.
+                  검색 중 본 모든 웹사이트가 아니라, 최종 AI 답변에 실제로 연결된 출처입니다.
                 </p>
                 {d.sources.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
@@ -500,101 +380,241 @@ function DashboardPage() {
                 )}
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">노출이 약한 질문</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  반복 측정에서 내 업체 노출이 관찰되지 않았거나 일부만 관찰된 질문입니다.
-                  원인 분석이 아니라 우선 확인해 볼 약한 영역입니다.
-                </p>
-                {d.priorityAreas.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    노출이 약한 질문이 없습니다.
-                  </p>
-                ) : (
-                  d.priorityAreas.map((p) => (
-                    <div key={p.questionId} className="rounded-md border p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-medium">{p.questionText}</p>
-                        <Badge variant={p.status === "missing" ? "destructive" : "secondary"}>
-                          {STATUS_LABEL[p.status]}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {intentLabel(p.intentType)} · 측정 {p.measurementCount}회 · 노출{" "}
-                        {p.mentionCount}회 · 노출률 {pct(p.visibilityRatePct)}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">노출률 변화 추적</CardTitle>
+              <CardTitle className="text-base">어떤 검색 상황에서 강하고 약한가요?</CardTitle>
             </CardHeader>
-            <CardContent>
-              {payload.trend.length >= 2 ? (
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={payload.trend.map((t) => ({
-                        시점: formatSeoul(t.measuredAt),
-                        노출률: t.visibilityRatePct,
-                        Top3: t.top3RatePct,
-                      }))}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="시점" fontSize={11} />
-                      <YAxis unit="%" domain={[0, 100]} fontSize={12} />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="노출률"
-                        stroke="var(--color-chart-1)"
-                        strokeWidth={2}
-                        dot
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="Top3"
-                        stroke="var(--color-chart-2)"
-                        strokeWidth={2}
-                        dot
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+            <CardContent className="overflow-x-auto">
+              <p className="mb-3 text-xs text-muted-foreground">
+                비슷한 상황끼리 질문을 묶어, 어떤 상황에서 내 업체가 더 자주 추천됐는지 비교한
+                표입니다.
+              </p>
+              {d.questionGroups.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  질문군 요약이 아직 없습니다.
+                </p>
               ) : (
-                <div className="py-6 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    비교할 이전 측정 시점이 아직 없습니다. 현재 1개 시점 상태만 표시합니다.
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tabular-nums">
-                    {pct(payload.trend[0]?.visibilityRatePct ?? d.overview.visibilityRatePct)}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatSeoul(payload.trend[0]?.measuredAt ?? d.scope.measuredAt)} 기준 · 유효
-                    측정 {payload.trend[0]?.validCount ?? d.overview.validCount}회
-                  </p>
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>검색 상황</TableHead>
+                      <TableHead>질문 수</TableHead>
+                      <TableHead>답변 수</TableHead>
+                      <TableHead>추천된 답변</TableHead>
+                      <TableHead>추천 비율</TableHead>
+                      <TableHead>상위 3곳 비율</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {d.questionGroups.map((g) => (
+                      <TableRow key={g.intentType}>
+                        <TableCell className="text-sm">{intentLabel(g.intentType)}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{g.questionCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{g.measurementCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{g.mentionCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">
+                          {pct(g.visibilityRatePct)}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums">{pct(g.top3RatePct)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
 
-          <p className="text-xs text-muted-foreground">
-            변화 추적은 비교 가능한 동일 질문 세트에서의 관찰값 비교일 뿐, 특정 작업의 개선
-            효과를 의미하지 않습니다. 표시된 모든 값은 반복 측정된 AI 검색 결과에서 관찰된
-            상태이며, 모든 사용자가 같은 답변을 보게 된다는 뜻은 아니고 개선 효과를 보장하지도
-            않습니다.
-          </p>
+          <Collapsible>
+            <Card>
+              <CardHeader className="pb-2">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="px-0 text-sm font-medium">
+                    분석 방법과 신뢰도 자세히 보기
+                  </Button>
+                </CollapsibleTrigger>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    기준 측정: {d.scope.runName} · {d.scope.providers.join(", ")} · 반복{" "}
+                    {d.scope.repetitions}회 · 완료 {d.scope.completedJobs}/{d.scope.totalJobs}
+                  </p>
+
+                  {aggregate && (
+                    <div className="space-y-3 rounded-md border p-3">
+                      <p className="text-sm font-medium">같은 조건으로 다시 확인한 결과</p>
+                      <p className="text-xs text-muted-foreground">
+                        최신 상태 진단과 별개이며, 동일 조건 반복 측정의 표본을 합친 신뢰도
+                        참고값입니다.
+                      </p>
+                      <p className="text-sm">
+                        동일 조건 측정 {aggregate.compatibleRunCount}회 · 유효 답변{" "}
+                        {aggregate.validCount}건
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-md border p-3">
+                          <p className="text-xs text-muted-foreground">통합 노출률</p>
+                          <p className="mt-1 text-2xl font-semibold tabular-nums">
+                            {pct(aggregate.visibilityRatePct)}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            노출 {aggregate.mentionCount}건
+                          </p>
+                        </div>
+                        <div className="rounded-md border p-3">
+                          <p className="text-xs text-muted-foreground">통합 Top3 노출률</p>
+                          <p className="mt-1 text-2xl font-semibold tabular-nums">
+                            {pct(aggregate.top3RatePct)}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Top3 {aggregate.top3Count}건
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        질문 안정성 · 질문 {aggregate.questionCount}개 중 항상 노출{" "}
+                        {aggregate.alwaysVisibleQuestionCount}개 · 일부 노출{" "}
+                        {aggregate.sometimesVisibleQuestionCount}개 · 미노출{" "}
+                        {aggregate.neverVisibleQuestionCount}개
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        집계 기간 {formatSeoul(aggregate.windowStart)} ~{" "}
+                        {formatSeoul(aggregate.windowEnd)}
+                      </p>
+                    </div>
+                  )}
+
+                  {benchmark && (
+                    <div className="space-y-3 rounded-md border p-3">
+                      <p className="text-sm font-medium">AI에 자주 보이는 업체들의 공통 출처 패턴</p>
+                      <p className="text-sm">
+                        AI 노출률 {benchmark.thresholdPct}% 이상인 업체{" "}
+                        {benchmark.highVisibilityEntityCount}곳에서 자주 연결된 출처를 모았습니다.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          최근 {benchmark.windowDays}일
+                        </Badge>
+                        {benchmark.dataStatus === "early" && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            표본 축적 중
+                          </Badge>
+                        )}
+                        {benchmark.dataStatus === "early" && (
+                          <span className="text-xs text-muted-foreground">
+                            현재는 초기 패턴입니다. 데이터가 쌓이면 고노출 기준과 출처 패턴이
+                            자동으로 다시 계산됩니다.
+                          </span>
+                        )}
+                      </div>
+                      {benchmark.sourceGroups.length === 0 ? (
+                        <p className="py-4 text-center text-sm text-muted-foreground">
+                          아직 공통 출처 패턴을 판단할 표본이 부족합니다.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {benchmark.sourceGroups.slice(0, 4).map((g) => {
+                            const siteLabels = (g.sites ?? [])
+                              .slice(0, 3)
+                              .map((s) => s.label)
+                              .join(" · ");
+                            return (
+                              <div
+                                key={g.key}
+                                className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium">{g.label}</p>
+                                  {siteLabels && (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                      {siteLabels}
+                                    </p>
+                                  )}
+                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                    고노출 업체 {benchmark.highVisibilityEntityCount}곳 중{" "}
+                                    {g.highEntityCount}곳에서 관찰
+                                    {g.highEntitySharePct !== null
+                                      ? ` (${g.highEntitySharePct.toFixed(1)}%)`
+                                      : ""}
+                                    {g.patternStrength !== "early" ? " · 반복 관찰" : ""}
+                                  </p>
+                                </div>
+                                <Badge variant={g.targetConnected ? "default" : "secondary"}>
+                                  {g.targetConnected ? "연결 있음" : "미관찰"}
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">{benchmark.disclaimer}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 rounded-md border p-3">
+                    <p className="text-sm font-medium">시간에 따른 AI 노출 변화</p>
+                    {payload.trend.length >= 2 ? (
+                      <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart
+                            data={payload.trend.map((t) => ({
+                              시점: formatSeoul(t.measuredAt),
+                              노출률: t.visibilityRatePct,
+                              Top3: t.top3RatePct,
+                            }))}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="시점" fontSize={11} />
+                            <YAxis unit="%" domain={[0, 100]} fontSize={12} />
+                            <Tooltip />
+                            <Line
+                              type="monotone"
+                              dataKey="노출률"
+                              stroke="var(--color-chart-1)"
+                              strokeWidth={2}
+                              dot
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="Top3"
+                              stroke="var(--color-chart-2)"
+                              strokeWidth={2}
+                              dot
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          비교할 이전 측정 시점이 아직 없습니다. 현재 1개 시점 상태만 표시합니다.
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold tabular-nums">
+                          {pct(payload.trend[0]?.visibilityRatePct ?? d.overview.visibilityRatePct)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatSeoul(payload.trend[0]?.measuredAt ?? d.scope.measuredAt)} 기준 ·
+                          유효 측정 {payload.trend[0]?.validCount ?? d.overview.validCount}회
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    변화 추적은 비교 가능한 동일 질문 세트에서의 관찰값 비교일 뿐, 특정 작업의 개선
+                    효과를 의미하지 않습니다. 표시된 모든 값은 반복 측정된 AI 검색 결과에서 관찰된
+                    상태이며, 모든 사용자가 같은 답변을 보게 된다는 뜻은 아니고 개선 효과를
+                    보장하지도 않습니다.
+                  </p>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </>
       )}
+
 
       <CompetitorDetailDialog
         orgId={activeOrgId ?? null}
