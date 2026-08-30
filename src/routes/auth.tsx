@@ -27,6 +27,8 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -49,8 +51,13 @@ function AuthPage() {
 
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
+    if (password !== passwordConfirm) {
+      toast.error("비밀번호가 일치하지 않습니다.");
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.auth.signUp({
+
       email,
       password,
       options: {
@@ -125,6 +132,18 @@ function AuthPage() {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pw3">비밀번호 확인</Label>
+                    <Input
+                      id="pw3"
+                      type="password"
+                      required
+                      minLength={6}
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                    />
+                  </div>
+
                   <Button type="submit" className="w-full" disabled={busy}>
                     회원가입
                   </Button>
