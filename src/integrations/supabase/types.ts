@@ -2819,6 +2819,10 @@ export type Database = {
           monthly_reserved_cost_usd: number
         }[]
       }
+      get_visibility_repeat_aggregate_v01: {
+        Args: { p_business_id: string; p_org_id: string }
+        Returns: Json
+      }
       has_org_role: {
         Args: {
           allowed_roles: Database["public"]["Enums"]["app_role"][]
