@@ -40,13 +40,13 @@ import {
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: "AI 노출 진단 · AI Visibility Lab" },
+      { title: "AI 노출 진단 · 차보임 CHABOIM" },
       {
         name: "description",
         content:
           "여러 고객 질문에서 업체가 AI 답변에 관찰된 노출 상태, 질문군별 수치, 대신 등장한 경쟁업체와 인용 출처를 확인하는 진단 대시보드.",
       },
-      { property: "og:title", content: "AI 노출 진단 · AI Visibility Lab" },
+      { property: "og:title", content: "AI 노출 진단 · 차보임 CHABOIM" },
       {
         property: "og:description",
         content: "관찰된 AI 노출 상태와 우선 점검 영역을 요약한 진단 대시보드",

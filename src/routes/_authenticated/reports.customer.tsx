@@ -35,13 +35,13 @@ import {
 export const Route = createFileRoute("/_authenticated/reports/customer")({
   head: () => ({
     meta: [
-      { title: "고객 보고서 · AI Visibility Lab" },
+      { title: "고객 보고서 · 차보임 CHABOIM" },
       {
         name: "description",
         content:
           "AI 노출 상태, 핵심 관찰, 보완 영역, 권장 행동, 실험 전후 결과를 한 화면에 정리한 고객용 자동 보고서입니다.",
       },
-      { property: "og:title", content: "고객 보고서 · AI Visibility Lab" },
+      { property: "og:title", content: "고객 보고서 · 차보임 CHABOIM" },
       {
         property: "og:description",
         content: "AI 노출 상태와 개선 실험 결과를 정리한 고객용 자동 보고서.",
@@ -268,7 +268,7 @@ function CustomerReportPage() {
 
       <header className="border-b pb-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          AI Visibility Lab · 고객 보고서
+          차보임 CHABOIM · 고객 보고서
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           {business?.name ?? "고객 업체 없음"}

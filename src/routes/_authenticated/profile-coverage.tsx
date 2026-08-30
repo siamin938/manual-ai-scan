@@ -61,13 +61,13 @@ const COVERAGE_EXPERIMENT_ERROR_MESSAGES: Partial<
 export const Route = createFileRoute("/_authenticated/profile-coverage")({
   head: () => ({
     meta: [
-      { title: "프로필 커버리지 · AI Visibility Lab" },
+      { title: "프로필 커버리지 · 차보임 CHABOIM" },
       {
         name: "description",
         content:
           "AI 질문 영역에서 대상 업체가 얼마나 넓고 안정적으로 노출되는지 보여주는 프로필 커버리지 대시보드입니다.",
       },
-      { property: "og:title", content: "프로필 커버리지 · AI Visibility Lab" },
+      { property: "og:title", content: "프로필 커버리지 · 차보임 CHABOIM" },
       { property: "og:description", content: "Profile Coverage Engine 분석 결과 대시보드" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

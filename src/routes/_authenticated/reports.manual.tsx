@@ -24,9 +24,9 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/reports/manual")({
   head: () => ({
     meta: [
-      { title: "수동 점검 고객 보고서 · AI Visibility Lab" },
+      { title: "수동 점검 고객 보고서 · 차보임 CHABOIM" },
       { name: "description", content: "사람이 직접 확인한 AI 답변 결과를 정리한 인쇄용 고객 보고서." },
-      { property: "og:title", content: "수동 점검 고객 보고서 · AI Visibility Lab" },
+      { property: "og:title", content: "수동 점검 고객 보고서 · 차보임 CHABOIM" },
       { property: "og:description", content: "수동 점검 기반 고객 보고서" },
     ],
   }),
@@ -280,7 +280,7 @@ function ManualReportPage() {
       {target && (
         <div className="space-y-6">
           <header className="border-b pb-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">AI Visibility Lab · 수동 점검 보고서</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">차보임 CHABOIM · 수동 점검 보고서</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">{target.name}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {[target.category, target.region, target.city].filter(Boolean).join(" · ")}

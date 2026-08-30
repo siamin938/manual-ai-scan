@@ -56,12 +56,12 @@ import { Textarea } from "@/components/ui/textarea";
 export const Route = createFileRoute("/_authenticated/insights")({
   head: () => ({
     meta: [
-      { title: "AI 인사이트 · AI Visibility Lab" },
+      { title: "AI 인사이트 · 차보임 CHABOIM" },
       {
         name: "description",
         content: "AI 검색 측정 데이터를 분석해 노출 문제와 우선 테스트 행동을 보여주는 인사이트 대시보드입니다.",
       },
-      { property: "og:title", content: "AI 인사이트 · AI Visibility Lab" },
+      { property: "og:title", content: "AI 인사이트 · 차보임 CHABOIM" },
       { property: "og:description", content: "Insight Engine 분석 결과 대시보드" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

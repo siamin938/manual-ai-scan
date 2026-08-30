@@ -54,12 +54,12 @@ import {
 export const Route = createFileRoute("/_authenticated/questions")({
   head: () => ({
     meta: [
-      { title: "질문 인벤토리 · AI Visibility Lab" },
+      { title: "질문 인벤토리 · 차보임 CHABOIM" },
       {
         name: "description",
         content: "업체별로 실제 고객이 AI에 물을 법한 질문 인벤토리를 생성하고 검토합니다.",
       },
-      { property: "og:title", content: "질문 인벤토리 · AI Visibility Lab" },
+      { property: "og:title", content: "질문 인벤토리 · 차보임 CHABOIM" },
       { property: "og:description", content: "AI 질문 인벤토리 생성과 검토" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

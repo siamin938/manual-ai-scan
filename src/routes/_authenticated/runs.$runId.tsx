@@ -23,12 +23,12 @@ import { ENGINE_LABEL, RUN_STATUS_LABELS, runStatusVariant } from "./runs.index"
 export const Route = createFileRoute("/_authenticated/runs/$runId")({
   head: () => ({
     meta: [
-      { title: "자동 측정 상세 · AI Visibility Lab" },
+      { title: "자동 측정 상세 · 차보임 CHABOIM" },
       {
         name: "description",
         content: "OpenAI Web Search API 벤치마크 실행의 측정 결과, 감지된 업체, 출처를 확인합니다.",
       },
-      { property: "og:title", content: "자동 측정 상세 · AI Visibility Lab" },
+      { property: "og:title", content: "자동 측정 상세 · 차보임 CHABOIM" },
       { property: "og:description", content: "자동 측정 실행 상세 및 측정 결과" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
