@@ -1,79 +1,62 @@
-# Entity Verification을 competitor_substitution 입력 gate로 전환 (조사 결과 + 계획)
+# UX 점검 리포트 — 소상공인 대상 AI 노출 진단 (수정 없음, 제안만)
 
-## 1) 자동 후처리 호출 순서가 구현된 위치
+점검 범위: 현재 코드 상태(상단 네비, 진단 대시보드, 업체 관리, 질문 인벤토리, AI 측정). 프리뷰는 외부 Supabase 인증이라 로그인 세션을 만들 수 없어 화면 캡처 대신 실제 렌더 코드/문구를 기준으로 점검했습니다.
 
-`src/lib/run-postprocess.functions.ts` (server function `runPostprocess`)에 단일 오케스트레이터로 구현되어 있습니다. 순서는:
+## 한 줄 결론
+분석 깊이(경쟁업체 티어, 반복 측정 통합, 출처 인용, 벤치마크)는 유료 서비스급인데, 화면이 "연구 도구" 언어와 표·숫자 위주로 구성돼 있어 컴퓨터에 익숙하지 않은 사장님은 첫 화면에서 무엇을 해야 하고 결과가 좋은지 나쁜지를 판단하기 어렵습니다.
 
-```text
-reparse-measurements (Edge)
-  -> entityVerification (verifyAndPersistBusinessEntities, .server.ts)
-  -> sourceClassification
-  -> measurementSummary
-  -> compute-profile-coverage (Edge)
-  -> firstPartyCoverage
-  -> compute-insights (Edge)
-```
+## P0 — 첫 사용자가 막히거나 오해하는 지점
 
-단계 상태/에러 코드 정의는 `src/lib/run-postprocess.helpers.ts`, UI 자동 트리거는 `src/routes/_authenticated/runs.$runId.tsx`에 있습니다.
+1. 온보딩 경로 없음
+   - `/`는 곧바로 `/dashboard`로 리다이렉트되고, 데이터가 없으면 "대상 업체가 없습니다"라는 문장만 보입니다. 등록 화면으로 가는 버튼도 없습니다.
+   - 제안: 진단 화면 최상단에 3단계 진행 표시(① 내 업체 등록 → ② 질문 만들기 → ③ AI 측정 시작)를 두고, 각 단계에 바로 가는 큰 버튼을 배치. 빈 상태 카드에 "내 업체 등록하러 가기" CTA 추가.
 
-즉 **Entity Verification이 compute-insights보다 먼저 실행되는 순서는 이미 충족**되어 있으며, 이번 단계에서 순서 변경은 필요하지 않습니다. 단계가 실패하면 이후 단계는 skipped 처리되어 insights도 실행되지 않습니다(fail-closed).
+2. 숫자의 의미(좋다/나쁘다)를 해석해 주지 않음
+   - `전체 AI 노출률 / Top3 노출률 / 노출된 질문 비율 / 유효 측정 수` 4개 카드가 값만 보여줍니다. 70.8%가 좋은 건지 나쁜 건지 알 수 없고, "유효 측정 수"는 고객 언어가 아닙니다.
+   - 제안: 맨 위에 한 문장 요약 배너 — "질문 24개 중 17번 추천되었습니다. 같은 지역 비교군 대비 보통 수준입니다." + 상태 뱃지(좋음/보통/개선 필요). "유효 측정 수"는 카드에서 빼고 보조 문구로 이동.
 
-## 2) compute-insights Edge Function 소스 접근 가능 여부
+3. 개발/연구 용어 노출
+   - `질문군(intent)`, `가중치`, `유효 측정`, `Top3`, `제외 N건`, `기준 측정: {runName} · {providers} · 반복 N회 · 완료 12/24`, `질문 인벤토리`, `AI 측정` 등.
+   - 제안 치환: 질문군(intent)→질문 유형, 가중치→중요도(또는 숨김), Top3→상위 3곳 안에 추천, 유효 측정→분석에 사용한 답변, 질문 인벤토리→내 질문, AI 측정→AI 검색 측정하기. 기술 메타(providers/runName/완료 수)는 "자세히 보기" 접기 안으로.
 
-**Lovable 저장소에서 직접 읽을 수 없습니다.** 이 프로젝트에는 `supabase/functions/` 디렉터리 자체가 없고(`supabase/`에는 `config.toml`과 `migrations`만 존재), Edge Function 소스는 연결된 외부 Supabase 프로젝트에만 존재합니다. 사용 가능한 도구는 배포/호출/로그 조회뿐이라, 기존 소스를 내려받아 diff 하는 것은 불가능합니다. 전체 소스를 새로 작성해 덮어쓰는 배포는 기술적으로 가능하지만, 현재 0.2.0 로직을 알 수 없으므로 **덮어쓰기는 회귀 위험이 커서 권장하지 않습니다.**
+4. 업체 등록 폼 부담
+   - 공식 업체명·업종·주소·시도·시군구·네이버 플레이스·홈페이지·구글 지도·별칭 수동 추가까지 한 화면에 노출.
+   - 제안: 필수 3개(업체명·업종·지역)만 1단계로 받고 저장 → 나머지(링크·별칭)는 "정확도 올리기(선택)" 접기 섹션. 별칭은 개념 설명 한 줄 필수("가게가 불리는 다른 이름").
 
-따라서 gate 적용 방식은 아래 두 갈래이며, 이 계획은 A안을 기본으로 합니다.
+5. 질문 만들기 흐름이 전문가용
+   - 세트/질문/intent/언어/국가/가중치/지역/도시를 직접 채우게 되어 있어, 사장님이 "무슨 질문을 넣어야 하지?"에서 멈춥니다.
+   - 제안: 기본 진입을 AI 자동 생성으로 두고(업체 선택 → "추천 질문 24개 만들기" 한 번 클릭 → 목록 체크박스로 확인), 수동 작성은 "직접 추가" 보조 버튼으로 강등.
 
-- **A안 (권장): DB 레이어 gate.** 코드가 아닌 데이터/뷰 계약으로 gate를 강제하고, Edge Function은 그 계약만 읽도록 최소 패치를 사용자가 적용.
-- **B안: Edge Function 전면 재작성 배포.** 소스 확보 후에만 검토.
+## P1 — 가치·전문성 인상 개선
 
-## 3) 확인된 현재 상태 (READ ONLY)
+6. 진단 정보 순서 재배치
+   - 현재: 지표 4개 → 기술 메타 → 반복 측정 통합 → 질문군 표 → 경쟁업체 → 출처 → 약한 질문 → 추세 → 벤치마크/추천.
+   - 제안 순서: ① 요약 한 문장 + 상태 → ② 지금 할 일 Top3(액션 추천을 위로) → ③ 나 대신 나오는 업체 → ④ 약한 질문 → ⑤ 인용 출처 → ⑥ 추세 → ⑦ 반복 측정 통합/벤치마크(신뢰도 근거, 접기).
+   - 근거: 사장님의 질문 순서는 "얼마나?→뭘 하지?→누가 대신?"입니다.
 
-- `public.measurement_entity_verifications` 컬럼: `org_id, business_id, measurement_id, measurement_mention_id, verifier_version, verification_status, verified_entity_kind, verified_count_as_business, confidence, reason_codes, created_at`. RLS 활성, service_role SELECT 가능.
-- 현재 데이터 분포(verifier_version 0.1.0): confirmed_business/specific_business/true = 9건, needs_review = 44건, rejected_non_business = 29건.
-- `insight_engine_runs.engine_version`에 존재하는 값: `0.1.1`, `0.2.0`. `0.2.1`은 아직 없음 → provenance 분리 여지 있음.
+7. 표 대신 시각 요약
+   - 경쟁업체·출처·질문군이 모두 4열 표(질문 수/등장 답변 수/답변 비율/인용 수)입니다. 카운트 열은 대부분 고객에게 불필요.
+   - 제안: 경쟁업체는 이름 + 티어 뱃지 + 가로 막대(추천 비율) 카드 리스트로, 상세 수치는 클릭 시 다이얼로그에 유지. 출처는 "블로그/지도·플레이스/뉴스" 그룹 아이콘 + 상위 도메인만.
 
-## 4) 계획
+8. 1회 측정 상태 안내 강화
+   - 액션 추천은 이미 1차 관찰 문구를 쓰지만, 상단 지표는 1회 측정도 동일하게 확정 수치처럼 보입니다.
+   - 제안: 반복 1회일 때 지표 카드 옆 "1차 관찰" 뱃지 + "한 번 더 측정하면 신뢰도가 올라갑니다" 재측정 버튼.
 
-### 단계 1 — Gate 계약을 DB 뷰로 고정 (migration)
+9. 측정 시작 후 기다림 경험
+   - `/runs`에서 시작하면 상세로 이동하지만, 진단 화면에는 진행 중 표시가 없습니다.
+   - 제안: 진단 상단에 "측정 진행 중 (12/24) 약 N분 남음" 진행 바, 완료 시 자동 갱신.
 
-읽기 전용 뷰 `public.v_entity_verified_business_mentions`를 추가:
+10. 전문성/신뢰 신호 정리
+    - 인과관계 부인 문구가 여러 카드에 반복 노출돼 오히려 자신 없어 보입니다.
+    - 제안: 면책은 리포트 하단 "측정 방법" 섹션 1곳으로 통합하고, 대신 상단에 "질문 24개 × 반복 3회 = 답변 72건 분석"처럼 표본 규모를 눈에 띄게 표기(이쪽이 유료 가치 인상에 더 효과적).
 
-- 조건: `verifier_version='0.1.0' AND verification_status='confirmed_business' AND verified_entity_kind='specific_business' AND verified_count_as_business=true`
-- 노출 컬럼: `org_id, business_id, measurement_id, measurement_mention_id` (텍스트/이유코드/증거 미노출)
-- `security_invoker=on`, `GRANT SELECT`는 `authenticated`, `service_role`에만 부여(anon 제외).
+## P2 — 다듬기
 
-이 뷰가 competitor_substitution의 **유일한 허용 mention 집합**입니다. verification row가 없으면 애초에 뷰에 없으므로 자동으로 fail-closed가 됩니다.
+11. 상단 네비 라벨: 진단 / 내 업체 / 질문 / AI 측정 → 내 AI 노출 / 내 업체 / 질문 관리 / 측정하기. 4개 유지는 적절하며, 첫 항목이 홈이라는 점을 로고 옆 표시로 보강.
+12. 조직 선택 셀렉트와 권한 뱃지(owner/admin)는 1인 사장님에게 불필요 — 조직이 1개면 숨김.
+13. 리포트 인쇄/PDF 저장 버튼을 진단 상단에 노출(유료 산출물 체감).
+14. 빈 상태 문구를 모두 "다음에 할 일" 문장 + 버튼 형태로 통일.
+15. 모바일: 4열 표 다수가 가로 스크롤 — 카드형 전환 시 함께 해결.
 
-### 단계 2 — compute-insights 최소 패치 지시서 재작성 (문서만, 배포는 사용자 확인 후)
-
-`docs/compute-insights-0.2.1-competitor-gate.md`를 **전면 교체**합니다(기존 텍스트 금지어/블랙리스트 방식 폐기 명시).
-
-새 지시서 내용:
-
-- `ENGINE_VERSION = "0.2.1"` (0.2.0 insight run은 그대로 보존, 재실행 시 새 run으로 분리)
-- `buildCompetitorSubstitutionFindings`에서 후보 루프 진입 전, 해당 run의 measurement mention id 집합을 위 뷰에서 조회해 `Set<measurement_mention_id>` 구성
-- 각 후보의 근거 mention이 그 Set에 없으면 `continue` (verification 없음/needs_review/rejected 모두 제외)
-- 텍스트 패턴 기반 판정 코드는 추가하지 않음. Parser v1.2.3 입력/규칙/버전 무변경. `buildConditionCanonical` 등 해시 입력 무변경.
-- 다른 finding type(생성 로직·임계값·evidence grade)은 무변경
-
-### 단계 3 — 앱 측 정합성 보강 (선택, 같은 계약 재사용)
-
-`src/routes/_authenticated/runs.$runId.tsx`의 자동 경쟁업체 후보 카드가 로컬 필터 대신 동일한 verification 계약을 우선 사용하도록 정리(이미 verifier 결과를 읽는 경로가 있으면 그 조건을 위 4개 컬럼 조건으로 통일). UI는 이유코드를 표시하지 않습니다.
-
-### 단계 4 — 검증
-
-- `bun test`, `tsgo --noEmit`, production build
-- 뷰 적용 후 READ ONLY 카운트 확인: 뷰 행 수 == confirmed_business 9건
-- client bundle secret scan
-- **실제 compute-insights 호출/재처리, Run 실행은 하지 않음.** 사용자가 별도로 배포·실행 후 0.2.1 run 생성 여부를 확인.
-
-## 보안 원칙 준수
-
-- verifier 입력·gate 모두 `response_text`, aliases, Registry, 내부 Insight 로직을 사용하지 않으며 provider/AI 호출 0.
-- service_role은 `.server.ts` 및 Edge Function 런타임에서만 사용, 클라이언트 노출 없음.
-- 뷰/서버 함수 모두 `org_id` + `business_id` 스코프 강제, anon grant 없음 → 타 org 데이터 접근 불가.
-
-## 확인이 필요한 사항
-
-- compute-insights를 Lovable에서 전체 재작성 배포(B안)까지 원하시면 현재 0.2.0 소스를 붙여 주세요. 그렇지 않으면 단계 2의 지시서를 그대로 Supabase 쪽에 적용하시는 방식으로 진행합니다.
+## 다음 단계
+승인해 주시면 P0부터 순서대로 UI/문구만 수정합니다(서버 판정·DTO·Edge 로직 무변경). 어디까지 이번 라운드에 넣을지 지정해 주세요.
