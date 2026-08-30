@@ -411,9 +411,9 @@ function QuestionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">질문 인벤토리</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">검색 질문</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          업체 선택 → AI 질문 인벤토리 생성 → 검토·저장 순서로 진행합니다.
+          고객이 AI에 실제로 물어볼 만한 질문을 만들고, 측정에 사용할 질문을 관리합니다.
         </p>
       </div>
 
@@ -441,14 +441,14 @@ function QuestionsPage() {
             </Select>
             {canWrite ? (
               <Button disabled={!businessId} onClick={() => setOpenConfirmAi(true)}>
-                AI 질문 인벤토리 생성
+                추천 검색 질문 만들기
               </Button>
             ) : (
               <Badge variant="secondary">조회 전용 권한</Badge>
             )}
           </div>
           <p className="w-full text-xs text-muted-foreground">
-            실제 고객이 AI에 물을 법한 질문을 여러 질문군으로 생성합니다.
+            지역·추천·후기·비교 등 다양한 상황의 검색 질문을 자동으로 만듭니다.
           </p>
         </CardContent>
       </Card>
@@ -476,7 +476,7 @@ function QuestionsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">질문군별 활성 질문 수</CardTitle>
+          <CardTitle className="text-base">검색 상황별 질문 수</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {intentCounts.length === 0 ? (
@@ -507,7 +507,7 @@ function QuestionsPage() {
           <CardHeader className="pb-2">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="px-0 text-sm font-medium">
-                고급 관리 (질문 세트·개별 질문 직접 편집)
+                고급 관리 (질문 직접 편집)
               </Button>
             </CollapsibleTrigger>
           </CardHeader>

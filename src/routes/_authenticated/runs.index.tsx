@@ -119,10 +119,9 @@ function RunsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">AI 측정</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">AI 노출 측정</h1>
           <p className="text-sm text-muted-foreground">
-            AI 답변에서 관찰된 추천·경쟁업체·출처를 확인하기 위한 측정 목록입니다. Change Impact용 baseline·follow-up
-            실행은 별도 화면에서 관리합니다.
+선택한 검색 질문으로 AI 답변을 확인하고, 내 업체·경쟁업체·인용 출처가 어떻게 나타나는지 측정합니다.
           </p>
         </div>
         <div className="ml-auto">
@@ -308,11 +307,11 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">새 AI 측정</Button>
+        <Button size="sm">새 측정 시작</Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>새 AI 측정</DialogTitle>
+          <DialogTitle>새 측정 시작</DialogTitle>
           <DialogDescription>
             AI가 같은 질문으로 시장의 추천·경쟁업체·출처를 확인합니다.
           </DialogDescription>
@@ -404,7 +403,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             취소
           </Button>
           <Button onClick={submit} disabled={blockers.length > 0 || submitting}>
-            {submitting ? "시작하는 중…" : "AI 경쟁 분석 시작"}
+            {submitting ? "시작하는 중…" : "AI 노출 측정 시작"}
           </Button>
         </DialogFooter>
       </DialogContent>

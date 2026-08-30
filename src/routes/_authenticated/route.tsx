@@ -25,10 +25,10 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const NAV = [
-  { to: "/dashboard", label: "진단" },
+  { to: "/dashboard", label: "내 AI 노출" },
   { to: "/businesses", label: "내 업체" },
-  { to: "/questions", label: "질문" },
-  { to: "/runs", label: "AI 측정" },
+  { to: "/questions", label: "검색 질문" },
+  { to: "/runs", label: "측정하기" },
 ] as const;
 
 
