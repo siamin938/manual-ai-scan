@@ -42,9 +42,9 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/businesses")({
   head: () => ({
     meta: [
-      { title: "업체 관리 · AI Visibility Lab" },
+      { title: "업체 관리 · 차보임 CHABOIM" },
       { name: "description", content: "대상 업체와 경쟁업체 정보를 등록하고 관리합니다." },
-      { property: "og:title", content: "업체 관리 · AI Visibility Lab" },
+      { property: "og:title", content: "업체 관리 · 차보임 CHABOIM" },
       { property: "og:description", content: "대상 업체와 경쟁업체 등록 및 관리" },
     ],
   }),

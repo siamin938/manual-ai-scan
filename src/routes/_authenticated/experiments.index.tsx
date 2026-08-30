@@ -16,12 +16,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const Route = createFileRoute("/_authenticated/experiments/")({
   head: () => ({
     meta: [
-      { title: "실험 관리 · AI Visibility Lab" },
+      { title: "실험 관리 · 차보임 CHABOIM" },
       {
         name: "description",
         content: "변경 전·후 측정을 누적해 실제 노출 변화의 방향성을 확인하는 실험 관리 화면입니다.",
       },
-      { property: "og:title", content: "실험 관리 · AI Visibility Lab" },
+      { property: "og:title", content: "실험 관리 · 차보임 CHABOIM" },
       {
         property: "og:description",
         content: "변경 전·후 측정을 누적해 실제 노출 변화의 방향성을 확인합니다.",

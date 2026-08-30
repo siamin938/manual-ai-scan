@@ -24,12 +24,12 @@ import {
 export const Route = createFileRoute("/_authenticated/experiments/$experimentId")({
   head: () => ({
     meta: [
-      { title: "실험 상세 · AI Visibility Lab" },
+      { title: "실험 상세 · 차보임 CHABOIM" },
       {
         name: "description",
         content: "변경 전·후 측정 결과를 같은 조건에서 비교해 방향성을 확인하는 실험 상세 화면입니다.",
       },
-      { property: "og:title", content: "실험 상세 · AI Visibility Lab" },
+      { property: "og:title", content: "실험 상세 · 차보임 CHABOIM" },
       {
         property: "og:description",
         content: "변경 전·후 측정 결과를 같은 조건에서 비교해 방향성을 확인합니다.",

@@ -40,9 +40,9 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/manual-checks")({
   head: () => ({
     meta: [
-      { title: "수동 UI 점검 · AI Visibility Lab" },
+      { title: "수동 UI 점검 · 차보임 CHABOIM" },
       { name: "description", content: "사람이 직접 확인한 AI 답변 결과를 기록하고 스크린샷을 보관합니다." },
-      { property: "og:title", content: "수동 UI 점검 · AI Visibility Lab" },
+      { property: "og:title", content: "수동 UI 점검 · 차보임 CHABOIM" },
       { property: "og:description", content: "AI 답변 수동 점검 기록 관리" },
     ],
   }),

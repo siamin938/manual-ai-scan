@@ -42,12 +42,12 @@ import {
 export const Route = createFileRoute("/_authenticated/runs/")({
   head: () => ({
     meta: [
-      { title: "AI 측정 · AI Visibility Lab" },
+      { title: "AI 측정 · 차보임 CHABOIM" },
       {
         name: "description",
         content: "AI 답변에서 관찰된 추천·경쟁업체·출처를 확인하기 위한 AI 측정을 시작하고 진행 상태를 확인합니다.",
       },
-      { property: "og:title", content: "AI 측정 · AI Visibility Lab" },
+      { property: "og:title", content: "AI 측정 · 차보임 CHABOIM" },
       { property: "og:description", content: "AI 노출 측정 실행 목록" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

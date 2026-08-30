@@ -79,11 +79,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AI Visibility Lab · AI 노출 수동 점검 콘솔" },
-      { name: "description", content: "업체·질문·수동 UI 점검을 기록하고 고객 보고서를 만드는 B2B 내부 운영 콘솔." },
+      { title: "차보임 CHABOIM | 자동차 업체 AI 추천시장 분석" },
+      { name: "description", content: "실제 고객 질문을 반복 측정해 자동차 업체의 AI 노출, 경쟁업체, 실제 인용 출처를 분석합니다." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "AI Visibility Lab" },
-      { property: "og:description", content: "AI 답변 노출 수동 점검 및 고객 보고서 운영 콘솔" },
+      { property: "og:title", content: "차보임 CHABOIM" },
+      { property: "og:description", content: "자동차 업체 AI 추천시장 분석" },
+
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
