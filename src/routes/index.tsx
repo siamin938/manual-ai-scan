@@ -122,7 +122,7 @@ const HERO_FLOW = [
   { label: "고객 질문", state: "질문군 구성" },
   { label: "AI 답변 측정", state: "반복 측정" },
   { label: "경쟁업체 발견", state: "자동 발견" },
-  { label: "실제 인용 출처", state: "답변 연결" },
+  { label: "노출 개선 분석", state: "우선 제안" },
 ];
 
 const RESEARCH_STEPS = [
@@ -196,8 +196,8 @@ function LandingPage() {
                 </span>
               </h1>
               <p className="mt-7 max-w-xl text-base leading-[1.75] text-muted-foreground">
-                실제 고객이 검색할 만한 질문을 반복 측정해 내 업체의 AI 노출, 대신 추천되는
-                경쟁업체, 실제 답변에 연결된 출처를 한 번에 분석합니다.
+                실제 고객이 검색할 만한 질문을 반복 측정해 내 업체의 AI 노출과 경쟁업체를 분석하고,
+                차보임의 분석 로직으로 AI 노출을 위해 무엇부터 확인할지 제안합니다.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Button asChild size="lg">
@@ -279,7 +279,7 @@ function LandingPage() {
                   </div>
 
                   <p className="mt-4 text-center text-xs text-muted-foreground">
-                    고객 질문 → AI 답변 측정 → 경쟁업체·출처 분석
+                    고객 질문 → AI 답변 측정 → 경쟁업체 분석 → 우선 확인 항목 제안
                   </p>
                 </CardContent>
               </Card>
