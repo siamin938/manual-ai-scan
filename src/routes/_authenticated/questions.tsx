@@ -304,32 +304,13 @@ function QuestionsPage() {
         return;
       }
       const list = toCandidates(data?.suggestions, selectedBusiness?.name ?? "");
-      if (list.length === 0) {
-        toast.error("사용할 수 있는 질문 후보가 없습니다. 다시 시도해 주세요.");
+      if (list.length !== 24) {
+        toast.error("표준 질문 24개를 완성하지 못했습니다. 다시 만들어 주세요.");
         return;
       }
       setCandidates(list);
-      setAiMeta({
-        model: typeof data?.model === "string" ? data.model : null,
-        costStatus: typeof data?.costStatus === "string" ? data.costStatus : null,
-        usage:
-          data?.usage && typeof data.usage === "object"
-            ? {
-                ...(typeof data.usage.inputTokens === "number" ? { inputTokens: data.usage.inputTokens } : {}),
-                ...(typeof data.usage.outputTokens === "number" ? { outputTokens: data.usage.outputTokens } : {}),
-              }
-            : null,
-        estimatedCostUsd: typeof data?.estimatedCostUsd === "number" ? data.estimatedCostUsd : null,
-        requestedCount: typeof data?.requestedCount === "number" ? data.requestedCount : null,
-        suggestionCount: typeof data?.suggestionCount === "number" ? data.suggestionCount : null,
-        batchCount: typeof data?.batchCount === "number" ? data.batchCount : null,
-        mode: typeof data?.mode === "string" ? data.mode : null,
-      });
-      setShowAiDetails(false);
-      setTargetSetMode("new");
-      setTargetSetId(setId);
       const today = new Date().toISOString().slice(0, 10);
-      setNewSetName(`${selectedBusiness?.name ?? "업체"} 질문 인벤토리 ${today}`);
+      setNewSetName(`${selectedBusiness?.name ?? "업체"} AI 검색 질문 ${today}`);
       setOpenConfirmAi(false);
       setOpenReview(true);
     },
@@ -338,31 +319,17 @@ function QuestionsPage() {
 
   const saveSuggestions = useMutation({
     mutationFn: async () => {
-      const selected = candidates.filter((c) => c.selected);
-      if (selected.length === 0) throw new Error("NO_SELECTION");
+      if (candidates.length === 0) throw new Error("NO_SELECTION");
 
-      let destSetId = targetSetMode === "existing" ? targetSetId : "";
-      if (targetSetMode === "new") {
-        const { data, error } = await supabase
-          .from("question_sets")
-          .insert({ org_id: activeOrgId!, business_id: businessId, name: newSetName.trim() })
-          .select("id")
-          .single();
-        if (error) throw error;
-        destSetId = data.id as string;
-      }
-      if (!destSetId) throw new Error("NO_SET");
+      const { data, error: setErr } = await supabase
+        .from("question_sets")
+        .insert({ org_id: activeOrgId!, business_id: businessId, name: newSetName.trim() })
+        .select("id")
+        .single();
+      if (setErr) throw setErr;
+      const destSetId = data.id as string;
 
-      const { data: existing, error: exErr } = await supabase
-        .from("questions")
-        .select("prompt_text")
-        .eq("question_set_id", destSetId);
-      if (exErr) throw exErr;
-
-      const { kept, skipped } = dedupeForSave(
-        selected,
-        (existing ?? []).map((q) => q.prompt_text as string),
-      );
+      const { kept, skipped } = dedupeForSave(candidates, []);
       if (kept.length === 0) throw new Error("ALL_DUPLICATE");
 
       const payloads = buildInsertPayloads(kept, {
@@ -376,8 +343,7 @@ function QuestionsPage() {
       return { destSetId, inserted: kept.length, skipped };
     },
     onSuccess: (res) => {
-      toast.success(`${res.inserted}개 질문을 인벤토리에 저장했습니다.`);
-      if (res.skipped > 0) toast.message(`중복 ${res.skipped}개는 제외했습니다.`);
+      toast.success(`${res.inserted}개 질문을 저장했습니다.`);
       setOpenReview(false);
       setCandidates([]);
       setSetId(res.destSetId);
@@ -387,15 +353,16 @@ function QuestionsPage() {
     },
     onError: (e: Error) => {
       if (e.message === "ALL_DUPLICATE") {
-        toast.error("선택한 질문이 모두 기존 질문과 중복되어 저장하지 않았습니다.");
+        toast.error("저장할 질문이 없습니다. 다시 만들어 주세요.");
         return;
       }
       if (e.message === "NO_SELECTION") {
-        toast.error("저장할 질문을 선택해 주세요.");
+        toast.error("저장할 질문이 없습니다.");
         return;
       }
       toast.error(`저장 실패: ${e.message}`);
     },
+
   });
 
   const candidateIntentCounts = useMemo(() => {
