@@ -399,7 +399,6 @@ function QuestionsPage() {
   });
 
   const candidateIntentCounts = useMemo(() => {
-  const candidateIntentCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of candidates) map.set(c.intentType, (map.get(c.intentType) ?? 0) + 1);
     return [...map.entries()].sort((a, b) => b[1] - a[1]);
