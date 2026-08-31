@@ -758,6 +758,9 @@ function QuestionsPage() {
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>생성된 질문 검토 ({candidates.length}개)</DialogTitle>
+            <DialogDescription>
+              24개 질문은 하나의 표준 질문 세트로 저장됩니다. 문구 수정은 첫 측정 전에 할 수 있습니다.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-wrap gap-2">
@@ -770,73 +773,19 @@ function QuestionsPage() {
 
           <div className="flex flex-wrap items-end gap-3 rounded-md border p-3">
             <div className="space-y-2">
-              <Label>저장 대상</Label>
-              <Select value={targetSetMode} onValueChange={(v) => setTargetSetMode(v as "existing" | "new")}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="new">새 질문 세트 생성</SelectItem>
-                  <SelectItem value="existing" disabled={sets.length === 0}>
-                    기존 세트에 추가
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {targetSetMode === "new" ? (
-              <div className="space-y-2">
-                <Label htmlFor="ai-set-name">새 세트 이름</Label>
-                <Input
-                  id="ai-set-name"
-                  className="w-[260px]"
-                  value={newSetName}
-                  onChange={(e) => setNewSetName(e.target.value)}
-                />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>질문 세트</Label>
-                <Select value={targetSetId} onValueChange={setTargetSetId}>
-                  <SelectTrigger className="w-[260px]">
-                    <SelectValue placeholder="질문 세트 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sets.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="ml-auto space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCandidates((cs) => cs.map((c) => ({ ...c, selected: true })))}
-              >
-                전체 선택
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setCandidates((cs) => cs.map((c) => ({ ...c, selected: false })))}
-              >
-                전체 해제
-              </Button>
+              <Label htmlFor="ai-set-name">질문 세트 이름</Label>
+              <Input
+                id="ai-set-name"
+                className="w-[300px]"
+                value={newSetName}
+                onChange={(e) => setNewSetName(e.target.value)}
+              />
             </div>
           </div>
 
           <div className="divide-y rounded-md border">
-            {candidates.map((c, i) => (
+            {candidates.map((c) => (
               <div key={c.id} className="flex items-start gap-3 p-3">
-                <Checkbox
-                  checked={c.selected}
-                  onCheckedChange={(v) =>
-                    setCandidates((cs) => cs.map((x, xi) => (xi === i ? { ...x, selected: v === true } : x)))
-                  }
-                />
                 <div className="flex-1 space-y-1">
                   <p className="text-sm">{c.promptText}</p>
                   <div className="flex flex-wrap items-center gap-2">
@@ -848,42 +797,17 @@ function QuestionsPage() {
             ))}
           </div>
 
-          <Collapsible open={showAiDetails} onOpenChange={setShowAiDetails}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="px-0 text-xs text-muted-foreground">
-                세부 정보
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <p className="text-xs text-muted-foreground">
-                {aiMeta.model ? `모델 ${aiMeta.model}` : "모델 정보 없음"}
-                {aiMeta.mode ? ` · 모드 ${aiMeta.mode}` : ""}
-                {aiMeta.requestedCount !== null ? ` · 요청 ${aiMeta.requestedCount}개` : ""}
-                {aiMeta.suggestionCount !== null ? ` · 응답 ${aiMeta.suggestionCount}개` : ""}
-                {aiMeta.batchCount !== null ? ` · batch ${aiMeta.batchCount}회` : ""}
-                {aiMeta.costStatus === "unpriced" && aiMeta.usage
-                  ? ` · 비용 미확정 · 입력 ${aiMeta.usage.inputTokens ?? 0}토큰 · 출력 ${aiMeta.usage.outputTokens ?? 0}토큰`
-                  : aiMeta.estimatedCostUsd !== null
-                    ? ` · 요청당 상한 추정 $${aiMeta.estimatedCostUsd.toFixed(4)}`
-                    : ""}
-              </p>
-            </CollapsibleContent>
-          </Collapsible>
-
           <DialogFooter>
             <Button
               onClick={() => saveSuggestions.mutate()}
-              disabled={
-                saveSuggestions.isPending ||
-                selectedCount === 0 ||
-                (targetSetMode === "new" ? !newSetName.trim() : !targetSetId)
-              }
+              disabled={saveSuggestions.isPending || !newSetName.trim()}
             >
-              {saveSuggestions.isPending ? "저장 중…" : `선택 질문 저장 (${selectedCount})`}
+              {saveSuggestions.isPending ? "저장 중…" : "24개 질문 저장"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
