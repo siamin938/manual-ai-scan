@@ -283,7 +283,7 @@ function QuestionsPage() {
   const suggestAi = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("suggest-questions", {
-        body: { orgId: activeOrgId, businessId, count: Number(aiCount) || 48 },
+        body: { orgId: activeOrgId, businessId, count: 24 },
       });
       if (error) throw new Error(error.message);
       return data as {
