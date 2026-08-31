@@ -95,9 +95,8 @@ const EMPTY_Q = {
   active: true,
 };
 
-const COUNT_PRESETS = ["24", "48", "72", "96"] as const;
-
 function intentLabel(intent: string): string {
+  if (intent === "informational") return "탐색·발견";
   return isAllowedIntent(intent) ? INTENT_LABELS[intent] : intent;
 }
 
@@ -115,7 +114,6 @@ function QuestionsPage() {
 
   // --- AI 질문 인벤토리 생성 상태 ---
   const [openConfirmAi, setOpenConfirmAi] = useState(false);
-  const [aiCount, setAiCount] = useState<string>("48");
   const [openReview, setOpenReview] = useState(false);
   const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
   const [aiMeta, setAiMeta] = useState<{
@@ -427,18 +425,6 @@ function QuestionsPage() {
             isError={businessSelection.isError}
           />
           <div className="ml-auto flex items-center gap-3">
-            <Select value={aiCount} onValueChange={setAiCount}>
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {COUNT_PRESETS.map((n) => (
-                  <SelectItem key={n} value={n}>
-                    {n}개
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             {canWrite ? (
               <Button disabled={!businessId} onClick={() => setOpenConfirmAi(true)}>
                 추천 검색 질문 만들기
@@ -448,7 +434,7 @@ function QuestionsPage() {
             )}
           </div>
           <p className="w-full text-xs text-muted-foreground">
-            지역·추천·후기·비교 등 다양한 상황의 검색 질문을 자동으로 만듭니다.
+            지역·추천·서비스·후기·신뢰·비교·가격·탐색 등 다양한 상황의 검색 질문 24개를 자동으로 만듭니다.
           </p>
         </CardContent>
       </Card>
@@ -854,7 +840,7 @@ function QuestionsPage() {
                 <div className="flex-1 space-y-1">
                   <p className="text-sm">{c.promptText}</p>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{INTENT_LABELS[c.intentType]}</span>
+                    <span className="text-xs text-muted-foreground">{intentLabel(c.intentType)}</span>
                     {c.containsBusinessName && <Badge variant="destructive">업체명 포함 · 수정 권장</Badge>}
                   </div>
                 </div>

@@ -10,21 +10,21 @@ export const ALLOWED_INTENTS = [
   "review_quality",
   "trust",
   "comparison",
-  "informational",
+  "price_value",
   "discovery",
 ] as const;
 
 export type AllowedIntent = (typeof ALLOWED_INTENTS)[number];
 
 export const INTENT_LABELS: Record<AllowedIntent, string> = {
-  local: "지역",
+  local: "지역·접근성",
   recommendation: "추천",
-  service: "서비스",
+  service: "서비스·작업",
   review_quality: "후기·평판",
-  trust: "신뢰·안심",
+  trust: "전문성·신뢰",
   comparison: "비교",
-  informational: "정보탐색",
-  discovery: "발견",
+  price_value: "가격·가성비",
+  discovery: "탐색·발견",
 };
 
 export const MIN_QUESTION_LENGTH = 8;
