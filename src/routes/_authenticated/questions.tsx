@@ -116,29 +116,8 @@ function QuestionsPage() {
   const [openConfirmAi, setOpenConfirmAi] = useState(false);
   const [openReview, setOpenReview] = useState(false);
   const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
-  const [aiMeta, setAiMeta] = useState<{
-    model: string | null;
-    costStatus: string | null;
-    usage: { inputTokens?: number; outputTokens?: number } | null;
-    estimatedCostUsd: number | null;
-    requestedCount: number | null;
-    suggestionCount: number | null;
-    batchCount: number | null;
-    mode: string | null;
-  }>({
-    model: null,
-    costStatus: null,
-    usage: null,
-    estimatedCostUsd: null,
-    requestedCount: null,
-    suggestionCount: null,
-    batchCount: null,
-    mode: null,
-  });
-  const [showAiDetails, setShowAiDetails] = useState(false);
-  const [targetSetMode, setTargetSetMode] = useState<"existing" | "new">("new");
-  const [targetSetId, setTargetSetId] = useState("");
   const [newSetName, setNewSetName] = useState("");
+
 
   const { data: selectedBusiness = null } = useQuery({
     queryKey: ["business-locale", activeOrgId, businessId],
