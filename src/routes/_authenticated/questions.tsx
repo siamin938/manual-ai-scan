@@ -39,7 +39,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   ALLOWED_INTENTS,
   INTENT_LABELS,
