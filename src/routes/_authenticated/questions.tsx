@@ -398,7 +398,7 @@ function QuestionsPage() {
     },
   });
 
-  const selectedCount = candidates.filter((c) => c.selected).length;
+  const candidateIntentCounts = useMemo(() => {
   const candidateIntentCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of candidates) map.set(c.intentType, (map.get(c.intentType) ?? 0) + 1);
