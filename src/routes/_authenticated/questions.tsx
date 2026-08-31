@@ -283,7 +283,7 @@ function QuestionsPage() {
   const suggestAi = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("suggest-questions", {
-        body: { orgId: activeOrgId, businessId, count: Number(aiCount) || 48 },
+        body: { orgId: activeOrgId, businessId, count: 24 },
       });
       if (error) throw new Error(error.message);
       return data as {
@@ -746,30 +746,15 @@ function QuestionsPage() {
       <Dialog open={openConfirmAi} onOpenChange={(v) => !suggestAi.isPending && setOpenConfirmAi(v)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>AI 질문 인벤토리를 생성할까요?</DialogTitle>
+            <DialogTitle>AI 검색 질문을 만들까요?</DialogTitle>
             <DialogDescription>
-              실제 고객이 AI에 물을 법한 질문을 여러 질문군으로 {aiCount}개 생성합니다.
+              등록한 업체의 업종과 지역을 바탕으로, 실제 고객이 AI에 물어볼 만한 검색 질문 24개를 만듭니다.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
-            <div className="space-y-2">
-              <Label htmlFor="ai-count">생성 개수</Label>
-              <Select value={aiCount} onValueChange={setAiCount}>
-                <SelectTrigger id="ai-count" className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {COUNT_PRESETS.map((n) => (
-                    <SelectItem key={n} value={n}>
-                      {n}개
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <p className="text-xs">
-              공개 기본 정보(업체명·업종·국가·지역·도시)만 사용합니다. 기존 질문과 내부 측정·분석 데이터는 AI에
-              보내지 않습니다. 생성 시 소액 API 비용이 발생할 수 있습니다.
+              만들어진 질문은 측정 전에 확인할 수 있습니다. 첫 측정을 시작하면 정확한 반복 비교를 위해 질문이
+              고정됩니다.
             </p>
           </div>
           <DialogFooter>
@@ -777,7 +762,7 @@ function QuestionsPage() {
               취소
             </Button>
             <Button onClick={() => suggestAi.mutate()} disabled={suggestAi.isPending || !businessId}>
-              {suggestAi.isPending ? "생성 중…" : "생성"}
+              {suggestAi.isPending ? "질문 만드는 중..." : "24개 질문 만들기"}
             </Button>
           </DialogFooter>
         </DialogContent>
