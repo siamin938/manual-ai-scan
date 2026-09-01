@@ -275,20 +275,15 @@ function RunDetailPage() {
   }
 
   const run = data.run;
-  const model = data.jobs[0]?.provider_model ?? "-";
   const measurementByJob = new Map(data.measurements.map((m) => [m.job_id, m]));
   const domainCitedRate =
     data.byProvider.length > 0 ? data.byProvider[0]!.domain_citation_rate_pct : null;
-  const reviewCount = data.measurements.filter(
-    (m) => m.manual_review_required || m.parse_confidence === "low",
-  ).length;
-  const confidenceSummary = (() => {
-    const counts: Record<string, number> = {};
-    for (const m of data.measurements) counts[m.parse_confidence] = (counts[m.parse_confidence] ?? 0) + 1;
-    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    if (entries.length === 0) return "-";
-    return entries.map(([k, v]) => `${CONFIDENCE_LABELS[k] ?? k} ${v}건`).join(" · ");
-  })();
+  const inProgress = IN_PROGRESS.has(run.status);
+  const showSummary = run.status === "completed" || run.status === "partial";
+  const totalJobs = Number(run.total_jobs ?? 0);
+  const completedJobs = Number(run.completed_jobs ?? 0);
+  const progressPct = totalJobs > 0 ? Math.min(100, (completedJobs / totalJobs) * 100) : 0;
+
 
   const validMeasurementCount =
     data.overall?.valid_n ?? data.measurements.filter((m) => m.valid).length;
