@@ -120,6 +120,19 @@ function DashboardPage() {
   const payload: VisibilityDiagnosticDTO | null = result && result.ok ? result.diagnostic : null;
   const d = payload?.diagnostic ?? null;
 
+  // 표시용 분류일 뿐, 새로운 판정/점수 계산이 아니다.
+  const mentionedGroupLabels = (d?.questionGroups ?? [])
+    .filter((g) => g.mentionCount > 0)
+    .map((g) => intentLabel(g.intentType));
+  const unmentionedGroupLabels = (d?.questionGroups ?? [])
+    .filter((g) => g.mentionCount === 0)
+    .map((g) => intentLabel(g.intentType));
+  const topCompetitor = (d?.competitors ?? []).reduce<
+    (typeof d extends null ? never : NonNullable<typeof d>["competitors"][number]) | null
+  >((best, c) => (best === null || c.responseCount > best.responseCount ? c : best), null);
+
+
+
 
   return (
     <div className="space-y-6">
