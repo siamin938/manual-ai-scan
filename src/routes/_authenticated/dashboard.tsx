@@ -252,6 +252,9 @@ function DashboardPage() {
                 같은 질문에서 반복해서 함께 등장한 주요 경쟁업체입니다. 업체를 누르면 어떤 질문과
                 출처에서 등장했는지 확인할 수 있습니다.
               </p>
+              <p className="mb-3 text-xs text-muted-foreground">
+                한 번만 확인된 확정 업체도 추가 관찰로 함께 표시합니다.
+              </p>
               {d.competitorGate ? (
                 <p className="mb-3 text-xs text-muted-foreground">
                   자주 등장 {d.competitorGate.coreCount}곳 · 가끔 등장{" "}
@@ -273,45 +276,60 @@ function DashboardPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {d.competitors.map((c) => (
-                      <TableRow key={c.name}>
-                        <TableCell className="text-sm">
-                          <span className="flex flex-wrap items-center gap-1.5">
-                            <button
-                              type="button"
-                              className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              onClick={() => setSelectedCompetitor(c.name)}
-                            >
-                              {c.name}
-                              <span className="sr-only"> 상세 보기</span>
-                            </button>
-                            <Badge
-                              variant={c.tier === "core" ? "default" : "secondary"}
-                              className="text-[10px] px-1.5 py-0"
-                            >
-                              {c.tierLabel}
-                            </Badge>
-                            {c.isNew && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                신규
+                    {d.competitors.map((c) => {
+                      const isAdditionalObservation =
+                        c.tier !== "core" &&
+                        c.responseCount === 1 &&
+                        (c.priorRunPresenceCount ?? 0) === 0;
+                      let badgeVariant: "default" | "secondary" | "outline" = "secondary";
+                      let badgeLabel = "주목 경쟁업체";
+                      if (c.tier === "core") {
+                        badgeVariant = "default";
+                        badgeLabel = "핵심 경쟁업체";
+                      } else if (isAdditionalObservation) {
+                        badgeVariant = "outline";
+                        badgeLabel = "추가 관찰";
+                      }
+                      return (
+                        <TableRow key={c.name}>
+                          <TableCell className="text-sm">
+                            <span className="flex flex-wrap items-center gap-1.5">
+                              <button
+                                type="button"
+                                className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                onClick={() => setSelectedCompetitor(c.name)}
+                              >
+                                {c.name}
+                                <span className="sr-only"> 상세 보기</span>
+                              </button>
+                              <Badge
+                                variant={badgeVariant}
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                {badgeLabel}
                               </Badge>
-                            )}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm tabular-nums">{c.questionCount}</TableCell>
-                        <TableCell className="text-sm tabular-nums">{c.responseCount}</TableCell>
-                        <TableCell className="text-sm tabular-nums">
-                          {pct(c.responseRatePct)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              {c.isNew && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  신규
+                                </Badge>
+                              )}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.questionCount}</TableCell>
+                          <TableCell className="text-sm tabular-nums">{c.responseCount}</TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {pct(c.responseRatePct)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2 items-start">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">내 업체가 잘 보이지 않는 검색 질문</CardTitle>
