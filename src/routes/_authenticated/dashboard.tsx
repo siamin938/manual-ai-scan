@@ -128,8 +128,9 @@ function DashboardPage() {
     .filter((g) => g.mentionCount === 0)
     .map((g) => intentLabel(g.intentType));
   const topCompetitor = (d?.competitors ?? []).reduce<
-    (typeof d extends null ? never : NonNullable<typeof d>["competitors"][number]) | null
+    NonNullable<typeof d>["competitors"][number] | null
   >((best, c) => (best === null || c.responseCount > best.responseCount ? c : best), null);
+
 
 
 
