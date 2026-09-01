@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ENGINE_LABEL, RUN_STATUS_LABELS, runStatusVariant } from "./runs.index";
+import { RUN_STATUS_LABELS, runStatusVariant } from "./runs.index";
 
 
 export const Route = createFileRoute("/_authenticated/runs/$runId")({
@@ -313,7 +313,7 @@ function RunDetailPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{run.name}</h1>
           <p className="text-sm text-muted-foreground">
-            {ENGINE_LABEL} · 내 업체 {data.businessName}
+            AI 노출 측정 · 내 업체 {data.businessName}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -489,52 +489,54 @@ function RunDetailPage() {
       </Card>
 
       {/* AI에서 함께 등장한 업체 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">AI에서 함께 등장한 업체</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {shareRows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              아직 함께 등장한 업체가 확인되지 않았습니다. 결과 정리가 끝나면 표시됩니다.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>업체명</TableHead>
-                    <TableHead className="text-right">등장한 질문 수</TableHead>
-                    <TableHead className="text-right">등장률</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shareRows.map((s) => (
-                    <TableRow key={s.key}>
-                      <TableCell className="text-sm">
-                        <span className="font-medium">{s.display_name}</span>
-                        {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
-                          <Badge className="ml-2">내 업체</Badge>
-                        ) : s.matched_business_id && data.competitorIds.has(s.matched_business_id) ? (
-                          <Badge variant="secondary" className="ml-2">
-                            등록 경쟁업체
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="ml-2">
-                            자동 발견
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">{s.response_count}</TableCell>
-                      <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
+      {showSummary ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">AI에서 함께 등장한 업체</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {shareRows.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                아직 함께 등장한 업체가 확인되지 않았습니다. 결과 정리가 끝나면 표시됩니다.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>업체명</TableHead>
+                      <TableHead className="text-right">등장한 질문 수</TableHead>
+                      <TableHead className="text-right">등장률</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {shareRows.map((s) => (
+                      <TableRow key={s.key}>
+                        <TableCell className="text-sm">
+                          <span className="font-medium">{s.display_name}</span>
+                          {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
+                            <Badge className="ml-2">내 업체</Badge>
+                          ) : s.matched_business_id && data.competitorIds.has(s.matched_business_id) ? (
+                            <Badge variant="secondary" className="ml-2">
+                              등록 경쟁업체
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="ml-2">
+                              자동 발견
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">{s.response_count}</TableCell>
+                        <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <p className="text-xs text-muted-foreground">
         AI 답변은 측정 시점과 질문에 따라 달라질 수 있습니다. 차보임은 동일한 질문을 반복 관찰해
