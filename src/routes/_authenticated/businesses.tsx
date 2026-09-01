@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { useImeSafeForm } from "@/hooks/use-ime-safe-form";
@@ -16,11 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -43,9 +40,9 @@ export const Route = createFileRoute("/_authenticated/businesses")({
   head: () => ({
     meta: [
       { title: "업체 관리 · 차보임 CHABOIM" },
-      { name: "description", content: "대상 업체와 경쟁업체 정보를 등록하고 관리합니다." },
+      { name: "description", content: "내 업체 정보를 등록하고 관리합니다." },
       { property: "og:title", content: "업체 관리 · 차보임 CHABOIM" },
-      { property: "og:description", content: "대상 업체와 경쟁업체 등록 및 관리" },
+      { property: "og:description", content: "내 업체 정보 등록 및 관리" },
     ],
   }),
   component: BusinessesPage,
@@ -69,29 +66,23 @@ type Business = {
 
 const CATEGORY_OPTIONS = [
   "자동차 튜닝",
-  "자동차 정비",
+  "자동차 정비/엔진오일",
   "자동차 디테일링/세차",
   "썬팅/신차패키지",
+  "PPF/랩핑",
   "자동차 용품/전장",
   "타이어/휠",
   "렌터카/자동차 서비스",
-  "음식점",
-  "카페/베이커리",
-  "병원/의료",
-  "미용/뷰티",
-  "교육",
-  "숙박/여행",
-  "전문 서비스",
+  "기타 자동차 서비스",
 ] as const;
 
-const CUSTOM_CATEGORY = "기타/직접 입력";
+/** 기존에 저장된 비표준 업종 값을 수정 화면에서 유지하기 위한 legacy 선택 상태. */
+const LEGACY_CATEGORY = "기존 업종 직접 입력";
 
 type FormState = {
   id: string;
   name: string;
   existingAliases: string[];
-  manualAliases: string[];
-  acceptedCandidates: string[];
   categorySelect: string;
   categoryCustom: string;
   website_url: string;
@@ -101,17 +92,13 @@ type FormState = {
   country_code: string;
   region: string;
   city: string;
-  is_client_business: boolean;
   active: boolean;
-  competitor_of: string;
 };
 
 const EMPTY: FormState = {
   id: "",
   name: "",
   existingAliases: [],
-  manualAliases: [],
-  acceptedCandidates: [],
   categorySelect: "",
   categoryCustom: "",
   website_url: "",
@@ -121,9 +108,7 @@ const EMPTY: FormState = {
   country_code: "KR",
   region: "",
   city: "",
-  is_client_business: true,
   active: true,
-  competitor_of: "",
 };
 
 const IME_TEXT_FIELDS = [
@@ -142,11 +127,7 @@ function BusinessesPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>({ ...EMPTY });
-  const [manualInput, setManualInput] = useState("");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const { formRef, resolveLatest, compositionProps, isComposing } = useImeSafeForm(IME_TEXT_FIELDS);
-  const manualInputRef = useRef<HTMLInputElement | null>(null);
-
 
   const { data: businesses = [], isLoading } = useQuery({
     queryKey: ["businesses", activeOrgId],
@@ -164,22 +145,7 @@ function BusinessesPage() {
     },
   });
 
-  const { data: links = [] } = useQuery({
-    queryKey: ["business-competitor-links", activeOrgId],
-    enabled: !!activeOrgId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("business_competitors")
-        .select("target_business_id, competitor_business_id, active")
-        .eq("org_id", activeOrgId!)
-        .eq("active", true);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
   const clientBusinesses = businesses.filter((b) => b.is_client_business);
-  const autoTargetId = clientBusinesses.length === 1 ? clientBusinesses[0]!.id : "";
 
   const normalizedName = normalizeBusinessName(form.name);
   const duplicateBusiness = useMemo(() => {
@@ -187,34 +153,17 @@ function BusinessesPage() {
     if (!key) return null;
     return businesses.find((b) => b.id !== form.id && businessNameIdentityKey(b.name) === key) ?? null;
   }, [businesses, form.id, form.name]);
-  const aliasCandidates = useMemo(() => {
-    const existing = new Set([
-      ...normalizeAliasList(form.existingAliases),
-      ...normalizeAliasList(form.manualAliases),
-    ]);
-    return generateSafeAliasCandidates(form.name).filter((c) => !existing.has(c));
-  }, [form.name, form.existingAliases, form.manualAliases]);
-
-  const resolvedCategory =
-    form.categorySelect === CUSTOM_CATEGORY
-      ? form.categoryCustom.trim()
-      : form.categorySelect.trim();
 
   function resolveCategoryOf(f: FormState): string {
-    return f.categorySelect === CUSTOM_CATEGORY ? f.categoryCustom.trim() : f.categorySelect.trim();
+    return f.categorySelect === LEGACY_CATEGORY ? f.categoryCustom.trim() : f.categorySelect.trim();
   }
 
+  /** 기존 별칭은 보존하고, 매우 보수적인 안전 후보만 자동 포함한다. */
   function buildAliases(f: FormState, canonicalName: string): string[] {
-    const existing = new Set([
-      ...normalizeAliasList(f.existingAliases),
-      ...normalizeAliasList(f.manualAliases),
-    ]);
-    const accepted = generateSafeAliasCandidates(f.name)
-      .filter((c) => !existing.has(c))
-      .filter((c) => f.acceptedCandidates.includes(c));
-    return normalizeAliasList([...f.existingAliases, ...f.manualAliases, ...accepted]).filter(
-      (a) => a !== canonicalName,
-    );
+    return normalizeAliasList([
+      ...f.existingAliases,
+      ...generateSafeAliasCandidates(f.name),
+    ]).filter((a) => a !== canonicalName);
   }
 
   const save = useMutation({
@@ -232,31 +181,14 @@ function BusinessesPage() {
         country_code: f.id ? f.country_code || "KR" : "KR",
         region: f.region.trim() || null,
         city: f.city.trim() || null,
-        is_client_business: f.is_client_business,
-        active: f.active,
+        is_client_business: true,
+        active: f.id ? f.active : true,
       };
-      let businessId = f.id;
       if (f.id) {
         const { error } = await supabase.from("businesses").update(payload).eq("id", f.id);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from("businesses").insert(payload).select("id").single();
-        if (error) throw error;
-        businessId = data!.id;
-      }
-
-      // 경쟁업체로 등록하면 대상 업체와의 관계를 business_competitors에 저장
-      const targetId = f.is_client_business ? "" : f.competitor_of || autoTargetId;
-      if (!f.is_client_business && targetId) {
-        const { error } = await supabase.from("business_competitors").upsert(
-          {
-            org_id: activeOrgId!,
-            target_business_id: targetId,
-            competitor_business_id: businessId,
-            active: true,
-          },
-          { onConflict: "target_business_id,competitor_business_id" },
-        );
+        const { error } = await supabase.from("businesses").insert(payload);
         if (error) throw error;
       }
     },
@@ -265,7 +197,6 @@ function BusinessesPage() {
       toast.success("저장되었습니다.");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["businesses", activeOrgId] });
-      qc.invalidateQueries({ queryKey: ["business-competitor-links", activeOrgId] });
       if (activeOrgId) {
         qc.invalidateQueries({ queryKey: ["client-business-options", activeOrgId] });
       }
@@ -289,8 +220,6 @@ function BusinessesPage() {
 
   function openNew() {
     setForm({ ...EMPTY });
-    setManualInput("");
-    setAdvancedOpen(false);
     setOpen(true);
   }
 
@@ -301,9 +230,7 @@ function BusinessesPage() {
       id: b.id,
       name: b.name,
       existingAliases: normalizeAliasList(b.aliases ?? []),
-      manualAliases: [],
-      acceptedCandidates: [],
-      categorySelect: category ? (isKnown ? category : CUSTOM_CATEGORY) : "",
+      categorySelect: category ? (isKnown ? category : LEGACY_CATEGORY) : "",
       categoryCustom: category && !isKnown ? category : "",
       website_url: b.website_url ?? "",
       naver_place_url: b.naver_place_url ?? "",
@@ -312,39 +239,9 @@ function BusinessesPage() {
       country_code: b.country_code ?? "KR",
       region: b.region ?? "",
       city: b.city ?? "",
-      is_client_business: b.is_client_business,
       active: b.active,
-      competitor_of:
-        links.find((l) => l.competitor_business_id === b.id)?.target_business_id ?? "",
     });
-    setManualInput("");
-    setAdvancedOpen(false);
     setOpen(true);
-  }
-
-  function addManualAlias() {
-    // 조합 중 마지막 글자가 state에 반영되지 않았을 수 있으므로 DOM 최신값을 우선 사용한다.
-    const raw = manualInputRef.current?.value ?? manualInput;
-    const value = normalizeBusinessName(raw);
-    if (!value) {
-      toast.error("추가할 이름을 입력해 주세요.");
-      return;
-    }
-    if (value === normalizeBusinessName(resolveLatest(form).name)) {
-      toast.error("공식 업체명과 같은 이름은 추가할 필요가 없습니다.");
-      return;
-    }
-    const already = new Set([
-      ...normalizeAliasList(form.existingAliases),
-      ...normalizeAliasList(form.manualAliases),
-    ]);
-    if (already.has(value)) {
-      toast.error("이미 등록된 이름입니다.");
-      return;
-    }
-    setForm((f) => ({ ...f, manualAliases: [...f.manualAliases, value] }));
-    setManualInput("");
-    if (manualInputRef.current) manualInputRef.current.value = "";
   }
 
   function submit() {
@@ -361,8 +258,8 @@ function BusinessesPage() {
       toast.error("업종을 선택해 주세요.");
       return;
     }
-    if (latest.categorySelect === CUSTOM_CATEGORY && !latest.categoryCustom.trim()) {
-      toast.error("업종을 직접 입력해 주세요.");
+    if (latest.categorySelect === LEGACY_CATEGORY && !latest.categoryCustom.trim()) {
+      toast.error("업종을 입력해 주세요.");
       return;
     }
     const latestKey = businessNameIdentityKey(latestName);
@@ -377,7 +274,6 @@ function BusinessesPage() {
     save.mutate(latest);
   }
 
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -390,36 +286,26 @@ function BusinessesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">등록된 업체 {businesses.length}곳</CardTitle>
+          <CardTitle className="text-base">등록된 업체 {clientBusinesses.length}곳</CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>업체명</TableHead>
-                <TableHead>구분</TableHead>
                 <TableHead>업종</TableHead>
                 <TableHead>지역</TableHead>
-                <TableHead>다른 이름</TableHead>
                 <TableHead>상태</TableHead>
                 {canWrite && <TableHead className="text-right">작업</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {businesses.map((b) => (
+              {clientBusinesses.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell className="font-medium">{b.name}</TableCell>
-                  <TableCell>
-                    <Badge variant={b.is_client_business ? "default" : "outline"}>
-                      {b.is_client_business ? "대상 업체" : "경쟁업체"}
-                    </Badge>
-                  </TableCell>
                   <TableCell className="text-sm">{b.category}</TableCell>
                   <TableCell className="text-sm">
                     {[b.region, b.city].filter(Boolean).join(" ") || "-"}
-                  </TableCell>
-                  <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
-                    {(b.aliases ?? []).join(", ") || "-"}
                   </TableCell>
                   <TableCell>
                     <Badge variant={b.active ? "secondary" : "outline"}>{b.active ? "활성" : "비활성"}</Badge>
@@ -436,9 +322,9 @@ function BusinessesPage() {
                   )}
                 </TableRow>
               ))}
-              {!isLoading && businesses.length === 0 && (
+              {!isLoading && clientBusinesses.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={canWrite ? 5 : 4} className="py-8 text-center text-sm text-muted-foreground">
                     등록된 업체가 없습니다.
                   </TableCell>
                 </TableRow>
@@ -453,8 +339,7 @@ function BusinessesPage() {
           <DialogHeader>
             <DialogTitle>{form.id ? "업체 수정" : "업체 추가"}</DialogTitle>
             <DialogDescription>
-              업체 기본 정보를 등록하면 질문 추천과 AI 측정을 시작할 수 있습니다. 이름 인식 후보는 시스템이 안전한
-              범위에서만 제안합니다.
+              업체 기본 정보와 공개 정보를 등록하면 질문 추천과 AI 측정을 시작할 수 있습니다.
             </DialogDescription>
           </DialogHeader>
 
@@ -510,14 +395,15 @@ function BusinessesPage() {
                         {c}
                       </SelectItem>
                     ))}
-                    <SelectItem value={CUSTOM_CATEGORY}>{CUSTOM_CATEGORY}</SelectItem>
+                    {form.categorySelect === LEGACY_CATEGORY && (
+                      <SelectItem value={LEGACY_CATEGORY}>{LEGACY_CATEGORY}</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
-                {form.categorySelect === CUSTOM_CATEGORY && (
+                {form.categorySelect === LEGACY_CATEGORY && (
                   <Input
-                    aria-label="업종 직접 입력"
+                    aria-label="기존 업종"
                     name="categoryCustom"
-                    placeholder="업종을 직접 입력해 주세요"
                     value={form.categoryCustom}
                     onChange={(e) => setForm({ ...form, categoryCustom: e.target.value })}
                     {...compositionProps((v) => setForm((f) => ({ ...f, categoryCustom: v })))}
@@ -597,180 +483,9 @@ function BusinessesPage() {
                     onChange={(e) => setForm({ ...form, google_maps_url: e.target.value })}
                     {...compositionProps((v) => setForm((f) => ({ ...f, google_maps_url: v })))}
                   />
-
                 </div>
               </div>
             </section>
-
-            {/* 업체 이름 인식 */}
-            <section className="space-y-4 rounded-md border p-4">
-              <div>
-                <h3 className="text-sm font-semibold">업체 이름 인식</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  AI 답변에서 같은 업체로 볼 수 있는 이름을 확인합니다. 잘못된 이름을 추가하면 다른 업체를 내 업체로
-                  오인할 수 있습니다.
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">공식 업체명</p>
-                <p className="text-sm font-medium">{normalizedName || "-"}</p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs font-medium">안전한 자동 후보</p>
-                {aliasCandidates.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">추가로 필요한 안전한 표기 변형이 없습니다.</p>
-                ) : (
-                  aliasCandidates.map((c) => (
-                    <label key={c} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={form.acceptedCandidates.includes(c)}
-                        onCheckedChange={(v) =>
-                          setForm((f) => ({
-                            ...f,
-                            acceptedCandidates: v
-                              ? [...f.acceptedCandidates, c]
-                              : f.acceptedCandidates.filter((x) => x !== c),
-                          }))
-                        }
-                      />
-                      <span>{c}</span>
-                    </label>
-                  ))
-                )}
-              </div>
-
-              {(form.existingAliases.length > 0 || form.manualAliases.length > 0) && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium">등록된 다른 이름</p>
-                  <div className="flex flex-wrap gap-2">
-                    {form.existingAliases.map((a) => (
-                      <Badge key={`e-${a}`} variant="secondary" className="gap-2">
-                        {a}
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground"
-                          onClick={() =>
-                            setForm((f) => ({
-                              ...f,
-                              existingAliases: f.existingAliases.filter((x) => x !== a),
-                            }))
-                          }
-                        >
-                          삭제
-                        </button>
-                      </Badge>
-                    ))}
-                    {form.manualAliases.map((a) => (
-                      <Badge key={`m-${a}`} variant="outline" className="gap-2">
-                        {a}
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-foreground"
-                          onClick={() =>
-                            setForm((f) => ({
-                              ...f,
-                              manualAliases: f.manualAliases.filter((x) => x !== a),
-                            }))
-                          }
-                        >
-                          삭제
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <Collapsible>
-                <CollapsibleTrigger asChild>
-                  <Button type="button" variant="ghost" size="sm">
-                    다른 이름 직접 추가
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2 space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    공식적으로 실제 사용되는 다른 이름만 추가하세요. 지점명·지역명을 임의로 빼면 다른 업체와 혼동될 수
-                    있습니다.
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      aria-label="다른 이름 입력"
-                      ref={manualInputRef}
-                      value={manualInput}
-                      onChange={(e) => setManualInput(e.target.value)}
-                      {...compositionProps((v) => setManualInput(v))}
-                      onKeyDown={(e) => {
-                        if (e.key !== "Enter") return;
-                        e.preventDefault();
-                        // 조합 중 Enter는 조합 확정용이므로 별칭 추가를 실행하지 않는다.
-                        if (isComposing(e)) return;
-                        addManualAlias();
-                      }}
-                      placeholder="한 번에 한 개씩 입력"
-                    />
-
-                    <Button type="button" variant="outline" onClick={addManualAlias}>
-                      추가
-                    </Button>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </section>
-
-            {/* 고급 설정 */}
-            <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-              <CollapsibleTrigger asChild>
-                <Button type="button" variant="ghost" size="sm">
-                  고급 설정
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2 space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  일반적인 첫 등록에서는 변경할 필요가 없습니다. 경쟁업체는 측정 결과에서 자동 발견됩니다.
-                </p>
-                <div className="flex items-center justify-between rounded-md border p-3">
-                  <div>
-                    <p className="text-sm font-medium">대상 업체</p>
-                    <p className="text-xs text-muted-foreground">끄면 경쟁업체로 등록됩니다.</p>
-                  </div>
-                  <Switch
-                    checked={form.is_client_business}
-                    onCheckedChange={(v) => setForm({ ...form, is_client_business: v })}
-                  />
-                </div>
-                {!form.is_client_business && (
-                  <div className="space-y-2">
-                    <Label>어느 대상 업체의 경쟁업체인가요?</Label>
-                    <Select
-                      {...(form.competitor_of || autoTargetId
-                        ? { value: form.competitor_of || autoTargetId }
-                        : {})}
-                      onValueChange={(v) => setForm({ ...form, competitor_of: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="대상 업체 선택" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clientBusinesses.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      선택한 대상 업체와의 관계가 저장되어 보고서 분석에 반영됩니다.
-                    </p>
-                  </div>
-                )}
-                <div className="flex items-center justify-between rounded-md border p-3">
-                  <p className="text-sm font-medium">활성 상태</p>
-                  <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
           </form>
 
           <DialogFooter>
