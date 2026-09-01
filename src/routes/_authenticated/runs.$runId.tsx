@@ -23,21 +23,22 @@ import { ENGINE_LABEL, RUN_STATUS_LABELS, runStatusVariant } from "./runs.index"
 export const Route = createFileRoute("/_authenticated/runs/$runId")({
   head: () => ({
     meta: [
-      { title: "자동 측정 상세 · 차보임 CHABOIM" },
+      { title: "AI 측정 결과 · 차보임 CHABOIM" },
       {
         name: "description",
-        content: "OpenAI Web Search API 벤치마크 실행의 측정 결과, 감지된 업체, 출처를 확인합니다.",
+        content: "우리 업체가 AI 답변에 얼마나 등장했는지, 함께 등장한 업체와 출처를 확인합니다.",
       },
-      { property: "og:title", content: "자동 측정 상세 · 차보임 CHABOIM" },
-      { property: "og:description", content: "자동 측정 실행 상세 및 측정 결과" },
+      { property: "og:title", content: "AI 측정 결과 · 차보임 CHABOIM" },
+      { property: "og:description", content: "AI 노출 측정 결과 상세" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
   }),
+
   component: RunDetailPage,
 });
 
-const usd = (n: number | string | null | undefined) => `$${Number(n ?? 0).toFixed(2)}`;
+
 
 const formatPositionLabel = (position: number | null | undefined) =>
   typeof position === "number" && Number.isInteger(position) && position > 0
@@ -59,11 +60,8 @@ const JOB_STATUS_LABELS: Record<string, string> = {
   cancelled: "취소",
 };
 
-const CONFIDENCE_LABELS: Record<string, string> = {
-  high: "높음",
-  medium: "보통",
-  low: "낮음",
-};
+const IN_PROGRESS = new Set(["draft", "queued", "running"]);
+
 
 const TERMINAL = new Set(["completed", "partial", "failed", "cancelled"]);
 
@@ -277,20 +275,15 @@ function RunDetailPage() {
   }
 
   const run = data.run;
-  const model = data.jobs[0]?.provider_model ?? "-";
   const measurementByJob = new Map(data.measurements.map((m) => [m.job_id, m]));
   const domainCitedRate =
     data.byProvider.length > 0 ? data.byProvider[0]!.domain_citation_rate_pct : null;
-  const reviewCount = data.measurements.filter(
-    (m) => m.manual_review_required || m.parse_confidence === "low",
-  ).length;
-  const confidenceSummary = (() => {
-    const counts: Record<string, number> = {};
-    for (const m of data.measurements) counts[m.parse_confidence] = (counts[m.parse_confidence] ?? 0) + 1;
-    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    if (entries.length === 0) return "-";
-    return entries.map(([k, v]) => `${CONFIDENCE_LABELS[k] ?? k} ${v}건`).join(" · ");
-  })();
+  const inProgress = IN_PROGRESS.has(run.status);
+  const showSummary = run.status === "completed" || run.status === "partial";
+  const totalJobs = Number(run.total_jobs ?? 0);
+  const completedJobs = Number(run.completed_jobs ?? 0);
+  const progressPct = totalJobs > 0 ? Math.min(100, (completedJobs / totalJobs) * 100) : 0;
+
 
   const validMeasurementCount =
     data.overall?.valid_n ?? data.measurements.filter((m) => m.valid).length;
@@ -320,7 +313,7 @@ function RunDetailPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{run.name}</h1>
           <p className="text-sm text-muted-foreground">
-            {ENGINE_LABEL} · 대상 업체 {data.businessName}
+            {ENGINE_LABEL} · 내 업체 {data.businessName}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -333,7 +326,30 @@ function RunDetailPage() {
         </div>
       </div>
 
-      {/* 서버 자동 진단 정리 상태 (프론트에서 실행하지 않음) */}
+      {/* 측정 진행 중 안내 */}
+      {inProgress ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">AI 노출 측정 진행 중</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm font-medium">
+              {completedJobs} / {totalJobs} 질문 확인 완료
+            </p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              모든 질문 측정이 끝난 뒤 최종 노출률과 경쟁업체·출처 결과를 정리해 보여드립니다.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* 결과 정리 상태 */}
       {(() => {
         const runRow = data.run;
         const eligible =
@@ -342,114 +358,75 @@ function RunDetailPage() {
           (runRow.status === "completed" || runRow.status === "partial");
         if (!eligible) return null;
         const event = data.latestEvent;
-        if (!event) {
-          return (
-            <Card>
-              <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                <Badge variant="secondary">기존 실행</Badge>
-                <span className="text-xs text-muted-foreground">
-                  서버 자동 진단 이력이 없는 실행입니다.
-                </span>
-              </CardContent>
-            </Card>
-          );
-        }
+        if (!event) return null;
+        let badge = "분석 완료";
+        let variant: "secondary" | "destructive" = "secondary";
+        let message = "경쟁업체와 출처까지 정리되었습니다.";
         if (event.event_type === "visibility_postprocess_failed") {
-          return (
-            <Card>
-              <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                <Badge variant="destructive">자동 진단 정리 확인 필요</Badge>
-                <span className="text-xs text-muted-foreground">
-                  서버 후처리 중 오류가 발생했습니다.
-                </span>
-              </CardContent>
-            </Card>
-          );
-        }
-        if (
+          badge = "결과 정리 확인 필요";
+          variant = "destructive";
+          message = "결과 정리를 완료하지 못했습니다. 잠시 후 다시 확인해 주세요.";
+        } else if (
           event.event_type === "visibility_postprocess_triggered" ||
           event.event_type === "visibility_postprocess_started"
         ) {
-          return (
-            <Card>
-              <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                <Badge variant="secondary">자동 진단 정리 중…</Badge>
-                <span className="text-xs text-muted-foreground">
-                  측정 결과를 정리하고 있습니다. 추가 AI 측정 비용은 발생하지 않습니다.
-                </span>
-              </CardContent>
-            </Card>
-          );
+          badge = "결과 정리 중";
+          message = "경쟁업체와 출처를 정리하고 있습니다.";
         }
         return (
           <Card>
             <CardContent className="flex flex-wrap items-center gap-3 p-4">
-              <Badge variant="secondary">자동 진단 준비 완료</Badge>
-              <span className="text-xs text-muted-foreground">
-                업체 검증·정규화가 완료되었습니다.
-              </span>
+              <Badge variant={variant}>{badge}</Badge>
+              <span className="text-xs text-muted-foreground">{message}</span>
             </CardContent>
           </Card>
         );
       })()}
 
-
-
       {/* 측정 결과 요약 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">측정 결과 요약</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Stat label="유효 측정 수" value={`${data.overall?.valid_n ?? 0}건`} />
-            <Stat label="대상 업체 노출 횟수" value={`${data.overall?.mention_n ?? 0}건`} />
-            <Stat label="대상 업체 노출률" value={pct(data.overall?.inclusion_rate_pct)} />
-            <Stat label="1위 언급률" value={pct(data.overall?.first_mention_rate_pct)} />
-            <Stat label="상위 3위 언급률" value={pct(data.overall?.top3_rate_pct)} />
-            <Stat label="대상 업체 도메인 인용률" value={pct(domainCitedRate)} />
-            <Stat
-              label="수동 검토 필요 건수"
-              value={
-                <span className={reviewCount > 0 ? "text-destructive" : undefined}>
-                  {reviewCount}건
-                </span>
-              }
-            />
-            <Stat label="분석 신뢰도 분포" value={confidenceSummary} />
-            <Stat label="기록된 실제 비용" value={usd(run.actual_cost_usd)} />
+      {showSummary ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">측정 결과 요약</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Stat
+                  label="분석 완료 질문"
+                  value={`${data.overall?.valid_n ?? 0} / ${data.questionCount}`}
+                />
+                <Stat
+                  label="우리 업체가 나온 질문"
+                  value={`${data.overall?.mention_n ?? 0}개`}
+                />
+                <Stat label="AI 노출률" value={pct(data.overall?.inclusion_rate_pct)} />
+                <Stat label="1위 노출률" value={pct(data.overall?.first_mention_rate_pct)} />
+                <Stat label="상위 3위 노출률" value={pct(data.overall?.top3_rate_pct)} />
+                <Stat label="공식 사이트 인용률" value={pct(domainCitedRate)} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Stat label="질문 수" value={`${data.questionCount}개`} />
+            <Stat label="측정 횟수" value={`${run.repetitions}회`} />
+            <Stat label="완료 시각" value={formatSeoul(run.completed_at)} />
           </div>
-        </CardContent>
-      </Card>
+        </>
+      ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="완료 작업 / 전체 작업" value={`${run.completed_jobs} / ${run.total_jobs}`} />
-        <Stat label="실패 작업" value={String(run.failed_jobs)} />
-        <Stat label="예상 비용" value={usd(run.estimated_cost_usd)} />
-        <Stat label="질문 수" value={`${data.questionCount}개`} />
-        <Stat label="반복 횟수" value={`${run.repetitions}회`} />
-        <Stat label="모델명" value={model} />
-        <Stat
-          label="생성 · 시작 · 완료 시각"
-          value={
-            <span className="block space-y-0.5 text-xs">
-              <span className="block">생성 {formatSeoul(run.created_at)}</span>
-              <span className="block">시작 {formatSeoul(run.started_at)}</span>
-              <span className="block">완료 {formatSeoul(run.completed_at)}</span>
-            </span>
-          }
-        />
-      </div>
 
-      {/* 작업 목록 */}
+
+      {/* 질문별 결과 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">작업 목록</CardTitle>
+          <CardTitle className="text-base">질문별 결과</CardTitle>
         </CardHeader>
         <CardContent>
           {data.jobs.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              자동 측정 작업을 기다리고 있습니다.
+              측정을 준비하고 있습니다.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -457,17 +434,14 @@ function RunDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>질문</TableHead>
-                    <TableHead className="text-right">반복 번호</TableHead>
                     <TableHead>상태</TableHead>
-                    <TableHead>대상 업체 노출</TableHead>
-                    <TableHead>검토</TableHead>
+                    <TableHead>우리 업체 노출</TableHead>
                     <TableHead className="w-24" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.jobs.map((j) => {
                     const m = measurementByJob.get(j.id);
-                    const needsReview = !!m && (m.manual_review_required || m.parse_confidence === "low");
                     const open = openJob === j.id;
                     return (
                       <Fragment key={j.id}>
@@ -478,7 +452,6 @@ function RunDetailPage() {
                           <TableCell className="max-w-[380px] text-sm">
                             {data.prompts.get(j.question_id) ?? j.question_id}
                           </TableCell>
-                          <TableCell className="text-right">{j.repetition_no}</TableCell>
                           <TableCell>
                             <Badge variant={j.status === "failed" ? "destructive" : "secondary"}>
                               {JOB_STATUS_LABELS[j.status] ?? j.status}
@@ -487,16 +460,13 @@ function RunDetailPage() {
                           <TableCell className="text-sm">
                             {m ? formatMentionPosition(m.was_client_mentioned, m.client_position) : "-"}
                           </TableCell>
-                          <TableCell>
-                            {needsReview ? <Badge variant="destructive">검토 필요</Badge> : null}
-                          </TableCell>
                           <TableCell className="text-right text-xs text-muted-foreground">
                             {open ? "접기 ▲" : "상세 ▼"}
                           </TableCell>
                         </TableRow>
                         {open ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="bg-muted/40">
+                            <TableCell colSpan={4} className="bg-muted/40">
                               <JobDetail
                                 job={j}
                                 prompt={data.prompts.get(j.question_id) ?? j.question_id}
@@ -518,54 +488,15 @@ function RunDetailPage() {
         </CardContent>
       </Card>
 
-      {/* 질문별 집계 */}
+      {/* AI에서 함께 등장한 업체 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">질문별 집계</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data.questionMetrics.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">집계할 결과가 없습니다.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>질문</TableHead>
-                    <TableHead className="text-right">유효 표본 수</TableHead>
-                    <TableHead className="text-right">대상 업체 노출 횟수</TableHead>
-                    <TableHead className="text-right">노출률</TableHead>
-                    <TableHead className="text-right">최고 순위</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.questionMetrics.map((q) => (
-                    <TableRow key={`${q.question_id}-${q.provider}`}>
-                      <TableCell className="max-w-[420px] text-sm">{q.prompt_text}</TableCell>
-                      <TableCell className="text-right">{q.valid_n ?? 0}</TableCell>
-                      <TableCell className="text-right">{q.mention_n ?? 0}</TableCell>
-                      <TableCell className="text-right">{pct(q.inclusion_rate_pct)}</TableCell>
-                      <TableCell className="text-right">
-                        {q.best_position ? `${q.best_position}위` : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 자동 발견 경쟁업체 · 언급 업체 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">자동 발견 경쟁업체 · 언급 업체</CardTitle>
+          <CardTitle className="text-base">AI에서 함께 등장한 업체</CardTitle>
         </CardHeader>
         <CardContent>
           {shareRows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              확정된 특정 업체 언급이 없습니다. 자동 분석 후처리가 끝나면 다시 표시됩니다.
+              아직 함께 등장한 업체가 확인되지 않았습니다. 결과 정리가 끝나면 표시됩니다.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -573,9 +504,8 @@ function RunDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>업체명</TableHead>
-                    <TableHead className="text-right">언급 횟수</TableHead>
-                    <TableHead className="text-right">등장한 응답 수</TableHead>
-                    <TableHead className="text-right">응답 점유율</TableHead>
+                    <TableHead className="text-right">등장한 질문 수</TableHead>
+                    <TableHead className="text-right">등장률</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -584,7 +514,7 @@ function RunDetailPage() {
                       <TableCell className="text-sm">
                         <span className="font-medium">{s.display_name}</span>
                         {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
-                          <Badge className="ml-2">대상 업체</Badge>
+                          <Badge className="ml-2">내 업체</Badge>
                         ) : s.matched_business_id && data.competitorIds.has(s.matched_business_id) ? (
                           <Badge variant="secondary" className="ml-2">
                             등록 경쟁업체
@@ -595,12 +525,10 @@ function RunDetailPage() {
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">{s.mention_count}</TableCell>
                       <TableCell className="text-right">{s.response_count}</TableCell>
                       <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
                     </TableRow>
                   ))}
-
                 </TableBody>
               </Table>
             </div>
@@ -609,8 +537,10 @@ function RunDetailPage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        본 결과는 {ENGINE_LABEL} 결과이며, 사람이 직접 확인한 수동 UI 점검 결과와 합산되지 않습니다.
+        AI 답변은 측정 시점과 질문에 따라 달라질 수 있습니다. 차보임은 동일한 질문을 반복 관찰해
+        나타나는 패턴을 확인합니다.
       </p>
+
     </div>
   );
 }
@@ -658,49 +588,34 @@ function JobDetail({
   targetBusinessId: string | null;
 }) {
   const [showText, setShowText] = useState(false);
-  const needsReview =
-    !!measurement && (measurement.manual_review_required || measurement.parse_confidence === "low");
 
   return (
     <div className="space-y-4 py-3">
       <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
         <Field label="질문" value={prompt} />
-        <Field label="반복 번호" value={String(job.repetition_no)} />
-        <Field label="제공자" value={job.provider} />
-        <Field label="모델" value={job.provider_model} />
         <Field label="측정 시각" value={measurement ? formatSeoul(measurement.observed_at) : "-"} />
         <Field label="상태" value={JOB_STATUS_LABELS[job.status] ?? job.status} />
-        <Field label="실제 비용" value={usd(measurement?.actual_cost_usd ?? job.actual_cost_usd)} />
-        {job.error_code ? <Field label="오류" value={`${job.error_code} ${job.error_message ?? ""}`} /> : null}
       </div>
 
       {!measurement ? (
-        <p className="text-xs text-muted-foreground">저장된 측정 결과가 없습니다.</p>
+        <p className="text-xs text-muted-foreground">아직 결과가 준비되지 않았습니다.</p>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={measurement.was_client_mentioned ? "default" : "outline"}>
-              대상 업체 노출: {measurement.was_client_mentioned ? "예" : "아니오"}
+              우리 업체 노출: {measurement.was_client_mentioned ? "예" : "아니오"}
             </Badge>
             <Badge variant="secondary">
-              추천/언급 순위: {formatPositionLabel(measurement.client_position)}
+              언급 순위: {formatPositionLabel(measurement.client_position)}
             </Badge>
             <Badge variant="secondary">
-              공식 도메인 인용: {measurement.client_domain_cited ? "예" : "아니오"}
+              공식 사이트 인용: {measurement.client_domain_cited ? "예" : "아니오"}
             </Badge>
-            <Badge variant="secondary">
-              분석 신뢰도: {CONFIDENCE_LABELS[measurement.parse_confidence] ?? measurement.parse_confidence}
-            </Badge>
-            {needsReview ? <Badge variant="destructive">검토 필요</Badge> : null}
-            {!measurement.valid ? (
-              <Badge variant="destructive">무효 {measurement.invalid_reason ?? ""}</Badge>
-            ) : null}
-            <span className="text-xs text-muted-foreground">파서 {measurement.parser_version}</span>
           </div>
 
           <div>
             <Button variant="outline" size="sm" onClick={() => setShowText((v) => !v)}>
-              {showText ? "원문 답변 접기" : "원문 답변 보기"}
+              {showText ? "원문 AI 답변 접기" : "원문 AI 답변 보기"}
             </Button>
             {showText ? (
               <div className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md border bg-background p-3 text-xs leading-relaxed">
@@ -717,7 +632,7 @@ function JobDetail({
               <div>
                 <p className="mb-1 text-xs font-semibold">감지된 업체 ({confirmed.length})</p>
                 {confirmed.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">확정된 업체가 없습니다.</p>
+                  <p className="text-xs text-muted-foreground">감지된 업체가 없습니다.</p>
                 ) : (
                   <ul className="space-y-1 text-xs">
                     {confirmed.map((m) => (
@@ -726,19 +641,12 @@ function JobDetail({
                           {m.position}위 {m.canonical_display_name}
                         </span>
                         {m.matched_business_id === targetBusinessId && targetBusinessId ? (
-                          <Badge>대상 업체</Badge>
+                          <Badge>내 업체</Badge>
                         ) : m.matched_business_id ? (
-                          <Badge variant="secondary">등록 업체</Badge>
+                          <Badge variant="secondary">등록 경쟁업체</Badge>
                         ) : (
                           <Badge variant="outline">자동 발견</Badge>
                         )}
-                        {m.matched_alias ? (
-                          <span className="text-muted-foreground">별칭 {m.matched_alias}</span>
-                        ) : null}
-                        <span className="text-muted-foreground">
-                          {m.explicit_rank ? "명시적 순위" : "추정 순위"} · 신뢰도{" "}
-                          {CONFIDENCE_LABELS[m.confidence] ?? m.confidence}
-                        </span>
                       </li>
                     ))}
                   </ul>
@@ -746,6 +654,7 @@ function JobDetail({
               </div>
             );
           })()}
+
 
 
           <div>
