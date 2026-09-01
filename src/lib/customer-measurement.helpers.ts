@@ -40,6 +40,8 @@ const CUSTOMER_ERROR_MESSAGES: Record<CustomerMeasurementErrorCode, string> = {
   RESTRICTED_QUESTIONS: "측정할 수 없는 질문이 포함되어 있습니다. 질문을 확인해 주세요.",
   DAILY_USAGE_LIMIT: "오늘 가능한 AI 측정 횟수를 모두 사용했습니다.",
   MONTHLY_USAGE_LIMIT: "이번 달 AI 측정 가능량을 모두 사용했습니다.",
+  NO_MEASUREMENT_CREDIT:
+    "AI 노출 측정권이 없습니다. 측정권을 구매하거나 관리자에게 문의해 주세요.",
   MEASUREMENT_NOT_READY: "AI 측정을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요.",
   INTERNAL_ERROR: "AI 측정을 준비할 수 없습니다. 잠시 후 다시 시도해 주세요.",
 };
