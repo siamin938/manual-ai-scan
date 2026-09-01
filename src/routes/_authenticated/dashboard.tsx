@@ -271,9 +271,7 @@ function DashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>업체</TableHead>
-                      <TableHead>질문 수</TableHead>
-                      <TableHead>등장 답변 수</TableHead>
-                      <TableHead>답변 비율</TableHead>
+                      <TableHead>AI 답변에 등장</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -316,16 +314,18 @@ function DashboardPage() {
                               )}
                             </span>
                           </TableCell>
-                          <TableCell className="text-sm tabular-nums">{c.questionCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{c.responseCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {pct(c.responseRatePct)}
+                          <TableCell className="text-sm">
+                            <span className="tabular-nums">{c.responseCount}건</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              전체 {d.overview.validCount}건 중 {pct(c.responseRatePct)}
+                            </span>
                           </TableCell>
                         </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
+
               )}
             </CardContent>
           </Card>
