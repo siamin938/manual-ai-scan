@@ -274,7 +274,7 @@ function SourceGroupCard({
     : isPriority
       ? customerLabel(g.evidenceLabel ?? g.actionLabel)
       : g.evidenceGrade === "candidate"
-        ? "관찰 후보"
+        ? "먼저 확인"
         : customerLabel(g.actionLabel);
   const badgeVariantForGroup: "default" | "secondary" | "outline" = referenceOnly
     ? "outline"
@@ -336,7 +336,7 @@ function SourceGroupCard({
                       : p.evidenceGrade === "priority"
                         ? customerLabel(p.evidenceLabel ?? p.actionLabel)
                         : p.evidenceGrade === "candidate"
-                          ? "관찰 후보"
+                          ? "먼저 확인"
                           : customerLabel(p.actionLabel)}
                   </Badge>
                 </div>
