@@ -588,49 +588,34 @@ function JobDetail({
   targetBusinessId: string | null;
 }) {
   const [showText, setShowText] = useState(false);
-  const needsReview =
-    !!measurement && (measurement.manual_review_required || measurement.parse_confidence === "low");
 
   return (
     <div className="space-y-4 py-3">
       <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
         <Field label="질문" value={prompt} />
-        <Field label="반복 번호" value={String(job.repetition_no)} />
-        <Field label="제공자" value={job.provider} />
-        <Field label="모델" value={job.provider_model} />
         <Field label="측정 시각" value={measurement ? formatSeoul(measurement.observed_at) : "-"} />
         <Field label="상태" value={JOB_STATUS_LABELS[job.status] ?? job.status} />
-        <Field label="실제 비용" value={usd(measurement?.actual_cost_usd ?? job.actual_cost_usd)} />
-        {job.error_code ? <Field label="오류" value={`${job.error_code} ${job.error_message ?? ""}`} /> : null}
       </div>
 
       {!measurement ? (
-        <p className="text-xs text-muted-foreground">저장된 측정 결과가 없습니다.</p>
+        <p className="text-xs text-muted-foreground">아직 결과가 준비되지 않았습니다.</p>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={measurement.was_client_mentioned ? "default" : "outline"}>
-              대상 업체 노출: {measurement.was_client_mentioned ? "예" : "아니오"}
+              우리 업체 노출: {measurement.was_client_mentioned ? "예" : "아니오"}
             </Badge>
             <Badge variant="secondary">
-              추천/언급 순위: {formatPositionLabel(measurement.client_position)}
+              언급 순위: {formatPositionLabel(measurement.client_position)}
             </Badge>
             <Badge variant="secondary">
-              공식 도메인 인용: {measurement.client_domain_cited ? "예" : "아니오"}
+              공식 사이트 인용: {measurement.client_domain_cited ? "예" : "아니오"}
             </Badge>
-            <Badge variant="secondary">
-              분석 신뢰도: {CONFIDENCE_LABELS[measurement.parse_confidence] ?? measurement.parse_confidence}
-            </Badge>
-            {needsReview ? <Badge variant="destructive">검토 필요</Badge> : null}
-            {!measurement.valid ? (
-              <Badge variant="destructive">무효 {measurement.invalid_reason ?? ""}</Badge>
-            ) : null}
-            <span className="text-xs text-muted-foreground">파서 {measurement.parser_version}</span>
           </div>
 
           <div>
             <Button variant="outline" size="sm" onClick={() => setShowText((v) => !v)}>
-              {showText ? "원문 답변 접기" : "원문 답변 보기"}
+              {showText ? "원문 AI 답변 접기" : "원문 AI 답변 보기"}
             </Button>
             {showText ? (
               <div className="mt-2 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-md border bg-background p-3 text-xs leading-relaxed">
@@ -647,7 +632,7 @@ function JobDetail({
               <div>
                 <p className="mb-1 text-xs font-semibold">감지된 업체 ({confirmed.length})</p>
                 {confirmed.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">확정된 업체가 없습니다.</p>
+                  <p className="text-xs text-muted-foreground">감지된 업체가 없습니다.</p>
                 ) : (
                   <ul className="space-y-1 text-xs">
                     {confirmed.map((m) => (
@@ -656,19 +641,12 @@ function JobDetail({
                           {m.position}위 {m.canonical_display_name}
                         </span>
                         {m.matched_business_id === targetBusinessId && targetBusinessId ? (
-                          <Badge>대상 업체</Badge>
+                          <Badge>내 업체</Badge>
                         ) : m.matched_business_id ? (
-                          <Badge variant="secondary">등록 업체</Badge>
+                          <Badge variant="secondary">등록 경쟁업체</Badge>
                         ) : (
                           <Badge variant="outline">자동 발견</Badge>
                         )}
-                        {m.matched_alias ? (
-                          <span className="text-muted-foreground">별칭 {m.matched_alias}</span>
-                        ) : null}
-                        <span className="text-muted-foreground">
-                          {m.explicit_rank ? "명시적 순위" : "추정 순위"} · 신뢰도{" "}
-                          {CONFIDENCE_LABELS[m.confidence] ?? m.confidence}
-                        </span>
                       </li>
                     ))}
                   </ul>
@@ -676,6 +654,7 @@ function JobDetail({
               </div>
             );
           })()}
+
 
 
           <div>
