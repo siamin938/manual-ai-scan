@@ -651,19 +651,11 @@ function DashboardPage() {
                         </ResponsiveContainer>
                       </div>
                     ) : (
-                      <div className="py-6 text-center">
-                        <p className="text-sm text-muted-foreground">
-                          비교할 이전 측정 시점이 아직 없습니다. 현재 1개 시점 상태만 표시합니다.
-                        </p>
-                        <p className="mt-2 text-2xl font-semibold tabular-nums">
-                          {pct(payload.trend[0]?.visibilityRatePct ?? d.overview.visibilityRatePct)}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {formatSeoul(payload.trend[0]?.measuredAt ?? d.scope.measuredAt)} 기준 ·
-                          유효 측정 {payload.trend[0]?.validCount ?? d.overview.validCount}회
-                        </p>
-                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        동일 조건의 2차 측정이 완료되면 여기에 변화가 표시됩니다.
+                      </p>
                     )}
+
                   </div>
 
                   <p className="text-xs text-muted-foreground">
