@@ -60,11 +60,8 @@ const JOB_STATUS_LABELS: Record<string, string> = {
   cancelled: "취소",
 };
 
-const CONFIDENCE_LABELS: Record<string, string> = {
-  high: "높음",
-  medium: "보통",
-  low: "낮음",
-};
+const IN_PROGRESS = new Set(["draft", "queued", "running"]);
+
 
 const TERMINAL = new Set(["completed", "partial", "failed", "cancelled"]);
 
