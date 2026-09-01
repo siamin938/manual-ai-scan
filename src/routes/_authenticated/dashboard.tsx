@@ -378,10 +378,8 @@ function DashboardPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>도메인</TableHead>
-                        <TableHead>등장 답변 수</TableHead>
-                        <TableHead>인용 수</TableHead>
-                        <TableHead>답변 비율</TableHead>
+                        <TableHead>출처</TableHead>
+                        <TableHead>AI 답변에 연결</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -395,15 +393,17 @@ function DashboardPage() {
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm tabular-nums">{s.responseCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">{s.citationCount}</TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {pct(s.responseRatePct)}
+                          <TableCell className="text-sm">
+                            <span className="tabular-nums">{s.responseCount}건</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              총 {s.citationCount}회 연결
+                            </span>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+
                 )}
               </CardContent>
             </Card>
