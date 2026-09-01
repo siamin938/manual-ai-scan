@@ -23,8 +23,10 @@ export type CustomerMeasurementErrorCode =
   | "RESTRICTED_QUESTIONS"
   | "DAILY_USAGE_LIMIT"
   | "MONTHLY_USAGE_LIMIT"
+  | "NO_MEASUREMENT_CREDIT"
   | "MEASUREMENT_NOT_READY"
   | "INTERNAL_ERROR";
+
 
 export type CreateCustomerMeasurementResult =
   | { ok: true; runId: string; plannedJobs: number }
