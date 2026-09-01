@@ -407,9 +407,10 @@ function ChannelCard({
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{c.reason}</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        관련 경쟁업체 답변 {c.responseCount}/{c.relatedResponseTotal} · 인용 {c.citationCount}회 ·
-        경쟁업체 {c.distinctCompetitorCount}곳
+        경쟁업체 답변 {c.responseCount}/{c.relatedResponseTotal}에서 연결 · 경쟁업체{" "}
+        {c.distinctCompetitorCount}곳
       </p>
+
       {c.domains.length > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">관찰 도메인: {c.domains.join(", ")}</p>
       )}
