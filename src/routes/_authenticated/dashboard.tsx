@@ -206,21 +206,26 @@ function DashboardPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
               label="AI에서 내 업체가 추천된 비율"
               value={pct(d.overview.visibilityRatePct)}
               note={`AI 답변 ${d.overview.validCount}건 중 ${d.overview.mentionCount}건에서 추천`}
             />
             <MetricCard
-              label="상위 3곳 안에 추천된 비율"
-              value={pct(d.overview.top3RatePct)}
-              note={`추천 순서 3번째 안에 든 답변 ${d.overview.top3Count}건`}
+              label="상위 3곳 안에 추천된 답변"
+              value={`${d.overview.top3Count}건`}
+              note={`AI 답변 ${d.overview.validCount}건 중 상위 3곳 안에 추천`}
             />
             <MetricCard
-              label="한 번 이상 노출된 검색 질문"
-              value={pct(d.overview.questionCoverageRatePct)}
-              note={`질문 ${d.overview.questionCount}개 중 ${d.overview.coveredQuestionCount}개에서 노출`}
+              label="함께 등장한 주요 경쟁업체"
+              value={`${d.competitors.length}곳`}
+              note="같은 질문에서 반복 관찰된 주요 업체"
+            />
+            <MetricCard
+              label="AI가 참고한 주요 출처"
+              value={`${d.sources.length}곳`}
+              note="최종 AI 답변에 실제로 연결된 출처"
             />
           </div>
 
