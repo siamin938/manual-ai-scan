@@ -353,11 +353,13 @@ function DashboardPage() {
                         </Badge>
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {intentLabel(p.intentType)} · 측정 {p.measurementCount}회 · 노출{" "}
-                        {p.mentionCount}회 · 노출률 {pct(p.visibilityRatePct)}
+                        {p.status === "missing"
+                          ? `${intentLabel(p.intentType)} · 이번 측정에서 추천되지 않음`
+                          : `${intentLabel(p.intentType)} · ${p.measurementCount}번 중 ${p.mentionCount}번 추천`}
                       </p>
                     </div>
                   ))
+
                 )}
               </CardContent>
             </Card>
