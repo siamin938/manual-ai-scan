@@ -313,7 +313,7 @@ function RunDetailPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{run.name}</h1>
           <p className="text-sm text-muted-foreground">
-            {ENGINE_LABEL} · 대상 업체 {data.businessName}
+            {ENGINE_LABEL} · 내 업체 {data.businessName}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
