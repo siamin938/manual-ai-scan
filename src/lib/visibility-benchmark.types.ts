@@ -23,6 +23,22 @@ export interface BenchmarkSourceGroupDTO {
 }
 
 
+export interface BenchmarkCategorySourceGroupDTO {
+  key: string;
+  label: string;
+  highEntityCount: number;
+  highEntitySharePct: number | null;
+  sites: BenchmarkSourceSiteDTO[];
+}
+
+export interface BenchmarkCategoryContextDTO {
+  available: boolean;
+  category: string | null;
+  eligibleTargetBusinessCount: number;
+  highVisibilityEntityCount: number;
+  sourceGroups: BenchmarkCategorySourceGroupDTO[];
+}
+
 export interface VisibilityBenchmarkDTO {
   windowDays: number;
   thresholdPct: number;
@@ -30,7 +46,12 @@ export interface VisibilityBenchmarkDTO {
   highVisibilityEntityCount: number;
   sourceGroups: BenchmarkSourceGroupDTO[];
   disclaimer: string;
+  scope?: "global_automotive";
+  eligibleTargetBusinessCount?: number;
+  contributingOrgCount?: number;
+  categoryContext?: BenchmarkCategoryContextDTO;
 }
+
 
 export type VisibilityBenchmarkResponseDTO =
   | { ok: true; benchmark: VisibilityBenchmarkDTO | null }

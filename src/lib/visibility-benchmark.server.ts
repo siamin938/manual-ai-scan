@@ -4,6 +4,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import type {
+  BenchmarkCategoryContextDTO,
+  BenchmarkCategorySourceGroupDTO,
   BenchmarkPatternStrength,
   BenchmarkSourceGroupDTO,
   BenchmarkSourceSiteDTO,
@@ -80,6 +82,44 @@ function parseSourceGroup(item: unknown, index: number): BenchmarkSourceGroupDTO
 }
 
 
+function parseCategorySourceGroup(
+  item: unknown,
+  index: number,
+): BenchmarkCategorySourceGroupDTO | null {
+  if (!isObj(item)) return null;
+  const label = str(item["label"]) ?? str(item["groupLabel"]) ?? str(item["name"]);
+  const highEntityCount = num(item["highEntityCount"]);
+  if (label === null || highEntityCount === null) return null;
+  const sites = parseSites(item["sites"]);
+  if (sites === null) return null;
+  return {
+    key: str(item["key"]) ?? str(item["groupKey"]) ?? `${label}-${index}`,
+    label,
+    highEntityCount,
+    highEntitySharePct: nullableNum(item["highEntitySharePct"]),
+    sites,
+  };
+}
+
+function parseCategoryContext(value: unknown): BenchmarkCategoryContextDTO | undefined {
+  if (!isObj(value)) return undefined;
+  const groupsRaw = value["sourceGroups"];
+  const sourceGroups: BenchmarkCategorySourceGroupDTO[] = [];
+  if (Array.isArray(groupsRaw)) {
+    for (let i = 0; i < groupsRaw.length; i += 1) {
+      const parsed = parseCategorySourceGroup(groupsRaw[i], i);
+      if (parsed !== null) sourceGroups.push(parsed);
+    }
+  }
+  return {
+    available: value["available"] === true,
+    category: str(value["category"]),
+    eligibleTargetBusinessCount: num(value["eligibleTargetBusinessCount"]) ?? 0,
+    highVisibilityEntityCount: num(value["highVisibilityEntityCount"]) ?? 0,
+    sourceGroups,
+  };
+}
+
 function parseBenchmark(value: unknown): VisibilityBenchmarkDTO | null {
   if (!isObj(value)) return null;
   const thresholdPct = num(value["thresholdPct"]);
@@ -102,7 +142,7 @@ function parseBenchmark(value: unknown): VisibilityBenchmarkDTO | null {
     }
   }
 
-  return {
+  const dto: VisibilityBenchmarkDTO = {
     windowDays,
     thresholdPct,
     dataStatus,
@@ -110,7 +150,18 @@ function parseBenchmark(value: unknown): VisibilityBenchmarkDTO | null {
     sourceGroups,
     disclaimer,
   };
+
+  if (value["scope"] === "global_automotive") dto.scope = "global_automotive";
+  const eligible = num(value["eligibleTargetBusinessCount"]);
+  if (eligible !== null) dto.eligibleTargetBusinessCount = eligible;
+  const orgs = num(value["contributingOrgCount"]);
+  if (orgs !== null) dto.contributingOrgCount = orgs;
+  const categoryContext = parseCategoryContext(value["categoryContext"]);
+  if (categoryContext !== undefined) dto.categoryContext = categoryContext;
+
+  return dto;
 }
+
 
 export function parseVisibilityBenchmarkResponse(
   payload: unknown,
