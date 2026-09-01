@@ -40,21 +40,17 @@ function customerLabel(label: string): string {
   return CUSTOMER_LABEL_OVERRIDES[label] ?? label;
 }
 
-/** 최우선 액션의 근거 수치를 그대로 사용한 한 줄 격차 요약(계산 규칙 없음). */
+/** 최우선 액션 제목만 한 줄로 안내한다(계산 규칙 없음). */
 function gapHeadline(
   rec: ActionRecommendationDTO | undefined,
   prefix: string,
 ): string | null {
   if (!rec) return null;
-  const e = rec.evidence;
-  const total = e.measurementCount;
-  if (!total || total <= 0) return null;
-  if (e.clientResponseCount == null || e.competitorResponseCount == null) return null;
-  if (e.clientResponseCount >= e.competitorResponseCount) return null;
   const label = rec.title?.trim();
   if (!label) return null;
-  return `${prefix} ${label} — 내 업체 ${e.clientResponseCount}/${total} vs 경쟁업체 ${e.competitorResponseCount}/${total}`;
+  return `${prefix} ${label}`;
 }
+
 
 export function ActionRecommendationsSection({
   orgId,
@@ -80,13 +76,16 @@ export function ActionRecommendationsSection({
     ? [...payload.recommendations].sort((a, b) => a.rank - b.rank)[0]
     : undefined;
   const isPreliminary = (payload?.scope?.repetitions ?? 0) < 2;
-  const headline = gapHeadline(topRec, isPreliminary ? "1차 관찰 차이:" : "가장 큰 차이:");
+  const headline = gapHeadline(
+    topRec,
+    isPreliminary ? "먼저 확인해볼 영역:" : "반복해서 확인된 우선 영역:",
+  );
 
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">
-          {isPreliminary ? "AI 노출 1차 관찰" : "AI 노출을 높이기 위해 먼저 해볼 것"}
+          {isPreliminary ? "첫 측정에서 먼저 확인해볼 영역" : "AI 노출을 높이기 위해 먼저 해볼 것"}
         </h2>
         {headline && (
           <p className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
@@ -95,10 +94,11 @@ export function ActionRecommendationsSection({
         )}
         <p className="mt-1 text-sm text-muted-foreground">
           {isPreliminary
-            ? "첫 측정에서 경쟁업체와 차이가 비교적 크게 관찰된 질문군입니다. 아직 실행 권고가 아니라, 동일 조건 재측정 후 우선순위를 확인할 후보입니다."
-            : "반복 측정에서 경쟁업체와 실제 인용 출처·질문군의 차이를 바탕으로, 지금 우선 시도해볼 항목을 정리했습니다."}
+            ? "이번에는 한 번 관찰된 결과입니다. 동일 조건으로 다시 측정해 같은 차이가 반복되는지 확인합니다."
+            : "반복 측정에서 경쟁업체와 실제 연결된 출처·검색 상황의 차이를 바탕으로, 지금 우선 시도해볼 항목을 정리했습니다."}
         </p>
       </div>
+
 
       {query.isLoading && <Skeleton className="h-40" />}
 
@@ -170,7 +170,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
         )}
 
         <div>
-          <p className="text-sm font-medium">어디에 반영할까요?</p>
+          <p className="text-sm font-medium">어디를 확인해볼까요?</p>
           {rec.sourceGroups.length > 0 || (rec.referenceSourceGroups?.length ?? 0) > 0 ? (
             <SourceGroups
               groups={rec.sourceGroups}
@@ -178,19 +178,19 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             />
           ) : rec.channelSuggestions.length === 0 ? (
             <p className="mt-1 text-sm text-muted-foreground">
-              현재 관련 질문의 실제 인용 데이터만으로는 특정 채널을 권할 근거가 부족합니다.
+              현재 관련 질문에서 AI 답변에 연결된 데이터만으로는 특정 채널을 권할 근거가
+              부족합니다.
             </p>
           ) : (
             <ChannelGroups channels={rec.channelSuggestions} />
           )}
         </div>
 
-
-
-
-        <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">이 판단의 근거</p>
-          <p className="mt-1">
+        <details className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+          <summary className="cursor-pointer font-medium text-foreground">
+            판단 근거 자세히 보기
+          </summary>
+          <p className="mt-2">
             내 업체 등장 답변 {e.clientResponseCount} · 경쟁업체 등장 답변{" "}
             {e.competitorResponseCount} · 함께 관찰된 경쟁업체 {e.distinctCompetitorCount}곳
           </p>
@@ -198,7 +198,8 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             측정 {e.measurementCount}건 · 관련 질문 {e.questionCount}개
           </p>
           {e.domains.length > 0 && <p className="mt-1">관찰 출처: {e.domains.join(", ")}</p>}
-        </div>
+        </details>
+
 
         {rec.sampleQuestions.length > 0 && (
           <div>
@@ -273,7 +274,7 @@ function SourceGroupCard({
     : isPriority
       ? customerLabel(g.evidenceLabel ?? g.actionLabel)
       : g.evidenceGrade === "candidate"
-        ? "관찰 후보"
+        ? "먼저 확인"
         : customerLabel(g.actionLabel);
   const badgeVariantForGroup: "default" | "secondary" | "outline" = referenceOnly
     ? "outline"
@@ -293,9 +294,10 @@ function SourceGroupCard({
         )}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        관련 경쟁업체 답변 {g.responseCount}/{g.relatedResponseTotal}에서 관찰 · 인용{" "}
-        {g.citationCount}회 · 경쟁업체 {g.distinctCompetitorCount}곳
+        경쟁업체 답변 {g.responseCount}/{g.relatedResponseTotal}에서 관찰 · 경쟁업체{" "}
+        {g.distinctCompetitorCount}곳
       </p>
+
       <p className="mt-1 text-sm text-muted-foreground">{g.reason}</p>
       {!referenceOnly && g.evidenceGrade === "candidate" && (g.clientOverallResponseCount ?? 0) > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">
@@ -316,9 +318,10 @@ function SourceGroupCard({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{customerLabel(p.name)}</span>
                   <span className="text-xs text-muted-foreground">
-                    {p.responseCount}/{p.relatedResponseTotal} · 인용 {p.citationCount}회 ·
-                    경쟁업체 {p.distinctCompetitorCount}곳
+                    {p.responseCount}/{p.relatedResponseTotal} 답변에서 연결 · 경쟁업체{" "}
+                    {p.distinctCompetitorCount}곳
                   </span>
+
                   <Badge
                     variant={
                       referenceOnly
@@ -335,7 +338,7 @@ function SourceGroupCard({
                       : p.evidenceGrade === "priority"
                         ? customerLabel(p.evidenceLabel ?? p.actionLabel)
                         : p.evidenceGrade === "candidate"
-                          ? "관찰 후보"
+                          ? "먼저 확인"
                           : customerLabel(p.actionLabel)}
                   </Badge>
                 </div>
@@ -404,9 +407,10 @@ function ChannelCard({
       </div>
       <p className="mt-1 text-sm text-muted-foreground">{c.reason}</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        관련 경쟁업체 답변 {c.responseCount}/{c.relatedResponseTotal} · 인용 {c.citationCount}회 ·
-        경쟁업체 {c.distinctCompetitorCount}곳
+        경쟁업체 답변 {c.responseCount}/{c.relatedResponseTotal}에서 연결 · 경쟁업체{" "}
+        {c.distinctCompetitorCount}곳
       </p>
+
       {c.domains.length > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">관찰 도메인: {c.domains.join(", ")}</p>
       )}
