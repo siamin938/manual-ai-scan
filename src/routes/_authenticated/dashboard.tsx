@@ -514,7 +514,7 @@ function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">어떤 검색 상황에서 강하고 약한가요?</CardTitle>
+              <CardTitle className="text-base">어떤 검색 상황에서 보였나요?</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
@@ -530,29 +530,28 @@ function DashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>검색 상황</TableHead>
-                      <TableHead>질문 수</TableHead>
-                      <TableHead>답변 수</TableHead>
                       <TableHead>추천된 답변</TableHead>
-                      <TableHead>추천 비율</TableHead>
-                      <TableHead>상위 3곳 비율</TableHead>
+                      <TableHead>이번 측정 결과</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {d.questionGroups.map((g) => (
                       <TableRow key={g.intentType}>
                         <TableCell className="text-sm">{intentLabel(g.intentType)}</TableCell>
-                        <TableCell className="text-sm tabular-nums">{g.questionCount}</TableCell>
-                        <TableCell className="text-sm tabular-nums">{g.measurementCount}</TableCell>
-                        <TableCell className="text-sm tabular-nums">{g.mentionCount}</TableCell>
                         <TableCell className="text-sm tabular-nums">
-                          {pct(g.visibilityRatePct)}
+                          {g.measurementCount}개 중 {g.mentionCount}개
                         </TableCell>
-                        <TableCell className="text-sm tabular-nums">{pct(g.top3RatePct)}</TableCell>
+                        <TableCell className="text-sm">
+                          <Badge variant={g.mentionCount > 0 ? "secondary" : "outline"}>
+                            {g.mentionCount > 0 ? "추천 확인" : "아직 미추천"}
+                          </Badge>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               )}
+
             </CardContent>
           </Card>
 
