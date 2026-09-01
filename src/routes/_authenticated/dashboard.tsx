@@ -393,10 +393,13 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm">
-                  최근 자동차 업체 측정 데이터를 모아, AI에 자주 노출되는 업체들과 반복적으로
-                  연결되는 출처를 확인합니다.
+                  최근 차보임에 누적된 자동차 업체 측정 데이터를 익명 집계해, AI 노출이 높은
+                  업체들과 반복적으로 함께 관찰된 출처를 확인합니다.
                 </p>
                 <p className="text-sm">
+                  {benchmark.eligibleTargetBusinessCount !== undefined
+                    ? `자동차 업체 ${benchmark.eligibleTargetBusinessCount}곳의 측정 데이터를 기반으로, `
+                    : ""}
                   AI 노출률 {benchmark.thresholdPct}% 이상인 업체{" "}
                   {benchmark.highVisibilityEntityCount}곳에서 자주 연결된 출처를 모았습니다.
                 </p>
@@ -422,9 +425,9 @@ function DashboardPage() {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {benchmark.sourceGroups.slice(0, 4).map((g) => {
+                    {benchmark.sourceGroups.slice(0, 6).map((g) => {
                       const siteLabels = (g.sites ?? [])
-                        .slice(0, 3)
+                        .slice(0, 4)
                         .map((s) => s.label)
                         .join(" · ");
                       return (
@@ -447,14 +450,41 @@ function DashboardPage() {
                             </p>
                           </div>
                           <Badge variant={g.targetConnected ? "default" : "secondary"}>
-                            {g.targetConnected ? "연결 있음" : "미관찰"}
+                            {g.targetConnected ? "내 업체에서도 관찰" : "내 업체에서는 미관찰"}
                           </Badge>
                         </div>
                       );
                     })}
                   </div>
                 )}
+                {benchmark.categoryContext?.available === true && (
+                  <div className="rounded-md border bg-muted/40 p-3 space-y-2">
+                    <p className="text-sm font-medium">같은 업종에서 특히 자주 보인 출처</p>
+                    <p className="text-xs text-muted-foreground">
+                      {benchmark.categoryContext.category ?? "동일"} 업종의 비교 가능한 업체{" "}
+                      {benchmark.categoryContext.eligibleTargetBusinessCount}곳에서 별도로 관찰된
+                      참고 패턴입니다.
+                    </p>
+                    <div className="space-y-1">
+                      {benchmark.categoryContext.sourceGroups.slice(0, 3).map((g) => {
+                        const labels = (g.sites ?? [])
+                          .slice(0, 4)
+                          .map((s) => s.label)
+                          .join(" · ");
+                        return (
+                          <p key={g.key} className="text-xs">
+                            <span className="font-medium">{g.label}</span>
+                            {labels && (
+                              <span className="text-muted-foreground"> · {labels}</span>
+                            )}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">{benchmark.disclaimer}</p>
+
               </CardContent>
             </Card>
           )}
