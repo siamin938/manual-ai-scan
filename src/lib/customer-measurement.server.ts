@@ -99,6 +99,15 @@ export async function createCustomerMeasurementRun(args: {
     return fail("MEASUREMENT_NOT_READY");
   }
 
+  // E-2) 측정권 사전 확인 (UX precheck 전용. 실제 차감은 DB 트리거가 담당한다.)
+  const { data: creditAccount, error: creditErr } = await supabase
+    .from("measurement_credit_accounts")
+    .select("balance")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (creditErr) return fail("INTERNAL_ERROR");
+  if (!creditAccount || Number(creditAccount.balance ?? 0) < 1) return fail("NO_MEASUREMENT_CREDIT");
+
   // F~H) 서버 강제 provider/repetitions + 용량/비용 계산
   const plannedJobs = calcPlannedJobs(activeQuestions.length);
   if (plannedJobs <= 0) return fail("NO_ACTIVE_QUESTIONS");

@@ -1003,6 +1003,95 @@ export type Database = {
           },
         ]
       }
+      measurement_credit_accounts: {
+        Row: {
+          balance: number
+          created_at: string
+          lifetime_consumed: number
+          lifetime_granted: number
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          lifetime_consumed?: number
+          lifetime_granted?: number
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          lifetime_consumed?: number
+          lifetime_granted?: number
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_credit_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      measurement_credit_ledger: {
+        Row: {
+          actor_user_id: string | null
+          amount: number
+          balance_after: number
+          created_at: string
+          entry_type: string
+          id: string
+          note: string | null
+          org_id: string
+          reference_key: string | null
+          run_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          amount: number
+          balance_after: number
+          created_at?: string
+          entry_type: string
+          id?: string
+          note?: string | null
+          org_id: string
+          reference_key?: string | null
+          run_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          entry_type?: string
+          id?: string
+          note?: string | null
+          org_id?: string
+          reference_key?: string | null
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_credit_ledger_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_credit_ledger_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_entity_canonicalizations: {
         Row: {
           business_id: string
@@ -2822,6 +2911,19 @@ export type Database = {
       get_visibility_repeat_aggregate_v01: {
         Args: { p_business_id: string; p_org_id: string }
         Returns: Json
+      }
+      grant_measurement_credits_v01: {
+        Args: {
+          p_actor_user_id?: string
+          p_amount: number
+          p_note?: string
+          p_org_id: string
+          p_reference_key?: string
+        }
+        Returns: {
+          balance_after: number
+          idempotent: boolean
+        }[]
       }
       has_org_role: {
         Args: {
