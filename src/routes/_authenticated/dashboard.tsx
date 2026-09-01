@@ -188,23 +188,31 @@ function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-1.5 text-sm">
               <p>
-                AI 답변 {d.overview.validCount}건을 분석했고, 그중 {d.overview.mentionCount}건에서 내
-                업체가 추천됐습니다.
+                내 업체는 AI 답변 {d.overview.validCount}개 중 {d.overview.mentionCount}개에서
+                추천됐습니다({pct(d.overview.visibilityRatePct)}).
               </p>
-              <p>상위 3곳 안에 추천된 답변은 {d.overview.top3Count}건입니다.</p>
-              {aggregate && (
-                <p>
-                  동일 조건 {aggregate.compatibleRunCount}회 반복 측정으로 총{" "}
-                  {aggregate.validCount}건을 함께 확인했습니다.
+              {mentionedGroupLabels.length > 0 && (
+                <p>추천이 확인된 검색 상황: {mentionedGroupLabels.join(", ")}</p>
+              )}
+              {unmentionedGroupLabels.length > 0 && (
+                <p className="text-muted-foreground">
+                  아직 추천이 확인되지 않은 검색 상황: {unmentionedGroupLabels.join(", ")}
                 </p>
               )}
-              {(d.competitors.length > 0 || d.sources.length > 0) && (
+              {topCompetitor && (
+                <p>
+                  가장 자주 함께 등장한 업체: {topCompetitor.name} · {topCompetitor.responseCount}개
+                  답변에서 확인
+                </p>
+              )}
+              {aggregate && (
                 <p className="text-muted-foreground">
-                  함께 등장한 업체 {d.competitors.length}곳과 AI가 참고한 출처 {d.sources.length}곳도
-                  같이 비교했습니다.
+                  같은 조건으로 {aggregate.compatibleRunCount}번 다시 측정해 답변{" "}
+                  {aggregate.validCount}개를 함께 확인했습니다.
                 </p>
               )}
             </CardContent>
+
           </Card>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
