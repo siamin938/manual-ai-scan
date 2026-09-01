@@ -265,6 +265,22 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
 
   const activeCount = questions.data?.length ?? 0;
 
+  /** 측정권 잔여 조회. 로딩/조회 실패는 0회로 오인하지 않도록 null로 둔다. */
+  const credit = useQuery({
+    queryKey: ["measurement-credit-balance", activeOrgId],
+    enabled: !!activeOrgId && open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("measurement_credit_accounts")
+        .select("balance")
+        .eq("org_id", activeOrgId!)
+        .maybeSingle();
+      if (error) throw error;
+      return Number(data?.balance ?? 0);
+    },
+  });
+  const creditBalance = credit.isSuccess ? credit.data : null;
+
   const blockers = useMemo(() => {
     const list: string[] = [];
     if (!session) list.push("로그인 세션이 없습니다.");
@@ -272,8 +288,10 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     if (!questionSetId) list.push("질문 세트를 선택하세요.");
     if (questionSetId && !questions.isLoading && activeCount === 0)
       list.push("측정할 활성 질문이 없습니다.");
+    if (creditBalance !== null && creditBalance < 1) list.push("AI 노출 측정권이 없습니다.");
     return list;
-  }, [session, businessId, questionSetId, activeCount, questions.isLoading]);
+  }, [session, businessId, questionSetId, activeCount, questions.isLoading, creditBalance]);
+
 
   async function submit() {
     if (blockers.length > 0 || submitting || !activeOrgId) return;
