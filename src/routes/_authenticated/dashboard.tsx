@@ -568,9 +568,10 @@ function DashboardPage() {
               <CollapsibleContent>
                 <CardContent className="space-y-4">
                   <p className="text-xs text-muted-foreground">
-                    기준 측정: {d.scope.runName} · {d.scope.providers.join(", ")} · 반복{" "}
-                    {d.scope.repetitions}회 · 완료 {d.scope.completedJobs}/{d.scope.totalJobs}
+                    기준 측정: {d.scope.runName} · 반복 {d.scope.repetitions}회 · 완료{" "}
+                    {d.scope.completedJobs}/{d.scope.totalJobs}
                   </p>
+
 
                   {aggregate && (
                     <div className="space-y-3 rounded-md border p-3">
