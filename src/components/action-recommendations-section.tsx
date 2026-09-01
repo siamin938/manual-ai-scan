@@ -170,7 +170,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
         )}
 
         <div>
-          <p className="text-sm font-medium">어디에 반영할까요?</p>
+          <p className="text-sm font-medium">어디를 확인해볼까요?</p>
           {rec.sourceGroups.length > 0 || (rec.referenceSourceGroups?.length ?? 0) > 0 ? (
             <SourceGroups
               groups={rec.sourceGroups}
@@ -178,19 +178,19 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             />
           ) : rec.channelSuggestions.length === 0 ? (
             <p className="mt-1 text-sm text-muted-foreground">
-              현재 관련 질문의 실제 인용 데이터만으로는 특정 채널을 권할 근거가 부족합니다.
+              현재 관련 질문에서 AI 답변에 연결된 데이터만으로는 특정 채널을 권할 근거가
+              부족합니다.
             </p>
           ) : (
             <ChannelGroups channels={rec.channelSuggestions} />
           )}
         </div>
 
-
-
-
-        <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">이 판단의 근거</p>
-          <p className="mt-1">
+        <details className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+          <summary className="cursor-pointer font-medium text-foreground">
+            판단 근거 자세히 보기
+          </summary>
+          <p className="mt-2">
             내 업체 등장 답변 {e.clientResponseCount} · 경쟁업체 등장 답변{" "}
             {e.competitorResponseCount} · 함께 관찰된 경쟁업체 {e.distinctCompetitorCount}곳
           </p>
@@ -198,7 +198,8 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             측정 {e.measurementCount}건 · 관련 질문 {e.questionCount}개
           </p>
           {e.domains.length > 0 && <p className="mt-1">관찰 출처: {e.domains.join(", ")}</p>}
-        </div>
+        </details>
+
 
         {rec.sampleQuestions.length > 0 && (
           <div>
