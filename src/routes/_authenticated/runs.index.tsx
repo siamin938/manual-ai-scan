@@ -401,7 +401,14 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               <span className="text-muted-foreground">예상 사용량</span>
               <span className="font-medium">{activeCount}회</span>
             </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-muted-foreground">남은 AI 노출 측정권</span>
+              <span className="font-medium">
+                {creditBalance === null ? "확인 중" : `${creditBalance}회`}
+              </span>
+            </div>
           </div>
+
 
           {blockers.length > 0 && (
             <ul className="space-y-1 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
