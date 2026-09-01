@@ -40,21 +40,17 @@ function customerLabel(label: string): string {
   return CUSTOMER_LABEL_OVERRIDES[label] ?? label;
 }
 
-/** 최우선 액션의 근거 수치를 그대로 사용한 한 줄 격차 요약(계산 규칙 없음). */
+/** 최우선 액션 제목만 한 줄로 안내한다(계산 규칙 없음). */
 function gapHeadline(
   rec: ActionRecommendationDTO | undefined,
   prefix: string,
 ): string | null {
   if (!rec) return null;
-  const e = rec.evidence;
-  const total = e.measurementCount;
-  if (!total || total <= 0) return null;
-  if (e.clientResponseCount == null || e.competitorResponseCount == null) return null;
-  if (e.clientResponseCount >= e.competitorResponseCount) return null;
   const label = rec.title?.trim();
   if (!label) return null;
-  return `${prefix} ${label} — 내 업체 ${e.clientResponseCount}/${total} vs 경쟁업체 ${e.competitorResponseCount}/${total}`;
+  return `${prefix} ${label}`;
 }
+
 
 export function ActionRecommendationsSection({
   orgId,
