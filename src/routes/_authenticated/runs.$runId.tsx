@@ -326,7 +326,30 @@ function RunDetailPage() {
         </div>
       </div>
 
-      {/* 서버 자동 진단 정리 상태 (프론트에서 실행하지 않음) */}
+      {/* 측정 진행 중 안내 */}
+      {inProgress ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">AI 노출 측정 진행 중</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm font-medium">
+              {completedJobs} / {totalJobs} 질문 확인 완료
+            </p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              모든 질문 측정이 끝난 뒤 최종 노출률과 경쟁업체·출처 결과를 정리해 보여드립니다.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* 결과 정리 상태 */}
       {(() => {
         const runRow = data.run;
         const eligible =
@@ -335,104 +358,65 @@ function RunDetailPage() {
           (runRow.status === "completed" || runRow.status === "partial");
         if (!eligible) return null;
         const event = data.latestEvent;
-        if (!event) {
-          return (
-            <Card>
-              <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                <Badge variant="secondary">기존 실행</Badge>
-                <span className="text-xs text-muted-foreground">
-                  서버 자동 진단 이력이 없는 실행입니다.
-                </span>
-              </CardContent>
-            </Card>
-          );
-        }
+        if (!event) return null;
+        let badge = "분석 완료";
+        let variant: "secondary" | "destructive" = "secondary";
+        let message = "경쟁업체와 출처까지 정리되었습니다.";
         if (event.event_type === "visibility_postprocess_failed") {
-          return (
-            <Card>
-              <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                <Badge variant="destructive">자동 진단 정리 확인 필요</Badge>
-                <span className="text-xs text-muted-foreground">
-                  서버 후처리 중 오류가 발생했습니다.
-                </span>
-              </CardContent>
-            </Card>
-          );
-        }
-        if (
+          badge = "결과 정리 확인 필요";
+          variant = "destructive";
+          message = "결과 정리를 완료하지 못했습니다. 잠시 후 다시 확인해 주세요.";
+        } else if (
           event.event_type === "visibility_postprocess_triggered" ||
           event.event_type === "visibility_postprocess_started"
         ) {
-          return (
-            <Card>
-              <CardContent className="flex flex-wrap items-center gap-3 p-4">
-                <Badge variant="secondary">자동 진단 정리 중…</Badge>
-                <span className="text-xs text-muted-foreground">
-                  측정 결과를 정리하고 있습니다. 추가 AI 측정 비용은 발생하지 않습니다.
-                </span>
-              </CardContent>
-            </Card>
-          );
+          badge = "결과 정리 중";
+          message = "경쟁업체와 출처를 정리하고 있습니다.";
         }
         return (
           <Card>
             <CardContent className="flex flex-wrap items-center gap-3 p-4">
-              <Badge variant="secondary">자동 진단 준비 완료</Badge>
-              <span className="text-xs text-muted-foreground">
-                업체 검증·정규화가 완료되었습니다.
-              </span>
+              <Badge variant={variant}>{badge}</Badge>
+              <span className="text-xs text-muted-foreground">{message}</span>
             </CardContent>
           </Card>
         );
       })()}
 
-
-
       {/* 측정 결과 요약 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">측정 결과 요약</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Stat label="유효 측정 수" value={`${data.overall?.valid_n ?? 0}건`} />
-            <Stat label="대상 업체 노출 횟수" value={`${data.overall?.mention_n ?? 0}건`} />
-            <Stat label="대상 업체 노출률" value={pct(data.overall?.inclusion_rate_pct)} />
-            <Stat label="1위 언급률" value={pct(data.overall?.first_mention_rate_pct)} />
-            <Stat label="상위 3위 언급률" value={pct(data.overall?.top3_rate_pct)} />
-            <Stat label="대상 업체 도메인 인용률" value={pct(domainCitedRate)} />
-            <Stat
-              label="수동 검토 필요 건수"
-              value={
-                <span className={reviewCount > 0 ? "text-destructive" : undefined}>
-                  {reviewCount}건
-                </span>
-              }
-            />
-            <Stat label="분석 신뢰도 분포" value={confidenceSummary} />
-            <Stat label="기록된 실제 비용" value={usd(run.actual_cost_usd)} />
-          </div>
-        </CardContent>
-      </Card>
+      {showSummary ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">측정 결과 요약</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <Stat
+                  label="분석 완료 질문"
+                  value={`${data.overall?.valid_n ?? 0} / ${data.questionCount}`}
+                />
+                <Stat
+                  label="우리 업체가 나온 질문"
+                  value={`${data.overall?.mention_n ?? 0}개`}
+                />
+                <Stat label="AI 노출률" value={pct(data.overall?.inclusion_rate_pct)} />
+                <Stat label="1위 노출률" value={pct(data.overall?.first_mention_rate_pct)} />
+                <Stat label="상위 3위 노출률" value={pct(data.overall?.top3_rate_pct)} />
+                <Stat label="공식 사이트 인용률" value={pct(domainCitedRate)} />
+              </div>
+            </CardContent>
+          </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="완료 작업 / 전체 작업" value={`${run.completed_jobs} / ${run.total_jobs}`} />
-        <Stat label="실패 작업" value={String(run.failed_jobs)} />
-        <Stat label="예상 비용" value={usd(run.estimated_cost_usd)} />
-        <Stat label="질문 수" value={`${data.questionCount}개`} />
-        <Stat label="반복 횟수" value={`${run.repetitions}회`} />
-        <Stat label="모델명" value={model} />
-        <Stat
-          label="생성 · 시작 · 완료 시각"
-          value={
-            <span className="block space-y-0.5 text-xs">
-              <span className="block">생성 {formatSeoul(run.created_at)}</span>
-              <span className="block">시작 {formatSeoul(run.started_at)}</span>
-              <span className="block">완료 {formatSeoul(run.completed_at)}</span>
-            </span>
-          }
-        />
-      </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Stat label="질문 수" value={`${data.questionCount}개`} />
+            <Stat label="측정 횟수" value={`${run.repetitions}회`} />
+            <Stat label="완료 시각" value={formatSeoul(run.completed_at)} />
+          </div>
+        </>
+      ) : null}
+
+
 
       {/* 작업 목록 */}
       <Card>
