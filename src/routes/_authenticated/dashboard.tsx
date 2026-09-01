@@ -69,9 +69,10 @@ function intentLabel(intentType: string): string {
 }
 
 const STATUS_LABEL: Record<"missing" | "partial", string> = {
-  missing: "미노출",
-  partial: "부분 노출",
+  missing: "이번 측정 미추천",
+  partial: "가끔 추천",
 };
+
 
 function DashboardPage() {
   const { activeOrgId } = useOrg();
