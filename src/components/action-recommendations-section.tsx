@@ -294,9 +294,10 @@ function SourceGroupCard({
         )}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        관련 경쟁업체 답변 {g.responseCount}/{g.relatedResponseTotal}에서 관찰 · 인용{" "}
-        {g.citationCount}회 · 경쟁업체 {g.distinctCompetitorCount}곳
+        경쟁업체 답변 {g.responseCount}/{g.relatedResponseTotal}에서 관찰 · 경쟁업체{" "}
+        {g.distinctCompetitorCount}곳
       </p>
+
       <p className="mt-1 text-sm text-muted-foreground">{g.reason}</p>
       {!referenceOnly && g.evidenceGrade === "candidate" && (g.clientOverallResponseCount ?? 0) > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">
