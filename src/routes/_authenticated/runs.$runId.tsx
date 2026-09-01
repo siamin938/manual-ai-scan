@@ -38,7 +38,7 @@ export const Route = createFileRoute("/_authenticated/runs/$runId")({
   component: RunDetailPage,
 });
 
-const usd = (n: number | string | null | undefined) => `$${Number(n ?? 0).toFixed(2)}`;
+
 
 const formatPositionLabel = (position: number | null | undefined) =>
   typeof position === "number" && Number.isInteger(position) && position > 0
