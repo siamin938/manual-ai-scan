@@ -418,15 +418,15 @@ function RunDetailPage() {
 
 
 
-      {/* 작업 목록 */}
+      {/* 질문별 결과 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">작업 목록</CardTitle>
+          <CardTitle className="text-base">질문별 결과</CardTitle>
         </CardHeader>
         <CardContent>
           {data.jobs.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              자동 측정 작업을 기다리고 있습니다.
+              측정을 준비하고 있습니다.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -434,17 +434,14 @@ function RunDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>질문</TableHead>
-                    <TableHead className="text-right">반복 번호</TableHead>
                     <TableHead>상태</TableHead>
-                    <TableHead>대상 업체 노출</TableHead>
-                    <TableHead>검토</TableHead>
+                    <TableHead>우리 업체 노출</TableHead>
                     <TableHead className="w-24" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.jobs.map((j) => {
                     const m = measurementByJob.get(j.id);
-                    const needsReview = !!m && (m.manual_review_required || m.parse_confidence === "low");
                     const open = openJob === j.id;
                     return (
                       <Fragment key={j.id}>
@@ -455,7 +452,6 @@ function RunDetailPage() {
                           <TableCell className="max-w-[380px] text-sm">
                             {data.prompts.get(j.question_id) ?? j.question_id}
                           </TableCell>
-                          <TableCell className="text-right">{j.repetition_no}</TableCell>
                           <TableCell>
                             <Badge variant={j.status === "failed" ? "destructive" : "secondary"}>
                               {JOB_STATUS_LABELS[j.status] ?? j.status}
@@ -464,16 +460,13 @@ function RunDetailPage() {
                           <TableCell className="text-sm">
                             {m ? formatMentionPosition(m.was_client_mentioned, m.client_position) : "-"}
                           </TableCell>
-                          <TableCell>
-                            {needsReview ? <Badge variant="destructive">검토 필요</Badge> : null}
-                          </TableCell>
                           <TableCell className="text-right text-xs text-muted-foreground">
                             {open ? "접기 ▲" : "상세 ▼"}
                           </TableCell>
                         </TableRow>
                         {open ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="bg-muted/40">
+                            <TableCell colSpan={4} className="bg-muted/40">
                               <JobDetail
                                 job={j}
                                 prompt={data.prompts.get(j.question_id) ?? j.question_id}
@@ -495,54 +488,15 @@ function RunDetailPage() {
         </CardContent>
       </Card>
 
-      {/* 질문별 집계 */}
+      {/* AI에서 함께 등장한 업체 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">질문별 집계</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {data.questionMetrics.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">집계할 결과가 없습니다.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>질문</TableHead>
-                    <TableHead className="text-right">유효 표본 수</TableHead>
-                    <TableHead className="text-right">대상 업체 노출 횟수</TableHead>
-                    <TableHead className="text-right">노출률</TableHead>
-                    <TableHead className="text-right">최고 순위</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.questionMetrics.map((q) => (
-                    <TableRow key={`${q.question_id}-${q.provider}`}>
-                      <TableCell className="max-w-[420px] text-sm">{q.prompt_text}</TableCell>
-                      <TableCell className="text-right">{q.valid_n ?? 0}</TableCell>
-                      <TableCell className="text-right">{q.mention_n ?? 0}</TableCell>
-                      <TableCell className="text-right">{pct(q.inclusion_rate_pct)}</TableCell>
-                      <TableCell className="text-right">
-                        {q.best_position ? `${q.best_position}위` : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 자동 발견 경쟁업체 · 언급 업체 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">자동 발견 경쟁업체 · 언급 업체</CardTitle>
+          <CardTitle className="text-base">AI에서 함께 등장한 업체</CardTitle>
         </CardHeader>
         <CardContent>
           {shareRows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              확정된 특정 업체 언급이 없습니다. 자동 분석 후처리가 끝나면 다시 표시됩니다.
+              아직 함께 등장한 업체가 확인되지 않았습니다. 결과 정리가 끝나면 표시됩니다.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -550,9 +504,8 @@ function RunDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>업체명</TableHead>
-                    <TableHead className="text-right">언급 횟수</TableHead>
-                    <TableHead className="text-right">등장한 응답 수</TableHead>
-                    <TableHead className="text-right">응답 점유율</TableHead>
+                    <TableHead className="text-right">등장한 질문 수</TableHead>
+                    <TableHead className="text-right">등장률</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -561,7 +514,7 @@ function RunDetailPage() {
                       <TableCell className="text-sm">
                         <span className="font-medium">{s.display_name}</span>
                         {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
-                          <Badge className="ml-2">대상 업체</Badge>
+                          <Badge className="ml-2">내 업체</Badge>
                         ) : s.matched_business_id && data.competitorIds.has(s.matched_business_id) ? (
                           <Badge variant="secondary" className="ml-2">
                             등록 경쟁업체
@@ -572,12 +525,10 @@ function RunDetailPage() {
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">{s.mention_count}</TableCell>
                       <TableCell className="text-right">{s.response_count}</TableCell>
                       <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
                     </TableRow>
                   ))}
-
                 </TableBody>
               </Table>
             </div>
@@ -586,8 +537,10 @@ function RunDetailPage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        본 결과는 {ENGINE_LABEL} 결과이며, 사람이 직접 확인한 수동 UI 점검 결과와 합산되지 않습니다.
+        AI 답변은 측정 시점과 질문에 따라 달라질 수 있습니다. 차보임은 동일한 질문을 반복 관찰해
+        나타나는 패턴을 확인합니다.
       </p>
+
     </div>
   );
 }
