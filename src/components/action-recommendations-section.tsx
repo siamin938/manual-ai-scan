@@ -318,9 +318,10 @@ function SourceGroupCard({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{customerLabel(p.name)}</span>
                   <span className="text-xs text-muted-foreground">
-                    {p.responseCount}/{p.relatedResponseTotal} · 인용 {p.citationCount}회 ·
-                    경쟁업체 {p.distinctCompetitorCount}곳
+                    {p.responseCount}/{p.relatedResponseTotal} 답변에서 연결 · 경쟁업체{" "}
+                    {p.distinctCompetitorCount}곳
                   </span>
+
                   <Badge
                     variant={
                       referenceOnly
