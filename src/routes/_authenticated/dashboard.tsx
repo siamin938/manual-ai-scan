@@ -393,7 +393,7 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
-                  실제 AI 답변에 연결됐고, 내 업체와 직접 연결되거나 여러 답변에서 반복해서 관찰된
+                  실제 AI 답변에 연결됐고, 업체 정보와 직접 연결되거나 여러 답변에서 반복해서 관찰된
                   출처입니다. 출처의 신뢰도나 AI가 추천한 이유를 뜻하지는 않습니다.
                 </p>
                 {d.sources.length === 0 ? (
@@ -436,13 +436,12 @@ function DashboardPage() {
                   <Collapsible className="mt-4">
                     <CollapsibleTrigger asChild>
                       <Button variant="outline" size="sm">
-                        한 번만 함께 관찰된 참고 출처 보기 ({d.referenceSources.length})
+                        추가 참고 출처 보기 ({d.referenceSources.length})
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="mt-3">
                       <p className="mb-3 text-xs text-muted-foreground">
-                        내 업체 이름 주변에 함께 놓였지만 반복되지 않아 주요 출처에서 제외한
-                        곳입니다. 해당 내용을 뒷받침하거나 추천 이유라는 뜻은 아닙니다.
+                        답변 속 업체 이름 주변에서 함께 확인됐지만 반복 근거가 부족해 주요 출처에서는 제외했습니다. 해당 업체 정보를 뒷받침하거나 AI 추천 이유라는 뜻은 아닙니다.
                       </p>
                       <Table>
                         <TableHeader>

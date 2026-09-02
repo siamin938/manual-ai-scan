@@ -98,7 +98,7 @@ export type VisibilityDiagnosticBodyDTO = {
   competitors: VisibilityCompetitorDTO[];
   competitorGate: VisibilityCompetitorGateDTO | null;
   sources: VisibilitySourceDTO[];
-  /** 한 번만 함께 관찰된 참고 출처 (서버 판정 결과 그대로) */
+  /** 주요 출처 기준에 들지 않은 참고 출처 (서버 판정 결과 그대로) */
   referenceSources: VisibilitySourceDTO[];
   priorityAreas: VisibilityPriorityAreaDTO[];
   dataQuality: VisibilityDataQualityDTO;
