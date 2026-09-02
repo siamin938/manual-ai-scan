@@ -6,6 +6,7 @@ import { formatSeoul } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExternalLink } from "lucide-react";
 
 /** evidenceLevel은 Badge variant 선택에만 쓰고, 어떤 판정에도 쓰지 않는다. */
 function badgeVariant(
