@@ -124,4 +124,70 @@ describe("parseActionRecommendationsResponse", () => {
     if (!result.ok) return;
     expect(result.data.recommendations[0]).not.toHaveProperty("secretScore");
   });
+
+  it("linkedCompetitors의 http/https 링크와 null url을 보존한다", () => {
+    const withLinks = {
+      ...payload,
+      recommendations: [
+        {
+          ...recommendation,
+          sourceGroups: [
+            {
+              ...group,
+              platforms: [
+                {
+                  ...platform,
+                  linkedCompetitors: [
+                    { name: "업체A", url: "https://blog.naver.com/a" },
+                    { name: "업체B", url: "http://example.com/b" },
+                    { name: "업체C", url: null },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const result = parseActionRecommendationsResponse(withLinks);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const linked =
+      result.data.recommendations[0]!.sourceGroups[0]!.platforms[0]!.linkedCompetitors;
+    expect(linked).toEqual([
+      { name: "업체A", url: "https://blog.naver.com/a" },
+      { name: "업체B", url: "http://example.com/b" },
+      { name: "업체C", url: null },
+    ]);
+  });
+
+  it("linkedCompetitors 필드가 없어도 하위 호환된다", () => {
+    const result = parseActionRecommendationsResponse(payload);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(
+      result.data.recommendations[0]!.sourceGroups[0]!.platforms[0]!.linkedCompetitors,
+    ).toBeUndefined();
+  });
+
+  it.each(["javascript:alert(1)", "data:text/html,x", "/relative/path", "example.com/a"])(
+    "안전하지 않은 url(%s)은 fail-closed 처리한다",
+    (url) => {
+      const bad = {
+        ...payload,
+        recommendations: [
+          {
+            ...recommendation,
+            sourceGroups: [
+              {
+                ...group,
+                platforms: [{ ...platform, linkedCompetitors: [{ name: "업체A", url }] }],
+              },
+            ],
+          },
+        ],
+      };
+      expect(parseActionRecommendationsResponse(bad)).toEqual({ ok: false, error: "INVALID_DTO" });
+    },
+  );
 });
