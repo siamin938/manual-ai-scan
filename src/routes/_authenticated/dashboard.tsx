@@ -389,15 +389,16 @@ function DashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">AI가 실제 답변에 참고한 출처</CardTitle>
+                <CardTitle className="text-base">AI 답변에 연결된 주요 출처</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
-                  검색 중 본 모든 웹사이트가 아니라, 최종 AI 답변에 실제로 연결된 출처입니다.
+                  실제 AI 답변에 연결됐고, 내 업체와 직접 연결되거나 여러 답변에서 반복해서 관찰된
+                  출처입니다. 출처의 신뢰도나 AI가 추천한 이유를 뜻하지는 않습니다.
                 </p>
                 {d.sources.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    인용 출처 정보가 없습니다.
+                    주요 출처로 확인된 정보가 없습니다.
                   </p>
                 ) : (
                   <Table>
@@ -429,6 +430,43 @@ function DashboardPage() {
                     </TableBody>
                   </Table>
 
+                )}
+
+                {d.referenceSources.length > 0 && (
+                  <Collapsible className="mt-4">
+                    <CollapsibleTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        한 번만 함께 관찰된 참고 출처 보기 ({d.referenceSources.length})
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-3">
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        내 업체 이름 주변에 함께 놓였지만 반복되지 않아 주요 출처에서 제외한
+                        곳입니다. 해당 내용을 뒷받침하거나 추천 이유라는 뜻은 아닙니다.
+                      </p>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>출처</TableHead>
+                            <TableHead>AI 답변에 연결</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {d.referenceSources.map((s) => (
+                            <TableRow key={s.domain}>
+                              <TableCell className="text-sm">{s.domain}</TableCell>
+                              <TableCell className="text-sm">
+                                <span className="tabular-nums">{s.responseCount}건</span>
+                                <span className="mt-0.5 block text-xs text-muted-foreground">
+                                  총 {s.citationCount}회 연결
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CollapsibleContent>
+                  </Collapsible>
                 )}
               </CardContent>
             </Card>
