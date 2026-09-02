@@ -311,6 +311,18 @@ function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
       sourceGroups.push(parsed);
     }
   }
+  const referenceRaw = value["referenceSourceGroups"];
+  let referenceSourceGroups: ActionSourceGroupDTO[] | undefined;
+  if (referenceRaw !== undefined && referenceRaw !== null) {
+    if (!Array.isArray(referenceRaw)) return null;
+    const groups: ActionSourceGroupDTO[] = [];
+    for (const item of referenceRaw) {
+      const parsed = parseSourceGroup(item);
+      if (parsed === null) return null;
+      groups.push(parsed);
+    }
+    referenceSourceGroups = groups;
+  }
   return {
     id,
     rank,
@@ -324,6 +336,7 @@ function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
     evidence,
     channelSuggestions,
     sourceGroups,
+    ...(referenceSourceGroups !== undefined ? { referenceSourceGroups } : {}),
   };
 }
 
