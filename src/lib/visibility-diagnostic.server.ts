@@ -304,6 +304,7 @@ function parseDiagnosticBody(value: unknown): VisibilityDiagnosticBodyDTO | null
   const competitors = strictArray(value["competitors"], parseCompetitor);
   const competitorGate = parseCompetitorGate(value["competitorGate"]);
   const sources = strictArray(value["sources"], parseSource);
+  const referenceSources = strictArray(value["referenceSources"], parseSource);
   const priorityAreas = strictArray(value["priorityAreas"], parsePriorityArea);
   const dataQuality = parseDataQuality(value["dataQuality"]);
   if (
@@ -312,6 +313,7 @@ function parseDiagnosticBody(value: unknown): VisibilityDiagnosticBodyDTO | null
     questionGroups === null ||
     competitors === null ||
     sources === null ||
+    referenceSources === null ||
     priorityAreas === null ||
     dataQuality === null
   ) {
@@ -324,6 +326,7 @@ function parseDiagnosticBody(value: unknown): VisibilityDiagnosticBodyDTO | null
     competitors,
     competitorGate,
     sources,
+    referenceSources,
     priorityAreas,
     dataQuality,
   };
