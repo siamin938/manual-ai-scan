@@ -12,6 +12,7 @@ import type {
   ActionRecommendationsErrorCode,
   ActionRecommendationsResponseDTO,
   ActionScopeDTO,
+  ActionSourceEvidenceGrade,
   ActionSourceGroupDTO,
   ActionSourcePlatformDTO,
 } from "./visibility-actions.types";
