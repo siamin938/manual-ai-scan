@@ -246,9 +246,9 @@ function DashboardPage() {
               note="같은 질문에서 반복 관찰된 주요 업체"
             />
             <MetricCard
-              label="AI가 참고한 주요 출처"
+              label="AI 답변에 연결된 주요 출처"
               value={`${d.sources.length}곳`}
-              note="최종 AI 답변에 실제로 연결된 출처"
+              note="직접 연결되거나 여러 답변에서 반복 관찰"
             />
           </div>
 
