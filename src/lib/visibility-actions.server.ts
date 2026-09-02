@@ -229,6 +229,7 @@ function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
   const isActionType = (CHANNEL_ACTION_TYPES as readonly string[]).includes(
     actionTypeRaw as string,
   );
+  const optionals = parseSourceOptionals(value);
   if (
     key === null ||
     name === null ||
@@ -239,6 +240,7 @@ function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
     relatedResponseTotal === null ||
     citationCount === null ||
     distinctCompetitorCount === null ||
+    optionals === null ||
     !Array.isArray(value["platforms"])
   ) {
     return null;
@@ -260,6 +262,7 @@ function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
     citationCount,
     distinctCompetitorCount,
     platforms,
+    ...optionals,
   };
 }
 
