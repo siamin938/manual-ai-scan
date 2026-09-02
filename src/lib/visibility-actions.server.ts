@@ -12,6 +12,7 @@ import type {
   ActionRecommendationsErrorCode,
   ActionRecommendationsResponseDTO,
   ActionScopeDTO,
+  ActionSourceEvidenceGrade,
   ActionSourceGroupDTO,
   ActionSourcePlatformDTO,
 } from "./visibility-actions.types";
@@ -119,6 +120,58 @@ function parseChannelSuggestion(value: unknown): ActionChannelSuggestionDTO | nu
   };
 }
 
+const SOURCE_EVIDENCE_GRADES = ["priority", "candidate", "reference"] as const;
+
+type Opt<T> = { ok: true; value: T | undefined } | { ok: false };
+
+function optStr(value: unknown): Opt<string> {
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  return typeof value === "string" ? { ok: true, value } : { ok: false };
+}
+
+function optNum(value: unknown): Opt<number> {
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  return typeof value === "number" && Number.isFinite(value) ? { ok: true, value } : { ok: false };
+}
+
+function optEvidenceGrade(value: unknown): Opt<ActionSourceEvidenceGrade> {
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  return (SOURCE_EVIDENCE_GRADES as readonly string[]).includes(value as string)
+    ? { ok: true, value: value as ActionSourceEvidenceGrade }
+    : { ok: false };
+}
+
+/** 서버가 준 optional 근거 필드만 계약대로 통과시킨다(값이 있으면 엄격 검증). */
+function parseSourceOptionals(value: Obj):
+  | {
+      evidenceGrade?: ActionSourceEvidenceGrade;
+      evidenceLabel?: string;
+      scopeLabel?: string;
+      clientOverallResponseCount?: number;
+    }
+  | null {
+  const evidenceGrade = optEvidenceGrade(value["evidenceGrade"]);
+  const evidenceLabel = optStr(value["evidenceLabel"]);
+  const scopeLabel = optStr(value["scopeLabel"]);
+  const clientOverallResponseCount = optNum(value["clientOverallResponseCount"]);
+  if (
+    !evidenceGrade.ok ||
+    !evidenceLabel.ok ||
+    !scopeLabel.ok ||
+    !clientOverallResponseCount.ok
+  ) {
+    return null;
+  }
+  return {
+    ...(evidenceGrade.value !== undefined ? { evidenceGrade: evidenceGrade.value } : {}),
+    ...(evidenceLabel.value !== undefined ? { evidenceLabel: evidenceLabel.value } : {}),
+    ...(scopeLabel.value !== undefined ? { scopeLabel: scopeLabel.value } : {}),
+    ...(clientOverallResponseCount.value !== undefined
+      ? { clientOverallResponseCount: clientOverallResponseCount.value }
+      : {}),
+  };
+}
+
 function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
   if (!isObj(value)) return null;
   const key = str(value["key"]);
@@ -133,6 +186,7 @@ function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
   const isActionType = (CHANNEL_ACTION_TYPES as readonly string[]).includes(
     actionTypeRaw as string,
   );
+  const optionals = parseSourceOptionals(value);
   if (
     key === null ||
     name === null ||
@@ -142,7 +196,8 @@ function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
     relatedResponseTotal === null ||
     citationCount === null ||
     distinctCompetitorCount === null ||
-    domains === null
+    domains === null ||
+    optionals === null
   ) {
     return null;
   }
@@ -156,8 +211,10 @@ function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
     citationCount,
     distinctCompetitorCount,
     domains,
+    ...optionals,
   };
 }
+
 
 function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
   if (!isObj(value)) return null;
@@ -173,6 +230,7 @@ function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
   const isActionType = (CHANNEL_ACTION_TYPES as readonly string[]).includes(
     actionTypeRaw as string,
   );
+  const optionals = parseSourceOptionals(value);
   if (
     key === null ||
     name === null ||
@@ -183,6 +241,7 @@ function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
     relatedResponseTotal === null ||
     citationCount === null ||
     distinctCompetitorCount === null ||
+    optionals === null ||
     !Array.isArray(value["platforms"])
   ) {
     return null;
@@ -204,6 +263,7 @@ function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
     citationCount,
     distinctCompetitorCount,
     platforms,
+    ...optionals,
   };
 }
 
@@ -252,6 +312,18 @@ function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
       sourceGroups.push(parsed);
     }
   }
+  const referenceRaw = value["referenceSourceGroups"];
+  let referenceSourceGroups: ActionSourceGroupDTO[] | undefined;
+  if (referenceRaw !== undefined && referenceRaw !== null) {
+    if (!Array.isArray(referenceRaw)) return null;
+    const groups: ActionSourceGroupDTO[] = [];
+    for (const item of referenceRaw) {
+      const parsed = parseSourceGroup(item);
+      if (parsed === null) return null;
+      groups.push(parsed);
+    }
+    referenceSourceGroups = groups;
+  }
   return {
     id,
     rank,
@@ -265,6 +337,7 @@ function parseRecommendation(value: unknown): ActionRecommendationDTO | null {
     evidence,
     channelSuggestions,
     sourceGroups,
+    ...(referenceSourceGroups !== undefined ? { referenceSourceGroups } : {}),
   };
 }
 

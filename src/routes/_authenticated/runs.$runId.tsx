@@ -1,7 +1,8 @@
 import { Fragment, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { aggregateBusinessShare } from "@/lib/business-share.helpers";
@@ -116,8 +117,33 @@ type Source = {
 
 function RunDetailPage() {
   const { runId } = Route.useParams();
-  const { activeOrgId } = useOrg();
+  const { activeOrgId, canWrite } = useOrg();
   const [openJob, setOpenJob] = useState<string | null>(null);
+  const [reparsing, setReparsing] = useState(false);
+  const queryClient = useQueryClient();
+
+  // 저장된 답변 재분석: 서버(reparse-measurements)가 JWT와 조직 권한을 검증하고
+  // 후처리·출처 귀속을 다시 생성한다. 프론트는 호출과 갱신만 담당한다.
+  const handleReparse = async () => {
+    if (reparsing) return;
+    setReparsing(true);
+    try {
+      const { error } = await supabase.functions.invoke("reparse-measurements", {
+        body: { run_id: runId, dry_run: false },
+      });
+      if (error) {
+        toast.error("다시 분석하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+      toast.success("저장된 답변을 다시 분석했습니다.");
+      await queryClient.invalidateQueries({ queryKey: ["run-detail", runId, activeOrgId] });
+      await queryClient.invalidateQueries({ queryKey: ["visibility-actions"] });
+    } catch {
+      toast.error("다시 분석하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setReparsing(false);
+    }
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["run-detail", runId, activeOrgId],
@@ -320,6 +346,14 @@ function RunDetailPage() {
           <Badge variant={runStatusVariant(run.status)}>
             {RUN_STATUS_LABELS[run.status] ?? run.status}
           </Badge>
+          {canWrite &&
+          run.run_type === "audit" &&
+          run.phase === "standalone" &&
+          (run.status === "completed" || run.status === "partial") ? (
+            <Button variant="outline" size="sm" onClick={handleReparse} disabled={reparsing}>
+              {reparsing ? "다시 분석 중…" : "저장된 답변 다시 분석"}
+            </Button>
+          ) : null}
           <Button asChild variant="outline" size="sm">
             <Link to="/runs">목록으로</Link>
           </Button>

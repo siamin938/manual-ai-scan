@@ -78,14 +78,14 @@ export function ActionRecommendationsSection({
   const isPreliminary = (payload?.scope?.repetitions ?? 0) < 2;
   const headline = gapHeadline(
     topRec,
-    isPreliminary ? "먼저 확인해볼 영역:" : "반복해서 확인된 우선 영역:",
+    isPreliminary ? "먼저 확인할 단서:" : "반복해서 확인된 우선 점검:",
   );
 
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">
-          {isPreliminary ? "첫 측정에서 먼저 확인해볼 영역" : "AI 노출을 높이기 위해 먼저 해볼 것"}
+          {isPreliminary ? "첫 측정에서 먼저 확인할 단서" : "AI 노출을 높이기 위해 먼저 해볼 것"}
         </h2>
         {headline && (
           <p className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
@@ -94,8 +94,8 @@ export function ActionRecommendationsSection({
         )}
         <p className="mt-1 text-sm text-muted-foreground">
           {isPreliminary
-            ? "이번에는 한 번 관찰된 결과입니다. 동일 조건으로 다시 측정해 같은 차이가 반복되는지 확인합니다."
-            : "반복 측정에서 경쟁업체와 실제 연결된 출처·검색 상황의 차이를 바탕으로, 지금 우선 시도해볼 항목을 정리했습니다."}
+            ? "실제 답변에 연결된 출처 차이를 먼저 보여드립니다. 질문 유형이나 출처가 추천의 원인이라는 뜻은 아니며, 해당 페이지를 직접 확인한 뒤 동일 조건으로 다시 측정해 보세요."
+            : "반복 측정에서 실제 답변에 연결된 출처 차이를 우선해 정리했습니다. 인과로 단정하지 않으며, 먼저 확인해볼 지점입니다."}
         </p>
       </div>
 
@@ -301,7 +301,7 @@ function SourceGroupCard({
       <p className="mt-1 text-sm text-muted-foreground">{g.reason}</p>
       {!referenceOnly && g.evidenceGrade === "candidate" && (g.clientOverallResponseCount ?? 0) > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">
-          전체 측정에서는 내 업체도 이 출처군이 {g.clientOverallResponseCount}개 답변에서 함께
+          같은 검색 상황에서는 내 업체도 이 출처군이 {g.clientOverallResponseCount}개 답변에서 함께
           관찰됐습니다.
         </p>
       )}
