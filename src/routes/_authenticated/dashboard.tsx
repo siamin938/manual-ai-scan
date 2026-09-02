@@ -241,9 +241,9 @@ function DashboardPage() {
               note={`AI 답변 ${d.overview.validCount}건 중 상위 3곳 안에 추천`}
             />
             <MetricCard
-              label="함께 등장한 주요 경쟁업체"
+              label="AI 답변에서 함께 관찰된 업체"
               value={`${d.competitors.length}곳`}
-              note="같은 질문에서 반복 관찰된 주요 업체"
+              note="자주 등장한 곳과 추가 관찰 업체 포함"
             />
             <MetricCard
               label="AI 답변에 연결된 주요 출처"
@@ -268,12 +268,12 @@ function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">AI에서 내 업체 대신 자주 보이는 곳</CardTitle>
+              <CardTitle className="text-base">AI 답변에서 함께 관찰된 업체</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-1 text-xs text-muted-foreground">
-                같은 질문에서 반복해서 함께 등장한 주요 경쟁업체입니다. 업체를 누르면 어떤 질문과
-                출처에서 등장했는지 확인할 수 있습니다.
+                같은 질문의 AI 답변에서 내 업체와 비교해볼 수 있도록 관찰된 업체입니다. 업체를 누르면
+                어떤 질문과 출처에서 등장했는지 확인할 수 있습니다.
               </p>
               <p className="mb-3 text-xs text-muted-foreground">
                 한 번만 확인된 확정 업체도 추가 관찰로 함께 표시합니다.
@@ -286,7 +286,7 @@ function DashboardPage() {
               ) : null}
               {d.competitors.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  함께 등장한 다른 업체가 없습니다.
+                  함께 관찰된 다른 업체가 없습니다.
                 </p>
               ) : (
                 <Table>
@@ -494,7 +494,7 @@ function DashboardPage() {
                   </Badge>
                   {benchmark.dataStatus === "early" && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                      표본 축적 중
+                      데이터 축적 중
                     </Badge>
                   )}
                   {benchmark.dataStatus === "early" && (

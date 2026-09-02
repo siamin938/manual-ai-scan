@@ -35,6 +35,12 @@ export type ActionChannelSuggestionDTO = {
 
 export type ActionSourceEvidenceGrade = "priority" | "candidate" | "reference";
 
+/** 서버가 판정한, 해당 출처 페이지에 연결된 업체 (url은 서버 값 그대로 사용). */
+export type ActionLinkedCompetitorDTO = {
+  name: string;
+  url: string | null;
+};
+
 export type ActionSourcePlatformDTO = {
   key: string;
   name: string;
@@ -49,6 +55,7 @@ export type ActionSourcePlatformDTO = {
   evidenceLabel?: string;
   scopeLabel?: string;
   clientOverallResponseCount?: number;
+  linkedCompetitors?: ActionLinkedCompetitorDTO[];
 };
 
 export type ActionSourceGroupDTO = {

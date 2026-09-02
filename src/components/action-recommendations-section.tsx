@@ -6,6 +6,7 @@ import { formatSeoul } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExternalLink } from "lucide-react";
 
 /** evidenceLevel은 Badge variant 선택에만 쓰고, 어떤 판정에도 쓰지 않는다. */
 function badgeVariant(
@@ -345,9 +346,43 @@ function SourceGroupCard({
                 {p.domains.length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">{p.domains.join(", ")}</p>
                 )}
+                {p.linkedCompetitors && p.linkedCompetitors.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-muted-foreground">함께 연결된 업체</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {p.linkedCompetitors.map((c, i) =>
+                        c.url ? (
+                          <a
+                            key={`${c.name}-${i}`}
+                            href={c.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`${c.name} 출처 페이지 열기 (새 창)`}
+                            className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          >
+                            {c.name}
+                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                          </a>
+                        ) : (
+                          <span
+                            key={`${c.name}-${i}`}
+                            className="inline-flex items-center rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground"
+                          >
+                            {c.name}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
+          {g.platforms.some((p) => p.linkedCompetitors?.some((c) => !!c.url)) && (
+            <p className="text-xs text-muted-foreground">
+              AI 답변에 실제 연결된 출처 페이지입니다. 업체별 상세 페이지가 아닐 수 있습니다.
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import type {
+  ActionLinkedCompetitorDTO,
   ActionChannelActionType,
   ActionChannelSuggestionDTO,
   ActionRecommendationDTO,
@@ -172,6 +173,33 @@ function parseSourceOptionals(value: Obj):
   };
 }
 
+/** url은 null 또는 절대 http/https URL만 허용한다(그 외는 fail-closed). */
+function parseLinkedCompetitors(value: unknown): Opt<ActionLinkedCompetitorDTO[]> {
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  if (!Array.isArray(value)) return { ok: false };
+  const out: ActionLinkedCompetitorDTO[] = [];
+  for (const item of value) {
+    if (!isObj(item)) return { ok: false };
+    const name = str(item["name"]);
+    if (name === null) return { ok: false };
+    const rawUrl = item["url"];
+    if (rawUrl === null) {
+      out.push({ name, url: null });
+      continue;
+    }
+    if (typeof rawUrl !== "string") return { ok: false };
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return { ok: false };
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return { ok: false };
+    out.push({ name, url: rawUrl });
+  }
+  return { ok: true, value: out };
+}
+
 function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
   if (!isObj(value)) return null;
   const key = str(value["key"]);
@@ -187,6 +215,7 @@ function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
     actionTypeRaw as string,
   );
   const optionals = parseSourceOptionals(value);
+  const linkedCompetitors = parseLinkedCompetitors(value["linkedCompetitors"]);
   if (
     key === null ||
     name === null ||
@@ -197,7 +226,8 @@ function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
     citationCount === null ||
     distinctCompetitorCount === null ||
     domains === null ||
-    optionals === null
+    optionals === null ||
+    !linkedCompetitors.ok
   ) {
     return null;
   }
@@ -212,8 +242,12 @@ function parseSourcePlatform(value: unknown): ActionSourcePlatformDTO | null {
     distinctCompetitorCount,
     domains,
     ...optionals,
+    ...(linkedCompetitors.value !== undefined
+      ? { linkedCompetitors: linkedCompetitors.value }
+      : {}),
   };
 }
+
 
 
 function parseSourceGroup(value: unknown): ActionSourceGroupDTO | null {
