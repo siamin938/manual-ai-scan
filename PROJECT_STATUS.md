@@ -351,3 +351,90 @@ Global Benchmark 초기 상태 배지:
 - 출시 직전 Security Hardening
 
 사용자의 다음 지시 없이 임의 수정, 새 측정, 프로덕션 게시를 하지 않습니다.
+
+## 21. 2026-09-02 실제 운영 교차검증 — 이 섹션이 위의 과거 기록보다 우선
+
+ChatGPT가 GitHub `main`과 실제 Supabase 운영 프로젝트를 **읽기 전용으로 직접 대조**한 결과입니다. 아래 항목은 문서 추정이 아니라 해당 시점 실제 상태를 확인한 내용입니다.
+
+### GitHub / Codex 브랜치 해석
+
+- GitHub 저장소의 실제 기본 브랜치는 `main`입니다.
+- 실제 GitHub에는 `work` 브랜치가 확인되지 않았습니다.
+- Codex Cloud 보고서에 보인 `work`는 Codex 실행 컨테이너의 작업용 브랜치로 해석하며, GitHub/Lovable 연결이 `work`로 바뀌었다는 의미로 보지 않습니다.
+- Codex 실행 환경에 remote/upstream이 없다는 사실만으로 실제 GitHub 연결이 끊겼다고 판단하지 않습니다.
+
+### compatible run 공통 RPC 실제 검증
+
+실제 Supabase DB에 다음 함수가 존재합니다.
+
+- `public.get_compatible_audit_runs_v01(p_org_id uuid, p_business_id uuid, p_limit integer default 6)`
+
+현재 함수는 단순히 같은 question set만 보는 것이 아니라, 최신 완료 standalone audit을 기준으로 다음 계약을 비교합니다.
+
+- 동일 `question_set_id`
+- 동일 `selected_providers`
+- 동일 `repetitions`
+- 동일 job 수
+- 동일 measurement 수
+- 동일 parser version 집합
+- provider payload 완전성
+- job별 `question_id`, provider, provider model, repetition 번호, redacted request 계약
+
+현재 확인된 호출 경로:
+
+- DB RPC `get_visibility_repeat_aggregate_v01` 내부에서 `get_compatible_audit_runs_v01` 호출
+- Edge Function `visibility-repeat-aggregate` v2에서 `get_compatible_audit_runs_v01` 호출
+- Edge Function `visibility-action-recommendations` v14에서 `get_compatible_audit_runs_v01` 호출
+
+따라서 현재 확인 범위에서는 **compatible run 판정 공통화 원칙이 실제 운영 경로에서 유지되고 있습니다.** 이 경로에 별도 compatible 판정을 새로 만들지 마세요.
+
+### 현재 실제 후처리 파이프라인 버전
+
+현재 실사용 통합 후처리:
+
+- `visibility-postprocess` Edge Function v7
+- Pipeline version `0.1.4`
+- Verifier version `0.1.5`
+- Resolver version `0.1.0`
+
+실제 `system_events`의 최근 완료 로그도 반복해서 다음 조합을 기록하고 있습니다.
+
+`pipeline 0.1.4 / verifier 0.1.5 / resolver 0.1.0`
+
+`reparse-measurements` v13은 Parser `1.2.3`으로 재파싱을 저장한 뒤 현재 `visibility-postprocess`와 citation attribution을 다시 호출하는 정상 경로를 가지고 있습니다.
+
+### standalone Entity Function 버전 주의
+
+별도 배포된 기존 함수에는 다른 verifier 계약이 남아 있습니다.
+
+- `entity-verification` v3 → 내부 Verifier `0.1.2`
+- `entity-canonical-resolver` v2 → Resolver `0.1.0`, 입력 Verifier `0.1.2`
+
+이 둘은 서로의 계약은 일치합니다. 반면 현재 통합 후처리 `visibility-postprocess`는 Verifier `0.1.5`를 사용합니다.
+
+따라서 `0.1.2`와 `0.1.5`가 보인다는 이유만으로 자동으로 버전을 맞추거나 기존 함수를 수정하지 마세요. standalone 두 함수가 현재 어떤 경로에서 사용되는지 먼저 확인한 뒤 레거시 여부를 판단해야 합니다.
+
+### 주요 Edge Function 실제 배포 스냅샷
+
+2026-09-02 실제 조회 기준:
+
+- `suggest-questions` v19 — `verify_jwt=true`
+- `visibility-action-recommendations` v14 — `verify_jwt=true`, evidence `0.6.0`
+- `visibility-diagnostic` v7 — `verify_jwt=true`
+- `visibility-repeat-aggregate` v2 — `verify_jwt=true`
+- `visibility-benchmark` v4 — `verify_jwt=true`
+- `visibility-postprocess` v7 — `verify_jwt=false`, 별도 내부 postprocess token 검증
+- `reparse-measurements` v13 — `verify_jwt=false`, 함수 내부에서 Bearer 사용자 JWT와 조직 역할을 직접 검증
+- `process-measurement-job` v10 — `verify_jwt=false`, `x-internal-secret` 기반 내부 호출 검증
+- `entity-verification` v3 — `verify_jwt=true`
+- `entity-canonical-resolver` v2 — `verify_jwt=true`
+
+`verify_jwt=false`인 내부 함수는 해당 값 하나만 보고 보안 오류라고 판단하지 않습니다. 현재 함수 내부의 별도 인증 구조를 함께 확인해야 하며, 근거 없이 `true`로 변경하지 마세요.
+
+### 이번 교차검증 결론
+
+- Codex 첫 상태 보고에서 제기한 가장 중요한 미확정 항목인 compatible RPC 존재/호출 경로는 실제 운영 환경에서 확인 완료되었습니다.
+- 현재 확인된 범위에서 compatible 판정 중복 구현 문제는 발견되지 않았습니다.
+- 현재 실사용 후처리 기준은 `Parser 1.2.3 → visibility-postprocess 0.1.4 → Verifier 0.1.5 → Resolver 0.1.0 → Citation Attribution`으로 봅니다.
+- `entity-verification 0.1.2` / `entity-canonical-resolver 0.1.2` 계열은 현재 통합 후처리와 별개로 남아 있으므로, 사용 경로 확인 전 임의 수정하지 않습니다.
+- 이번 확인만을 근거로 코드, DB, Edge Function을 수정할 필요는 없습니다.
