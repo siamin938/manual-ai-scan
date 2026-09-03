@@ -604,7 +604,7 @@ function DashboardPage() {
                     : `최근 ${benchmark.windowDays}일 동안 자동차 업체 측정 결과에서 함께 관찰된 업체들을 익명 집계했습니다.`}
                 </p>
                 <p className="text-sm">
-                  현재 고노출 기준에 해당하는 관찭 업체 {benchmark.highVisibilityEntityCount}곳에서
+                  현재 고노출 기준에 해당하는 관찰 업체 {benchmark.highVisibilityEntityCount}곳에서
                   자주 연결된 출처 패턴입니다.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
