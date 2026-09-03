@@ -80,11 +80,18 @@ export async function fetchVisibilityRepeatContext(args: {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const db = supabaseAdmin as unknown as DbClient;
 
-  const runsResult = await db.rpc("get_compatible_audit_runs_v01", {
-    p_org_id: orgId,
-    p_business_id: businessId,
-    p_limit: MAX_COMPATIBLE_RUNS,
-  });
+  // 서버 환경변수 누락 등으로 admin client 생성이 실패하면 화면을 깨지 않고 fail-closed한다.
+  let runsResult;
+  try {
+    runsResult = await db.rpc("get_compatible_audit_runs_v01", {
+      p_org_id: orgId,
+      p_business_id: businessId,
+      p_limit: MAX_COMPATIBLE_RUNS,
+    });
+  } catch {
+    console.error("[visibility-repeat-context] server client unavailable");
+    return { ok: false, error: "NOT_AVAILABLE" };
+  }
   if (runsResult.error) {
     console.error("[visibility-repeat-context] compatible runs RPC failed");
     return { ok: false, error: "NOT_AVAILABLE" };
