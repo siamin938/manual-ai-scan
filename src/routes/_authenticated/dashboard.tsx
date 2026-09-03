@@ -387,10 +387,63 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  측정에서 내 업체가 전혀 보이지 않았거나 가끔만 보인 질문입니다. 먼저 확인해 볼
-                  영역입니다.
+                  {useRepeatQuestions
+                    ? `동일 조건으로 반복한 ${repeatContext?.compatibleRunCount ?? 0}회 측정에서 내 업체가 전혀 보이지 않았거나 일부 회차에만 보인 질문입니다. 먼저 확인해 볼 영역입니다.`
+                    : "측정에서 내 업체가 전혀 보이지 않았거나 가끔만 보인 질문입니다. 먼저 확인해 볼 영역입니다."}
                 </p>
-                {d.priorityAreas.length === 0 ? (
+                {useRepeatQuestions ? (
+                  repeatQuestions.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      반복 측정에서 노출이 약한 질문이 없습니다.
+                    </p>
+                  ) : (
+                    <>
+                      {repeatQuestionsHead.map((q) => (
+                        <div key={q.questionId} className="rounded-md border p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-medium">{q.questionText}</p>
+                            <Badge
+                              variant={q.state === "never_visible" ? "destructive" : "secondary"}
+                            >
+                              {repeatQuestionLabel(q.validCount, q.mentionCount)}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {intentLabel(q.intentType)}
+                          </p>
+                        </div>
+                      ))}
+                      {repeatQuestionsRest.length > 0 && (
+                        <Collapsible>
+                          <CollapsibleTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              추가 {repeatQuestionsRest.length}개 질문 보기
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-3 space-y-3">
+                            {repeatQuestionsRest.map((q) => (
+                              <div key={q.questionId} className="rounded-md border p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-sm font-medium">{q.questionText}</p>
+                                  <Badge
+                                    variant={
+                                      q.state === "never_visible" ? "destructive" : "secondary"
+                                    }
+                                  >
+                                    {repeatQuestionLabel(q.validCount, q.mentionCount)}
+                                  </Badge>
+                                </div>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  {intentLabel(q.intentType)}
+                                </p>
+                              </div>
+                            ))}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
+                    </>
+                  )
+                ) : d.priorityAreas.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     노출이 약한 질문이 없습니다.
                   </p>
@@ -410,9 +463,9 @@ function DashboardPage() {
                       </p>
                     </div>
                   ))
-
                 )}
               </CardContent>
+
             </Card>
 
             <Card>
