@@ -10,6 +10,7 @@ import { getVisibilityRepeatAggregate } from "@/lib/visibility-repeat-aggregate.
 import { getVisibilityRepeatContext } from "@/lib/visibility-repeat-context.functions";
 import {
   SOURCE_SIDE_LABEL,
+  normalizeDomain,
   repeatQuestionLabel,
 } from "@/lib/visibility-repeat-context.helpers";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
