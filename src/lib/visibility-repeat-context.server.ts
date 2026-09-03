@@ -69,6 +69,8 @@ export async function fetchVisibilityRepeatContext(args: {
     .select("id")
     .eq("id", businessId)
     .eq("org_id", orgId)
+    .eq("is_client_business", true)
+    .eq("active", true)
     .maybeSingle();
   if (businessCheck.error) return { ok: false, error: "NOT_AVAILABLE" };
   if (!businessCheck.data) return { ok: false, error: "FORBIDDEN" };
