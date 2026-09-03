@@ -20,7 +20,7 @@ import type {
   VisibilityRepeatContextResponseDTO,
 } from "./visibility-repeat-context.types";
 
-type UserClient = SupabaseClient<Database>;
+type DbClient = SupabaseClient<Database>;
 
 const MAX_COMPATIBLE_RUNS = 6;
 const SIGNIFICANT_TIERS = new Set(["core", "notable"]);
@@ -37,7 +37,7 @@ type AttributionRow = {
  * base attribution row로 대체하면 기존 actionable 정책을 우회하게 되므로 하지 않는다.
  */
 async function loadAttributionRows(
-  supabase: UserClient,
+  supabase: DbClient,
   orgId: string,
   businessId: string,
   runIds: string[],
