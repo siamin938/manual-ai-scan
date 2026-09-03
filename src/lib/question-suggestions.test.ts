@@ -5,6 +5,7 @@ import {
   dedupeForSave,
   mapSuggestError,
   normalizeQuestion,
+  resolveQuestionLocation,
   toCandidates,
   type SuggestionCandidate,
 } from "./question-suggestions";
@@ -94,6 +95,47 @@ describe("dedupeForSave", () => {
   });
 });
 
+describe("resolveQuestionLocation", () => {
+  it("서울 범위 질문이면 숨은 구로구 city를 제거한다", () => {
+    expect(resolveQuestionLocation("서울 썬팅 업체 어디야?", "서울특별시", "구로구")).toEqual({
+      region: "서울특별시",
+      city: null,
+    });
+  });
+
+  it("구로구 범위 질문이면 구로구 city를 유지한다", () => {
+    expect(resolveQuestionLocation("구로구 썬팅 전문점 어디가 있어?", "서울특별시", "구로구")).toEqual({
+      region: "서울특별시",
+      city: "구로구",
+    });
+  });
+
+  it("고양시 일산동구에서 고양 범위와 일산동구 범위를 구분한다", () => {
+    expect(resolveQuestionLocation("고양 썬팅 업체 어디가 있어?", "경기도", "고양시 일산동구")).toEqual({
+      region: "경기도",
+      city: "고양시",
+    });
+    expect(resolveQuestionLocation("일산동구 썬팅 업체 추천해줘", "경기도", "고양시 일산동구")).toEqual({
+      region: "경기도",
+      city: "고양시 일산동구",
+    });
+  });
+
+  it("단일 시 단위는 기존 city를 유지한다", () => {
+    expect(resolveQuestionLocation("파주 타이어 업체 어디야?", "경기도", "파주시")).toEqual({
+      region: "경기도",
+      city: "파주시",
+    });
+  });
+
+  it("질문에서 지역 범위를 판별할 수 없으면 기존 메타데이터를 보존한다", () => {
+    expect(resolveQuestionLocation("썬팅 시공 후기 좋은 업체 알려줘", "서울특별시", "구로구")).toEqual({
+      region: "서울특별시",
+      city: "구로구",
+    });
+  });
+});
+
 describe("buildInsertPayloads", () => {
   it("고정 필드를 항상 강제한다", () => {
     const [p] = buildInsertPayloads([cand({})], {
@@ -113,6 +155,23 @@ describe("buildInsertPayloads", () => {
       region: "경기",
       city: null,
     });
+  });
+
+  it("최종 질문 문구에 맞춰 서울/구로구 location metadata를 저장한다", () => {
+    const [seoul, guro] = buildInsertPayloads(
+      [
+        cand({ id: "1", promptText: "서울 썬팅 업체 어디야?", intentType: "local" }),
+        cand({ id: "2", promptText: "구로구 썬팅 업체 어디야?", intentType: "local" }),
+      ],
+      {
+        orgId: "org1",
+        questionSetId: "set1",
+        region: "서울특별시",
+        city: "구로구",
+      },
+    );
+    expect(seoul).toMatchObject({ region: "서울특별시", city: null });
+    expect(guro).toMatchObject({ region: "서울특별시", city: "구로구" });
   });
 });
 
