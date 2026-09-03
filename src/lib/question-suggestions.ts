@@ -47,6 +47,90 @@ export function normalizeQuestion(text: string): string {
     .trim();
 }
 
+function cleanLocation(value: string | null | undefined): string | null {
+  const cleaned = value?.normalize("NFKC").replace(/\s+/g, " ").trim();
+  return cleaned || null;
+}
+
+function stripAdministrativeSuffix(value: string): string {
+  return value.replace(/(특별자치도|특별자치시|특별시|광역시|자치구|시|군|구|도)$/u, "") || value;
+}
+
+function containsLocationSurface(promptKey: string, value: string | null): boolean {
+  if (!value) return false;
+  const exact = normalizeQuestion(value);
+  if (exact && promptKey.includes(exact)) return true;
+  const stripped = stripAdministrativeSuffix(value);
+  const strippedKey = normalizeQuestion(stripped);
+  return strippedKey.length >= 2 && promptKey.includes(strippedKey);
+}
+
+function sameLocationSurface(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false;
+  return normalizeQuestion(stripAdministrativeSuffix(a)) === normalizeQuestion(stripAdministrativeSuffix(b));
+}
+
+export type ResolvedQuestionLocation = {
+  region: string | null;
+  city: string | null;
+};
+
+/**
+ * 고객에게 보이는 질문의 지역 표면과 실제 provider location 메타데이터를 맞춘다.
+ * - 서울특별시 + 구로구에서 "서울 ..." 질문은 city를 비워 서울 범위로 보낸다.
+ * - "구로구 ..." 질문은 기존 구로구 city를 유지한다.
+ * - 고양시 일산동구처럼 city에 시/구가 함께 있으면 "고양 ..."은 고양시,
+ *   "일산동구 ..."는 기존 상세 city를 유지한다.
+ * - 질문에서 범위를 안전하게 판별할 수 없으면 기존 city를 그대로 유지한다.
+ */
+export function resolveQuestionLocation(
+  promptText: string,
+  region: string | null,
+  city: string | null,
+): ResolvedQuestionLocation {
+  const safeRegion = cleanLocation(region);
+  const safeCity = cleanLocation(city);
+  if (!safeCity) return { region: safeRegion, city: null };
+
+  const promptKey = normalizeQuestion(promptText);
+  const cityParts = safeCity.split(/[\s,]+/u).map((part) => part.trim()).filter(Boolean);
+  if (cityParts.length === 0) return { region: safeRegion, city: safeCity };
+
+  if (cityParts.length > 1) {
+    const broaderCity = cityParts[0]!;
+    const localDistrict = cityParts[cityParts.length - 1]!;
+
+    if (containsLocationSurface(promptKey, localDistrict)) {
+      return { region: safeRegion, city: safeCity };
+    }
+
+    if (containsLocationSurface(promptKey, broaderCity)) {
+      const metroRegion = !!safeRegion && /(특별자치시|특별시|광역시)$/u.test(safeRegion);
+      return {
+        region: safeRegion,
+        city: metroRegion && sameLocationSurface(broaderCity, safeRegion) ? null : broaderCity,
+      };
+    }
+
+    return { region: safeRegion, city: safeCity };
+  }
+
+  const onlyCity = cityParts[0]!;
+  const metroRegion = !!safeRegion && /(특별자치시|특별시|광역시)$/u.test(safeRegion);
+  const districtLikeCity = /(구|군)$/u.test(onlyCity);
+
+  if (metroRegion && districtLikeCity) {
+    if (containsLocationSurface(promptKey, onlyCity)) {
+      return { region: safeRegion, city: safeCity };
+    }
+    if (containsLocationSurface(promptKey, safeRegion)) {
+      return { region: safeRegion, city: null };
+    }
+  }
+
+  return { region: safeRegion, city: safeCity };
+}
+
 /** 공백 변형까지 포함해 대상 업체명이 질문에 들어있는지 검사. */
 export function containsTargetBusinessName(text: string, businessName: string): boolean {
   const name = normalizeQuestion(businessName ?? "");
@@ -158,7 +242,7 @@ export type QuestionInsertPayload = {
   active: true;
 };
 
-/** 저장 payload 생성. 고정 필드는 항상 클라이언트 상수로 강제한다. */
+/** 저장 payload 생성. 고정 필드는 클라이언트 상수로 강제하고 위치는 최종 질문 문구에 맞춘다. */
 export function buildInsertPayloads(
   candidates: SuggestionCandidate[],
   ctx: {
@@ -168,19 +252,22 @@ export function buildInsertPayloads(
     city: string | null;
   },
 ): QuestionInsertPayload[] {
-  return candidates.map((c) => ({
-    org_id: ctx.orgId,
-    question_set_id: ctx.questionSetId,
-    prompt_text: c.promptText.trim(),
-    intent_type: c.intentType,
-    language: "ko",
-    country_code: "KR",
-    region: ctx.region ?? null,
-    city: ctx.city ?? null,
-    weight: 1,
-    data_class: "public",
-    active: true,
-  }));
+  return candidates.map((c) => {
+    const location = resolveQuestionLocation(c.promptText, ctx.region, ctx.city);
+    return {
+      org_id: ctx.orgId,
+      question_set_id: ctx.questionSetId,
+      prompt_text: c.promptText.trim(),
+      intent_type: c.intentType,
+      language: "ko",
+      country_code: "KR",
+      region: location.region,
+      city: location.city,
+      weight: 1,
+      data_class: "public",
+      active: true,
+    };
+  });
 }
 
 /** Edge Function 에러를 사용자 안전 문구로 매핑. */
