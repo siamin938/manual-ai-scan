@@ -49,7 +49,8 @@ function customerText(text: string): string {
   return text
     .replace(/관련 경쟁업체/g, "함께 관찰된 업체")
     .replace(/함께 관찰된 경쟁업체/g, "함께 관찰된 업체")
-    .replace(/경쟁업체/g, "함께 관찰된 업체");
+    .replace(/경쟁업체/g, "함께 관찰된 업체")
+    .replace(/우선 시도/g, "우선 확인");
 }
 
 /** 최우선 액션 제목만 한 줄로 안내한다(계산 규칙 없음). */
