@@ -208,8 +208,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             판단 근거 자세히 보기
           </summary>
           <p className="mt-2">
-            내 업체 등장 답변 {e.clientResponseCount} · 함께 관찰된 업체 등장 답변{" "}
-            {e.competitorResponseCount} · 함께 관찰된 업체 {e.distinctCompetitorCount}곳
+            내 업체 등장 {e.clientResponseCount}개 · 함께 관찰된 업체 등장 {e.competitorResponseCount}개 · 관찰 업체 {e.distinctCompetitorCount}곳
           </p>
           <p className="mt-1">
             측정 {e.measurementCount}건 · 관련 질문 {e.questionCount}개
