@@ -466,7 +466,7 @@ function ChannelCard({
       <p className="mt-1 text-sm text-muted-foreground">{customerText(c.reason)}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         {customerText(
-          `함께 관찰된 업체 연결 답변 ${c.responseCount}/${c.relatedResponseTotal}에서 연결 · 함께 관찰된 업체 ${c.distinctCompetitorCount}곳`,
+          `관련 답변 ${c.relatedResponseTotal}개 중 ${c.responseCount}개에서 업체 ${c.distinctCompetitorCount}곳과 연결`,
         )}
       </p>
 
