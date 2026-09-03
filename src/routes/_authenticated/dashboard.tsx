@@ -7,6 +7,11 @@ import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
 import { getVisibilityRepeatAggregate } from "@/lib/visibility-repeat-aggregate.functions";
+import { getVisibilityRepeatContext } from "@/lib/visibility-repeat-context.functions";
+import {
+  SOURCE_SIDE_LABEL,
+  repeatQuestionLabel,
+} from "@/lib/visibility-repeat-context.helpers";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
 import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
