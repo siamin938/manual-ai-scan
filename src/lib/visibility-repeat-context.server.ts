@@ -32,13 +32,16 @@ type AttributionRow = {
   domain: string | null;
 };
 
-/** actionable view를 우선 읽고, 접근 불가하면 저장된 attribution row로 안전하게 대체한다. */
+/**
+ * actionable view만 사용한다. 조회 실패 시 null을 반환해 fail-closed 처리한다.
+ * base attribution row로 대체하면 기존 actionable 정책을 우회하게 되므로 하지 않는다.
+ */
 async function loadAttributionRows(
   supabase: UserClient,
   orgId: string,
   businessId: string,
   runIds: string[],
-): Promise<AttributionRow[]> {
+): Promise<AttributionRow[] | null> {
   const viewResult = await supabase
     .from("measurement_citation_attributions_actionable_v2")
     .select("measurement_id, source_run_id, canonical_key, domain")
@@ -46,20 +49,11 @@ async function loadAttributionRows(
     .eq("business_id", businessId)
     .in("source_run_id", runIds);
 
-  if (!viewResult.error && viewResult.data) {
-    return viewResult.data as AttributionRow[];
+  if (viewResult.error || !viewResult.data) {
+    console.error("[visibility-repeat-context] actionable attribution view unavailable");
+    return null;
   }
-
-  const baseResult = await supabase
-    .from("measurement_citation_attributions")
-    .select("measurement_id, source_run_id, canonical_key, domain, attribution_level")
-    .eq("org_id", orgId)
-    .eq("business_id", businessId)
-    .in("source_run_id", runIds)
-    .in("attribution_level", ["direct", "section"]);
-
-  if (baseResult.error || !baseResult.data) return [];
-  return baseResult.data as AttributionRow[];
+  return viewResult.data as AttributionRow[];
 }
 
 export async function fetchVisibilityRepeatContext(args: {
@@ -75,6 +69,8 @@ export async function fetchVisibilityRepeatContext(args: {
     .select("id")
     .eq("id", businessId)
     .eq("org_id", orgId)
+    .eq("is_client_business", true)
+    .eq("active", true)
     .maybeSingle();
   if (businessCheck.error) return { ok: false, error: "NOT_AVAILABLE" };
   if (!businessCheck.data) return { ok: false, error: "FORBIDDEN" };
@@ -124,11 +120,14 @@ export async function fetchVisibilityRepeatContext(args: {
       p_run_id: runId,
     });
     const keys = new Set<string>();
-    if (!sig.error) {
-      for (const row of sig.data ?? []) {
-        if (typeof row.canonical_key === "string" && SIGNIFICANT_TIERS.has(row.tier ?? "")) {
-          keys.add(row.canonical_key);
-        }
+    if (sig.error) {
+      // competitor evidence가 빠지면 source side가 잘못 표시되므로 fail-closed.
+      console.error("[visibility-repeat-context] competitor significance RPC failed");
+      return { ok: false, error: "NOT_AVAILABLE" };
+    }
+    for (const row of sig.data ?? []) {
+      if (typeof row.canonical_key === "string" && SIGNIFICANT_TIERS.has(row.tier ?? "")) {
+        keys.add(row.canonical_key);
       }
     }
     significantByRun.set(runId, keys);
@@ -136,6 +135,7 @@ export async function fetchVisibilityRepeatContext(args: {
 
   const clientKey = `business:${businessId}`;
   const rows = await loadAttributionRows(supabase, orgId, businessId, runIds);
+  if (rows === null) return { ok: false, error: "NOT_AVAILABLE" };
 
   type Bucket = { client: Set<string>; competitor: Set<string> };
   const byDomain = new Map<string, Bucket>();

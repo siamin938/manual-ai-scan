@@ -8,7 +8,8 @@ export const getVisibilityRepeatContext = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { orgId: string; businessId: string }) => {
     if (!input?.orgId || typeof input.orgId !== "string") throw new Error("INVALID_ORG");
-    if (!input?.businessId || typeof input.businessId !== "string") throw new Error("INVALID_ORG");
+    if (!input?.businessId || typeof input.businessId !== "string")
+      throw new Error("INVALID_BUSINESS");
     return { orgId: input.orgId, businessId: input.businessId };
   })
   .handler(async ({ data, context }): Promise<VisibilityRepeatContextResponseDTO> => {
