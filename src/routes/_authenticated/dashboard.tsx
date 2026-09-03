@@ -590,32 +590,32 @@ function DashboardPage() {
           {benchmark && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">AI에 자주 추천되는 업체들은 어디에서 많이 보일까요?</CardTitle>
+                <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                  AI에 자주 추천되는 업체들은 어디에서 많이 보일까요?
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    데이터 축적 중
+                  </Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm">
-                  최근 차보임에 누적된 자동차 업체 측정 데이터를 익명 집계해, AI 노출이 높은
-                  업체들과 반복적으로 함께 관찰된 출처를 확인합니다.
+                  최근 차보임에 누적된 자동차 업체 측정 데이터를 익명 집계해, AI 답변에 자주
+                  연결된 업체들과 함께 관찰된 출처 패턴을 확인합니다.
                 </p>
                 <p className="text-sm">
                   {benchmark.eligibleTargetBusinessCount !== undefined
-                    ? `자동차 업체 ${benchmark.eligibleTargetBusinessCount}곳의 측정 데이터를 기반으로, `
+                    ? `최근 ${benchmark.windowDays}일 동안 자동차 업체 ${benchmark.eligibleTargetBusinessCount}곳의 측정 결과에서 함께 관찰된 업체들을 익명 집계했습니다. `
                     : ""}
-                  AI 노출률 {benchmark.thresholdPct}% 이상인 업체{" "}
-                  {benchmark.highVisibilityEntityCount}곳에서 자주 연결된 출처를 모았습니다.
+                  현재 고노출 기준에 해당하는 관찰 업체 {benchmark.highVisibilityEntityCount}곳에서
+                  자주 연결된 출처 패턴입니다.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     최근 {benchmark.windowDays}일
                   </Badge>
                   {benchmark.dataStatus === "early" && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                      데이터 축적 중
-                    </Badge>
-                  )}
-                  {benchmark.dataStatus === "early" && (
                     <span className="text-xs text-muted-foreground">
-                      현재는 초기 패턴입니다. 데이터가 쌓이면 고노출 기준과 출처 패턴이 자동으로
+                      현재는 초기 표본으로 참고용 집계입니다. 데이터가 쌓이면 기준과 패턴이 자동으로
                       다시 계산됩니다.
                     </span>
                   )}
@@ -797,7 +797,13 @@ function DashboardPage() {
 
                   <div className="space-y-3 rounded-md border p-3">
                     <p className="text-sm font-medium">시간에 따른 AI 노출 변화</p>
-                    {payload.trend.length >= 2 ? (
+                    {payload.trend.length === 1 ? (
+                      <p className="text-sm text-muted-foreground">
+                        반복 측정이 더 쌓이면 시간에 따른 변화를 비교할 수 있습니다.
+                      </p>
+                    ) : payload.trend.length === 2 ? (
+                      <TwoPointTrend trend={payload.trend} />
+                    ) : (
                       <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart
@@ -828,10 +834,6 @@ function DashboardPage() {
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        동일 조건의 2차 측정이 완료되면 여기에 변화가 표시됩니다.
-                      </p>
                     )}
 
                   </div>
@@ -858,6 +860,54 @@ function DashboardPage() {
       />
     </div>
 
+  );
+}
+
+/** 2회 측정일 때만 쓰는 단순 표시용 차이입니다. 평가/추세/원인 판단에는 사용하지 않습니다. */
+function TwoPointTrend({
+  trend,
+}: {
+  trend: NonNullable<VisibilityDiagnosticDTO["trend"]>;
+}) {
+  if (trend.length < 2) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        반복 측정이 더 쌓이면 시간에 따른 변화를 비교할 수 있습니다.
+      </p>
+    );
+  }
+  const first = trend[0]!;
+  const second = trend[1]!;
+  const diff =
+    first.visibilityRatePct !== null && second.visibilityRatePct !== null
+      ? second.visibilityRatePct - first.visibilityRatePct
+      : null;
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border p-3">
+          <p className="text-xs text-muted-foreground">1차 측정</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">
+            {pct(first.visibilityRatePct)}
+          </p>
+        </div>
+        <div className="rounded-md border p-3">
+          <p className="text-xs text-muted-foreground">2차 측정</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">
+            {pct(second.visibilityRatePct)}
+          </p>
+        </div>
+      </div>
+      {diff !== null && (
+        <p className="text-sm font-medium">
+          관찰 변화 {diff >= 0 ? "+" : ""}
+          {diff.toFixed(1)}%p
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        2회 측정의 관찰 변화이며 추세로 판단하지 않습니다.
+      </p>
+    </div>
   );
 }
 
