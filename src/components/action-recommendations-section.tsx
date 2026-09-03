@@ -91,14 +91,14 @@ export function ActionRecommendationsSection({
   const isPreliminary = (payload?.scope?.repetitions ?? 0) < 2;
   const headline = gapHeadline(
     topRec,
-    isPreliminary ? "먼저 확인할 단서:" : "반복해서 확인된 우선 점검:",
+    isPreliminary ? "먼저 확인할 단서:" : "반복해서 확인된 우선 확인:",
   );
 
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">
-          {isPreliminary ? "첫 측정에서 먼저 확인할 단서" : "AI 노출을 높이기 위해 먼저 해볼 것"}
+          {isPreliminary ? "첫 측정에서 먼저 확인할 단서" : "AI 노출에서 먼저 확인할 단서"}
         </h2>
         {headline && (
           <p className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
