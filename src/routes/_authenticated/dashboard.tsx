@@ -7,6 +7,12 @@ import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getVisibilityDiagnostic } from "@/lib/visibility-diagnostic.functions";
 import { getVisibilityRepeatAggregate } from "@/lib/visibility-repeat-aggregate.functions";
+import { getVisibilityRepeatContext } from "@/lib/visibility-repeat-context.functions";
+import {
+  SOURCE_SIDE_LABEL,
+  normalizeDomain,
+  repeatQuestionLabel,
+} from "@/lib/visibility-repeat-context.helpers";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
 import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
@@ -115,6 +121,29 @@ function DashboardPage() {
   });
   const benchmarkResult = benchmarkQuery.data;
   const benchmark = benchmarkResult && benchmarkResult.ok ? benchmarkResult.benchmark : null;
+
+  // 반복 측정 보조 컨텍스트: 실패하면 기존 화면으로 안전하게 fallback한다.
+  const fetchRepeatContext = useServerFn(getVisibilityRepeatContext);
+  const repeatContextQuery = useQuery({
+    queryKey: ["visibility-repeat-context", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: () =>
+      fetchRepeatContext({
+        data: { orgId: activeOrgId as string, businessId: businessId as string },
+      }),
+  });
+  const repeatContextResult = repeatContextQuery.data;
+  const repeatContext =
+    repeatContextResult && repeatContextResult.ok ? repeatContextResult.context : null;
+  const sourceSideByDomain = new Map(
+    (repeatContext?.sources ?? []).map((s) => [s.domain, s.side] as const),
+  );
+  const useRepeatQuestions = !!repeatContext && repeatContext.compatibleRunCount >= 2;
+  const repeatQuestions = useRepeatQuestions ? (repeatContext?.questions ?? []) : [];
+  const repeatQuestionsHead = repeatQuestions.slice(0, 8);
+  const repeatQuestionsRest = repeatQuestions.slice(8);
+
+
 
   const result = query.data;
   const payload: VisibilityDiagnosticDTO | null = result && result.ok ? result.diagnostic : null;
@@ -359,10 +388,63 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  측정에서 내 업체가 전혀 보이지 않았거나 가끔만 보인 질문입니다. 먼저 확인해 볼
-                  영역입니다.
+                  {useRepeatQuestions
+                    ? `동일 조건으로 반복한 ${repeatContext?.compatibleRunCount ?? 0}회 측정에서 내 업체가 전혀 보이지 않았거나 일부 회차에만 보인 질문입니다. 먼저 확인해 볼 영역입니다.`
+                    : "측정에서 내 업체가 전혀 보이지 않았거나 가끔만 보인 질문입니다. 먼저 확인해 볼 영역입니다."}
                 </p>
-                {d.priorityAreas.length === 0 ? (
+                {useRepeatQuestions ? (
+                  repeatQuestions.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      반복 측정에서 노출이 약한 질문이 없습니다.
+                    </p>
+                  ) : (
+                    <>
+                      {repeatQuestionsHead.map((q) => (
+                        <div key={q.questionId} className="rounded-md border p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-medium">{q.questionText}</p>
+                            <Badge
+                              variant={q.state === "never_visible" ? "destructive" : "secondary"}
+                            >
+                              {repeatQuestionLabel(q.validCount, q.mentionCount)}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {intentLabel(q.intentType)}
+                          </p>
+                        </div>
+                      ))}
+                      {repeatQuestionsRest.length > 0 && (
+                        <Collapsible>
+                          <CollapsibleTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              추가 {repeatQuestionsRest.length}개 질문 보기
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-3 space-y-3">
+                            {repeatQuestionsRest.map((q) => (
+                              <div key={q.questionId} className="rounded-md border p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-sm font-medium">{q.questionText}</p>
+                                  <Badge
+                                    variant={
+                                      q.state === "never_visible" ? "destructive" : "secondary"
+                                    }
+                                  >
+                                    {repeatQuestionLabel(q.validCount, q.mentionCount)}
+                                  </Badge>
+                                </div>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                  {intentLabel(q.intentType)}
+                                </p>
+                              </div>
+                            ))}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
+                    </>
+                  )
+                ) : d.priorityAreas.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     노출이 약한 질문이 없습니다.
                   </p>
@@ -382,9 +464,9 @@ function DashboardPage() {
                       </p>
                     </div>
                   ))
-
                 )}
               </CardContent>
+
             </Card>
 
             <Card>
@@ -409,28 +491,49 @@ function DashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {d.sources.map((s) => (
-                        <TableRow key={s.domain}>
-                          <TableCell className="text-sm">
-                            {s.domain}
-                            {s.sampleTitle && (
-                              <span className="mt-0.5 block max-w-[240px] truncate text-xs text-muted-foreground">
-                                {s.sampleTitle}
+                      {d.sources.map((s) => {
+                        const side = sourceSideByDomain.get(normalizeDomain(s.domain) ?? "");
+                        return (
+                          <TableRow key={s.domain}>
+                            <TableCell className="text-sm">
+                              <span className="flex flex-wrap items-center gap-2">
+                                {s.domain}
+                                {side && (
+                                  <Badge
+                                    variant={side === "client" ? "default" : "secondary"}
+                                    className="font-normal"
+                                  >
+                                    {SOURCE_SIDE_LABEL[side]}
+                                  </Badge>
+                                )}
                               </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <span className="tabular-nums">{s.responseCount}건</span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              총 {s.citationCount}회 연결
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                              {s.sampleTitle && (
+                                <span className="mt-0.5 block max-w-[240px] truncate text-xs text-muted-foreground">
+                                  {s.sampleTitle}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <span className="tabular-nums">{s.responseCount}건</span>
+                              <span className="mt-0.5 block text-xs text-muted-foreground">
+                                총 {s.citationCount}회 연결
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
 
                 )}
+
+                {sourceSideByDomain.size > 0 && (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    출처 목록은 최근 측정의 연결 횟수이며, 배지는 동일 조건 반복 측정에서 내 업체와
+                    경쟁업체 중 어느 쪽과 연결됐는지 보여줍니다.
+                  </p>
+                )}
+
 
                 {d.referenceSources.length > 0 && (
                   <Collapsible className="mt-4">
