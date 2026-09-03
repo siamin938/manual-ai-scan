@@ -41,6 +41,17 @@ function customerLabel(label: string): string {
   return CUSTOMER_LABEL_OVERRIDES[label] ?? label;
 }
 
+/**
+ * 서버 DTO 라벨/문구 중 고객에게 노출될 때 "경쟁업체" 단정 표현을 관찰 중심으로만 바꾼다.
+ * 내부 데이터/판정/점수는 변경하지 않고 렌더링에만 사용한다.
+ */
+function customerText(text: string): string {
+  return text
+    .replace(/관련 경쟁업체/g, "함께 관찰된 업체")
+    .replace(/함께 관찰된 경쟁업체/g, "함께 관찰된 업체")
+    .replace(/경쟁업체/g, "함께 관찰된 업체");
+}
+
 /** 최우선 액션 제목만 한 줄로 안내한다(계산 규칙 없음). */
 function gapHeadline(
   rec: ActionRecommendationDTO | undefined,
@@ -49,7 +60,7 @@ function gapHeadline(
   if (!rec) return null;
   const label = rec.title?.trim();
   if (!label) return null;
-  return `${prefix} ${label}`;
+  return `${prefix} ${customerText(label)}`;
 }
 
 
@@ -115,7 +126,9 @@ export function ActionRecommendationsSection({
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
             {isPreliminary
-              ? "첫 측정에서 표시할 만큼 뚜렷한 경쟁업체 격차가 아직 없습니다. 동일 조건으로 한 번 더 측정하면 반복 여부를 확인합니다."
+              ? customerText(
+                  "첫 측정에서 표시할 만큼 뚜렷한 경쟁업체 격차가 아직 없습니다. 동일 조건으로 한 번 더 측정하면 반복 여부를 확인합니다.",
+                )
               : "아직 행동을 권할 만큼 반복적으로 확인된 격차가 없습니다. 측정 데이터가 더 쌓이면 우선순위를 제안합니다."}
           </CardContent>
         </Card>
@@ -132,7 +145,7 @@ export function ActionRecommendationsSection({
       {payload?.scope && (
         <p className="text-xs text-muted-foreground">
           기준 측정: {payload.scope.runName} · {formatSeoul(payload.scope.measuredAt)} · 반복{" "}
-          {payload.scope.repetitions}회 · 유효 측정 {payload.scope.validCount}건 · 관찰 경쟁업체{" "}
+          {payload.scope.repetitions}회 · 유효 측정 {payload.scope.validCount}건 · 관찰 업체{" "}
           {payload.scope.competitorCount}곳
         </p>
       )}
@@ -149,14 +162,16 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">{rec.rank}순위</Badge>
-          <Badge variant={badgeVariant(rec.evidenceLevel)}>{rec.evidenceLabel}</Badge>
+          <Badge variant={badgeVariant(rec.evidenceLevel)}>
+            {customerText(rec.evidenceLabel)}
+          </Badge>
         </div>
-        <CardTitle className="mt-2 text-base sm:text-lg">{rec.title}</CardTitle>
+        <CardTitle className="mt-2 text-base sm:text-lg">{customerText(rec.title)}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
           <p className="text-sm font-medium">왜 이걸 먼저 보나요?</p>
-          <p className="mt-1 text-sm text-muted-foreground">{rec.summary}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{customerText(rec.summary)}</p>
         </div>
 
         {rec.steps.length > 0 && (
@@ -164,7 +179,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             <p className="text-sm font-medium">무엇을 하면 되나요?</p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
               {rec.steps.map((s, i) => (
-                <li key={i}>{s}</li>
+                <li key={i}>{customerText(s)}</li>
               ))}
             </ul>
           </div>
@@ -192,8 +207,8 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             판단 근거 자세히 보기
           </summary>
           <p className="mt-2">
-            내 업체 등장 답변 {e.clientResponseCount} · 경쟁업체 등장 답변{" "}
-            {e.competitorResponseCount} · 함께 관찰된 경쟁업체 {e.distinctCompetitorCount}곳
+            내 업체 등장 답변 {e.clientResponseCount} · 함께 관찰된 업체 등장 답변{" "}
+            {e.competitorResponseCount} · 함께 관찰된 업체 {e.distinctCompetitorCount}곳
           </p>
           <p className="mt-1">
             측정 {e.measurementCount}건 · 관련 질문 {e.questionCount}개
@@ -207,7 +222,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             <p className="text-sm font-medium">실제로 측정한 질문 예시</p>
             <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
               {rec.sampleQuestions.slice(0, 2).map((q, i) => (
-                <li key={i}>{q}</li>
+                <li key={i}>{customerText(q)}</li>
               ))}
             </ul>
           </div>
@@ -270,13 +285,15 @@ function SourceGroupCard({
   referenceOnly?: boolean;
 }) {
   const isPriority = g.evidenceGrade === "priority";
-  const badgeText = referenceOnly
-    ? "참고"
-    : isPriority
-      ? customerLabel(g.evidenceLabel ?? g.actionLabel)
-      : g.evidenceGrade === "candidate"
-        ? "먼저 확인"
-        : customerLabel(g.actionLabel);
+  const badgeText = customerText(
+    referenceOnly
+      ? "참고"
+      : isPriority
+        ? customerLabel(g.evidenceLabel ?? g.actionLabel)
+        : g.evidenceGrade === "candidate"
+          ? "먼저 확인"
+          : customerLabel(g.actionLabel),
+  );
   const badgeVariantForGroup: "default" | "secondary" | "outline" = referenceOnly
     ? "outline"
     : isPriority
@@ -291,15 +308,16 @@ function SourceGroupCard({
         <span className="text-base font-semibold">{customerLabel(g.name)}</span>
         <Badge variant={badgeVariantForGroup}>{badgeText}</Badge>
         {g.scopeLabel && (
-          <span className="text-xs text-muted-foreground">{g.scopeLabel}</span>
+          <span className="text-xs text-muted-foreground">{customerText(g.scopeLabel)}</span>
         )}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        경쟁업체 답변 {g.responseCount}/{g.relatedResponseTotal}에서 관찰 · 경쟁업체{" "}
-        {g.distinctCompetitorCount}곳
+        {customerText(
+          `함께 관찰된 업체 연결 답변 ${g.responseCount}/${g.relatedResponseTotal}에서 관찰 · 함께 관찰된 업체 ${g.distinctCompetitorCount}곳`,
+        )}
       </p>
 
-      <p className="mt-1 text-sm text-muted-foreground">{g.reason}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{customerText(g.reason)}</p>
       {!referenceOnly && g.evidenceGrade === "candidate" && (g.clientOverallResponseCount ?? 0) > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">
           같은 검색 상황에서는 내 업체도 이 출처군이 {g.clientOverallResponseCount}개 답변에서 함께
@@ -319,8 +337,9 @@ function SourceGroupCard({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{customerLabel(p.name)}</span>
                   <span className="text-xs text-muted-foreground">
-                    {p.responseCount}/{p.relatedResponseTotal} 답변에서 연결 · 경쟁업체{" "}
-                    {p.distinctCompetitorCount}곳
+                    {customerText(
+                      `${p.responseCount}/${p.relatedResponseTotal} 답변에서 연결 · 함께 관찰된 업체 ${p.distinctCompetitorCount}곳`,
+                    )}
                   </span>
 
                   <Badge
@@ -334,13 +353,15 @@ function SourceGroupCard({
                             : channelBadgeVariant(p.actionType)
                     }
                   >
-                    {referenceOnly
-                      ? "참고"
-                      : p.evidenceGrade === "priority"
-                        ? customerLabel(p.evidenceLabel ?? p.actionLabel)
-                        : p.evidenceGrade === "candidate"
-                          ? "먼저 확인"
-                          : customerLabel(p.actionLabel)}
+                    {customerText(
+                      referenceOnly
+                        ? "참고"
+                        : p.evidenceGrade === "priority"
+                          ? customerLabel(p.evidenceLabel ?? p.actionLabel)
+                          : p.evidenceGrade === "candidate"
+                            ? "먼저 확인"
+                            : customerLabel(p.actionLabel),
+                    )}
                   </Badge>
                 </div>
                 {p.domains.length > 0 && (
@@ -438,12 +459,15 @@ function ChannelCard({
     <div className="rounded-md border bg-background p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">{customerLabel(c.name)}</span>
-        <Badge variant={channelBadgeVariant(c.actionType)}>{customerLabel(c.actionLabel)}</Badge>
+        <Badge variant={channelBadgeVariant(c.actionType)}>
+          {customerText(customerLabel(c.actionLabel))}
+        </Badge>
       </div>
-      <p className="mt-1 text-sm text-muted-foreground">{c.reason}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{customerText(c.reason)}</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        경쟁업체 답변 {c.responseCount}/{c.relatedResponseTotal}에서 연결 · 경쟁업체{" "}
-        {c.distinctCompetitorCount}곳
+        {customerText(
+          `함께 관찰된 업체 연결 답변 ${c.responseCount}/${c.relatedResponseTotal}에서 연결 · 함께 관찰된 업체 ${c.distinctCompetitorCount}곳`,
+        )}
       </p>
 
       {c.domains.length > 0 && (
