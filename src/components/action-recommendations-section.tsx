@@ -49,7 +49,8 @@ function customerText(text: string): string {
   return text
     .replace(/관련 경쟁업체/g, "함께 관찰된 업체")
     .replace(/함께 관찰된 경쟁업체/g, "함께 관찰된 업체")
-    .replace(/경쟁업체/g, "함께 관찰된 업체");
+    .replace(/경쟁업체/g, "함께 관찰된 업체")
+    .replace(/우선 시도/g, "우선 확인");
 }
 
 /** 최우선 액션 제목만 한 줄로 안내한다(계산 규칙 없음). */
@@ -90,14 +91,14 @@ export function ActionRecommendationsSection({
   const isPreliminary = (payload?.scope?.repetitions ?? 0) < 2;
   const headline = gapHeadline(
     topRec,
-    isPreliminary ? "먼저 확인할 단서:" : "반복해서 확인된 우선 점검:",
+    isPreliminary ? "먼저 확인할 단서:" : "반복해서 확인된 우선 확인:",
   );
 
   return (
     <section className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">
-          {isPreliminary ? "첫 측정에서 먼저 확인할 단서" : "AI 노출을 높이기 위해 먼저 해볼 것"}
+          {isPreliminary ? "첫 측정에서 먼저 확인할 단서" : "AI 노출에서 먼저 확인할 단서"}
         </h2>
         {headline && (
           <p className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
@@ -207,8 +208,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             판단 근거 자세히 보기
           </summary>
           <p className="mt-2">
-            내 업체 등장 답변 {e.clientResponseCount} · 함께 관찰된 업체 등장 답변{" "}
-            {e.competitorResponseCount} · 함께 관찰된 업체 {e.distinctCompetitorCount}곳
+            내 업체 등장 {e.clientResponseCount}개 · 함께 관찰된 업체 등장 {e.competitorResponseCount}개 · 관찰 업체 {e.distinctCompetitorCount}곳
           </p>
           <p className="mt-1">
             측정 {e.measurementCount}건 · 관련 질문 {e.questionCount}개
@@ -313,7 +313,7 @@ function SourceGroupCard({
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         {customerText(
-          `함께 관찰된 업체 연결 답변 ${g.responseCount}/${g.relatedResponseTotal}에서 관찰 · 함께 관찰된 업체 ${g.distinctCompetitorCount}곳`,
+          `관련 답변 ${g.relatedResponseTotal}개 중 ${g.responseCount}개에서 업체 ${g.distinctCompetitorCount}곳과 함께 연결`,
         )}
       </p>
 
@@ -338,7 +338,7 @@ function SourceGroupCard({
                   <span className="text-sm font-medium">{customerLabel(p.name)}</span>
                   <span className="text-xs text-muted-foreground">
                     {customerText(
-                      `${p.responseCount}/${p.relatedResponseTotal} 답변에서 연결 · 함께 관찰된 업체 ${p.distinctCompetitorCount}곳`,
+                      `관련 답변 ${p.relatedResponseTotal}개 중 ${p.responseCount}개에서 업체 ${p.distinctCompetitorCount}곳과 연결`,
                     )}
                   </span>
 
@@ -466,7 +466,7 @@ function ChannelCard({
       <p className="mt-1 text-sm text-muted-foreground">{customerText(c.reason)}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         {customerText(
-          `함께 관찰된 업체 연결 답변 ${c.responseCount}/${c.relatedResponseTotal}에서 연결 · 함께 관찰된 업체 ${c.distinctCompetitorCount}곳`,
+          `관련 답변 ${c.relatedResponseTotal}개 중 ${c.responseCount}개에서 업체 ${c.distinctCompetitorCount}곳과 연결`,
         )}
       </p>
 

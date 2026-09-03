@@ -600,12 +600,11 @@ function DashboardPage() {
               <CardContent className="space-y-3">
                 <p className="text-sm">
                   {benchmark.eligibleTargetBusinessCount !== undefined
-                    ? `최근 ${benchmark.windowDays}일 동안 자동차 업체 ${benchmark.eligibleTargetBusinessCount}곳의 측정 결과에서 함께 관찰된 업체들을 익명 집계했습니다.`
-                    : `최근 ${benchmark.windowDays}일 동안 자동차 업체 측정 결과에서 함께 관찰된 업체들을 익명 집계했습니다.`}
+                    ? `최근 ${benchmark.windowDays}일 동안 측정 대상 자동차 업체 ${benchmark.eligibleTargetBusinessCount}곳의 AI 답변에서 함께 등장한 업체들을 익명 집계했습니다.`
+                    : `최근 ${benchmark.windowDays}일 동안 측정 대상 자동차 업체의 AI 답변에서 함께 등장한 업체들을 익명 집계했습니다.`}
                 </p>
                 <p className="text-sm">
-                  현재 고노출 기준에 해당하는 관찰 업체 {benchmark.highVisibilityEntityCount}곳에서
-                  자주 연결된 출처 패턴입니다.
+                  그 답변에서 관찰된 업체 중 현재 고노출 기준에 해당하는 {benchmark.highVisibilityEntityCount}곳의 출처 패턴입니다.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0">
