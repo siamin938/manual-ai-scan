@@ -121,6 +121,29 @@ function DashboardPage() {
   const benchmarkResult = benchmarkQuery.data;
   const benchmark = benchmarkResult && benchmarkResult.ok ? benchmarkResult.benchmark : null;
 
+  // 반복 측정 보조 컨텍스트: 실패하면 기존 화면으로 안전하게 fallback한다.
+  const fetchRepeatContext = useServerFn(getVisibilityRepeatContext);
+  const repeatContextQuery = useQuery({
+    queryKey: ["visibility-repeat-context", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: () =>
+      fetchRepeatContext({
+        data: { orgId: activeOrgId as string, businessId: businessId as string },
+      }),
+  });
+  const repeatContextResult = repeatContextQuery.data;
+  const repeatContext =
+    repeatContextResult && repeatContextResult.ok ? repeatContextResult.context : null;
+  const sourceSideByDomain = new Map(
+    (repeatContext?.sources ?? []).map((s) => [s.domain, s.side] as const),
+  );
+  const useRepeatQuestions = !!repeatContext && repeatContext.compatibleRunCount >= 2;
+  const repeatQuestions = useRepeatQuestions ? (repeatContext?.questions ?? []) : [];
+  const repeatQuestionsHead = repeatQuestions.slice(0, 8);
+  const repeatQuestionsRest = repeatQuestions.slice(8);
+
+
+
   const result = query.data;
   const payload: VisibilityDiagnosticDTO | null = result && result.ok ? result.diagnostic : null;
   const d = payload?.diagnostic ?? null;
