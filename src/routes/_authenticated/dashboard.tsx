@@ -490,28 +490,49 @@ function DashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {d.sources.map((s) => (
-                        <TableRow key={s.domain}>
-                          <TableCell className="text-sm">
-                            {s.domain}
-                            {s.sampleTitle && (
-                              <span className="mt-0.5 block max-w-[240px] truncate text-xs text-muted-foreground">
-                                {s.sampleTitle}
+                      {d.sources.map((s) => {
+                        const side = sourceSideByDomain.get(normalizeDomain(s.domain) ?? "");
+                        return (
+                          <TableRow key={s.domain}>
+                            <TableCell className="text-sm">
+                              <span className="flex flex-wrap items-center gap-2">
+                                {s.domain}
+                                {side && (
+                                  <Badge
+                                    variant={side === "client" ? "default" : "secondary"}
+                                    className="font-normal"
+                                  >
+                                    {SOURCE_SIDE_LABEL[side]}
+                                  </Badge>
+                                )}
                               </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <span className="tabular-nums">{s.responseCount}건</span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              총 {s.citationCount}회 연결
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                              {s.sampleTitle && (
+                                <span className="mt-0.5 block max-w-[240px] truncate text-xs text-muted-foreground">
+                                  {s.sampleTitle}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              <span className="tabular-nums">{s.responseCount}건</span>
+                              <span className="mt-0.5 block text-xs text-muted-foreground">
+                                총 {s.citationCount}회 연결
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
 
                 )}
+
+                {sourceSideByDomain.size > 0 && (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    출처 목록은 최근 측정의 연결 횟수이며, 배지는 동일 조건 반복 측정에서 내 업체와
+                    경쟁업체 중 어느 쪽과 연결됐는지 보여줍니다.
+                  </p>
+                )}
+
 
                 {d.referenceSources.length > 0 && (
                   <Collapsible className="mt-4">
