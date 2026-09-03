@@ -338,7 +338,7 @@ function SourceGroupCard({
                   <span className="text-sm font-medium">{customerLabel(p.name)}</span>
                   <span className="text-xs text-muted-foreground">
                     {customerText(
-                      `${p.responseCount}/${p.relatedResponseTotal} 답변에서 연결 · 함께 관찰된 업체 ${p.distinctCompetitorCount}곳`,
+                      `관련 답변 ${p.relatedResponseTotal}개 중 ${p.responseCount}개에서 업체 ${p.distinctCompetitorCount}곳과 연결`,
                     )}
                   </span>
 
