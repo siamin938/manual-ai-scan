@@ -170,7 +170,7 @@ function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">내 AI 노출 진단</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            고객이 실제로 물을 법한 질문으로 AI 답변을 측정해, 내 업체의 노출과 경쟁업체·인용
+            고객이 실제로 물을 법한 질문으로 AI 답변을 측정해, 내 업체의 노출과 함께 관찰된 업체·인용
             출처를 확인합니다.
           </p>
         </div>
@@ -227,7 +227,7 @@ function DashboardPage() {
         <>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">이번 분석 한눈에 보기</CardTitle>
+              <CardTitle className="text-base">최근 측정 결과</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1.5 text-sm">
               <p>
@@ -248,11 +248,24 @@ function DashboardPage() {
                   답변에서 확인
                 </p>
               )}
-              {aggregate && (
-                <p className="text-muted-foreground">
-                  같은 조건으로 {aggregate.compatibleRunCount}번 다시 측정해 답변{" "}
-                  {aggregate.validCount}개를 함께 확인했습니다.
-                </p>
+              {aggregate && aggregate.compatibleRunCount >= 2 && (
+                <div className="border-t pt-3">
+                  <p className="font-medium">동일 조건 반복 종합</p>
+                  <p className="text-muted-foreground">
+                    동일 조건으로 총 {aggregate.compatibleRunCount}회 측정한 {aggregate.validCount}개
+                    답변을 함께 확인했습니다.
+                  </p>
+                  <p className="text-muted-foreground">
+                    종합 노출률 {pct(aggregate.visibilityRatePct)} · 상위 3곳 노출률{" "}
+                    {pct(aggregate.top3RatePct)}
+                  </p>
+                  <p className="text-muted-foreground">
+                    질문 안정성: {aggregate.compatibleRunCount}회 모두 추천{" "}
+                    {aggregate.alwaysVisibleQuestionCount}개 · 일부 회차 추천{" "}
+                    {aggregate.sometimesVisibleQuestionCount}개 · {aggregate.compatibleRunCount}회 모두
+                    미추천 {aggregate.neverVisibleQuestionCount}개
+                  </p>
+                </div>
               )}
             </CardContent>
 
@@ -260,12 +273,12 @@ function DashboardPage() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
-              label="AI에서 내 업체가 추천된 비율"
+              label="최근 측정 · AI에서 추천된 비율"
               value={pct(d.overview.visibilityRatePct)}
               note={`AI 답변 ${d.overview.validCount}건 중 ${d.overview.mentionCount}건에서 추천`}
             />
             <MetricCard
-              label="상위 3곳 안에 추천된 답변"
+              label="최근 측정 · 상위 3곳 안에 추천"
               value={`${d.overview.top3Count}건`}
               note={`AI 답변 ${d.overview.validCount}건 중 상위 3곳 안에 추천`}
             />
@@ -309,7 +322,7 @@ function DashboardPage() {
               </p>
               {d.competitorGate ? (
                 <p className="mb-3 text-xs text-muted-foreground">
-                  자주 등장 {d.competitorGate.coreCount}곳 · 가끔 등장{" "}
+                  반복 관찰 {d.competitorGate.coreCount}곳 · 주목 관찰{" "}
                   {d.competitorGate.notableCount}곳
                 </p>
               ) : null}
@@ -332,10 +345,10 @@ function DashboardPage() {
                         c.responseCount === 1 &&
                         (c.priorRunPresenceCount ?? 0) === 0;
                       let badgeVariant: "default" | "secondary" | "outline" = "secondary";
-                      let badgeLabel = "주목 경쟁업체";
+                      let badgeLabel = "주목 관찰 업체";
                       if (c.tier === "core") {
                         badgeVariant = "default";
-                        badgeLabel = "핵심 경쟁업체";
+                        badgeLabel = "반복 관찰 업체";
                       } else if (isAdditionalObservation) {
                         badgeVariant = "outline";
                         badgeLabel = "추가 관찰";
@@ -530,7 +543,7 @@ function DashboardPage() {
                 {sourceSideByDomain.size > 0 && (
                   <p className="mt-3 text-xs text-muted-foreground">
                     출처 목록은 최근 측정의 연결 횟수이며, 배지는 동일 조건 반복 측정에서 내 업체와
-                    경쟁업체 중 어느 쪽과 연결됐는지 보여줍니다.
+                    함께 관찰된 업체 중 어느 쪽과 연결됐는지 보여줍니다.
                   </p>
                 )}
 
