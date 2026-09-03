@@ -398,13 +398,17 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               <span className="font-medium">기본 측정</span>
             </div>
             <div className="mt-1 flex justify-between">
-              <span className="text-muted-foreground">예상 사용량</span>
-              <span className="font-medium">{activeCount}회</span>
+              <span className="text-muted-foreground">차감 예정 측정권</span>
+              <span className="font-medium">{questionSetId && activeCount > 0 ? "1회" : "-"}</span>
             </div>
             <div className="mt-1 flex justify-between">
-              <span className="text-muted-foreground">남은 AI 노출 측정권</span>
+              <span className="text-muted-foreground">측정 후 남는 측정권</span>
               <span className="font-medium">
-                {creditBalance === null ? "확인 중" : `${creditBalance}회`}
+                {creditBalance === null
+                  ? "확인 중"
+                  : questionSetId && activeCount > 0
+                    ? `${Math.max(creditBalance - 1, 0)}회`
+                    : `${creditBalance}회`}
               </span>
             </div>
           </div>
