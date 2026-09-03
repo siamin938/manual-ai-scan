@@ -20,7 +20,7 @@ import type {
   VisibilityRepeatContextResponseDTO,
 } from "./visibility-repeat-context.types";
 
-type UserClient = SupabaseClient<Database>;
+type DbClient = SupabaseClient<Database>;
 
 const MAX_COMPATIBLE_RUNS = 6;
 const SIGNIFICANT_TIERS = new Set(["core", "notable"]);
@@ -37,7 +37,7 @@ type AttributionRow = {
  * base attribution row로 대체하면 기존 actionable 정책을 우회하게 되므로 하지 않는다.
  */
 async function loadAttributionRows(
-  supabase: UserClient,
+  supabase: DbClient,
   orgId: string,
   businessId: string,
   runIds: string[],
@@ -57,7 +57,7 @@ async function loadAttributionRows(
 }
 
 export async function fetchVisibilityRepeatContext(args: {
-  supabase: UserClient;
+  supabase: DbClient;
   orgId: string;
   businessId: string;
 }): Promise<VisibilityRepeatContextResponseDTO> {
@@ -75,7 +75,12 @@ export async function fetchVisibilityRepeatContext(args: {
   if (businessCheck.error) return { ok: false, error: "NOT_AVAILABLE" };
   if (!businessCheck.data) return { ok: false, error: "FORBIDDEN" };
 
-  const runsResult = await supabase.rpc("get_compatible_audit_runs_v01", {
+  // scope 확인 통과 후에만 서버 전용 read-only 조회에 admin client를 사용한다.
+  // (compatible-runs / significance RPC는 authenticated role에 EXECUTE 권한이 없다.)
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const db = supabaseAdmin as unknown as DbClient;
+
+  const runsResult = await db.rpc("get_compatible_audit_runs_v01", {
     p_org_id: orgId,
     p_business_id: businessId,
     p_limit: MAX_COMPATIBLE_RUNS,
@@ -93,7 +98,7 @@ export async function fetchVisibilityRepeatContext(args: {
     return { ok: true, context: { compatibleRunCount: 0, sources: [], questions: [] } };
   }
 
-  const measurementsResult = await supabase
+  const measurementsResult = await db
     .from("measurements")
     .select("id, run_id, question_id, was_client_mentioned")
     .eq("org_id", orgId)
@@ -114,7 +119,7 @@ export async function fetchVisibilityRepeatContext(args: {
   // significant competitor canonical key (run별)
   const significantByRun = new Map<string, Set<string>>();
   for (const runId of runIds) {
-    const sig = await supabase.rpc("get_competitor_significance_v01", {
+    const sig = await db.rpc("get_competitor_significance_v01", {
       p_org_id: orgId,
       p_business_id: businessId,
       p_run_id: runId,
@@ -134,7 +139,7 @@ export async function fetchVisibilityRepeatContext(args: {
   }
 
   const clientKey = `business:${businessId}`;
-  const rows = await loadAttributionRows(supabase, orgId, businessId, runIds);
+  const rows = await loadAttributionRows(db, orgId, businessId, runIds);
   if (rows === null) return { ok: false, error: "NOT_AVAILABLE" };
 
   type Bucket = { client: Set<string>; competitor: Set<string> };
@@ -176,7 +181,7 @@ export async function fetchVisibilityRepeatContext(args: {
 
   let questions: RepeatContextQuestionDTO[] = [];
   if (weakQuestionIds.length > 0) {
-    const questionsResult = await supabase
+    const questionsResult = await db
       .from("questions")
       .select("id, prompt_text, intent_type")
       .eq("org_id", orgId)
