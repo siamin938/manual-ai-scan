@@ -313,7 +313,7 @@ function SourceGroupCard({
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
         {customerText(
-          `함께 관찰된 업체 연결 답변 ${g.responseCount}/${g.relatedResponseTotal}에서 관찰 · 함께 관찰된 업체 ${g.distinctCompetitorCount}곳`,
+          `관련 답변 ${g.relatedResponseTotal}개 중 ${g.responseCount}개에서 업체 ${g.distinctCompetitorCount}곳과 함께 연결`,
         )}
       </p>
 
