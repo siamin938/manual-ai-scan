@@ -599,13 +599,11 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm">
-                  최근 차보임에 누적된 자동차 업체 측정 데이터를 익명 집계해, AI 답변에 자주
-                  연결된 업체들과 함께 관찰된 출처 패턴을 확인합니다.
+                  {benchmark.eligibleTargetBusinessCount !== undefined
+                    ? `최근 ${benchmark.windowDays}일 동안 자동차 업체 ${benchmark.eligibleTargetBusinessCount}곳의 측정 결과에서 함께 관찰된 업체들을 익명 집계했습니다.`
+                    : `최근 ${benchmark.windowDays}일 동안 자동차 업체 측정 결과에서 함께 관찰된 업체들을 익명 집계했습니다.`}
                 </p>
                 <p className="text-sm">
-                  {benchmark.eligibleTargetBusinessCount !== undefined
-                    ? `최근 ${benchmark.windowDays}일 동안 자동차 업체 ${benchmark.eligibleTargetBusinessCount}곳의 측정 결과에서 함께 관찰된 업체들을 익명 집계했습니다. `
-                    : ""}
                   현재 고노출 기준에 해당하는 관찰 업체 {benchmark.highVisibilityEntityCount}곳에서
                   자주 연결된 출처 패턴입니다.
                 </p>
