@@ -32,13 +32,16 @@ type AttributionRow = {
   domain: string | null;
 };
 
-/** actionable view를 우선 읽고, 접근 불가하면 저장된 attribution row로 안전하게 대체한다. */
+/**
+ * actionable view만 사용한다. 조회 실패 시 null을 반환해 fail-closed 처리한다.
+ * base attribution row로 대체하면 기존 actionable 정책을 우회하게 되므로 하지 않는다.
+ */
 async function loadAttributionRows(
   supabase: UserClient,
   orgId: string,
   businessId: string,
   runIds: string[],
-): Promise<AttributionRow[]> {
+): Promise<AttributionRow[] | null> {
   const viewResult = await supabase
     .from("measurement_citation_attributions_actionable_v2")
     .select("measurement_id, source_run_id, canonical_key, domain")
@@ -46,20 +49,11 @@ async function loadAttributionRows(
     .eq("business_id", businessId)
     .in("source_run_id", runIds);
 
-  if (!viewResult.error && viewResult.data) {
-    return viewResult.data as AttributionRow[];
+  if (viewResult.error || !viewResult.data) {
+    console.error("[visibility-repeat-context] actionable attribution view unavailable");
+    return null;
   }
-
-  const baseResult = await supabase
-    .from("measurement_citation_attributions")
-    .select("measurement_id, source_run_id, canonical_key, domain, attribution_level")
-    .eq("org_id", orgId)
-    .eq("business_id", businessId)
-    .in("source_run_id", runIds)
-    .in("attribution_level", ["direct", "section"]);
-
-  if (baseResult.error || !baseResult.data) return [];
-  return baseResult.data as AttributionRow[];
+  return viewResult.data as AttributionRow[];
 }
 
 export async function fetchVisibilityRepeatContext(args: {
