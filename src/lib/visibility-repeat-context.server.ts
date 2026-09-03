@@ -120,11 +120,14 @@ export async function fetchVisibilityRepeatContext(args: {
       p_run_id: runId,
     });
     const keys = new Set<string>();
-    if (!sig.error) {
-      for (const row of sig.data ?? []) {
-        if (typeof row.canonical_key === "string" && SIGNIFICANT_TIERS.has(row.tier ?? "")) {
-          keys.add(row.canonical_key);
-        }
+    if (sig.error) {
+      // competitor evidence가 빠지면 source side가 잘못 표시되므로 fail-closed.
+      console.error("[visibility-repeat-context] competitor significance RPC failed");
+      return { ok: false, error: "NOT_AVAILABLE" };
+    }
+    for (const row of sig.data ?? []) {
+      if (typeof row.canonical_key === "string" && SIGNIFICANT_TIERS.has(row.tier ?? "")) {
+        keys.add(row.canonical_key);
       }
     }
     significantByRun.set(runId, keys);
@@ -132,6 +135,7 @@ export async function fetchVisibilityRepeatContext(args: {
 
   const clientKey = `business:${businessId}`;
   const rows = await loadAttributionRows(supabase, orgId, businessId, runIds);
+  if (rows === null) return { ok: false, error: "NOT_AVAILABLE" };
 
   type Bucket = { client: Set<string>; competitor: Set<string> };
   const byDomain = new Map<string, Bucket>();
