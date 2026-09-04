@@ -79,6 +79,19 @@ const STATUS_LABEL: Record<"missing" | "partial", string> = {
   partial: "가끔 추천",
 };
 
+type CompetitorDisplayCategory = "repeated" | "notable" | "additional";
+
+/** 행 badge와 동일한 표시 규칙으로 분류한다(판정/점수는 서버 DTO 그대로). */
+function classifyCompetitorDisplay(c: {
+  tier: "core" | "notable";
+  responseCount: number;
+  priorRunPresenceCount: number;
+}): CompetitorDisplayCategory {
+  if (c.tier === "core") return "repeated";
+  if (c.responseCount === 1 && c.priorRunPresenceCount === 0) return "additional";
+  return "notable";
+}
+
 
 function DashboardPage() {
   const { activeOrgId } = useOrg();
@@ -159,6 +172,20 @@ function DashboardPage() {
   const topCompetitor = (d?.competitors ?? []).reduce<
     NonNullable<typeof d>["competitors"][number] | null
   >((best, c) => (best === null || c.responseCount > best.responseCount ? c : best), null);
+
+  // 카드에 실제로 표시되는 competitor 목록 기준, badge와 동일한 규칙으로 표시용 개수를 계산한다.
+  const competitorDisplayCounts = (d?.competitors ?? []).reduce<{
+    repeated: number;
+    notable: number;
+    additional: number;
+  }>(
+    (acc, c) => {
+      const category = classifyCompetitorDisplay(c);
+      acc[category] += 1;
+      return acc;
+    },
+    { repeated: 0, notable: 0, additional: 0 },
+  );
 
 
 
@@ -320,10 +347,11 @@ function DashboardPage() {
               <p className="mb-3 text-xs text-muted-foreground">
                 한 번만 확인된 확정 업체도 추가 관찰로 함께 표시합니다.
               </p>
-              {d.competitorGate ? (
+              {d.competitors.length > 0 ? (
                 <p className="mb-3 text-xs text-muted-foreground">
-                  반복 관찰 {d.competitorGate.coreCount}곳 · 주목 관찰{" "}
-                  {d.competitorGate.notableCount}곳
+                  현재 표시: 반복 관찰 {competitorDisplayCounts.repeated}곳 · 주목 관찰{" "}
+                  {competitorDisplayCounts.notable}곳 · 추가 관찰{" "}
+                  {competitorDisplayCounts.additional}곳
                 </p>
               ) : null}
               {d.competitors.length === 0 ? (
