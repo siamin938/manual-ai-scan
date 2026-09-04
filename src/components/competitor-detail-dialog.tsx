@@ -47,6 +47,9 @@ const OBSERVED_IN_LABELS: Record<CompetitorCompareObservedIn, string> = {
   competitor_only: "경쟁업체 쪽",
 };
 
+const DETAIL_NOTE =
+  "이 데이터는 측정된 AI 답변에서 함께 관찰된 패턴입니다. 특정 출처나 질문이 해당 업체 노출의 직접적인 원인임을 의미하지 않습니다.";
+
 const COMPARE_NOTE =
   "이 비교는 같은 최신 측정에서 두 업체가 어떤 질문과 출처와 함께 관찰됐는지 나란히 보여줍니다. 차이가 노출의 직접적인 원인이라는 뜻은 아닙니다.";
 
@@ -134,8 +137,7 @@ export function CompetitorDetailDialog({
         <DialogHeader>
           <DialogTitle>{competitorName ?? "업체 상세"}</DialogTitle>
           <DialogDescription>
-            이 업체가 어떤 질문에서 자주 등장했고, 그 답변에 어떤 출처가 함께 인용됐는지
-            보여줍니다.
+            이 업체가 어떤 질문에서 등장했고, 그 답변에 어떤 출처가 함께 인용됐는지 보여줍니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -189,13 +191,21 @@ export function CompetitorDetailDialog({
 }
 
 function DetailBody({ detail }: { detail: CompetitorDetailDTO }) {
+  const c = detail.competitor;
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Metric label="등장 답변 수" value={String(detail.competitor.responseCount)} />
-        <Metric label="답변 비율" value={pct(detail.competitor.responseRatePct)} />
-        <Metric label="언급 수" value={String(detail.competitor.mentionCount)} />
-        <Metric label="Top3 비율" value={pct(detail.competitor.top3RatePct)} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Metric
+          label="AI 답변에 등장"
+          value={`${c.responseCount}건`}
+          hint={pct(c.responseRatePct)}
+        />
+        <Metric
+          label="Top3 등장"
+          value={`${c.top3ResponseCount}건`}
+          hint={pct(c.top3RatePct)}
+        />
       </div>
 
       <p className="text-xs text-muted-foreground">
@@ -203,41 +213,7 @@ function DetailBody({ detail }: { detail: CompetitorDetailDTO }) {
       </p>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">어떤 질문군에서 자주 등장했나</h3>
-        {detail.questionGroups.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">질문군 정보가 없습니다.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>질문군</TableHead>
-                  <TableHead>측정</TableHead>
-                  <TableHead>등장 답변</TableHead>
-                  <TableHead>언급</TableHead>
-                  <TableHead>답변 비율</TableHead>
-                  <TableHead>Top3</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {detail.questionGroups.map((g) => (
-                  <TableRow key={g.intentType}>
-                    <TableCell className="text-sm">{intentLabel(g.intentType)}</TableCell>
-                    <TableCell className="text-sm tabular-nums">{g.measurementCount}</TableCell>
-                    <TableCell className="text-sm tabular-nums">{g.responseCount}</TableCell>
-                    <TableCell className="text-sm tabular-nums">{g.mentionCount}</TableCell>
-                    <TableCell className="text-sm tabular-nums">{pct(g.responseRatePct)}</TableCell>
-                    <TableCell className="text-sm tabular-nums">{pct(g.top3RatePct)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold">실제로 등장한 질문</h3>
+        <h3 className="text-sm font-semibold">어떤 질문에서 등장했나요?</h3>
         {detail.questions.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">등장한 질문이 없습니다.</p>
         ) : (
@@ -245,11 +221,16 @@ function DetailBody({ detail }: { detail: CompetitorDetailDTO }) {
             {detail.questions.map((q) => (
               <div key={q.questionId} className="rounded-md border p-3">
                 <p className="text-sm font-medium">{q.questionText}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {intentLabel(q.intentType)} · 등장 답변 {q.responseCount}/{q.measurementCount} ·
-                  답변 비율 {pct(q.responseRatePct)} · 최고 순위{" "}
-                  {q.bestPosition === null ? "–" : `${q.bestPosition}위`} · Top3 {pct(q.top3RatePct)}
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">{intentLabel(q.intentType)}</Badge>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    등장 {q.responseCount}/{q.measurementCount}
+                  </span>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    최고 {q.bestPosition === null ? "–" : `${q.bestPosition}위`}
+                  </span>
+                  {q.top3ResponseCount > 0 && <Badge variant="outline">Top3</Badge>}
+                </div>
               </div>
             ))}
           </div>
@@ -257,7 +238,7 @@ function DetailBody({ detail }: { detail: CompetitorDetailDTO }) {
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">이 업체가 등장한 답변에서 실제 인용된 출처</h3>
+        <h3 className="text-sm font-semibold">이 업체가 등장한 답변의 출처</h3>
         <p className="text-xs text-muted-foreground">
           이 업체가 등장한 답변과 같은 답변에서 실제 인용된 출처입니다.
         </p>
@@ -269,9 +250,8 @@ function DetailBody({ detail }: { detail: CompetitorDetailDTO }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>도메인</TableHead>
-                  <TableHead>등장 답변 수</TableHead>
-                  <TableHead>인용 수</TableHead>
-                  <TableHead>답변 비율</TableHead>
+                  <TableHead>등장 답변</TableHead>
+                  <TableHead>인용</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -287,7 +267,6 @@ function DetailBody({ detail }: { detail: CompetitorDetailDTO }) {
                     </TableCell>
                     <TableCell className="text-sm tabular-nums">{s.responseCount}</TableCell>
                     <TableCell className="text-sm tabular-nums">{s.citationCount}</TableCell>
-                    <TableCell className="text-sm tabular-nums">{pct(s.responseRatePct)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -296,10 +275,106 @@ function DetailBody({ detail }: { detail: CompetitorDetailDTO }) {
         )}
       </section>
 
-      <p className="text-xs text-muted-foreground">
-        이 데이터는 반복 측정된 AI 답변에서 함께 관찰된 패턴입니다. 특정 출처나 질문이 해당 업체
-        노출의 직접적인 원인임을 의미하지 않습니다.
-      </p>
+      <details className="rounded-md border p-3">
+        <summary className="cursor-pointer text-sm font-semibold">세부 통계 보기</summary>
+        <div className="space-y-4 pt-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Metric label="언급 수" value={String(c.mentionCount)} />
+            <Metric label="등장 답변 수" value={String(c.responseCount)} />
+          </div>
+
+          <section className="space-y-2">
+            <h4 className="text-sm font-semibold">질문군별 등장</h4>
+            {detail.questionGroups.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">질문군 정보가 없습니다.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>질문군</TableHead>
+                      <TableHead>측정</TableHead>
+                      <TableHead>등장 답변</TableHead>
+                      <TableHead>언급</TableHead>
+                      <TableHead>답변 비율</TableHead>
+                      <TableHead>Top3</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.questionGroups.map((g) => (
+                      <TableRow key={g.intentType}>
+                        <TableCell className="text-sm">{intentLabel(g.intentType)}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{g.measurementCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{g.responseCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{g.mentionCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">
+                          {pct(g.responseRatePct)}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums">{pct(g.top3RatePct)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h4 className="text-sm font-semibold">질문별 세부 수치</h4>
+            {detail.questions.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">등장한 질문이 없습니다.</p>
+            ) : (
+              <div className="space-y-2">
+                {detail.questions.map((q) => (
+                  <div key={q.questionId} className="rounded-md border p-3">
+                    <p className="text-sm font-medium">{q.questionText}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {intentLabel(q.intentType)} · 등장 답변 {q.responseCount}/{q.measurementCount}{" "}
+                      · 언급 {q.mentionCount} · 답변 비율 {pct(q.responseRatePct)} · 최고 순위{" "}
+                      {q.bestPosition === null ? "–" : `${q.bestPosition}위`} · Top3{" "}
+                      {pct(q.top3RatePct)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h4 className="text-sm font-semibold">출처별 답변 비율</h4>
+            {detail.sources.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">인용 출처 정보가 없습니다.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>도메인</TableHead>
+                      <TableHead>등장 답변 수</TableHead>
+                      <TableHead>인용 수</TableHead>
+                      <TableHead>답변 비율</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detail.sources.map((s) => (
+                      <TableRow key={s.domain}>
+                        <TableCell className="text-sm">{s.domain}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{s.responseCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{s.citationCount}</TableCell>
+                        <TableCell className="text-sm tabular-nums">
+                          {pct(s.responseRatePct)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </section>
+        </div>
+      </details>
+
+      <p className="text-xs text-muted-foreground">{DETAIL_NOTE}</p>
     </div>
   );
 }
@@ -317,6 +392,13 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
   );
   const bothQuestions = compare.questions.filter((q) => q.bothResponseCount > 0);
 
+  // 표시용: 등장 여부 또는 Top3 여부가 서로 다른 질문만 기본 노출 (DTO 순서 유지)
+  const differingQuestions = compare.questions.filter(
+    (q) =>
+      q.clientResponseCount > 0 !== q.competitorResponseCount > 0 ||
+      q.clientTop3ResponseCount > 0 !== q.competitorTop3ResponseCount > 0,
+  );
+
   const sourcesBoth = compare.sources.filter((s) => s.observedIn === "both").length;
   const sourcesClientOnly = compare.sources.filter((s) => s.observedIn === "client_only").length;
   const sourcesCompetitorOnly = compare.sources.filter(
@@ -327,116 +409,56 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
     <div className="space-y-6">
       <p className="text-xs text-muted-foreground">{COMPARE_NOTE}</p>
 
-      <p className="text-xs text-muted-foreground">
-        기준 측정: {compare.scope.runName} · {formatSeoul(compare.scope.measuredAt)} · 전체 유효 측정{" "}
-        {o.validCount}
-      </p>
-
-      <div className="grid grid-cols-2 gap-3">
-        <CompareColumn
-          title={myName}
-          rows={[
-            ["등장 답변", `${o.clientResponseCount} / ${o.validCount}`],
-            ["등장 비율", pct(o.clientResponseRatePct)],
-            ["Top3 답변", String(o.clientTop3ResponseCount)],
-            ["Top3 비율", pct(o.clientTop3RatePct)],
-          ]}
-        />
-        <CompareColumn
-          title={theirName}
-          rows={[
-            ["등장 답변", `${o.competitorResponseCount} / ${o.validCount}`],
-            ["등장 비율", pct(o.competitorResponseRatePct)],
-            ["Top3 답변", String(o.competitorTop3ResponseCount)],
-            ["Top3 비율", pct(o.competitorTop3RatePct)],
-          ]}
-        />
-      </div>
-
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold">한눈에 보는 차이</h3>
-        <p className="text-xs text-muted-foreground">
-          관찰된 차이이며 원인 분석이 아닙니다.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <DiffCard title="경쟁업체만 등장한 질문" questions={competitorOnly} />
-          <DiffCard title="내 업체만 등장한 질문" questions={clientOnly} />
-          <DiffCard title="함께 등장한 질문" questions={bothQuestions} />
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold">핵심 차이</h3>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <CompareColumn
+            title={myName}
+            value={`등장 ${o.clientResponseCount} / ${o.validCount}`}
+            hint={pct(o.clientResponseRatePct)}
+            sub={`Top3 ${o.clientTop3ResponseCount}`}
+          />
+          <CompareColumn
+            title={theirName}
+            value={`등장 ${o.competitorResponseCount} / ${o.validCount}`}
+            hint={pct(o.competitorResponseRatePct)}
+            sub={`Top3 ${o.competitorTop3ResponseCount}`}
+          />
         </div>
+        <div className="grid grid-cols-3 gap-2">
+          <CountCard label="경쟁업체만 등장" value={competitorOnly.length} />
+          <CountCard label="내 업체만 등장" value={clientOnly.length} />
+          <CountCard label="함께 등장" value={bothQuestions.length} />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          기준 측정: {compare.scope.runName} · {formatSeoul(compare.scope.measuredAt)}
+        </p>
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">질문군별 비교</h3>
-        {compare.questionGroups.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">질문군 정보가 없습니다.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>질문군</TableHead>
-                  <TableHead>측정</TableHead>
-                  <TableHead className="min-w-[140px]">{myName}</TableHead>
-                  <TableHead className="min-w-[140px]">{theirName}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {compare.questionGroups.map((g) => (
-                  <TableRow key={g.intentType}>
-                    <TableCell className="whitespace-nowrap text-sm">
-                      {intentLabel(g.intentType)}
-                    </TableCell>
-                    <TableCell className="text-sm tabular-nums">{g.measurementCount}</TableCell>
-                    <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                      <span className="block">
-                        등장 {g.clientResponseCount} · {pct(g.clientResponseRatePct)}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        Top3 {g.clientTop3ResponseCount} · {pct(g.clientTop3RatePct)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                      <span className="block">
-                        등장 {g.competitorResponseCount} · {pct(g.competitorResponseRatePct)}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        Top3 {g.competitorTop3ResponseCount} · {pct(g.competitorTop3RatePct)}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold">질문별 비교</h3>
-        {compare.questions.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">질문 정보가 없습니다.</p>
+        <h3 className="text-sm font-semibold">차이가 난 질문</h3>
+        {differingQuestions.length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground">
+            이번 측정에서 질문별 등장 차이는 확인되지 않았습니다.
+          </p>
         ) : (
           <div className="space-y-2">
-            {compare.questions.map((q) => (
+            {differingQuestions.map((q) => (
               <div key={q.questionId} className="rounded-md border p-3">
                 <p className="text-sm font-medium">{q.questionText}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {intentLabel(q.intentType)} · 함께 등장 {q.bothResponseCount}회
-                </p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <QuestionMiniCard
+                <div className="mt-1">
+                  <Badge variant="secondary">{intentLabel(q.intentType)}</Badge>
+                </div>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <QuestionSideCard
                     name={myName}
                     responseCount={q.clientResponseCount}
-                    measurementCount={q.measurementCount}
-                    responseRatePct={q.clientResponseRatePct}
                     bestPosition={q.clientBestPosition}
                     top3ResponseCount={q.clientTop3ResponseCount}
                   />
-                  <QuestionMiniCard
+                  <QuestionSideCard
                     name={theirName}
                     responseCount={q.competitorResponseCount}
-                    measurementCount={q.measurementCount}
-                    responseRatePct={q.competitorResponseRatePct}
                     bestPosition={q.competitorBestPosition}
                     top3ResponseCount={q.competitorTop3ResponseCount}
                   />
@@ -448,11 +470,9 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">업체별로 연결된 출처</h3>
+        <h3 className="text-sm font-semibold">출처 차이</h3>
         <p className="text-xs text-muted-foreground">
-          AI 답변 안에서 각 업체 설명에 직접 붙어 있던 출처입니다. <strong>직접 연결</strong>은 업체를
-          설명하는 문장·행에 인용이 붙은 경우로 가장 강한 근거이고, <strong>관련 구간</strong>은 같은
-          업체 설명 구간 안에서 인용된 경우입니다.
+          AI 답변에서 각 업체 설명과 직접 또는 관련 구간으로 연결된 출처를 비교합니다.
         </p>
         {compare.attributedSources.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">
@@ -464,8 +484,8 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>도메인</TableHead>
-                  <TableHead className="min-w-[140px]">{myName}</TableHead>
-                  <TableHead className="min-w-[140px]">{theirName}</TableHead>
+                  <TableHead className="min-w-[120px]">{myName}</TableHead>
+                  <TableHead className="min-w-[120px]">{theirName}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -500,72 +520,156 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
       </section>
 
       <details className="rounded-md border p-3">
-        <summary className="cursor-pointer text-sm font-semibold">
-          답변에서 함께 인용된 출처 (참고)
-        </summary>
-        <section className="space-y-2 pt-3">
-          <p className="text-xs text-muted-foreground">
-            각 업체가 등장한 AI 답변에서 함께 인용된 출처를 비교합니다. 해당 웹페이지가 그 업체를
-            직접 언급하거나 소개했다는 뜻은 아닙니다.
-          </p>
+        <summary className="cursor-pointer text-sm font-semibold">세부 비교 보기</summary>
+        <div className="space-y-6 pt-3">
+          <section className="space-y-2">
+            <h4 className="text-sm font-semibold">질문군별 비교</h4>
+            {compare.questionGroups.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">질문군 정보가 없습니다.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>질문군</TableHead>
+                      <TableHead>측정</TableHead>
+                      <TableHead className="min-w-[140px]">{myName}</TableHead>
+                      <TableHead className="min-w-[140px]">{theirName}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {compare.questionGroups.map((g) => (
+                      <TableRow key={g.intentType}>
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {intentLabel(g.intentType)}
+                        </TableCell>
+                        <TableCell className="text-sm tabular-nums">{g.measurementCount}</TableCell>
+                        <TableCell className="whitespace-nowrap text-sm tabular-nums">
+                          <span className="block">
+                            등장 {g.clientResponseCount} · {pct(g.clientResponseRatePct)}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            Top3 {g.clientTop3ResponseCount} · {pct(g.clientTop3RatePct)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm tabular-nums">
+                          <span className="block">
+                            등장 {g.competitorResponseCount} · {pct(g.competitorResponseRatePct)}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            Top3 {g.competitorTop3ResponseCount} · {pct(g.competitorTop3RatePct)}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </section>
 
-        <div className="grid grid-cols-3 gap-2">
-          <Metric label="양쪽 업체 등장 답변에서 인용" value={String(sourcesBoth)} />
-          <Metric label="내 업체 등장 답변에서만 인용" value={String(sourcesClientOnly)} />
-          <Metric label="경쟁업체 등장 답변에서만 인용" value={String(sourcesCompetitorOnly)} />
-        </div>
-        {compare.sources.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">인용 출처 정보가 없습니다.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-muted-foreground">
-              답변 = 해당 업체가 등장하면서 이 도메인이 함께 인용된 AI 답변 수 / 인용 = 그 답변들에
-              기록된 실제 citation 수 / 비율 = 해당 업체 등장 답변 중 이 도메인이 함께 인용된 비율
-            </p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>도메인</TableHead>
-                  <TableHead>함께 인용된 범위</TableHead>
-                  <TableHead className="min-w-[120px]">{myName}</TableHead>
-                  <TableHead className="min-w-[120px]">{theirName}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {compare.sources.map((s) => (
-                  <TableRow key={s.domain}>
-                    <TableCell className="text-sm">
-                      {s.domain}
-                      {s.sampleTitle && (
-                        <span className="mt-0.5 block max-w-[240px] truncate text-xs text-muted-foreground">
-                          {s.sampleTitle}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm">
-                      <Badge variant="secondary">{OBSERVED_IN_LABELS[s.observedIn]}</Badge>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                      <SourceCell
-                        responseCount={s.clientResponseCount}
-                        citationCount={s.clientCitationCount}
-                        responseRatePct={s.clientResponseRatePct}
+          <section className="space-y-2">
+            <h4 className="text-sm font-semibold">질문별 비교 (전체)</h4>
+            {compare.questions.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">질문 정보가 없습니다.</p>
+            ) : (
+              <div className="space-y-2">
+                {compare.questions.map((q) => (
+                  <div key={q.questionId} className="rounded-md border p-3">
+                    <p className="text-sm font-medium">{q.questionText}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {intentLabel(q.intentType)} · 함께 등장 {q.bothResponseCount}회
+                    </p>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <QuestionMiniCard
+                        name={myName}
+                        responseCount={q.clientResponseCount}
+                        measurementCount={q.measurementCount}
+                        responseRatePct={q.clientResponseRatePct}
+                        bestPosition={q.clientBestPosition}
+                        top3ResponseCount={q.clientTop3ResponseCount}
                       />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm tabular-nums">
-                      <SourceCell
-                        responseCount={s.competitorResponseCount}
-                        citationCount={s.competitorCitationCount}
-                        responseRatePct={s.competitorResponseRatePct}
+                      <QuestionMiniCard
+                        name={theirName}
+                        responseCount={q.competitorResponseCount}
+                        measurementCount={q.measurementCount}
+                        responseRatePct={q.competitorResponseRatePct}
+                        bestPosition={q.competitorBestPosition}
+                        top3ResponseCount={q.competitorTop3ResponseCount}
                       />
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-        </section>
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <h4 className="text-sm font-semibold">답변에서 함께 인용된 출처 (참고)</h4>
+            <p className="text-xs text-muted-foreground">
+              각 업체가 등장한 AI 답변에서 함께 인용된 출처를 비교합니다. 해당 웹페이지가 그 업체를
+              직접 언급하거나 소개했다는 뜻은 아닙니다.
+            </p>
+
+            <div className="grid grid-cols-3 gap-2">
+              <Metric label="양쪽 업체 등장 답변에서 인용" value={String(sourcesBoth)} />
+              <Metric label="내 업체 등장 답변에서만 인용" value={String(sourcesClientOnly)} />
+              <Metric label="경쟁업체 등장 답변에서만 인용" value={String(sourcesCompetitorOnly)} />
+            </div>
+            {compare.sources.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">인용 출처 정보가 없습니다.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <p className="mb-2 text-xs text-muted-foreground">
+                  답변 = 해당 업체가 등장하면서 이 도메인이 함께 인용된 AI 답변 수 / 인용 = 그
+                  답변들에 기록된 실제 citation 수 / 비율 = 해당 업체 등장 답변 중 이 도메인이 함께
+                  인용된 비율
+                </p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>도메인</TableHead>
+                      <TableHead>함께 인용된 범위</TableHead>
+                      <TableHead className="min-w-[120px]">{myName}</TableHead>
+                      <TableHead className="min-w-[120px]">{theirName}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {compare.sources.map((s) => (
+                      <TableRow key={s.domain}>
+                        <TableCell className="text-sm">
+                          {s.domain}
+                          {s.sampleTitle && (
+                            <span className="mt-0.5 block max-w-[240px] truncate text-xs text-muted-foreground">
+                              {s.sampleTitle}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm">
+                          <Badge variant="secondary">{OBSERVED_IN_LABELS[s.observedIn]}</Badge>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm tabular-nums">
+                          <SourceCell
+                            responseCount={s.clientResponseCount}
+                            citationCount={s.clientCitationCount}
+                            responseRatePct={s.clientResponseRatePct}
+                          />
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm tabular-nums">
+                          <SourceCell
+                            responseCount={s.competitorResponseCount}
+                            citationCount={s.competitorCitationCount}
+                            responseRatePct={s.competitorResponseRatePct}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </section>
+        </div>
       </details>
     </div>
   );
@@ -585,28 +689,38 @@ function AttributedCell({ direct, section }: { direct: number; section: number }
   );
 }
 
+function CountCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border p-2 text-center">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
 
-function DiffCard({
-  title,
-  questions,
+function QuestionSideCard({
+  name,
+  responseCount,
+  bestPosition,
+  top3ResponseCount,
 }: {
-  title: string;
-  questions: CompetitorCompareDTO["questions"];
+  name: string;
+  responseCount: number;
+  bestPosition: number | null;
+  top3ResponseCount: number;
 }) {
   return (
-    <div className="rounded-md border p-3">
-      <p className="text-xs text-muted-foreground">{title}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums">{questions.length}</p>
-      {questions.length === 0 ? (
-        <p className="mt-1 text-xs text-muted-foreground">없음</p>
+    <div className="min-w-0 rounded-md bg-muted/40 p-2">
+      <p className="truncate text-xs font-medium">{name}</p>
+      {responseCount === 0 ? (
+        <p className="mt-1 text-xs text-muted-foreground">미등장</p>
       ) : (
-        <ul className="mt-1 space-y-0.5">
-          {questions.slice(0, 2).map((q) => (
-            <li key={q.questionId} className="truncate text-xs text-muted-foreground">
-              {q.questionText}
-            </li>
-          ))}
-        </ul>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="text-xs tabular-nums">
+            등장 · 최고 {bestPosition === null ? "–" : `${bestPosition}위`}
+          </span>
+          {top3ResponseCount > 0 && <Badge variant="outline">Top3</Badge>}
+        </div>
       )}
     </div>
   );
@@ -665,27 +779,33 @@ function SourceCell({
   );
 }
 
-function CompareColumn({ title, rows }: { title: string; rows: Array<[string, string]> }) {
+function CompareColumn({
+  title,
+  value,
+  hint,
+  sub,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  sub: string;
+}) {
   return (
     <div className="min-w-0 rounded-md border p-3">
-      <p className="truncate text-base font-semibold">{title}</p>
-      <div className="mt-2 space-y-1">
-        {rows.map(([label, value]) => (
-          <p key={label} className="text-sm tabular-nums">
-            <span className="text-muted-foreground">{label}</span>{" "}
-            <span className="font-semibold">{value}</span>
-          </p>
-        ))}
-      </div>
+      <p className="truncate text-sm text-muted-foreground">{title}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+      <p className="text-xs tabular-nums text-muted-foreground">{hint}</p>
+      <p className="mt-1 text-xs tabular-nums text-muted-foreground">{sub}</p>
     </div>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-md border p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+      {hint && <p className="text-xs tabular-nums text-muted-foreground">{hint}</p>}
     </div>
   );
 }
