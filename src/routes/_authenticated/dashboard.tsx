@@ -187,6 +187,11 @@ function DashboardPage() {
     { repeated: 0, notable: 0, additional: 0 },
   );
 
+  // 표시 문구만: 동일조건 측정이 1회뿐이면 '반복'이라고 단정하지 않는다.
+  const coreObservationLabel =
+    (repeatContext?.compatibleRunCount ?? 0) >= 2 ? "반복 측정에서도 관찰" : "자주 관찰";
+
+
 
 
 
