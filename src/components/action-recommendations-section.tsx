@@ -102,7 +102,7 @@ function actionablePlatformKeys(rec: ActionRecommendationDTO): string[] {
     for (const p of g.platforms) {
       if (p.actionType === "observe_only") continue;
       if (p.evidenceGrade === "reference") continue;
-      keys.push(p.key, g.key);
+      keys.push(p.key);
     }
   }
   return keys;
