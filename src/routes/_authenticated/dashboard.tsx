@@ -347,10 +347,11 @@ function DashboardPage() {
               <p className="mb-3 text-xs text-muted-foreground">
                 한 번만 확인된 확정 업체도 추가 관찰로 함께 표시합니다.
               </p>
-              {d.competitorGate ? (
+              {d.competitors.length > 0 ? (
                 <p className="mb-3 text-xs text-muted-foreground">
-                  반복 관찰 {d.competitorGate.coreCount}곳 · 주목 관찰{" "}
-                  {d.competitorGate.notableCount}곳
+                  현재 표시: 반복 관찰 {competitorDisplayCounts.repeated}곳 · 주목 관찰{" "}
+                  {competitorDisplayCounts.notable}곳 · 추가 관찰{" "}
+                  {competitorDisplayCounts.additional}곳
                 </p>
               ) : null}
               {d.competitors.length === 0 ? (
