@@ -52,6 +52,16 @@ function AuthedLayout() {
 function Shell() {
   const { memberships, activeOrgId, setActiveOrgId, role, loading } = useOrg();
   const navigate = useNavigate();
+  const checkDataAssetAccess = useServerFn(canViewDataAssetAdmin);
+  const { data: dataAssetAccess } = useQuery({
+    queryKey: ["can-view-data-asset-admin"],
+    queryFn: () => checkDataAssetAccess({ data: undefined }),
+    retry: false,
+    staleTime: Infinity,
+  });
+  const navItems = dataAssetAccess?.allowed ? [...NAV, DATA_ASSET_NAV] : [...NAV];
+
+
 
   async function signOut() {
     await supabase.auth.signOut();
