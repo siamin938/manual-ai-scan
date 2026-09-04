@@ -207,9 +207,10 @@ export function ActionRecommendationsSection({
 
   const result = query.data;
   const payload = result && result.ok ? result.data : null;
-  const topRec = payload?.recommendations
-    ? [...payload.recommendations].sort((a, b) => a.rank - b.rank)[0]
-    : undefined;
+  const displayRecommendations = payload
+    ? buildDisplayRecommendations(payload.recommendations)
+    : [];
+  const topRec = displayRecommendations[0];
   const isPreliminary = (payload?.scope?.repetitions ?? 0) < 2;
   const headline = gapHeadline(
     topRec,
@@ -245,7 +246,7 @@ export function ActionRecommendationsSection({
         </Card>
       )}
 
-      {payload && payload.recommendations.length === 0 && (
+      {payload && displayRecommendations.length === 0 && (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
             {isPreliminary
@@ -257,9 +258,9 @@ export function ActionRecommendationsSection({
         </Card>
       )}
 
-      {payload && payload.recommendations.length > 0 && (
+      {payload && displayRecommendations.length > 0 && (
         <div className="space-y-4">
-          {payload.recommendations.map((rec) => (
+          {displayRecommendations.map((rec) => (
             <RecommendationCard key={rec.id} rec={rec} />
           ))}
         </div>
@@ -466,7 +467,7 @@ function SourceGroupCard({
 
                   <Badge
                     variant={
-                      referenceOnly
+                      isSharedBlogKey(p.key) || referenceOnly
                         ? "outline"
                         : p.evidenceGrade === "priority"
                           ? "default"
@@ -475,19 +476,27 @@ function SourceGroupCard({
                             : channelBadgeVariant(p.actionType)
                     }
                   >
-                    {customerText(
-                      referenceOnly
-                        ? "참고"
-                        : p.evidenceGrade === "priority"
-                          ? customerLabel(p.evidenceLabel ?? p.actionLabel)
-                          : p.evidenceGrade === "candidate"
-                            ? "먼저 확인"
-                            : customerLabel(p.actionLabel),
-                    )}
+                    {isSharedBlogKey(p.key)
+                      ? "외부 콘텐츠 확인"
+                      : customerText(
+                          referenceOnly
+                            ? "참고"
+                            : p.evidenceGrade === "priority"
+                              ? customerLabel(p.evidenceLabel ?? p.actionLabel)
+                              : p.evidenceGrade === "candidate"
+                                ? "먼저 확인"
+                                : customerLabel(p.actionLabel),
+                        )}
                   </Badge>
                 </div>
                 {p.domains.length > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">{p.domains.join(", ")}</p>
+                )}
+                {isSharedBlogKey(p.key) && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    소유가 확인되지 않은 공유형 블로그 출처로, 직접 수정 대상으로 단정하지 않고 외부
+                    콘텐츠 확인 대상으로 표시합니다.
+                  </p>
                 )}
                 {p.linkedCompetitors && p.linkedCompetitors.length > 0 && (
                   <div className="mt-2">
