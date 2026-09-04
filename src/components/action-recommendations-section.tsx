@@ -96,16 +96,28 @@ function parseSourceRecommendationId(
   return { sourceKey: rest, intent: null };
 }
 
-function actionablePlatformKeys(rec: ActionRecommendationDTO): string[] {
-  const keys: string[] = [];
-  for (const g of rec.sourceGroups) {
-    for (const p of g.platforms) {
-      if (p.actionType === "observe_only") continue;
-      if (p.evidenceGrade === "reference") continue;
-      keys.push(p.key);
-    }
-  }
-  return keys;
+/**
+ * 이미 상위 source 카드로 병합된 platform key를 가진 group은 표시용 복사본에서 제거한다.
+ * group.platforms가 비어있으면 판단 근거가 부족한 상태로 유지하기 위해 남겨둔다.
+ */
+function filterExplainedSourceGroups(
+  groups: ActionRecommendationDTO["sourceGroups"],
+  selectedSourceKeys: Set<string>,
+): ActionRecommendationDTO["sourceGroups"] {
+  return groups.filter((g) => {
+    if (g.platforms.length === 0) return true;
+    return !g.platforms.every((p) => selectedSourceKeys.has(p.key));
+  });
+}
+
+/**
+ * 이미 상위 source 카드로 병합된 platform key를 가진 channel은 표시용 복사본에서 제거한다.
+ */
+function filterExplainedChannels(
+  channels: ActionRecommendationDTO["channelSuggestions"],
+  selectedSourceKeys: Set<string>,
+): ActionRecommendationDTO["channelSuggestions"] {
+  return channels.filter((c) => !selectedSourceKeys.has(c.key));
 }
 
 /**
@@ -164,10 +176,16 @@ function buildDisplayRecommendations(
         steps: isSharedBlogKey(entry.sourceKey) ? SHARED_BLOG_STEPS : lead.steps,
       });
     } else {
-      const keys = actionablePlatformKeys(entry.rec);
-      const explained = keys.length > 0 && keys.every((k) => selectedSourceKeys.has(k));
-      if (explained) continue;
-      out.push(entry.rec);
+      const rec = entry.rec;
+      out.push({
+        ...rec,
+        sourceGroups: filterExplainedSourceGroups(rec.sourceGroups, selectedSourceKeys),
+        referenceSourceGroups: filterExplainedSourceGroups(
+          rec.referenceSourceGroups ?? [],
+          selectedSourceKeys,
+        ),
+        channelSuggestions: filterExplainedChannels(rec.channelSuggestions, selectedSourceKeys),
+      });
     }
   }
 
