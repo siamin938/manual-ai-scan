@@ -53,6 +53,127 @@ function customerText(text: string): string {
     .replace(/우선 시도/g, "우선 확인");
 }
 
+/** 고객 표시용 intent 라벨 (표시 전용, 서버 판정과 무관). */
+const INTENT_LABELS: Record<string, string> = {
+  local: "지역·접근성",
+  recommendation: "추천",
+  service: "서비스·작업",
+  review_quality: "후기·평판",
+  trust: "전문성·신뢰",
+  comparison: "비교",
+  price_value: "가격·가성비",
+  discovery: "탐색·발견",
+  informational: "탐색·발견",
+};
+const INTENT_KEYS = Object.keys(INTENT_LABELS);
+
+/** 소유 확인이 불가능한 공유형 블로그 플랫폼 (표시 전용 fail-closed). */
+const SHARED_BLOG_PLATFORM_KEYS = ["tistory", "naver_blog"];
+const SHARED_BLOG_STEPS = [
+  "해당 블로그 글에서 내 업체 정보가 어떻게 언급되어 있는지 확인하세요.",
+  "함께 관찰된 업체와 어떤 정보 차이가 있는지 참고하세요.",
+  "직접 수정 가능한 내 채널이 아니라면 변경 대상으로 보지 말고 외부 노출 신호로만 관찰하세요.",
+];
+
+function isSharedBlogKey(key: string): boolean {
+  return SHARED_BLOG_PLATFORM_KEYS.some(
+    (k) => key === k || key.endsWith(`:${k}`) || key.startsWith(`${k}:`),
+  );
+}
+
+/** `source:<sourceKey>:<intent>` 에서 마지막 known intent suffix만 제거한다. */
+function parseSourceRecommendationId(
+  id: string,
+): { sourceKey: string; intent: string | null } | null {
+  if (!id.startsWith("source:")) return null;
+  const rest = id.slice("source:".length);
+  for (const intent of INTENT_KEYS) {
+    const suffix = `:${intent}`;
+    if (rest.endsWith(suffix) && rest.length > suffix.length) {
+      return { sourceKey: rest.slice(0, rest.length - suffix.length), intent };
+    }
+  }
+  return { sourceKey: rest, intent: null };
+}
+
+function actionablePlatformKeys(rec: ActionRecommendationDTO): string[] {
+  const keys: string[] = [];
+  for (const g of rec.sourceGroups) {
+    for (const p of g.platforms) {
+      if (p.actionType === "observe_only") continue;
+      if (p.evidenceGrade === "reference") continue;
+      keys.push(p.key, g.key);
+    }
+  }
+  return keys;
+}
+
+/**
+ * 고객 렌더링용 목록만 정리한다. 서버 rank/score/판정은 변경하지 않고,
+ * 중복 출처 카드를 합쳐 표시용 rank만 1부터 다시 매긴다.
+ */
+function buildDisplayRecommendations(
+  recommendations: ActionRecommendationDTO[],
+): ActionRecommendationDTO[] {
+  const sorted = [...recommendations].sort((a, b) => a.rank - b.rank);
+  const groups = new Map<string, ActionRecommendationDTO[]>();
+  const order: Array<{ type: "source"; sourceKey: string } | { type: "other"; rec: ActionRecommendationDTO }> = [];
+
+  for (const rec of sorted) {
+    const parsed = parseSourceRecommendationId(rec.id);
+    if (parsed) {
+      const existing = groups.get(parsed.sourceKey);
+      if (existing) {
+        existing.push(rec);
+      } else {
+        groups.set(parsed.sourceKey, [rec]);
+        order.push({ type: "source", sourceKey: parsed.sourceKey });
+      }
+    } else {
+      order.push({ type: "other", rec });
+    }
+  }
+
+  const selectedSourceKeys = new Set(groups.keys());
+  const out: ActionRecommendationDTO[] = [];
+
+  for (const entry of order) {
+    if (entry.type === "source") {
+      const members = groups.get(entry.sourceKey) ?? [];
+      const lead = members[0];
+      if (!lead) continue;
+      const questions: string[] = [];
+      for (const m of members) {
+        for (const q of m.sampleQuestions) {
+          if (!questions.includes(q) && questions.length < 4) questions.push(q);
+        }
+      }
+      const labels: string[] = [];
+      for (const m of members) {
+        const label = INTENT_LABELS[parseSourceRecommendationId(m.id)?.intent ?? ""];
+        if (label && !labels.includes(label)) labels.push(label);
+      }
+      const summary =
+        members.length > 1 && labels.length > 1
+          ? `${lead.summary} 같은 출처 단서는 ${labels.join(", ")} 등 여러 검색 상황에서도 함께 관찰됐습니다.`
+          : lead.summary;
+      out.push({
+        ...lead,
+        summary,
+        sampleQuestions: questions,
+        steps: isSharedBlogKey(entry.sourceKey) ? SHARED_BLOG_STEPS : lead.steps,
+      });
+    } else {
+      const keys = actionablePlatformKeys(entry.rec);
+      const explained = keys.length > 0 && keys.every((k) => selectedSourceKeys.has(k));
+      if (explained) continue;
+      out.push(entry.rec);
+    }
+  }
+
+  return out.map((rec, i) => ({ ...rec, rank: i + 1 }));
+}
+
 /** 최우선 액션 제목만 한 줄로 안내한다(계산 규칙 없음). */
 function gapHeadline(
   rec: ActionRecommendationDTO | undefined,
@@ -63,6 +184,7 @@ function gapHeadline(
   if (!label) return null;
   return `${prefix} ${customerText(label)}`;
 }
+
 
 
 export function ActionRecommendationsSection({
