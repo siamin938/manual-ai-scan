@@ -187,6 +187,11 @@ function DashboardPage() {
     { repeated: 0, notable: 0, additional: 0 },
   );
 
+  // 표시 문구만: 동일조건 측정이 1회뿐이면 '반복'이라고 단정하지 않는다.
+  const coreObservationLabel =
+    (repeatContext?.compatibleRunCount ?? 0) >= 2 ? "반복 측정에서도 관찰" : "자주 관찰";
+
+
 
 
 
@@ -349,7 +354,7 @@ function DashboardPage() {
               </p>
               {d.competitors.length > 0 ? (
                 <p className="mb-3 text-xs text-muted-foreground">
-                  현재 표시: 반복 관찰 {competitorDisplayCounts.repeated}곳 · 주목 관찰{" "}
+                  현재 표시: {coreObservationLabel} {competitorDisplayCounts.repeated}곳 · 주목 관찰{" "}
                   {competitorDisplayCounts.notable}곳 · 추가 관찰{" "}
                   {competitorDisplayCounts.additional}곳
                 </p>
@@ -376,7 +381,7 @@ function DashboardPage() {
                       let badgeLabel = "주목 관찰 업체";
                       if (c.tier === "core") {
                         badgeVariant = "default";
-                        badgeLabel = "반복 관찰 업체";
+                        badgeLabel = coreObservationLabel;
                       } else if (isAdditionalObservation) {
                         badgeVariant = "outline";
                         badgeLabel = "추가 관찰";
