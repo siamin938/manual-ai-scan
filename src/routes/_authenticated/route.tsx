@@ -80,7 +80,7 @@ function Shell() {
           </Link>
 
           <nav className="order-3 flex w-full flex-wrap gap-1 md:order-none md:w-auto">
-            {NAV.map((n) => (
+            {navItems.map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
