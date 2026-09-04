@@ -34,7 +34,10 @@ const NAV = [
   { to: "/runs", label: "측정하기" },
 ] as const;
 
-const DATA_ASSET_NAV = { to: "/data-assets", label: "데이터 자산" } as const;
+const INTERNAL_NAV = [
+  { to: "/data-assets", label: "데이터 자산" },
+  { to: "/measurement-credits", label: "측정권 관리" },
+] as const;
 
 
 
