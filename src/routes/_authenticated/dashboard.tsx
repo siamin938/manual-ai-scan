@@ -173,6 +173,20 @@ function DashboardPage() {
     NonNullable<typeof d>["competitors"][number] | null
   >((best, c) => (best === null || c.responseCount > best.responseCount ? c : best), null);
 
+  // 카드에 실제로 표시되는 competitor 목록 기준, badge와 동일한 규칙으로 표시용 개수를 계산한다.
+  const competitorDisplayCounts = (d?.competitors ?? []).reduce<{
+    repeated: number;
+    notable: number;
+    additional: number;
+  }>(
+    (acc, c) => {
+      const category = classifyCompetitorDisplay(c);
+      acc[category] += 1;
+      return acc;
+    },
+    { repeated: 0, notable: 0, additional: 0 },
+  );
+
 
 
 
