@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authenticated/businesses'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDataAssetsRouteImport } from './routes/_authenticated/data-assets'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
 import { Route as AuthenticatedProfileCoverageRouteImport } from './routes/_authenticated/profile-coverage'
@@ -47,6 +48,11 @@ const AuthenticatedBusinessesRoute = AuthenticatedBusinessesRouteImport.update({
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDataAssetsRoute = AuthenticatedDataAssetsRouteImport.update({
+  id: '/data-assets',
+  path: '/data-assets',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/data-assets': typeof AuthenticatedDataAssetsRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/data-assets': typeof AuthenticatedDataAssetsRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/businesses': typeof AuthenticatedBusinessesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/data-assets': typeof AuthenticatedDataAssetsRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
   '/_authenticated/profile-coverage': typeof AuthenticatedProfileCoverageRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/businesses'
     | '/dashboard'
+    | '/data-assets'
     | '/insights'
     | '/manual-checks'
     | '/profile-coverage'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/businesses'
     | '/dashboard'
+    | '/data-assets'
     | '/insights'
     | '/manual-checks'
     | '/profile-coverage'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/businesses'
     | '/_authenticated/dashboard'
+    | '/_authenticated/data-assets'
     | '/_authenticated/insights'
     | '/_authenticated/manual-checks'
     | '/_authenticated/profile-coverage'
@@ -249,6 +261,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/data-assets': {
+      id: '/_authenticated/data-assets'
+      path: '/data-assets'
+      fullPath: '/data-assets'
+      preLoaderRoute: typeof AuthenticatedDataAssetsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/insights': {
@@ -327,6 +346,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedBusinessesRoute: typeof AuthenticatedBusinessesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDataAssetsRoute: typeof AuthenticatedDataAssetsRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
   AuthenticatedProfileCoverageRoute: typeof AuthenticatedProfileCoverageRoute
@@ -342,6 +362,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBusinessesRoute: AuthenticatedBusinessesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDataAssetsRoute: AuthenticatedDataAssetsRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
   AuthenticatedProfileCoverageRoute: AuthenticatedProfileCoverageRoute,

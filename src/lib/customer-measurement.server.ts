@@ -174,12 +174,21 @@ export async function createCustomerMeasurementRun(args: {
 
   let runId = existingDraft?.id ?? null;
   if (!runId) {
+    // data_origin은 조직 설정값을 그대로 승계한다(NOT NULL, DB 기본값 없음).
+    const { data: orgRow } = await supabase
+      .from("organizations")
+      .select("measurement_data_origin")
+      .eq("id", orgId)
+      .maybeSingle();
+
     const { data: inserted, error: insertErr } = await supabase
       .from("measurement_runs")
       .insert({
         org_id: orgId,
         business_id: businessId,
         question_set_id: questionSetId,
+        data_origin: orgRow?.measurement_data_origin ?? "internal_observation",
+
         name: runName,
         run_type: "audit",
         phase: "standalone",

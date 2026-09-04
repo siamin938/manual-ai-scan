@@ -717,12 +717,21 @@ export async function startExperimentFollowupImpl(args: {
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  // data_origin은 조직 설정값을 그대로 승계한다(NOT NULL, DB 기본값 없음).
+  const { data: followupOrgRow } = await supabaseAdmin
+    .from("organizations")
+    .select("measurement_data_origin")
+    .eq("id", experiment.org_id)
+    .maybeSingle();
+
   const { data: createdRun, error: runInsErr } = await supabaseAdmin
     .from("measurement_runs")
     .insert({
       org_id: experiment.org_id,
       business_id: experiment.business_id,
       question_set_id: ctx.baseline.question_set_id,
+      data_origin: followupOrgRow?.measurement_data_origin ?? "internal_observation",
+
       experiment_id: experiment.id,
       name: `${experiment.name} · Follow-up`,
       run_type: "experiment",

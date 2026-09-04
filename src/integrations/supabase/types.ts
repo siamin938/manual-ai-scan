@@ -1492,6 +1492,7 @@ export type Database = {
           completed_jobs: number
           created_at: string
           created_by: string | null
+          data_origin: string
           estimated_cost_usd: number
           experiment_id: string | null
           failed_jobs: number
@@ -1517,6 +1518,7 @@ export type Database = {
           completed_jobs?: number
           created_at?: string
           created_by?: string | null
+          data_origin: string
           estimated_cost_usd?: number
           experiment_id?: string | null
           failed_jobs?: number
@@ -1542,6 +1544,7 @@ export type Database = {
           completed_jobs?: number
           created_at?: string
           created_by?: string | null
+          data_origin?: string
           estimated_cost_usd?: number
           experiment_id?: string | null
           failed_jobs?: number
@@ -1865,6 +1868,7 @@ export type Database = {
           created_at: string
           daily_request_limit: number
           id: string
+          measurement_data_origin: string
           monthly_budget_usd: number
           name: string
           plan: string
@@ -1876,6 +1880,7 @@ export type Database = {
           created_at?: string
           daily_request_limit?: number
           id?: string
+          measurement_data_origin?: string
           monthly_budget_usd?: number
           name: string
           plan?: string
@@ -1887,6 +1892,7 @@ export type Database = {
           created_at?: string
           daily_request_limit?: number
           id?: string
+          measurement_data_origin?: string
           monthly_budget_usd?: number
           name?: string
           plan?: string
@@ -2831,6 +2837,7 @@ export type Database = {
       }
     }
     Functions: {
+      can_view_data_asset_admin_v01: { Args: never; Returns: boolean }
       claim_measurement_jobs: {
         Args: { p_limit?: number }
         Returns: {
@@ -2865,6 +2872,17 @@ export type Database = {
       }
       create_organization_with_owner: {
         Args: { p_name: string; p_slug: string }
+        Returns: string
+      }
+      get_benchmark_business_identity_key_v01: {
+        Args: {
+          p_address: string
+          p_business_id: string
+          p_city: string
+          p_country_code: string
+          p_name: string
+          p_region: string
+        }
         Returns: string
       }
       get_compatible_audit_runs_v01: {
@@ -2916,6 +2934,11 @@ export type Database = {
           tier: string
           top3_response_count: number
         }[]
+      }
+      get_data_asset_admin_overview_v01: { Args: never; Returns: Json }
+      get_global_high_visibility_source_patterns_legacy_v01: {
+        Args: { p_business_id: string; p_requesting_org_id: string }
+        Returns: Json
       }
       get_global_high_visibility_source_patterns_v01: {
         Args: { p_business_id: string; p_requesting_org_id: string }

@@ -1,8 +1,11 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { OrgProvider, useOrg, useSession } from "@/lib/org";
 import { ActiveTargetBusinessProvider } from "@/lib/active-business";
 import { OrgOnboarding } from "@/components/OrgOnboarding";
+import { canViewDataAssetAdmin } from "@/lib/data-asset-admin.functions";
 import { ROLE_LABELS } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +34,9 @@ const NAV = [
   { to: "/runs", label: "측정하기" },
 ] as const;
 
+const DATA_ASSET_NAV = { to: "/data-assets", label: "데이터 자산" } as const;
+
+
 
 function AuthedLayout() {
   const { session } = useSession();
@@ -46,6 +52,16 @@ function AuthedLayout() {
 function Shell() {
   const { memberships, activeOrgId, setActiveOrgId, role, loading } = useOrg();
   const navigate = useNavigate();
+  const checkDataAssetAccess = useServerFn(canViewDataAssetAdmin);
+  const { data: dataAssetAccess } = useQuery({
+    queryKey: ["can-view-data-asset-admin"],
+    queryFn: () => checkDataAssetAccess({ data: undefined }),
+    retry: false,
+    staleTime: Infinity,
+  });
+  const navItems = dataAssetAccess?.allowed ? [...NAV, DATA_ASSET_NAV] : [...NAV];
+
+
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -64,7 +80,7 @@ function Shell() {
           </Link>
 
           <nav className="order-3 flex w-full flex-wrap gap-1 md:order-none md:w-auto">
-            {NAV.map((n) => (
+            {navItems.map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
