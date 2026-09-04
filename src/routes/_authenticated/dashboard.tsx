@@ -79,6 +79,19 @@ const STATUS_LABEL: Record<"missing" | "partial", string> = {
   partial: "가끔 추천",
 };
 
+type CompetitorDisplayCategory = "repeated" | "notable" | "additional";
+
+/** 행 badge와 동일한 표시 규칙으로 분류한다(판정/점수는 서버 DTO 그대로). */
+function classifyCompetitorDisplay(c: {
+  tier: "core" | "notable";
+  responseCount: number;
+  priorRunPresenceCount: number;
+}): CompetitorDisplayCategory {
+  if (c.tier === "core") return "repeated";
+  if (c.responseCount === 1 && c.priorRunPresenceCount === 0) return "additional";
+  return "notable";
+}
+
 
 function DashboardPage() {
   const { activeOrgId } = useOrg();
