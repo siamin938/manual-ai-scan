@@ -238,7 +238,7 @@ function DetailBody({ detail }: { detail: CompetitorDetailDTO }) {
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">이 업체가 등장한 답변의 출처</h3>
+        <h3 className="text-sm font-semibold">이 업체가 등장한 답변에서 함께 인용된 출처</h3>
         <p className="text-xs text-muted-foreground">
           이 업체가 등장한 답변과 같은 답변에서 실제 인용된 출처입니다.
         </p>
@@ -392,11 +392,12 @@ function CompareBody({ compare }: { compare: CompetitorCompareDTO }) {
   );
   const bothQuestions = compare.questions.filter((q) => q.bothResponseCount > 0);
 
-  // 표시용: 등장 여부 또는 Top3 여부가 서로 다른 질문만 기본 노출 (DTO 순서 유지)
+  // 표시용: DTO 값만 단순 비교해 응답/Top3/최고 순위 중 하나라도 다른 질문 기본 노출 (DTO 순서 유지)
   const differingQuestions = compare.questions.filter(
     (q) =>
-      q.clientResponseCount > 0 !== q.competitorResponseCount > 0 ||
-      q.clientTop3ResponseCount > 0 !== q.competitorTop3ResponseCount > 0,
+      q.clientResponseCount !== q.competitorResponseCount ||
+      q.clientTop3ResponseCount !== q.competitorTop3ResponseCount ||
+      q.clientBestPosition !== q.competitorBestPosition,
   );
 
   const sourcesBoth = compare.sources.filter((s) => s.observedIn === "both").length;
