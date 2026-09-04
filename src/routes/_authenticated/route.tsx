@@ -62,7 +62,7 @@ function Shell() {
     retry: false,
     staleTime: Infinity,
   });
-  const navItems = dataAssetAccess?.allowed ? [...NAV, DATA_ASSET_NAV] : [...NAV];
+  const navItems = dataAssetAccess?.allowed ? [...NAV, ...INTERNAL_NAV] : [...NAV];
 
 
 
