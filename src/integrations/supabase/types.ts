@@ -2837,6 +2837,18 @@ export type Database = {
       }
     }
     Functions: {
+      admin_grant_measurement_credits_v01: {
+        Args: {
+          p_amount: number
+          p_note: string
+          p_org_id: string
+          p_reference_key: string
+        }
+        Returns: {
+          balance_after: number
+          idempotent: boolean
+        }[]
+      }
       can_view_data_asset_admin_v01: { Args: never; Returns: boolean }
       claim_measurement_jobs: {
         Args: { p_limit?: number }
@@ -2946,6 +2958,14 @@ export type Database = {
       }
       get_high_visibility_source_patterns_v01: {
         Args: { p_business_id: string; p_org_id: string }
+        Returns: Json
+      }
+      get_measurement_credit_admin_ledger_v01: {
+        Args: { p_limit?: number; p_org_id: string }
+        Returns: Json
+      }
+      get_measurement_credit_admin_overview_v01: {
+        Args: { p_limit?: number }
         Returns: Json
       }
       get_org_usage: {
