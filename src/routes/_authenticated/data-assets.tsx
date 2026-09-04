@@ -121,13 +121,13 @@ function DataAssetsPage() {
         </CardHeader>
         <CardContent className="space-y-1.5">
           <Row label="현실 업체 수" value={`${benchmark90d.realBusinessCount}`} />
-          <Row label="eligible Run" value={`${benchmark90d.eligibleRunCount}`} />
-          <Row label="포함 origin" value="내부 관찰 + 고객 측정" />
-          <Row label="포함 origin 수" value={`${benchmark90d.contributingOriginCount}`} />
+          <Row label="벤치마크 포함 Run" value={`${benchmark90d.eligibleRunCount}회`} />
+          <Row label="벤치마크 포함 대상" value="내부 관찰 + 고객 측정" />
+          <Row label="현재 기여 origin 수" value={`${benchmark90d.contributingOriginCount}종`} />
           <Row label="최근 측정" value={formatSeoul(benchmark90d.latestMeasuredAt)} />
           <Row
-            label="business identity version"
-            value={benchmark90d.businessIdentityVersion}
+            label="현실 업체 식별 기준"
+            value={`v${benchmark90d.businessIdentityVersion}`}
           />
           <p className="pt-2 text-xs text-muted-foreground">
             데모 데이터는 벤치마크 집계에서 제외됩니다.
