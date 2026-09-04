@@ -763,6 +763,13 @@ export async function startExperimentBaselineImpl(args: {
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  // data_origin은 조직 설정값을 그대로 승계한다(NOT NULL, DB 기본값 없음).
+  const { data: baselineOrgRow } = await supabaseAdmin
+    .from("organizations")
+    .select("measurement_data_origin")
+    .eq("id", snapshot.org_id)
+    .maybeSingle();
+
   // D. measurement_runs INSERT (draft) — 값은 snapshot/서버 상수에서만
   const { data: createdRun, error: runInsErr } = await supabaseAdmin
     .from("measurement_runs")
@@ -770,6 +777,8 @@ export async function startExperimentBaselineImpl(args: {
       org_id: snapshot.org_id,
       business_id: snapshot.business_id,
       question_set_id: snapshot.question_set_id,
+      data_origin: baselineOrgRow?.measurement_data_origin ?? "internal_observation",
+
       experiment_id: experiment.id,
       name: `${experiment.name} · Baseline`,
       run_type: "experiment",
