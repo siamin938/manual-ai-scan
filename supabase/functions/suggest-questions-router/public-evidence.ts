@@ -305,6 +305,7 @@ async function queueUnmappedServiceCandidate(
       .select("id,seen_count")
       .eq("business_identity_key", row.business_identity_key)
       .eq("normalized_label", row.normalized_label)
+      .eq("source_url", row.source_url)
       .maybeSingle();
     if (selectErr) return false;
 
@@ -323,7 +324,7 @@ async function queueUnmappedServiceCandidate(
 
     const { error: insertErr } = await admin.from("measurement_market_service_candidates").insert({
       ...row,
-      status: "pending_review",
+      status: "pending",
       seen_count: 1,
       first_seen_at: nowIso,
       last_seen_at: nowIso,
