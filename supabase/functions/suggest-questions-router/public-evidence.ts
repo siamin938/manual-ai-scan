@@ -261,7 +261,18 @@ export async function ensureMarketPublicEvidence(
       body: JSON.stringify({
         model: MODEL,
         store: false,
-        tools: [{ type: "web_search" }],
+        tools: [
+          {
+            type: "web_search",
+            search_context_size: "low",
+            user_location: {
+              type: "approximate",
+              country: business.country_code ?? "KR",
+              region: business.region ?? undefined,
+              city: business.city ?? undefined,
+            },
+          },
+        ],
         tool_choice: "auto",
         include: ["web_search_call.action.sources"],
         reasoning: { effort: "low" },
@@ -363,9 +374,10 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_1",
+        feature: "measurement_market_public_evidence_v0_2",
         business_id: business.id,
         web_search_call_limit: 1,
+        search_context_size: "low",
         candidate_service_count: services.length,
         source_count: sourceCount,
         accepted_evidence_count: acceptedEvidenceCount,
