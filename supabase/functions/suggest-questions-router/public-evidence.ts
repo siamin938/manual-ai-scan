@@ -217,7 +217,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_3",
+    evidence_search_version: "v0_3_diag1",
     region: clean(business.region),
     city: clean(business.city),
     address: clean(business.address),
@@ -274,6 +274,13 @@ export async function ensureMarketPublicEvidence(
   let outputTokens = 0;
   let sourceCount = 0;
   let acceptedEvidenceCount = 0;
+  let parsedServiceCount = 0;
+  let modelReturnedUrlCount = 0;
+  let canonicalizableReturnedUrlCount = 0;
+  let matchedSourceUrlCount = 0;
+  let unmatchedSourceUrlCount = 0;
+  let unknownServiceCount = 0;
+  let matchedServiceCount = 0;
 
   try {
     const prompt = [
@@ -350,16 +357,28 @@ export async function ensureMarketPublicEvidence(
     const allowedServices = new Set(serviceKeys);
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
-    for (const raw of Array.isArray(parsed.services) ? parsed.services : []) {
+    const matchedServiceKeys = new Set<string>();
+    const parsedServices = Array.isArray(parsed.services) ? parsed.services : [];
+    parsedServiceCount = parsedServices.length;
+    for (const raw of parsedServices) {
       const r = rec(raw);
       const serviceKey = clean(r?.service_key);
-      if (!allowedServices.has(serviceKey)) continue;
+      if (!allowedServices.has(serviceKey)) {
+        unknownServiceCount += 1;
+        continue;
+      }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
       for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
         if (typeof rawUrl !== "string") continue;
+        modelReturnedUrlCount += 1;
         const key = canonicalUrl(rawUrl);
-        if (!key || seen.has(`${serviceKey}|${key}`)) continue;
-        const source = sources.get(key);
+        if (!key) continue;
+        canonicalizableReturnedUrlCount += 1;
+        const matchedSource = sources.get(key);
+        if (matchedSource) matchedSourceUrlCount += 1;
+        else unmatchedSourceUrlCount += 1;
+        if (seen.has(`${serviceKey}|${key}`)) continue;
+        const source = matchedSource;
         if (!source) continue;
         let domain = "";
         try { domain = new URL(source.url).hostname.toLowerCase(); } catch { continue; }
@@ -377,8 +396,11 @@ export async function ensureMarketPublicEvidence(
           observed_at: new Date().toISOString(),
           active: true,
         });
+        matchedServiceKeys.add(serviceKey);
       }
     }
+    matchedServiceCount = matchedServiceKeys.size;
+
 
     if (rows.length > 0) {
       const { error: insertErr } = await admin.from("measurement_market_public_evidence").upsert(rows, {
@@ -423,12 +445,19 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_3",
+        feature: "measurement_market_public_evidence_v0_3_diag1",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
         source_count: sourceCount,
         accepted_evidence_count: acceptedEvidenceCount,
+        parsed_service_count: parsedServiceCount,
+        model_returned_url_count: modelReturnedUrlCount,
+        canonicalizable_returned_url_count: canonicalizableReturnedUrlCount,
+        matched_source_url_count: matchedSourceUrlCount,
+        unmatched_source_url_count: unmatchedSourceUrlCount,
+        unknown_service_count: unknownServiceCount,
+        matched_service_count: matchedServiceCount,
       },
     });
   }
