@@ -405,7 +405,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_5_discovery",
+    evidence_search_version: "v0_6_service_offer_gate",
     taxonomy_signature: taxonomySignature,
     region: clean(business.region),
     city: clean(business.city),
@@ -438,6 +438,18 @@ export async function ensureMarketPublicEvidence(
   }
 
   const taxonomyKeys = taxonomyRows.map((t) => t.key);
+  const EVIDENCE_KINDS = [
+    "customer_service_page",
+    "work_case",
+    "official_profile_service",
+    "review_service",
+    "company_registration",
+    "business_purpose",
+    "job_company_info",
+    "product_sale_only",
+    "directory_category_only",
+    "other_non_service",
+  ];
   const schema = {
     type: "object",
     additionalProperties: false,
@@ -457,8 +469,16 @@ export async function ensureMarketPublicEvidence(
               items: { type: "string" },
             },
             evidence_note: { type: "string", maxLength: 300 },
+            evidence_kind: { type: "string", enum: EVIDENCE_KINDS },
+            customer_facing_service_explicit: { type: "boolean" },
           },
-          required: ["service_key", "source_urls", "evidence_note"],
+          required: [
+            "service_key",
+            "source_urls",
+            "evidence_note",
+            "evidence_kind",
+            "customer_facing_service_explicit",
+          ],
         },
       },
       unmapped_services: {
@@ -476,13 +496,31 @@ export async function ensureMarketPublicEvidence(
               items: { type: "string" },
             },
             evidence_note: { type: "string", maxLength: 300 },
+            evidence_kind: { type: "string", enum: EVIDENCE_KINDS },
+            customer_facing_service_explicit: { type: "boolean" },
           },
-          required: ["service_label", "source_urls", "evidence_note"],
+          required: [
+            "service_label",
+            "source_urls",
+            "evidence_note",
+            "evidence_kind",
+            "customer_facing_service_explicit",
+          ],
         },
       },
     },
     required: ["services", "unmapped_services"],
   };
+
+  const ACCEPTED_EVIDENCE_KINDS = new Set([
+    "customer_service_page",
+    "work_case",
+    "official_profile_service",
+    "review_service",
+  ]);
+  const passesServiceOfferGate = (r: Record<string, unknown> | null): boolean =>
+    r?.customer_facing_service_explicit === true && ACCEPTED_EVIDENCE_KINDS.has(clean(r?.evidence_kind));
+
 
 
   let inputTokens = 0;
@@ -492,6 +530,7 @@ export async function ensureMarketPublicEvidence(
   let acceptedStrongEvidenceCount = 0;
   let acceptedSupportingEvidenceCount = 0;
   let unmappedServiceCandidateCount = 0;
+  let rejectedNonServiceEvidenceCount = 0;
 
   try {
     const prompt = [
@@ -505,6 +544,11 @@ export async function ensureMarketPublicEvidence(
       "candidate_services are only priority candidates derived from registration data. Any other service in known_service_taxonomy may also be returned in services when a public page explicitly connects it to this exact business.",
       "Never let a broad registered category stand in for a specific service. For example generic tuning and software vehicle coding are separate service families and must not be merged.",
       "Return in unmapped_services ONLY an explicit automotive service that has no reasonable match anywhere in known_service_taxonomy. Never force an unmapped service into services, and never map it to a loosely related taxonomy key.",
+      "Service evidence must explicitly show an automotive service a customer can actually receive from this exact business at this location.",
+      "Never treat as service evidence: corporate/business registration industry codes, stated business purposes, business-description text on recruiting or company-info pages, wholesale/retail/e-commerce product listings, or a plain directory category or keyword tag.",
+      "Such non-service sources may support identity confirmation, but must never be returned as valid service evidence in services or unmapped_services.",
+      "Only an actual service menu, services listed on an official profile, real work/installation/repair cases, or customer reviews of using the service at this exact business count as customer-facing service evidence.",
+      "For every returned item set evidence_kind to the kind of page the evidence came from, and set customer_facing_service_explicit to true only when that page explicitly shows a customer-facing service of this exact business.",
       JSON.stringify({
         business: {
           name: business.name,
@@ -579,6 +623,10 @@ export async function ensureMarketPublicEvidence(
       const r = rec(raw);
       const serviceKey = clean(r?.service_key);
       if (!allowedServices.has(serviceKey)) continue;
+      if (!passesServiceOfferGate(r)) {
+        rejectedNonServiceEvidenceCount += 1;
+        continue;
+      }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
       for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
         if (typeof rawUrl !== "string") continue;
@@ -618,6 +666,10 @@ export async function ensureMarketPublicEvidence(
       const normalizedLabel = normalizeServiceLabel(candidateLabel);
       if (normalizedLabel.length < 2) continue;
       if (queuedLabels.has(normalizedLabel)) continue;
+      if (!passesServiceOfferGate(r)) {
+        rejectedNonServiceEvidenceCount += 1;
+        continue;
+      }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
 
       let matched: { source: Source; domain: string } | null = null;
@@ -696,7 +748,7 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_5_discovery",
+        feature: "measurement_market_public_evidence_v0_6_service_offer_gate",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
@@ -705,6 +757,7 @@ export async function ensureMarketPublicEvidence(
         accepted_strong_evidence_count: acceptedStrongEvidenceCount,
         accepted_supporting_evidence_count: acceptedSupportingEvidenceCount,
         unmapped_service_candidate_count: unmappedServiceCandidateCount,
+        rejected_non_service_evidence_count: rejectedNonServiceEvidenceCount,
       },
     });
   }
