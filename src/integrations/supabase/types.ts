@@ -1485,6 +1485,36 @@ export type Database = {
         }
         Relationships: []
       }
+      measurement_market_public_evidence_checks: {
+        Row: {
+          accepted_evidence_count: number
+          business_identity_key: string
+          candidate_signature: string
+          checked_at: string
+          created_at: string
+          source_count: number
+          status: string
+        }
+        Insert: {
+          accepted_evidence_count?: number
+          business_identity_key: string
+          candidate_signature: string
+          checked_at?: string
+          created_at?: string
+          source_count?: number
+          status: string
+        }
+        Update: {
+          accepted_evidence_count?: number
+          business_identity_key?: string
+          candidate_signature?: string
+          checked_at?: string
+          created_at?: string
+          source_count?: number
+          status?: string
+        }
+        Relationships: []
+      }
       measurement_market_shadow_nonces: {
         Row: {
           business_id: string
@@ -3101,6 +3131,10 @@ export type Database = {
       }
       get_measurement_market_feature_flag_v01: {
         Args: { p_org_id: string }
+        Returns: Json
+      }
+      get_measurement_market_generation_eligibility_v01: {
+        Args: { p_business_id: string; p_org_id: string }
         Returns: Json
       }
       get_org_usage: {
