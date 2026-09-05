@@ -381,11 +381,31 @@ export async function ensureMarketPublicEvidence(
     return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
 
+  const { data: taxonomyRaw, error: taxonomyErr } = await admin
+    .from("measurement_market_service_taxonomy")
+    .select("service_key,label,question_anchors,sort_order")
+    .eq("active", true)
+    .order("sort_order", { ascending: true });
+
+  const taxonomyRows: Array<{ key: string; label: string }> = [];
+  for (const raw of Array.isArray(taxonomyRaw) ? taxonomyRaw : []) {
+    const r = rec(raw);
+    const key = clean(r?.service_key);
+    const label = clean(r?.label);
+    if (key && label) taxonomyRows.push({ key, label });
+  }
+
+  const taxonomySignature = taxonomyRows
+    .map((t) => `${t.key}:${t.label}`)
+    .sort()
+    .join("|");
+
   const candidateSignature = JSON.stringify({
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_4",
+    evidence_search_version: "v0_5_discovery",
+    taxonomy_signature: taxonomySignature,
     region: clean(business.region),
     city: clean(business.city),
     address: clean(business.address),
@@ -393,6 +413,12 @@ export async function ensureMarketPublicEvidence(
     naver: clean(business.naver_place_url),
     google: clean(business.google_maps_url),
   });
+
+  // Fail closed when the central taxonomy cannot be read.
+  if (taxonomyErr || taxonomyRows.length === 0) {
+    await writeCheck(admin, identityKey, candidateSignature, "failed", 0, 0);
+    return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
+  }
 
   const { data: cached } = await admin
     .from("measurement_market_public_evidence_checks")
@@ -410,19 +436,19 @@ export async function ensureMarketPublicEvidence(
     }
   }
 
-  const serviceKeys = services.map((s) => s.key);
+  const taxonomyKeys = taxonomyRows.map((t) => t.key);
   const schema = {
     type: "object",
     additionalProperties: false,
     properties: {
       services: {
         type: "array",
-        maxItems: services.length,
+        maxItems: MAX_SERVICES,
         items: {
           type: "object",
           additionalProperties: false,
           properties: {
-            service_key: { type: "string", enum: serviceKeys },
+            service_key: { type: "string", enum: taxonomyKeys },
             source_urls: {
               type: "array",
               minItems: 1,
@@ -434,9 +460,29 @@ export async function ensureMarketPublicEvidence(
           required: ["service_key", "source_urls", "evidence_note"],
         },
       },
+      unmapped_services: {
+        type: "array",
+        maxItems: 3,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            service_label: { type: "string", minLength: 2, maxLength: 80 },
+            source_urls: {
+              type: "array",
+              minItems: 1,
+              maxItems: 2,
+              items: { type: "string" },
+            },
+            evidence_note: { type: "string", maxLength: 300 },
+          },
+          required: ["service_label", "source_urls", "evidence_note"],
+        },
+      },
     },
-    required: ["services"],
+    required: ["services", "unmapped_services"],
   };
+
 
   let inputTokens = 0;
   let outputTokens = 0;
