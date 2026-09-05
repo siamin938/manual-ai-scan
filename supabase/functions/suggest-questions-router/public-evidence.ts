@@ -111,6 +111,116 @@ function canonicalUrl(raw: string): string | null {
   }
 }
 
+type SourceQuality = {
+  sourceType: "registered_profile" | "first_party_site" | "platform_directory" | "secondary_web";
+  evidenceStrength: "strong" | "supporting";
+};
+
+const MULTI_TENANT_HOSTS = new Set([
+  "blog.naver.com",
+  "m.blog.naver.com",
+  "instagram.com",
+  "www.instagram.com",
+  "facebook.com",
+  "www.facebook.com",
+  "youtube.com",
+  "www.youtube.com",
+  "tistory.com",
+]);
+
+function parseHttpUrl(raw: string | null | undefined): URL | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u;
+  } catch {
+    return null;
+  }
+}
+
+function bareHost(u: URL): string {
+  return u.hostname.toLowerCase().replace(/^www\./, "");
+}
+
+function firstPathSegment(u: URL): string {
+  const segments = u.pathname.split("/").filter(Boolean);
+  return (segments[0] ?? "").toLowerCase();
+}
+
+function naverPlaceId(u: URL): string | null {
+  const match = u.pathname.match(/\/place\/(\d+)/);
+  return match ? match[1] : null;
+}
+
+function sameCanonical(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const ca = canonicalUrl(a);
+  const cb = canonicalUrl(b);
+  return !!ca && !!cb && ca === cb;
+}
+
+function isSameSite(sourceUrl: URL, knownUrl: URL): boolean {
+  const sourceHost = sourceUrl.hostname.toLowerCase();
+  const knownHost = knownUrl.hostname.toLowerCase();
+  if (MULTI_TENANT_HOSTS.has(sourceHost) || MULTI_TENANT_HOSTS.has(knownHost)) {
+    if (sourceHost !== knownHost) return false;
+    const sourceSegment = firstPathSegment(sourceUrl);
+    const knownSegment = firstPathSegment(knownUrl);
+    return sourceSegment.length > 0 && sourceSegment === knownSegment;
+  }
+  return bareHost(sourceUrl) === bareHost(knownUrl);
+}
+
+function isPlatformDirectory(u: URL): boolean {
+  const host = u.hostname.toLowerCase();
+  if (
+    host === "map.naver.com" ||
+    host === "m.map.naver.com" ||
+    host === "place.naver.com" ||
+    host === "m.place.naver.com" ||
+    host === "place.map.kakao.com" ||
+    host === "map.kakao.com" ||
+    host === "maps.google.com"
+  ) {
+    return true;
+  }
+  if ((host === "google.com" || host === "www.google.com") && u.pathname.startsWith("/maps")) return true;
+  if (/(^|\.)google\.[a-z.]+$/.test(host) && u.pathname.startsWith("/maps")) return true;
+  return false;
+}
+
+function classifySourceQuality(rawSourceUrl: string, business: PublicEvidenceBusiness): SourceQuality {
+  const sourceUrl = parseHttpUrl(rawSourceUrl);
+  if (!sourceUrl) return { sourceType: "secondary_web", evidenceStrength: "supporting" };
+
+  if (sameCanonical(rawSourceUrl, business.naver_place_url) || sameCanonical(rawSourceUrl, business.google_maps_url)) {
+    return { sourceType: "registered_profile", evidenceStrength: "strong" };
+  }
+
+  const knownNaver = parseHttpUrl(business.naver_place_url);
+  if (knownNaver) {
+    const knownId = naverPlaceId(knownNaver);
+    const sourceId = naverPlaceId(sourceUrl);
+    if (knownId && sourceId && knownId === sourceId) {
+      return { sourceType: "registered_profile", evidenceStrength: "strong" };
+    }
+  }
+
+  const knownSite = parseHttpUrl(business.website_url);
+  if (knownSite && (sameCanonical(rawSourceUrl, business.website_url) || isSameSite(sourceUrl, knownSite))) {
+    return { sourceType: "first_party_site", evidenceStrength: "strong" };
+  }
+
+  if (isPlatformDirectory(sourceUrl)) {
+    return { sourceType: "platform_directory", evidenceStrength: "supporting" };
+  }
+
+  return { sourceType: "secondary_web", evidenceStrength: "supporting" };
+}
+
+
+
 function collectSources(payload: Record<string, unknown>): Map<string, Source> {
   const out = new Map<string, Source>();
   const add = (urlValue: unknown, titleValue: unknown) => {
@@ -217,7 +327,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_3_diag1",
+    evidence_search_version: "v0_4",
     region: clean(business.region),
     city: clean(business.city),
     address: clean(business.address),
@@ -274,13 +384,8 @@ export async function ensureMarketPublicEvidence(
   let outputTokens = 0;
   let sourceCount = 0;
   let acceptedEvidenceCount = 0;
-  let parsedServiceCount = 0;
-  let modelReturnedUrlCount = 0;
-  let canonicalizableReturnedUrlCount = 0;
-  let matchedSourceUrlCount = 0;
-  let unmatchedSourceUrlCount = 0;
-  let unknownServiceCount = 0;
-  let matchedServiceCount = 0;
+  let acceptedStrongEvidenceCount = 0;
+  let acceptedSupportingEvidenceCount = 0;
 
   try {
     const prompt = [
@@ -290,6 +395,7 @@ export async function ensureMarketPublicEvidence(
       "A directory, map/listing, official site, blog post, cafe post, or news page is acceptable only when it clearly connects the exact business to the service.",
       "If a service cannot be verified, omit it. If nothing can be verified, return an empty services array.",
       "The public trade name may differ from the registered business name. A brand_stem_hint is provided, but treat a name variant as the same business ONLY when the exact address or a known registered URL strongly links the variant to this business. Never merge different branches or same-name businesses. Services must still be explicitly connected to this exact business on the page.",
+      "When several sources explicitly verify the same exact business and the same service, prefer source_urls in this order: registered profile / first-party official site > platform or directory listing > secondary or aggregator page. Never drop a service just because no strong source exists, and never relax the exact-business-identity or explicit-service-verification requirements for this preference.",
       JSON.stringify({
         business: {
           name: business.name,
@@ -357,49 +463,42 @@ export async function ensureMarketPublicEvidence(
     const allowedServices = new Set(serviceKeys);
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
-    const matchedServiceKeys = new Set<string>();
     const parsedServices = Array.isArray(parsed.services) ? parsed.services : [];
-    parsedServiceCount = parsedServices.length;
     for (const raw of parsedServices) {
       const r = rec(raw);
       const serviceKey = clean(r?.service_key);
-      if (!allowedServices.has(serviceKey)) {
-        unknownServiceCount += 1;
-        continue;
-      }
+      if (!allowedServices.has(serviceKey)) continue;
       const note = clean(r?.evidence_note).slice(0, 500) || null;
       for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
         if (typeof rawUrl !== "string") continue;
-        modelReturnedUrlCount += 1;
         const key = canonicalUrl(rawUrl);
         if (!key) continue;
-        canonicalizableReturnedUrlCount += 1;
-        const matchedSource = sources.get(key);
-        if (matchedSource) matchedSourceUrlCount += 1;
-        else unmatchedSourceUrlCount += 1;
         if (seen.has(`${serviceKey}|${key}`)) continue;
-        const source = matchedSource;
+        const source = sources.get(key);
         if (!source) continue;
         let domain = "";
         try { domain = new URL(source.url).hostname.toLowerCase(); } catch { continue; }
         if (!domain) continue;
         seen.add(`${serviceKey}|${key}`);
+        const quality = classifySourceQuality(source.url, business);
+        if (quality.evidenceStrength === "strong") acceptedStrongEvidenceCount += 1;
+        else acceptedSupportingEvidenceCount += 1;
         rows.push({
           business_identity_key: identityKey,
           service_key: serviceKey,
           source_url: source.url,
           source_domain: domain,
           source_title: source.title,
-          source_type: "public_web",
-          evidence_strength: "supporting",
+          source_type: quality.sourceType,
+          evidence_strength: quality.evidenceStrength,
           evidence_note: note,
           observed_at: new Date().toISOString(),
           active: true,
         });
-        matchedServiceKeys.add(serviceKey);
       }
     }
-    matchedServiceCount = matchedServiceKeys.size;
+
+
 
 
     if (rows.length > 0) {
@@ -445,19 +544,14 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_3_diag1",
+        feature: "measurement_market_public_evidence_v0_4",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
         source_count: sourceCount,
         accepted_evidence_count: acceptedEvidenceCount,
-        parsed_service_count: parsedServiceCount,
-        model_returned_url_count: modelReturnedUrlCount,
-        canonicalizable_returned_url_count: canonicalizableReturnedUrlCount,
-        matched_source_url_count: matchedSourceUrlCount,
-        unmatched_source_url_count: unmatchedSourceUrlCount,
-        unknown_service_count: unknownServiceCount,
-        matched_service_count: matchedServiceCount,
+        accepted_strong_evidence_count: acceptedStrongEvidenceCount,
+        accepted_supporting_evidence_count: acceptedSupportingEvidenceCount,
       },
     });
   }
