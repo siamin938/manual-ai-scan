@@ -98,23 +98,35 @@ Deno.serve(async (req) => {
     if (flagErr) return json({ error: "FEATURE_FLAG_CHECK_FAILED" }, 500);
 
     const flag = rec(flagRaw);
-    let useMarket =
+    const origin = typeof flag?.organizationOrigin === "string" ? flag.organizationOrigin : "";
+    const internalPilot =
       flag?.enabled === true &&
       flag?.rolloutStage === "internal_pilot" &&
       flag?.internalPilotAllowed === true;
-
-    if (
+    const newBusinessFirst =
       flag?.enabled === true &&
       flag?.rolloutStage === "new_business_first" &&
-      flag?.newBusinessFirstAllowed === true
-    ) {
+      flag?.newBusinessFirstAllowed === true;
+
+    let useMarket = internalPilot;
+
+    if (newBusinessFirst) {
       const { data: eligibilityRaw, error: eligibilityErr } = await admin.rpc(
         "get_measurement_market_generation_eligibility_v01",
         { p_org_id: orgId, p_business_id: businessId },
       );
       if (eligibilityErr) return json({ error: "MARKET_ELIGIBILITY_CHECK_FAILED" }, 500);
       const eligibility = rec(eligibilityRaw);
-      useMarket = eligibility?.eligible === true;
+
+      if (eligibility?.eligible === true) {
+        useMarket = true;
+      } else if (origin === "customer_measurement") {
+        const reason = typeof eligibility?.reason === "string" ? eligibility.reason : "not_eligible";
+        if (reason === "existing_question_set" || reason === "existing_measurement_run") {
+          return json({ error: "MEASUREMENT_QUESTION_SET_ALREADY_EXISTS" }, 409);
+        }
+        return json({ error: "MARKET_FIRST_GENERATION_NOT_AVAILABLE" }, 409);
+      }
     }
 
     if (!useMarket) {
