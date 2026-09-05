@@ -130,7 +130,7 @@ describe("resolveQuestionLocation", () => {
 
   it("질문에서 지역 범위를 판별할 수 없으면 기존 메타데이터를 보존한다", () => {
     expect(resolveQuestionLocation("썬팅 시공 후기 좋은 업체 알려줘", "서울특별시", "구로구")).toEqual({
-      region: "경기도",
+      region: "서울특별시",
       city: "구로구",
     });
   });
