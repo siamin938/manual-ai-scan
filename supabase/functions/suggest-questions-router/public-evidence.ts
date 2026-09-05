@@ -608,7 +608,48 @@ export async function ensureMarketPublicEvidence(
       }
     }
 
+    // Unmapped services never reach live questions; they only enter the internal review queue.
+    const queuedLabels = new Set<string>();
+    const parsedUnmapped = Array.isArray(parsed.unmapped_services) ? parsed.unmapped_services : [];
+    for (const raw of parsedUnmapped) {
+      const r = rec(raw);
+      const candidateLabel = clean(r?.service_label);
+      const normalizedLabel = normalizeServiceLabel(candidateLabel);
+      if (normalizedLabel.length < 2) continue;
+      if (queuedLabels.has(normalizedLabel)) continue;
+      const note = clean(r?.evidence_note).slice(0, 500) || null;
 
+      let matched: { source: Source; domain: string } | null = null;
+      for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
+        if (typeof rawUrl !== "string") continue;
+        const key = canonicalUrl(rawUrl);
+        if (!key) continue;
+        const source = sources.get(key);
+        if (!source) continue;
+        let domain = "";
+        try { domain = new URL(source.url).hostname.toLowerCase(); } catch { continue; }
+        if (!domain) continue;
+        matched = { source, domain };
+        break;
+      }
+      if (!matched) continue;
+
+      const queued = await queueUnmappedServiceCandidate(admin, {
+        org_id: orgId,
+        business_id: business.id,
+        business_identity_key: identityKey,
+        candidate_label: candidateLabel,
+        normalized_label: normalizedLabel,
+        source_url: matched.source.url,
+        source_domain: matched.domain,
+        source_title: matched.source.title,
+        evidence_note: note,
+      });
+      if (queued) {
+        queuedLabels.add(normalizedLabel);
+        unmappedServiceCandidateCount += 1;
+      }
+    }
 
 
     if (rows.length > 0) {
