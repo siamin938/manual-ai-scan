@@ -217,7 +217,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_3",
+    evidence_search_version: "v0_3_diag1",
     region: clean(business.region),
     city: clean(business.city),
     address: clean(business.address),
@@ -274,6 +274,13 @@ export async function ensureMarketPublicEvidence(
   let outputTokens = 0;
   let sourceCount = 0;
   let acceptedEvidenceCount = 0;
+  let parsedServiceCount = 0;
+  let modelReturnedUrlCount = 0;
+  let canonicalizableReturnedUrlCount = 0;
+  let matchedSourceUrlCount = 0;
+  let unmatchedSourceUrlCount = 0;
+  let unknownServiceCount = 0;
+  let matchedServiceCount = 0;
 
   try {
     const prompt = [
