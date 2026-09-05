@@ -462,45 +462,42 @@ export async function ensureMarketPublicEvidence(
     const allowedServices = new Set(serviceKeys);
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
-    const matchedServiceKeys = new Set<string>();
     const parsedServices = Array.isArray(parsed.services) ? parsed.services : [];
-    parsedServiceCount = parsedServices.length;
     for (const raw of parsedServices) {
       const r = rec(raw);
       const serviceKey = clean(r?.service_key);
-      if (!allowedServices.has(serviceKey)) {
-        unknownServiceCount += 1;
-        continue;
-      }
+      if (!allowedServices.has(serviceKey)) continue;
       const note = clean(r?.evidence_note).slice(0, 500) || null;
       for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
         if (typeof rawUrl !== "string") continue;
-        modelReturnedUrlCount += 1;
         const key = canonicalUrl(rawUrl);
         if (!key) continue;
-        canonicalizableReturnedUrlCount += 1;
-        const matchedSource = sources.get(key);
-        if (matchedSource) matchedSourceUrlCount += 1;
-        else unmatchedSourceUrlCount += 1;
         if (seen.has(`${serviceKey}|${key}`)) continue;
-        const source = matchedSource;
+        const source = sources.get(key);
         if (!source) continue;
         let domain = "";
         try { domain = new URL(source.url).hostname.toLowerCase(); } catch { continue; }
         if (!domain) continue;
         seen.add(`${serviceKey}|${key}`);
+        const quality = classifySourceQuality(source.url, business);
+        if (quality.evidenceStrength === "strong") acceptedStrongEvidenceCount += 1;
+        else acceptedSupportingEvidenceCount += 1;
         rows.push({
           business_identity_key: identityKey,
           service_key: serviceKey,
           source_url: source.url,
           source_domain: domain,
           source_title: source.title,
-          source_type: "public_web",
-          evidence_strength: "supporting",
+          source_type: quality.sourceType,
+          evidence_strength: quality.evidenceStrength,
           evidence_note: note,
           observed_at: new Date().toISOString(),
           active: true,
         });
+      }
+    }
+
+
         matchedServiceKeys.add(serviceKey);
       }
     }
