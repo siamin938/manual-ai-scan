@@ -98,12 +98,26 @@ Deno.serve(async (req) => {
     if (flagErr) return json({ error: "FEATURE_FLAG_CHECK_FAILED" }, 500);
 
     const flag = rec(flagRaw);
-    const usePilot =
+    let useMarket =
       flag?.enabled === true &&
       flag?.rolloutStage === "internal_pilot" &&
       flag?.internalPilotAllowed === true;
 
-    if (!usePilot) {
+    if (
+      flag?.enabled === true &&
+      flag?.rolloutStage === "new_business_first" &&
+      flag?.newBusinessFirstAllowed === true
+    ) {
+      const { data: eligibilityRaw, error: eligibilityErr } = await admin.rpc(
+        "get_measurement_market_generation_eligibility_v01",
+        { p_org_id: orgId, p_business_id: businessId },
+      );
+      if (eligibilityErr) return json({ error: "MARKET_ELIGIBILITY_CHECK_FAILED" }, 500);
+      const eligibility = rec(eligibilityRaw);
+      useMarket = eligibility?.eligible === true;
+    }
+
+    if (!useMarket) {
       const forwarded = await fetch(`${url}/functions/v1/suggest-questions`, {
         method: "POST",
         headers: {
