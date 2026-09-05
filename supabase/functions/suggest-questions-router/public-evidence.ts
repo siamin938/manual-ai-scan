@@ -357,16 +357,28 @@ export async function ensureMarketPublicEvidence(
     const allowedServices = new Set(serviceKeys);
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
-    for (const raw of Array.isArray(parsed.services) ? parsed.services : []) {
+    const matchedServiceKeys = new Set<string>();
+    const parsedServices = Array.isArray(parsed.services) ? parsed.services : [];
+    parsedServiceCount = parsedServices.length;
+    for (const raw of parsedServices) {
       const r = rec(raw);
       const serviceKey = clean(r?.service_key);
-      if (!allowedServices.has(serviceKey)) continue;
+      if (!allowedServices.has(serviceKey)) {
+        unknownServiceCount += 1;
+        continue;
+      }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
       for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
         if (typeof rawUrl !== "string") continue;
+        modelReturnedUrlCount += 1;
         const key = canonicalUrl(rawUrl);
-        if (!key || seen.has(`${serviceKey}|${key}`)) continue;
-        const source = sources.get(key);
+        if (!key) continue;
+        canonicalizableReturnedUrlCount += 1;
+        const matchedSource = sources.get(key);
+        if (matchedSource) matchedSourceUrlCount += 1;
+        else unmatchedSourceUrlCount += 1;
+        if (seen.has(`${serviceKey}|${key}`)) continue;
+        const source = matchedSource;
         if (!source) continue;
         let domain = "";
         try { domain = new URL(source.url).hostname.toLowerCase(); } catch { continue; }
