@@ -748,7 +748,7 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_5_discovery",
+        feature: "measurement_market_public_evidence_v0_6_service_offer_gate",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
