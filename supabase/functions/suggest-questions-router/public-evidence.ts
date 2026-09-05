@@ -530,6 +530,7 @@ export async function ensureMarketPublicEvidence(
   let acceptedStrongEvidenceCount = 0;
   let acceptedSupportingEvidenceCount = 0;
   let unmappedServiceCandidateCount = 0;
+  let rejectedNonServiceEvidenceCount = 0;
 
   try {
     const prompt = [
