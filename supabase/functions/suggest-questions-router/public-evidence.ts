@@ -378,7 +378,15 @@ export async function ensureMarketPublicEvidence(
   const identityKey = clean(profile.businessIdentityKey);
   const brandStemHint = makeBrandStemHint(business.name, business.city);
   const services = serviceCandidates(profile);
-  if (!identityKey || services.length === 0) {
+  const hasTrustedLocator =
+    clean(business.naver_place_url) !== "" ||
+    clean(business.google_maps_url) !== "" ||
+    clean(business.website_url) !== "";
+
+  if (!identityKey) {
+    return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
+  }
+  if (services.length === 0 && !hasTrustedLocator) {
     return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
 
@@ -405,7 +413,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_7_third_party_service_listing",
+    evidence_search_version: "v0_8_zero_candidate_discovery",
     taxonomy_signature: taxonomySignature,
     region: clean(business.region),
     city: clean(business.city),
@@ -544,6 +552,7 @@ export async function ensureMarketPublicEvidence(
       "The public trade name may differ from the registered business name. A brand_stem_hint is provided, but treat a name variant as the same business ONLY when the exact address or a known registered URL strongly links the variant to this business. Never merge different branches or same-name businesses. Services must still be explicitly connected to this exact business on the page.",
       "When several sources explicitly verify the same exact business and the same service, prefer source_urls in this order: registered profile / first-party official site > platform or directory listing > secondary or aggregator page. Never drop a service just because no strong source exists, and never relax the exact-business-identity or explicit-service-verification requirements for this preference.",
       "candidate_services are only priority candidates derived from registration data. Any other service in known_service_taxonomy may also be returned in services when a public page explicitly connects it to this exact business.",
+      "when candidate_services is empty, discover services only from known_service_taxonomy using exact business/location/registered locator evidence; do not infer from the generic category or business name.",
       "Never let a broad registered category stand in for a specific service. For example generic tuning and software vehicle coding are separate service families and must not be merged.",
       "Return in unmapped_services ONLY an explicit automotive service that has no reasonable match anywhere in known_service_taxonomy. Never force an unmapped service into services, and never map it to a loosely related taxonomy key.",
       "Service evidence must explicitly show an automotive service a customer can actually receive from this exact business at this location.",
@@ -751,10 +760,11 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_7_third_party_service_listing",
+        feature: "measurement_market_public_evidence_v0_8_zero_candidate_discovery",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
+        zero_candidate_discovery: services.length === 0,
         source_count: sourceCount,
         accepted_evidence_count: acceptedEvidenceCount,
         accepted_strong_evidence_count: acceptedStrongEvidenceCount,
