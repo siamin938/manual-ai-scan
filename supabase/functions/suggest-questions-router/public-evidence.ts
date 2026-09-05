@@ -395,6 +395,7 @@ export async function ensureMarketPublicEvidence(
       "A directory, map/listing, official site, blog post, cafe post, or news page is acceptable only when it clearly connects the exact business to the service.",
       "If a service cannot be verified, omit it. If nothing can be verified, return an empty services array.",
       "The public trade name may differ from the registered business name. A brand_stem_hint is provided, but treat a name variant as the same business ONLY when the exact address or a known registered URL strongly links the variant to this business. Never merge different branches or same-name businesses. Services must still be explicitly connected to this exact business on the page.",
+      "When several sources explicitly verify the same exact business and the same service, prefer source_urls in this order: registered profile / first-party official site > platform or directory listing > secondary or aggregator page. Never drop a service just because no strong source exists, and never relax the exact-business-identity or explicit-service-verification requirements for this preference.",
       JSON.stringify({
         business: {
           name: business.name,
