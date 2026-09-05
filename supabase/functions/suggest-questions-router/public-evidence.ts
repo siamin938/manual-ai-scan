@@ -111,6 +111,116 @@ function canonicalUrl(raw: string): string | null {
   }
 }
 
+type SourceQuality = {
+  sourceType: "registered_profile" | "first_party_site" | "platform_directory" | "secondary_web";
+  evidenceStrength: "strong" | "supporting";
+};
+
+const MULTI_TENANT_HOSTS = new Set([
+  "blog.naver.com",
+  "m.blog.naver.com",
+  "instagram.com",
+  "www.instagram.com",
+  "facebook.com",
+  "www.facebook.com",
+  "youtube.com",
+  "www.youtube.com",
+  "tistory.com",
+]);
+
+function parseHttpUrl(raw: string | null | undefined): URL | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u;
+  } catch {
+    return null;
+  }
+}
+
+function bareHost(u: URL): string {
+  return u.hostname.toLowerCase().replace(/^www\./, "");
+}
+
+function firstPathSegment(u: URL): string {
+  const segments = u.pathname.split("/").filter(Boolean);
+  return (segments[0] ?? "").toLowerCase();
+}
+
+function naverPlaceId(u: URL): string | null {
+  const match = u.pathname.match(/\/place\/(\d+)/);
+  return match ? match[1] : null;
+}
+
+function sameCanonical(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const ca = canonicalUrl(a);
+  const cb = canonicalUrl(b);
+  return !!ca && !!cb && ca === cb;
+}
+
+function isSameSite(sourceUrl: URL, knownUrl: URL): boolean {
+  const sourceHost = sourceUrl.hostname.toLowerCase();
+  const knownHost = knownUrl.hostname.toLowerCase();
+  if (MULTI_TENANT_HOSTS.has(sourceHost) || MULTI_TENANT_HOSTS.has(knownHost)) {
+    if (sourceHost !== knownHost) return false;
+    const sourceSegment = firstPathSegment(sourceUrl);
+    const knownSegment = firstPathSegment(knownUrl);
+    return sourceSegment.length > 0 && sourceSegment === knownSegment;
+  }
+  return bareHost(sourceUrl) === bareHost(knownUrl);
+}
+
+function isPlatformDirectory(u: URL): boolean {
+  const host = u.hostname.toLowerCase();
+  if (
+    host === "map.naver.com" ||
+    host === "m.map.naver.com" ||
+    host === "place.naver.com" ||
+    host === "m.place.naver.com" ||
+    host === "place.map.kakao.com" ||
+    host === "map.kakao.com" ||
+    host === "maps.google.com"
+  ) {
+    return true;
+  }
+  if ((host === "google.com" || host === "www.google.com") && u.pathname.startsWith("/maps")) return true;
+  if (/(^|\.)google\.[a-z.]+$/.test(host) && u.pathname.startsWith("/maps")) return true;
+  return false;
+}
+
+function classifySourceQuality(rawSourceUrl: string, business: PublicEvidenceBusiness): SourceQuality {
+  const sourceUrl = parseHttpUrl(rawSourceUrl);
+  if (!sourceUrl) return { sourceType: "secondary_web", evidenceStrength: "supporting" };
+
+  if (sameCanonical(rawSourceUrl, business.naver_place_url) || sameCanonical(rawSourceUrl, business.google_maps_url)) {
+    return { sourceType: "registered_profile", evidenceStrength: "strong" };
+  }
+
+  const knownNaver = parseHttpUrl(business.naver_place_url);
+  if (knownNaver) {
+    const knownId = naverPlaceId(knownNaver);
+    const sourceId = naverPlaceId(sourceUrl);
+    if (knownId && sourceId && knownId === sourceId) {
+      return { sourceType: "registered_profile", evidenceStrength: "strong" };
+    }
+  }
+
+  const knownSite = parseHttpUrl(business.website_url);
+  if (knownSite && (sameCanonical(rawSourceUrl, business.website_url) || isSameSite(sourceUrl, knownSite))) {
+    return { sourceType: "first_party_site", evidenceStrength: "strong" };
+  }
+
+  if (isPlatformDirectory(sourceUrl)) {
+    return { sourceType: "platform_directory", evidenceStrength: "supporting" };
+  }
+
+  return { sourceType: "secondary_web", evidenceStrength: "supporting" };
+}
+
+
+
 function collectSources(payload: Record<string, unknown>): Map<string, Source> {
   const out = new Map<string, Source>();
   const add = (urlValue: unknown, titleValue: unknown) => {
