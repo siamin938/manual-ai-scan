@@ -623,6 +623,10 @@ export async function ensureMarketPublicEvidence(
       const r = rec(raw);
       const serviceKey = clean(r?.service_key);
       if (!allowedServices.has(serviceKey)) continue;
+      if (!passesServiceOfferGate(r)) {
+        rejectedNonServiceEvidenceCount += 1;
+        continue;
+      }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
       for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
         if (typeof rawUrl !== "string") continue;
