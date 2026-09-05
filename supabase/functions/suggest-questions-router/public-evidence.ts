@@ -490,6 +490,7 @@ export async function ensureMarketPublicEvidence(
   let acceptedEvidenceCount = 0;
   let acceptedStrongEvidenceCount = 0;
   let acceptedSupportingEvidenceCount = 0;
+  let unmappedServiceCandidateCount = 0;
 
   try {
     const prompt = [
@@ -500,6 +501,9 @@ export async function ensureMarketPublicEvidence(
       "If a service cannot be verified, omit it. If nothing can be verified, return an empty services array.",
       "The public trade name may differ from the registered business name. A brand_stem_hint is provided, but treat a name variant as the same business ONLY when the exact address or a known registered URL strongly links the variant to this business. Never merge different branches or same-name businesses. Services must still be explicitly connected to this exact business on the page.",
       "When several sources explicitly verify the same exact business and the same service, prefer source_urls in this order: registered profile / first-party official site > platform or directory listing > secondary or aggregator page. Never drop a service just because no strong source exists, and never relax the exact-business-identity or explicit-service-verification requirements for this preference.",
+      "candidate_services are only priority candidates derived from registration data. Any other service in known_service_taxonomy may also be returned in services when a public page explicitly connects it to this exact business.",
+      "Never let a broad registered category stand in for a specific service. For example generic tuning and software vehicle coding are separate service families and must not be merged.",
+      "Return in unmapped_services ONLY an explicit automotive service that has no reasonable match anywhere in known_service_taxonomy. Never force an unmapped service into services, and never map it to a loosely related taxonomy key.",
       JSON.stringify({
         business: {
           name: business.name,
@@ -519,7 +523,9 @@ export async function ensureMarketPublicEvidence(
           never_merge_branches_or_namesakes: true,
         },
         candidate_services: services,
+        known_service_taxonomy: taxonomyRows.map((t) => ({ service_key: t.key, label: t.label })),
       }),
+
     ].join("\n");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
