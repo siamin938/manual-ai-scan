@@ -327,7 +327,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_3_diag1",
+    evidence_search_version: "v0_4",
     region: clean(business.region),
     city: clean(business.city),
     address: clean(business.address),
