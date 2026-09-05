@@ -593,7 +593,7 @@ export async function ensureMarketPublicEvidence(
         tool_choice: "auto",
         include: ["web_search_call.action.sources"],
         reasoning: { effort: "low" },
-        max_output_tokens: 1200,
+        max_output_tokens: 1800,
         input: prompt,
         text: { format: { type: "json_schema", name: "measurement_market_public_evidence_v01", strict: true, schema } },
       }),
