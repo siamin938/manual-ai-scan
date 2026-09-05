@@ -544,6 +544,11 @@ export async function ensureMarketPublicEvidence(
       "candidate_services are only priority candidates derived from registration data. Any other service in known_service_taxonomy may also be returned in services when a public page explicitly connects it to this exact business.",
       "Never let a broad registered category stand in for a specific service. For example generic tuning and software vehicle coding are separate service families and must not be merged.",
       "Return in unmapped_services ONLY an explicit automotive service that has no reasonable match anywhere in known_service_taxonomy. Never force an unmapped service into services, and never map it to a loosely related taxonomy key.",
+      "Service evidence must explicitly show an automotive service a customer can actually receive from this exact business at this location.",
+      "Never treat as service evidence: corporate/business registration industry codes, stated business purposes, business-description text on recruiting or company-info pages, wholesale/retail/e-commerce product listings, or a plain directory category or keyword tag.",
+      "Such non-service sources may support identity confirmation, but must never be returned as valid service evidence in services or unmapped_services.",
+      "Only an actual service menu, services listed on an official profile, real work/installation/repair cases, or customer reviews of using the service at this exact business count as customer-facing service evidence.",
+      "For every returned item set evidence_kind to the kind of page the evidence came from, and set customer_facing_service_explicit to true only when that page explicitly shows a customer-facing service of this exact business.",
       JSON.stringify({
         business: {
           name: business.name,
