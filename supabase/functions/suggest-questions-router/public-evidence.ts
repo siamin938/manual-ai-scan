@@ -277,6 +277,63 @@ function profileHasPublicEvidence(profile: Record<string, unknown> | null): bool
   return profile?.webEvidenceStatus === "available";
 }
 
+function normalizeServiceLabel(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z\uac00-\ud7a3]+/gu, "");
+}
+
+async function queueUnmappedServiceCandidate(
+  admin: SupabaseAdmin,
+  row: {
+    org_id: string;
+    business_id: string;
+    business_identity_key: string;
+    candidate_label: string;
+    normalized_label: string;
+    source_url: string;
+    source_domain: string;
+    source_title: string | null;
+    evidence_note: string | null;
+  },
+): Promise<boolean> {
+  try {
+    const nowIso = new Date().toISOString();
+    const { data: existing, error: selectErr } = await admin
+      .from("measurement_market_service_candidates")
+      .select("id,seen_count")
+      .eq("business_identity_key", row.business_identity_key)
+      .eq("normalized_label", row.normalized_label)
+      .maybeSingle();
+    if (selectErr) return false;
+
+    if (existing?.id) {
+      const { error: updateErr } = await admin
+        .from("measurement_market_service_candidates")
+        .update({
+          seen_count: Number(existing.seen_count ?? 0) + 1,
+          last_seen_at: nowIso,
+          source_title: row.source_title,
+          evidence_note: row.evidence_note,
+        })
+        .eq("id", existing.id);
+      return !updateErr;
+    }
+
+    const { error: insertErr } = await admin.from("measurement_market_service_candidates").insert({
+      ...row,
+      status: "pending_review",
+      seen_count: 1,
+      first_seen_at: nowIso,
+      last_seen_at: nowIso,
+    });
+    return !insertErr;
+  } catch {
+    return false;
+  }
+}
+
 async function writeCheck(
   admin: SupabaseAdmin,
   businessIdentityKey: string,
@@ -297,6 +354,7 @@ async function writeCheck(
     { onConflict: "business_identity_key" },
   );
 }
+
 
 export async function ensureMarketPublicEvidence(
   admin: SupabaseAdmin,
@@ -323,11 +381,31 @@ export async function ensureMarketPublicEvidence(
     return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
 
+  const { data: taxonomyRaw, error: taxonomyErr } = await admin
+    .from("measurement_market_service_taxonomy")
+    .select("service_key,label,question_anchors,sort_order")
+    .eq("active", true)
+    .order("sort_order", { ascending: true });
+
+  const taxonomyRows: Array<{ key: string; label: string }> = [];
+  for (const raw of Array.isArray(taxonomyRaw) ? taxonomyRaw : []) {
+    const r = rec(raw);
+    const key = clean(r?.service_key);
+    const label = clean(r?.label);
+    if (key && label) taxonomyRows.push({ key, label });
+  }
+
+  const taxonomySignature = taxonomyRows
+    .map((t) => `${t.key}:${t.label}`)
+    .sort()
+    .join("|");
+
   const candidateSignature = JSON.stringify({
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_4",
+    evidence_search_version: "v0_5_discovery",
+    taxonomy_signature: taxonomySignature,
     region: clean(business.region),
     city: clean(business.city),
     address: clean(business.address),
@@ -335,6 +413,12 @@ export async function ensureMarketPublicEvidence(
     naver: clean(business.naver_place_url),
     google: clean(business.google_maps_url),
   });
+
+  // Fail closed when the central taxonomy cannot be read.
+  if (taxonomyErr || taxonomyRows.length === 0) {
+    await writeCheck(admin, identityKey, candidateSignature, "failed", 0, 0);
+    return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
+  }
 
   const { data: cached } = await admin
     .from("measurement_market_public_evidence_checks")
@@ -352,19 +436,19 @@ export async function ensureMarketPublicEvidence(
     }
   }
 
-  const serviceKeys = services.map((s) => s.key);
+  const taxonomyKeys = taxonomyRows.map((t) => t.key);
   const schema = {
     type: "object",
     additionalProperties: false,
     properties: {
       services: {
         type: "array",
-        maxItems: services.length,
+        maxItems: MAX_SERVICES,
         items: {
           type: "object",
           additionalProperties: false,
           properties: {
-            service_key: { type: "string", enum: serviceKeys },
+            service_key: { type: "string", enum: taxonomyKeys },
             source_urls: {
               type: "array",
               minItems: 1,
@@ -376,9 +460,29 @@ export async function ensureMarketPublicEvidence(
           required: ["service_key", "source_urls", "evidence_note"],
         },
       },
+      unmapped_services: {
+        type: "array",
+        maxItems: 3,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            service_label: { type: "string", minLength: 2, maxLength: 80 },
+            source_urls: {
+              type: "array",
+              minItems: 1,
+              maxItems: 2,
+              items: { type: "string" },
+            },
+            evidence_note: { type: "string", maxLength: 300 },
+          },
+          required: ["service_label", "source_urls", "evidence_note"],
+        },
+      },
     },
-    required: ["services"],
+    required: ["services", "unmapped_services"],
   };
+
 
   let inputTokens = 0;
   let outputTokens = 0;
@@ -386,6 +490,7 @@ export async function ensureMarketPublicEvidence(
   let acceptedEvidenceCount = 0;
   let acceptedStrongEvidenceCount = 0;
   let acceptedSupportingEvidenceCount = 0;
+  let unmappedServiceCandidateCount = 0;
 
   try {
     const prompt = [
@@ -396,6 +501,9 @@ export async function ensureMarketPublicEvidence(
       "If a service cannot be verified, omit it. If nothing can be verified, return an empty services array.",
       "The public trade name may differ from the registered business name. A brand_stem_hint is provided, but treat a name variant as the same business ONLY when the exact address or a known registered URL strongly links the variant to this business. Never merge different branches or same-name businesses. Services must still be explicitly connected to this exact business on the page.",
       "When several sources explicitly verify the same exact business and the same service, prefer source_urls in this order: registered profile / first-party official site > platform or directory listing > secondary or aggregator page. Never drop a service just because no strong source exists, and never relax the exact-business-identity or explicit-service-verification requirements for this preference.",
+      "candidate_services are only priority candidates derived from registration data. Any other service in known_service_taxonomy may also be returned in services when a public page explicitly connects it to this exact business.",
+      "Never let a broad registered category stand in for a specific service. For example generic tuning and software vehicle coding are separate service families and must not be merged.",
+      "Return in unmapped_services ONLY an explicit automotive service that has no reasonable match anywhere in known_service_taxonomy. Never force an unmapped service into services, and never map it to a loosely related taxonomy key.",
       JSON.stringify({
         business: {
           name: business.name,
@@ -415,7 +523,9 @@ export async function ensureMarketPublicEvidence(
           never_merge_branches_or_namesakes: true,
         },
         candidate_services: services,
+        known_service_taxonomy: taxonomyRows.map((t) => ({ service_key: t.key, label: t.label })),
       }),
+
     ].join("\n");
 
     const response = await fetch("https://api.openai.com/v1/responses", {
@@ -460,7 +570,7 @@ export async function ensureMarketPublicEvidence(
       throw new Error("WEB_EVIDENCE_OUTPUT_INVALID");
     }
 
-    const allowedServices = new Set(serviceKeys);
+    const allowedServices = new Set(taxonomyKeys);
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
     const parsedServices = Array.isArray(parsed.services) ? parsed.services : [];
@@ -498,7 +608,48 @@ export async function ensureMarketPublicEvidence(
       }
     }
 
+    // Unmapped services never reach live questions; they only enter the internal review queue.
+    const queuedLabels = new Set<string>();
+    const parsedUnmapped = Array.isArray(parsed.unmapped_services) ? parsed.unmapped_services : [];
+    for (const raw of parsedUnmapped) {
+      const r = rec(raw);
+      const candidateLabel = clean(r?.service_label);
+      const normalizedLabel = normalizeServiceLabel(candidateLabel);
+      if (normalizedLabel.length < 2) continue;
+      if (queuedLabels.has(normalizedLabel)) continue;
+      const note = clean(r?.evidence_note).slice(0, 500) || null;
 
+      let matched: { source: Source; domain: string } | null = null;
+      for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
+        if (typeof rawUrl !== "string") continue;
+        const key = canonicalUrl(rawUrl);
+        if (!key) continue;
+        const source = sources.get(key);
+        if (!source) continue;
+        let domain = "";
+        try { domain = new URL(source.url).hostname.toLowerCase(); } catch { continue; }
+        if (!domain) continue;
+        matched = { source, domain };
+        break;
+      }
+      if (!matched) continue;
+
+      const queued = await queueUnmappedServiceCandidate(admin, {
+        org_id: orgId,
+        business_id: business.id,
+        business_identity_key: identityKey,
+        candidate_label: candidateLabel,
+        normalized_label: normalizedLabel,
+        source_url: matched.source.url,
+        source_domain: matched.domain,
+        source_title: matched.source.title,
+        evidence_note: note,
+      });
+      if (queued) {
+        queuedLabels.add(normalizedLabel);
+        unmappedServiceCandidateCount += 1;
+      }
+    }
 
 
     if (rows.length > 0) {
@@ -544,7 +695,7 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_4",
+        feature: "measurement_market_public_evidence_v0_5_discovery",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
@@ -552,6 +703,7 @@ export async function ensureMarketPublicEvidence(
         accepted_evidence_count: acceptedEvidenceCount,
         accepted_strong_evidence_count: acceptedStrongEvidenceCount,
         accepted_supporting_evidence_count: acceptedSupportingEvidenceCount,
+        unmapped_service_candidate_count: unmappedServiceCandidateCount,
       },
     });
   }

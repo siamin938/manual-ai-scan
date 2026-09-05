@@ -1515,6 +1515,111 @@ export type Database = {
         }
         Relationships: []
       }
+      measurement_market_service_candidates: {
+        Row: {
+          business_id: string
+          business_identity_key: string
+          candidate_label: string
+          created_at: string
+          evidence_note: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          normalized_label: string
+          org_id: string
+          seen_count: number
+          source_domain: string
+          source_title: string | null
+          source_url: string
+          status: string
+        }
+        Insert: {
+          business_id: string
+          business_identity_key: string
+          candidate_label: string
+          created_at?: string
+          evidence_note?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          normalized_label: string
+          org_id: string
+          seen_count?: number
+          source_domain: string
+          source_title?: string | null
+          source_url: string
+          status?: string
+        }
+        Update: {
+          business_id?: string
+          business_identity_key?: string
+          candidate_label?: string
+          created_at?: string
+          evidence_note?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          normalized_label?: string
+          org_id?: string
+          seen_count?: number
+          source_domain?: string
+          source_title?: string | null
+          source_url?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_market_service_candidates_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_market_service_candidates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      measurement_market_service_taxonomy: {
+        Row: {
+          active: boolean
+          created_at: string
+          is_broad: boolean
+          label: string
+          pattern: string
+          question_anchors: string[]
+          service_key: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          is_broad?: boolean
+          label: string
+          pattern: string
+          question_anchors?: string[]
+          service_key: string
+          sort_order: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          is_broad?: boolean
+          label?: string
+          pattern?: string
+          question_anchors?: string[]
+          service_key?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       measurement_market_shadow_nonces: {
         Row: {
           business_id: string
