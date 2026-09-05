@@ -207,6 +207,7 @@ export async function ensureMarketPublicEvidence(
   }
 
   const identityKey = clean(profile.businessIdentityKey);
+  const brandStemHint = makeBrandStemHint(business.name, business.city);
   const services = serviceCandidates(profile);
   if (!identityKey || services.length === 0) {
     return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
@@ -215,6 +216,8 @@ export async function ensureMarketPublicEvidence(
   const candidateSignature = JSON.stringify({
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
+    brand_stem_hint: brandStemHint,
+    evidence_search_version: "v0_3",
     region: clean(business.region),
     city: clean(business.city),
     address: clean(business.address),
