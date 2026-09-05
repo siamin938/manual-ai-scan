@@ -277,6 +277,63 @@ function profileHasPublicEvidence(profile: Record<string, unknown> | null): bool
   return profile?.webEvidenceStatus === "available";
 }
 
+function normalizeServiceLabel(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z\uac00-\ud7a3]+/gu, "");
+}
+
+async function queueUnmappedServiceCandidate(
+  admin: SupabaseAdmin,
+  row: {
+    org_id: string;
+    business_id: string;
+    business_identity_key: string;
+    candidate_label: string;
+    normalized_label: string;
+    source_url: string;
+    source_domain: string;
+    source_title: string | null;
+    evidence_note: string | null;
+  },
+): Promise<boolean> {
+  try {
+    const nowIso = new Date().toISOString();
+    const { data: existing, error: selectErr } = await admin
+      .from("measurement_market_service_candidates")
+      .select("id,seen_count")
+      .eq("business_identity_key", row.business_identity_key)
+      .eq("normalized_label", row.normalized_label)
+      .maybeSingle();
+    if (selectErr) return false;
+
+    if (existing?.id) {
+      const { error: updateErr } = await admin
+        .from("measurement_market_service_candidates")
+        .update({
+          seen_count: Number(existing.seen_count ?? 0) + 1,
+          last_seen_at: nowIso,
+          source_title: row.source_title,
+          evidence_note: row.evidence_note,
+        })
+        .eq("id", existing.id);
+      return !updateErr;
+    }
+
+    const { error: insertErr } = await admin.from("measurement_market_service_candidates").insert({
+      ...row,
+      status: "pending_review",
+      seen_count: 1,
+      first_seen_at: nowIso,
+      last_seen_at: nowIso,
+    });
+    return !insertErr;
+  } catch {
+    return false;
+  }
+}
+
 async function writeCheck(
   admin: SupabaseAdmin,
   businessIdentityKey: string,
@@ -297,6 +354,7 @@ async function writeCheck(
     { onConflict: "business_identity_key" },
   );
 }
+
 
 export async function ensureMarketPublicEvidence(
   admin: SupabaseAdmin,
