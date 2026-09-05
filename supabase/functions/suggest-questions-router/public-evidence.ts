@@ -438,6 +438,18 @@ export async function ensureMarketPublicEvidence(
   }
 
   const taxonomyKeys = taxonomyRows.map((t) => t.key);
+  const EVIDENCE_KINDS = [
+    "customer_service_page",
+    "work_case",
+    "official_profile_service",
+    "review_service",
+    "company_registration",
+    "business_purpose",
+    "job_company_info",
+    "product_sale_only",
+    "directory_category_only",
+    "other_non_service",
+  ];
   const schema = {
     type: "object",
     additionalProperties: false,
@@ -457,8 +469,16 @@ export async function ensureMarketPublicEvidence(
               items: { type: "string" },
             },
             evidence_note: { type: "string", maxLength: 300 },
+            evidence_kind: { type: "string", enum: EVIDENCE_KINDS },
+            customer_facing_service_explicit: { type: "boolean" },
           },
-          required: ["service_key", "source_urls", "evidence_note"],
+          required: [
+            "service_key",
+            "source_urls",
+            "evidence_note",
+            "evidence_kind",
+            "customer_facing_service_explicit",
+          ],
         },
       },
       unmapped_services: {
@@ -476,13 +496,31 @@ export async function ensureMarketPublicEvidence(
               items: { type: "string" },
             },
             evidence_note: { type: "string", maxLength: 300 },
+            evidence_kind: { type: "string", enum: EVIDENCE_KINDS },
+            customer_facing_service_explicit: { type: "boolean" },
           },
-          required: ["service_label", "source_urls", "evidence_note"],
+          required: [
+            "service_label",
+            "source_urls",
+            "evidence_note",
+            "evidence_kind",
+            "customer_facing_service_explicit",
+          ],
         },
       },
     },
     required: ["services", "unmapped_services"],
   };
+
+  const ACCEPTED_EVIDENCE_KINDS = new Set([
+    "customer_service_page",
+    "work_case",
+    "official_profile_service",
+    "review_service",
+  ]);
+  const passesServiceOfferGate = (r: Record<string, unknown> | null): boolean =>
+    r?.customer_facing_service_explicit === true && ACCEPTED_EVIDENCE_KINDS.has(clean(r?.evidence_kind));
+
 
 
   let inputTokens = 0;
