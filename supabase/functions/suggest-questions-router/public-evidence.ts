@@ -207,6 +207,7 @@ export async function ensureMarketPublicEvidence(
   }
 
   const identityKey = clean(profile.businessIdentityKey);
+  const brandStemHint = makeBrandStemHint(business.name, business.city);
   const services = serviceCandidates(profile);
   if (!identityKey || services.length === 0) {
     return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
@@ -215,6 +216,8 @@ export async function ensureMarketPublicEvidence(
   const candidateSignature = JSON.stringify({
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
+    brand_stem_hint: brandStemHint,
+    evidence_search_version: "v0_3",
     region: clean(business.region),
     city: clean(business.city),
     address: clean(business.address),
@@ -273,7 +276,6 @@ export async function ensureMarketPublicEvidence(
   let acceptedEvidenceCount = 0;
 
   try {
-    const brandStemHint = makeBrandStemHint(business.name, business.city);
     const prompt = [
       "Verify public web evidence for the exact Korean automotive local business below.",
       "Search the web. Confirm only services that a public page explicitly connects to this exact business, using business name plus location/address/known URLs to avoid namesakes.",
