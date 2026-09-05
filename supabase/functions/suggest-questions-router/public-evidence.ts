@@ -498,10 +498,6 @@ export async function ensureMarketPublicEvidence(
     }
 
 
-        matchedServiceKeys.add(serviceKey);
-      }
-    }
-    matchedServiceCount = matchedServiceKeys.size;
 
 
     if (rows.length > 0) {
