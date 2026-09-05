@@ -273,6 +273,10 @@ export function buildInsertPayloads(
 /** Edge Function 에러를 사용자 안전 문구로 매핑. */
 export function mapSuggestError(message: string | null | undefined): string {
   const m = (message ?? "").toLowerCase();
+  if (m.includes("measurement_question_set_already_exists"))
+    return "이미 이 업체의 측정 기준 질문이 만들어져 있습니다. 저장된 질문 세트를 사용해 주세요.";
+  if (m.includes("market_first_generation_not_available"))
+    return "이 업체는 새 측정 기준 질문을 다시 만들 수 없습니다. 저장된 질문 세트를 확인해 주세요.";
   if (m.includes("unauthorized") || m.includes("401")) return "권한이 없습니다. 다시 로그인해 주세요.";
   if (m.includes("forbidden") || m.includes("403")) return "이 업체에 대한 권한이 없습니다.";
   if (m.includes("ai_generation_failed") || m.includes("ai_output_invalid"))
