@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@^2.47.0",
+    "@supabase/realtime-js": "npm:@supabase/realtime-js@^2.115.0"
+  }
+}
