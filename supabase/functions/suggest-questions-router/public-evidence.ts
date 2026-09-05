@@ -666,6 +666,10 @@ export async function ensureMarketPublicEvidence(
       const normalizedLabel = normalizeServiceLabel(candidateLabel);
       if (normalizedLabel.length < 2) continue;
       if (queuedLabels.has(normalizedLabel)) continue;
+      if (!passesServiceOfferGate(r)) {
+        rejectedNonServiceEvidenceCount += 1;
+        continue;
+      }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
 
       let matched: { source: Source; domain: string } | null = null;
