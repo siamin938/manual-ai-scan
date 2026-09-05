@@ -550,19 +550,14 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_3_diag1",
+        feature: "measurement_market_public_evidence_v0_4",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
         source_count: sourceCount,
         accepted_evidence_count: acceptedEvidenceCount,
-        parsed_service_count: parsedServiceCount,
-        model_returned_url_count: modelReturnedUrlCount,
-        canonicalizable_returned_url_count: canonicalizableReturnedUrlCount,
-        matched_source_url_count: matchedSourceUrlCount,
-        unmatched_source_url_count: unmatchedSourceUrlCount,
-        unknown_service_count: unknownServiceCount,
-        matched_service_count: matchedServiceCount,
+        accepted_strong_evidence_count: acceptedStrongEvidenceCount,
+        accepted_supporting_evidence_count: acceptedSupportingEvidenceCount,
       },
     });
   }
