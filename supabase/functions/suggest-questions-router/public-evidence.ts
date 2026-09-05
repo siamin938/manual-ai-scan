@@ -695,7 +695,7 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_4",
+        feature: "measurement_market_public_evidence_v0_5_discovery",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
@@ -703,6 +703,7 @@ export async function ensureMarketPublicEvidence(
         accepted_evidence_count: acceptedEvidenceCount,
         accepted_strong_evidence_count: acceptedStrongEvidenceCount,
         accepted_supporting_evidence_count: acceptedSupportingEvidenceCount,
+        unmapped_service_candidate_count: unmappedServiceCandidateCount,
       },
     });
   }
