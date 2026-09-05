@@ -396,8 +396,11 @@ export async function ensureMarketPublicEvidence(
           observed_at: new Date().toISOString(),
           active: true,
         });
+        matchedServiceKeys.add(serviceKey);
       }
     }
+    matchedServiceCount = matchedServiceKeys.size;
+
 
     if (rows.length > 0) {
       const { error: insertErr } = await admin.from("measurement_market_public_evidence").upsert(rows, {
