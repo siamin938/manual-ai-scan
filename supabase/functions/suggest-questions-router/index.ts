@@ -1,10 +1,5 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import {
-  generateMarketSuggestions,
-  PROVIDER_ANSWER_GATE_VERSION,
-  SEMANTIC_DIVERSITY_GATE_VERSION,
-  type MarketBusiness,
-} from "./market-generator.ts";
+import { generateMarketSuggestions, type MarketBusiness } from "./market-generator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -126,12 +121,17 @@ Deno.serve(async (req) => {
               typeof payload.error === "string"
                 ? payload.error
                 : "QUESTION_GENERATION_FAILED",
-            dispatchMode: "legacy",
           },
           forwarded.status,
         );
       }
-      return json({ ...payload, dispatchMode: "legacy", featureFlagVersion: "0.1" });
+
+      const suggestions = Array.isArray(payload.suggestions) ? payload.suggestions : [];
+      return json({
+        suggestions,
+        requestedCount: 24,
+        suggestionCount: suggestions.length,
+      });
     }
 
     if (!openai) return json({ error: "SERVER_NOT_CONFIGURED" }, 500);
@@ -157,21 +157,11 @@ Deno.serve(async (req) => {
       return json({
         suggestions: result.suggestions,
         requestedCount: 24,
-        suggestionCount: 24,
-        dispatchMode: "market_pilot_direct",
-        featureFlagVersion: "0.1",
-        marketProfileVersion: "0.2",
-        portfolioVersion: result.portfolioVersion,
-        providerAnswerGateVersion: PROVIDER_ANSWER_GATE_VERSION,
-        semanticDiversityGateVersion: SEMANTIC_DIVERSITY_GATE_VERSION,
-        repairAttempts: result.repairAttempts,
+        suggestionCount: result.suggestions.length,
       });
     } catch (e) {
       return json(
-        {
-          error: e instanceof Error ? e.message : "MARKET_GENERATION_FAILED",
-          dispatchMode: "market_pilot_direct",
-        },
+        { error: e instanceof Error ? e.message : "MARKET_GENERATION_FAILED" },
         502,
       );
     }
