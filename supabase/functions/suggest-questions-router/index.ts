@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { generateMarketSuggestions, type MarketBusiness } from "./market-generator.ts";
+import { ensureMarketPublicEvidence } from "./public-evidence.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -164,7 +165,7 @@ Deno.serve(async (req) => {
 
     const { data: biz, error: bizErr } = await admin
       .from("businesses")
-      .select("id,name,country_code,region,city,is_client_business,active")
+      .select("id,name,category,country_code,region,city,address,website_url,naver_place_url,google_maps_url,is_client_business,active")
       .eq("id", businessId)
       .eq("org_id", orgId)
       .eq("is_client_business", true)
@@ -172,6 +173,19 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (bizErr || !biz) return json({ error: "BUSINESS_NOT_AVAILABLE" }, 404);
+
+    const evidence = await ensureMarketPublicEvidence(admin, openai, orgId, biz);
+    if (!evidence.ready) {
+      return json(
+        {
+          error:
+            evidence.reason === "check_failed" || evidence.reason === "profile_unavailable"
+              ? "PUBLIC_EVIDENCE_CHECK_FAILED"
+              : "PUBLIC_EVIDENCE_NOT_FOUND",
+        },
+        evidence.reason === "check_failed" || evidence.reason === "profile_unavailable" ? 502 : 422,
+      );
+    }
 
     try {
       const result = await generateMarketSuggestions(
