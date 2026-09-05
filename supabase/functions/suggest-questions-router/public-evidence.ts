@@ -378,7 +378,15 @@ export async function ensureMarketPublicEvidence(
   const identityKey = clean(profile.businessIdentityKey);
   const brandStemHint = makeBrandStemHint(business.name, business.city);
   const services = serviceCandidates(profile);
-  if (!identityKey || services.length === 0) {
+  const hasTrustedLocator =
+    clean(business.naver_place_url) !== "" ||
+    clean(business.google_maps_url) !== "" ||
+    clean(business.website_url) !== "";
+
+  if (!identityKey) {
+    return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
+  }
+  if (services.length === 0 && !hasTrustedLocator) {
     return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
 
