@@ -384,13 +384,8 @@ export async function ensureMarketPublicEvidence(
   let outputTokens = 0;
   let sourceCount = 0;
   let acceptedEvidenceCount = 0;
-  let parsedServiceCount = 0;
-  let modelReturnedUrlCount = 0;
-  let canonicalizableReturnedUrlCount = 0;
-  let matchedSourceUrlCount = 0;
-  let unmatchedSourceUrlCount = 0;
-  let unknownServiceCount = 0;
-  let matchedServiceCount = 0;
+  let acceptedStrongEvidenceCount = 0;
+  let acceptedSupportingEvidenceCount = 0;
 
   try {
     const prompt = [
