@@ -276,7 +276,6 @@ export async function ensureMarketPublicEvidence(
   let acceptedEvidenceCount = 0;
 
   try {
-    const brandStemHint = makeBrandStemHint(business.name, business.city);
     const prompt = [
       "Verify public web evidence for the exact Korean automotive local business below.",
       "Search the web. Confirm only services that a public page explicitly connects to this exact business, using business name plus location/address/known URLs to avoid namesakes.",
