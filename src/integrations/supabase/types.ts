@@ -1408,6 +1408,125 @@ export type Database = {
           },
         ]
       }
+      measurement_market_feature_flags: {
+        Row: {
+          enabled: boolean
+          org_id: string
+          rollout_stage: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          enabled?: boolean
+          org_id: string
+          rollout_stage?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          org_id?: string
+          rollout_stage?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_market_feature_flags_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      measurement_market_public_evidence: {
+        Row: {
+          active: boolean
+          business_identity_key: string
+          created_at: string
+          evidence_note: string | null
+          evidence_strength: string
+          id: string
+          observed_at: string
+          service_key: string
+          source_domain: string
+          source_title: string | null
+          source_type: string
+          source_url: string
+        }
+        Insert: {
+          active?: boolean
+          business_identity_key: string
+          created_at?: string
+          evidence_note?: string | null
+          evidence_strength?: string
+          id?: string
+          observed_at?: string
+          service_key: string
+          source_domain: string
+          source_title?: string | null
+          source_type?: string
+          source_url: string
+        }
+        Update: {
+          active?: boolean
+          business_identity_key?: string
+          created_at?: string
+          evidence_note?: string | null
+          evidence_strength?: string
+          id?: string
+          observed_at?: string
+          service_key?: string
+          source_domain?: string
+          source_title?: string | null
+          source_type?: string
+          source_url?: string
+        }
+        Relationships: []
+      }
+      measurement_market_shadow_nonces: {
+        Row: {
+          business_id: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          org_id: string
+          token_hash: string
+        }
+        Insert: {
+          business_id: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          org_id: string
+          token_hash: string
+        }
+        Update: {
+          business_id?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          org_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_market_shadow_nonces_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_market_shadow_nonces_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_mentions: {
         Row: {
           confidence: Database["public"]["Enums"]["parse_confidence"]
@@ -2849,6 +2968,14 @@ export type Database = {
           idempotent: boolean
         }[]
       }
+      build_measurement_market_portfolio_candidate_v01: {
+        Args: { p_business_id: string }
+        Returns: Json
+      }
+      build_measurement_market_portfolio_candidate_v02: {
+        Args: { p_business_id: string }
+        Returns: Json
+      }
       can_view_data_asset_admin_v01: { Args: never; Returns: boolean }
       claim_measurement_jobs: {
         Args: { p_limit?: number }
@@ -2881,6 +3008,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      consume_measurement_market_shadow_nonce_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_token_hash: string }
+        Returns: boolean
       }
       create_organization_with_owner: {
         Args: { p_name: string; p_slug: string }
@@ -2968,6 +3099,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      get_measurement_market_feature_flag_v01: {
+        Args: { p_org_id: string }
+        Returns: Json
+      }
       get_org_usage: {
         Args: { p_org_id: string }
         Returns: {
@@ -3008,10 +3143,22 @@ export type Database = {
           region: string
         }[]
       }
+      preview_measurement_market_questions_candidate_v02: {
+        Args: { p_business_id: string }
+        Returns: Json
+      }
       purge_expired_provider_payloads: { Args: never; Returns: number }
       refresh_run_progress: {
         Args: { p_run_id: string }
         Returns: Database["public"]["Enums"]["run_status"]
+      }
+      resolve_measurement_market_profile_candidate_v01: {
+        Args: { p_business_id: string }
+        Returns: Json
+      }
+      resolve_measurement_market_profile_candidate_v02: {
+        Args: { p_business_id: string }
+        Returns: Json
       }
       seed_automotive_question_set: {
         Args: {
