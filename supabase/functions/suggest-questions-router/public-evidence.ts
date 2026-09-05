@@ -570,7 +570,7 @@ export async function ensureMarketPublicEvidence(
       throw new Error("WEB_EVIDENCE_OUTPUT_INVALID");
     }
 
-    const allowedServices = new Set(serviceKeys);
+    const allowedServices = new Set(taxonomyKeys);
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
     const parsedServices = Array.isArray(parsed.services) ? parsed.services : [];
