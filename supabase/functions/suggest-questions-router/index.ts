@@ -1,4 +1,4 @@
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import { generateMarketSuggestions, type MarketBusiness } from "./market-generator.ts";
 import { ensureMarketPublicEvidence } from "./public-evidence.ts";
 
