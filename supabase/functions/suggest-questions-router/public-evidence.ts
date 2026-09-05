@@ -405,7 +405,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_6_service_offer_gate",
+    evidence_search_version: "v0_7_third_party_service_listing",
     taxonomy_signature: taxonomySignature,
     region: clean(business.region),
     city: clean(business.city),
@@ -443,6 +443,7 @@ export async function ensureMarketPublicEvidence(
     "work_case",
     "official_profile_service",
     "review_service",
+    "third_party_service_listing",
     "company_registration",
     "business_purpose",
     "job_company_info",
@@ -517,6 +518,7 @@ export async function ensureMarketPublicEvidence(
     "work_case",
     "official_profile_service",
     "review_service",
+    "third_party_service_listing",
   ]);
   const passesServiceOfferGate = (r: Record<string, unknown> | null): boolean =>
     r?.customer_facing_service_explicit === true && ACCEPTED_EVIDENCE_KINDS.has(clean(r?.evidence_kind));
@@ -547,7 +549,8 @@ export async function ensureMarketPublicEvidence(
       "Service evidence must explicitly show an automotive service a customer can actually receive from this exact business at this location.",
       "Never treat as service evidence: corporate/business registration industry codes, stated business purposes, business-description text on recruiting or company-info pages, wholesale/retail/e-commerce product listings, or a plain directory category or keyword tag.",
       "Such non-service sources may support identity confirmation, but must never be returned as valid service evidence in services or unmapped_services.",
-      "Only an actual service menu, services listed on an official profile, real work/installation/repair cases, or customer reviews of using the service at this exact business count as customer-facing service evidence.",
+      "An independent third-party business/service listing may count only when it explicitly identifies the exact business/location and explicitly states that the business offers the specific automotive service; a generic category/tag/directory classification alone is not enough.",
+      "Only an actual service menu, services listed on an official profile, real work/installation/repair cases, customer reviews of using the service at this exact business, or an explicit third-party service listing for this exact business count as customer-facing service evidence.",
       "For every returned item set evidence_kind to the kind of page the evidence came from, and set customer_facing_service_explicit to true only when that page explicitly shows a customer-facing service of this exact business.",
       JSON.stringify({
         business: {
@@ -748,7 +751,7 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_6_service_offer_gate",
+        feature: "measurement_market_public_evidence_v0_7_third_party_service_listing",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
