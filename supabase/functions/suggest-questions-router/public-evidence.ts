@@ -324,7 +324,7 @@ async function queueUnmappedServiceCandidate(
 
     const { error: insertErr } = await admin.from("measurement_market_service_candidates").insert({
       ...row,
-      status: "pending_review",
+      status: "pending",
       seen_count: 1,
       first_seen_at: nowIso,
       last_seen_at: nowIso,
