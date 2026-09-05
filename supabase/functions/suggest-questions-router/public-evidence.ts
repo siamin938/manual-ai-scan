@@ -305,6 +305,7 @@ async function queueUnmappedServiceCandidate(
       .select("id,seen_count")
       .eq("business_identity_key", row.business_identity_key)
       .eq("normalized_label", row.normalized_label)
+      .eq("source_url", row.source_url)
       .maybeSingle();
     if (selectErr) return false;
 
