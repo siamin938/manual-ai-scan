@@ -277,6 +277,10 @@ export function mapSuggestError(message: string | null | undefined): string {
     return "이미 이 업체의 측정 기준 질문이 만들어져 있습니다. 저장된 질문 세트를 사용해 주세요.";
   if (m.includes("market_first_generation_not_available"))
     return "이 업체는 새 측정 기준 질문을 다시 만들 수 없습니다. 저장된 질문 세트를 확인해 주세요.";
+  if (m.includes("public_evidence_not_found"))
+    return "공개 웹에서 업체의 서비스 근거를 충분히 확인하지 못했습니다. 업체 정보나 공개 페이지를 확인한 뒤 다시 시도해 주세요.";
+  if (m.includes("public_evidence_check_failed"))
+    return "업체의 공개 정보를 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
   if (m.includes("unauthorized") || m.includes("401")) return "권한이 없습니다. 다시 로그인해 주세요.";
   if (m.includes("forbidden") || m.includes("403")) return "이 업체에 대한 권한이 없습니다.";
   if (m.includes("ai_generation_failed") || m.includes("ai_output_invalid"))
