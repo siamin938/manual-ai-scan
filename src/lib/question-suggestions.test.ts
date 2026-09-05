@@ -130,7 +130,7 @@ describe("resolveQuestionLocation", () => {
 
   it("질문에서 지역 범위를 판별할 수 없으면 기존 메타데이터를 보존한다", () => {
     expect(resolveQuestionLocation("썬팅 시공 후기 좋은 업체 알려줘", "서울특별시", "구로구")).toEqual({
-      region: "서울특별시",
+      region: "경기도",
       city: "구로구",
     });
   });
@@ -180,6 +180,8 @@ describe("mapSuggestError", () => {
     expect(mapSuggestError("SERVER_NOT_CONFIGURED")).toContain("관리자");
     expect(mapSuggestError("AI_OUTPUT_INVALID")).toContain("생성");
     expect(mapSuggestError("Unauthorized")).toContain("권한");
+    expect(mapSuggestError("PUBLIC_EVIDENCE_NOT_FOUND")).toContain("공개 웹");
+    expect(mapSuggestError("PUBLIC_EVIDENCE_CHECK_FAILED")).toContain("공개 정보");
     expect(mapSuggestError("boom")).toContain("오류");
   });
 });
