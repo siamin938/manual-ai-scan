@@ -36,6 +36,46 @@ function clean(v: unknown): string {
   return typeof v === "string" ? v.normalize("NFKC").replace(/\s+/g, " ").trim() : "";
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function makeBrandStemHint(name: string, city: string | null | undefined): string {
+  const rawName = clean(name);
+  if (!rawName) return "";
+
+  const cityTokens = clean(city).split(/\s+/).filter(Boolean);
+  const adminSuffixes = ["특별자치시", "특별시", "광역시", "시", "군", "구"];
+  const stripTokens = new Set<string>();
+
+  for (const token of cityTokens) {
+    if (!token) continue;
+    stripTokens.add(token);
+    for (const suffix of adminSuffixes) {
+      if (token.endsWith(suffix) && token.length > suffix.length) {
+        stripTokens.add(token.slice(0, -suffix.length));
+      }
+    }
+  }
+
+  // Remove longer tokens first so that short tokens do not corrupt longer matches.
+  const sortedTokens = Array.from(stripTokens).sort((a, b) => b.length - a.length);
+  let stem = rawName;
+  for (const token of sortedTokens) {
+    if (token.length < 1) continue;
+    stem = stem.replace(new RegExp(escapeRegExp(token), "g"), "");
+  }
+
+  const branchSuffixes = ["본점", "지점"];
+  for (const suffix of branchSuffixes) {
+    stem = stem.replace(new RegExp(escapeRegExp(suffix) + "$"), "").trim();
+  }
+
+  stem = clean(stem);
+  if (stem.length < 2) return rawName;
+  return stem;
+}
+
 function outputText(payload: Record<string, unknown>): string {
   if (typeof payload.output_text === "string") return payload.output_text;
   const parts: string[] = [];
@@ -233,15 +273,18 @@ export async function ensureMarketPublicEvidence(
   let acceptedEvidenceCount = 0;
 
   try {
+    const brandStemHint = makeBrandStemHint(business.name, business.city);
     const prompt = [
       "Verify public web evidence for the exact Korean automotive local business below.",
       "Search the web. Confirm only services that a public page explicitly connects to this exact business, using business name plus location/address/known URLs to avoid namesakes.",
       "Do not infer a service merely from the business category. Do not invent URLs. Return only source URLs that actually appeared in your web search results.",
       "A directory, map/listing, official site, blog post, cafe post, or news page is acceptable only when it clearly connects the exact business to the service.",
       "If a service cannot be verified, omit it. If nothing can be verified, return an empty services array.",
+      "The public trade name may differ from the registered business name. A brand_stem_hint is provided, but treat a name variant as the same business ONLY when the exact address or a known registered URL strongly links the variant to this business. Never merge different branches or same-name businesses. Services must still be explicitly connected to this exact business on the page.",
       JSON.stringify({
         business: {
           name: business.name,
+          brand_stem_hint: brandStemHint,
           category_for_candidate_discovery_only: business.category ?? null,
           country_code: business.country_code ?? "KR",
           region: business.region ?? null,
@@ -250,6 +293,11 @@ export async function ensureMarketPublicEvidence(
           website_url: business.website_url ?? null,
           naver_place_url: business.naver_place_url ?? null,
           google_maps_url: business.google_maps_url ?? null,
+        },
+        identity_hints: {
+          exact_address_must_match_for_name_variant: true,
+          known_urls_are_strong_link: true,
+          never_merge_branches_or_namesakes: true,
         },
         candidate_services: services,
       }),
@@ -264,7 +312,6 @@ export async function ensureMarketPublicEvidence(
         tools: [
           {
             type: "web_search",
-            search_context_size: "low",
             user_location: {
               type: "approximate",
               country: business.country_code ?? "KR",
@@ -374,10 +421,9 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_2",
+        feature: "measurement_market_public_evidence_v0_3",
         business_id: business.id,
         web_search_call_limit: 1,
-        search_context_size: "low",
         candidate_service_count: services.length,
         source_count: sourceCount,
         accepted_evidence_count: acceptedEvidenceCount,
