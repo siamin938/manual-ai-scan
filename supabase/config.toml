@@ -1,1 +1,4 @@
 project_id = "qoirkwmnyolquvsgbian"
+
+[functions.suggest-questions-router]
+verify_jwt = true
