@@ -757,6 +757,7 @@ export async function ensureMarketPublicEvidence(
         accepted_strong_evidence_count: acceptedStrongEvidenceCount,
         accepted_supporting_evidence_count: acceptedSupportingEvidenceCount,
         unmapped_service_candidate_count: unmappedServiceCandidateCount,
+        rejected_non_service_evidence_count: rejectedNonServiceEvidenceCount,
       },
     });
   }
