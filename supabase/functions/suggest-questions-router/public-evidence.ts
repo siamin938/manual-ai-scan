@@ -553,6 +553,7 @@ export async function ensureMarketPublicEvidence(
     accepted_supporting_evidence_count: number;
     unmapped_service_candidate_count: number;
     rejected_non_service_evidence_count: number;
+    rejected_low_confidence_discovery_count: number;
   };
 
   let inputTokens = 0;
