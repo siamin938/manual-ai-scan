@@ -906,6 +906,7 @@ export async function ensureMarketPublicEvidence(
         accepted_supporting_evidence_count: sumStats("accepted_supporting_evidence_count"),
         unmapped_service_candidate_count: sumStats("unmapped_service_candidate_count"),
         rejected_non_service_evidence_count: sumStats("rejected_non_service_evidence_count"),
+        rejected_low_confidence_discovery_count: sumStats("rejected_low_confidence_discovery_count"),
         total_input_tokens: inputTokens,
         total_output_tokens: outputTokens,
       },
