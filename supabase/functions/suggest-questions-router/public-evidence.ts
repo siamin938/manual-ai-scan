@@ -553,6 +553,7 @@ export async function ensureMarketPublicEvidence(
     accepted_supporting_evidence_count: number;
     unmapped_service_candidate_count: number;
     rejected_non_service_evidence_count: number;
+    rejected_low_confidence_discovery_count: number;
   };
 
   let inputTokens = 0;
@@ -577,6 +578,7 @@ export async function ensureMarketPublicEvidence(
       accepted_supporting_evidence_count: 0,
       unmapped_service_candidate_count: 0,
       rejected_non_service_evidence_count: 0,
+      rejected_low_confidence_discovery_count: 0,
     };
     passStats.push(stats);
 
@@ -718,8 +720,6 @@ export async function ensureMarketPublicEvidence(
         if (!domain) continue;
         seen.add(`${serviceKey}|${key}`);
         const quality = classifySourceQuality(source.url, business);
-        if (quality.evidenceStrength === "strong") stats.accepted_strong_evidence_count += 1;
-        else stats.accepted_supporting_evidence_count += 1;
         rows.push({
           business_identity_key: identityKey,
           service_key: serviceKey,
@@ -735,6 +735,38 @@ export async function ensureMarketPublicEvidence(
       }
     }
     stats.parsed_service_keys = Array.from(parsedServiceKeySet).sort();
+
+    // Discovery fallback only: a service that was NOT a registration candidate needs either one
+    // strong source or two supporting sources on distinct domains. Precision over recall.
+    let acceptedRows = rows;
+    if (mode === "discovery_fallback") {
+      const candidateKeySet = new Set(candidateKeys);
+      const byService = new Map<string, Record<string, unknown>[]>();
+      for (const row of rows) {
+        const key = String(row.service_key);
+        const list = byService.get(key);
+        if (list) list.push(row);
+        else byService.set(key, [row]);
+      }
+      acceptedRows = [];
+      for (const [serviceKey, serviceRows] of byService) {
+        if (candidateKeySet.has(serviceKey)) {
+          acceptedRows.push(...serviceRows);
+          continue;
+        }
+        const hasStrong = serviceRows.some((r) => r.evidence_strength === "strong");
+        const supportingDomains = new Set(
+          serviceRows.filter((r) => r.evidence_strength !== "strong").map((r) => String(r.source_domain)),
+        );
+        if (hasStrong || supportingDomains.size >= 2) acceptedRows.push(...serviceRows);
+        else stats.rejected_low_confidence_discovery_count += 1;
+      }
+    }
+    for (const row of acceptedRows) {
+      if (row.evidence_strength === "strong") stats.accepted_strong_evidence_count += 1;
+      else stats.accepted_supporting_evidence_count += 1;
+    }
+
 
     // Unmapped services never reach live questions; they only enter the internal review queue.
     const queuedLabels = new Set<string>();
@@ -784,13 +816,13 @@ export async function ensureMarketPublicEvidence(
       }
     }
 
-    if (rows.length > 0) {
-      const { error: insertErr } = await admin.from("measurement_market_public_evidence").upsert(rows, {
+    if (acceptedRows.length > 0) {
+      const { error: insertErr } = await admin.from("measurement_market_public_evidence").upsert(acceptedRows, {
         onConflict: "business_identity_key,service_key,source_url",
         ignoreDuplicates: false,
       });
       if (insertErr) throw new Error("WEB_EVIDENCE_SAVE_FAILED");
-      stats.accepted_evidence_count = rows.length;
+      stats.accepted_evidence_count = acceptedRows.length;
     }
 
     return stats;
@@ -874,6 +906,7 @@ export async function ensureMarketPublicEvidence(
         accepted_supporting_evidence_count: sumStats("accepted_supporting_evidence_count"),
         unmapped_service_candidate_count: sumStats("unmapped_service_candidate_count"),
         rejected_non_service_evidence_count: sumStats("rejected_non_service_evidence_count"),
+        rejected_low_confidence_discovery_count: sumStats("rejected_low_confidence_discovery_count"),
         total_input_tokens: inputTokens,
         total_output_tokens: outputTokens,
       },
