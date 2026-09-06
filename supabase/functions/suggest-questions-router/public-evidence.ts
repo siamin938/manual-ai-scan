@@ -816,13 +816,13 @@ export async function ensureMarketPublicEvidence(
       }
     }
 
-    if (rows.length > 0) {
-      const { error: insertErr } = await admin.from("measurement_market_public_evidence").upsert(rows, {
+    if (acceptedRows.length > 0) {
+      const { error: insertErr } = await admin.from("measurement_market_public_evidence").upsert(acceptedRows, {
         onConflict: "business_identity_key,service_key,source_url",
         ignoreDuplicates: false,
       });
       if (insertErr) throw new Error("WEB_EVIDENCE_SAVE_FAILED");
-      stats.accepted_evidence_count = rows.length;
+      stats.accepted_evidence_count = acceptedRows.length;
     }
 
     return stats;
