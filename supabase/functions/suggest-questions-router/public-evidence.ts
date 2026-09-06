@@ -287,11 +287,12 @@ type RegisteredLocatorHint = {
   address: string | null;
 };
 
-function looseMatch(a: string, b: string): boolean {
-  const na = normalizeServiceLabel(a);
-  const nb = normalizeServiceLabel(b);
-  if (!na || !nb) return false;
-  return na === nb || na.includes(nb) || nb.includes(na);
+// Deterministic exact normalization (NFKC + drop whitespace/punctuation). No substring matching.
+function exactNorm(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z\uac00-\ud7a3]+/gu, "");
 }
 
 // Best-effort, single-shot public Naver place summary lookup.
@@ -319,27 +320,50 @@ async function fetchRegisteredLocatorHint(business: PublicEvidenceBusiness): Pro
     const res = await fetch(`https://map.naver.com/p/api/place/summary/${placeId}`, {
       method: "GET",
       headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(2800),
     });
     hint.summary_status = res.status;
     if (!res.ok) return hint;
     const body = rec(await res.json().catch(() => null));
     if (!body) return hint;
-    const node = rec(body.result) ?? rec(body.place) ?? body;
-    const name = clean(node?.name) || clean(node?.title) || null;
-    const address = clean(node?.roadAddress) || clean(node?.address) || null;
-    const category = clean(node?.category) || null;
+    // Actual shape: { data: { placeDetail: { id, name, category: { category }, address: { address, roadAddress } } } }
+    const detail = rec(rec(body.data)?.placeDetail) ?? rec(body.placeDetail);
+    if (!detail) return hint;
+
+    const responseId = clean(detail.id);
+    const name = clean(detail.name) || null;
+    const addressNode = rec(detail.address);
+    const roadAddress = clean(addressNode?.roadAddress) || null;
+    const jibunAddress = clean(addressNode?.address) || null;
+    const category = clean(rec(detail.category)?.category) || null;
+
     hint.name = name;
-    hint.address = address;
+    hint.address = roadAddress ?? jibunAddress;
     hint.category = category;
-    // Deterministic identity match: place id resolved AND name or address agrees with registration.
-    const nameOk = !!name && looseMatch(name, business.name);
-    const addressOk = !!address && !!clean(business.address) && looseMatch(address, clean(business.address));
-    hint.identity_verified = nameOk || addressOk;
+
+    // The summary must describe the exact registered place id.
+    if (!responseId || responseId !== placeId) return hint;
+
+    const registeredAddress = clean(business.address);
+    const nameOk = !!name && !!exactNorm(name) && exactNorm(name) === exactNorm(business.name);
+    if (!nameOk) return hint;
+
+    if (registeredAddress) {
+      const target = exactNorm(registeredAddress);
+      const matched = [roadAddress, jibunAddress].find((a) => !!a && exactNorm(a) === target) ?? null;
+      if (!matched) return hint;
+      hint.address = matched;
+      hint.identity_verified = true;
+    } else {
+      // No registered address at all: exact name match on the same place id is the only allowance.
+      hint.identity_verified = true;
+    }
   } catch {
     // best effort only; never blocks the existing path
   }
   return hint;
 }
+
 
 
 function normalizeServiceLabel(value: string): string {
