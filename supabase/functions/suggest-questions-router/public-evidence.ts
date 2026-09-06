@@ -277,6 +277,71 @@ function profileHasPublicEvidence(profile: Record<string, unknown> | null): bool
   return profile?.webEvidenceStatus === "available";
 }
 
+type RegisteredLocatorHint = {
+  place_id: string | null;
+  summary_checked: boolean;
+  summary_status: number | null;
+  identity_verified: boolean;
+  category: string | null;
+  name: string | null;
+  address: string | null;
+};
+
+function looseMatch(a: string, b: string): boolean {
+  const na = normalizeServiceLabel(a);
+  const nb = normalizeServiceLabel(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+// Best-effort, single-shot public Naver place summary lookup.
+// Used ONLY as an identity/retrieval hint for the evidence search prompt.
+// It is never stored as service evidence and never retried.
+async function fetchRegisteredLocatorHint(business: PublicEvidenceBusiness): Promise<RegisteredLocatorHint> {
+  const hint: RegisteredLocatorHint = {
+    place_id: null,
+    summary_checked: false,
+    summary_status: null,
+    identity_verified: false,
+    category: null,
+    name: null,
+    address: null,
+  };
+
+  const known = parseHttpUrl(business.naver_place_url);
+  if (!known) return hint;
+  const placeId = naverPlaceId(known) ?? (known.searchParams.get("id") || "").match(/^\d+$/)?.[0] ?? null;
+  if (!placeId) return hint;
+  hint.place_id = placeId;
+
+  try {
+    hint.summary_checked = true;
+    const res = await fetch(`https://map.naver.com/p/api/place/summary/${placeId}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    hint.summary_status = res.status;
+    if (!res.ok) return hint;
+    const body = rec(await res.json().catch(() => null));
+    if (!body) return hint;
+    const node = rec(body.result) ?? rec(body.place) ?? body;
+    const name = clean(node?.name) || clean(node?.title) || null;
+    const address = clean(node?.roadAddress) || clean(node?.address) || null;
+    const category = clean(node?.category) || null;
+    hint.name = name;
+    hint.address = address;
+    hint.category = category;
+    // Deterministic identity match: place id resolved AND name or address agrees with registration.
+    const nameOk = !!name && looseMatch(name, business.name);
+    const addressOk = !!address && !!clean(business.address) && looseMatch(address, clean(business.address));
+    hint.identity_verified = nameOk || addressOk;
+  } catch {
+    // best effort only; never blocks the existing path
+  }
+  return hint;
+}
+
+
 function normalizeServiceLabel(value: string): string {
   return value
     .normalize("NFKC")
@@ -396,12 +461,16 @@ export async function ensureMarketPublicEvidence(
     .eq("active", true)
     .order("sort_order", { ascending: true });
 
-  const taxonomyRows: Array<{ key: string; label: string }> = [];
+  const taxonomyRows: Array<{ key: string; label: string; anchors: string[] }> = [];
   for (const raw of Array.isArray(taxonomyRaw) ? taxonomyRaw : []) {
     const r = rec(raw);
     const key = clean(r?.service_key);
     const label = clean(r?.label);
-    if (key && label) taxonomyRows.push({ key, label });
+    const anchors = (Array.isArray(r?.question_anchors) ? r?.question_anchors : [])
+      .map((a) => clean(a))
+      .filter(Boolean)
+      .slice(0, 5);
+    if (key && label) taxonomyRows.push({ key, label, anchors });
   }
 
   const taxonomySignature = taxonomyRows
@@ -413,7 +482,8 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_9_candidate_verification_fallback",
+    evidence_search_version: "v0_9_1_naver_registered_locator",
+
     bootstrap_discovery: bootstrapDiscovery,
     taxonomy_signature: taxonomySignature,
     region: clean(business.region),
@@ -561,6 +631,8 @@ export async function ensureMarketPublicEvidence(
   let webSearchCallCount = 0;
   let fallbackTriggered = false;
   const passStats: PassStats[] = [];
+  const locatorHint = await fetchRegisteredLocatorHint(business);
+
 
   const runPass = async (mode: SearchMode, allowedKeys: string[]): Promise<PassStats> => {
     const stats: PassStats = {
@@ -608,6 +680,10 @@ export async function ensureMarketPublicEvidence(
       "An independent third-party business/service listing may count only when it explicitly identifies the exact business/location and explicitly states that the business offers the specific automotive service; a generic category/tag/directory classification alone is not enough.",
       "Only an actual service menu, services listed on an official profile, real work/installation/repair cases, customer reviews of using the service at this exact business, or an explicit third-party service listing for this exact business count as customer-facing service evidence.",
       "For every returned item set evidence_kind to the kind of page the evidence came from, and set customer_facing_service_explicit to true only when that page explicitly shows a customer-facing service of this exact business.",
+      "registered_locator holds the registered map place identifiers for this exact business. Use its place id, name and address only to pin the exact business and to retrieve its pages. The registered map category itself is NEVER service evidence and must never be returned as a verified service.",
+      mode === "candidate_verification"
+        ? "Search actively by combining the exact business name, address/location and registered place id with each candidate service label and its question anchors, so that a candidate is verified only from pages that clearly belong to this exact business."
+        : "Search actively by combining the exact business name, address/location and registered place id with service labels and question anchors from the taxonomy.",
       JSON.stringify({
         business: {
           name: business.name,
@@ -621,15 +697,35 @@ export async function ensureMarketPublicEvidence(
           naver_place_url: business.naver_place_url ?? null,
           google_maps_url: business.google_maps_url ?? null,
         },
+        registered_locator: {
+          naver_place_id: locatorHint.place_id,
+          summary_checked: locatorHint.summary_checked,
+          identity_verified: locatorHint.identity_verified,
+          registered_map_name: locatorHint.identity_verified ? locatorHint.name : null,
+          registered_map_address: locatorHint.identity_verified ? locatorHint.address : null,
+          registered_map_category_identity_hint_only: locatorHint.identity_verified ? locatorHint.category : null,
+          category_is_not_service_evidence: true,
+        },
         identity_hints: {
           exact_address_must_match_for_name_variant: true,
           known_urls_are_strong_link: true,
           never_merge_branches_or_namesakes: true,
         },
         search_mode: mode,
-        candidate_services: mode === "candidate_verification" ? services : [],
-        known_service_taxonomy: allowedTaxonomy.map((t) => ({ service_key: t.key, label: t.label })),
+        candidate_services:
+          mode === "candidate_verification"
+            ? services.map((s) => ({
+                ...s,
+                question_anchors: taxonomyRows.find((t) => t.key === s.key)?.anchors ?? [],
+              }))
+            : [],
+        known_service_taxonomy: allowedTaxonomy.map((t) => ({
+          service_key: t.key,
+          label: t.label,
+          question_anchors: t.anchors,
+        })),
       }),
+
     ].join("\n");
 
     webSearchCallCount += 1;
@@ -882,14 +978,20 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_9_candidate_verification_fallback",
-        evidence_search_prompt_version: "v0_9_candidate_verification_fallback",
+        feature: "measurement_market_public_evidence_v0_9_1_naver_registered_locator",
+        evidence_search_prompt_version: "v0_9_1_naver_registered_locator",
         search_mode: passStats[0]?.search_mode ?? null,
         search_modes: passStats.map((s) => s.search_mode),
         web_search_call_count: webSearchCallCount,
         web_search_call_limit: candidateKeys.length > 0 ? 2 : 1,
         fallback_triggered: fallbackTriggered,
         bootstrap_discovery: bootstrapDiscovery,
+        naver_place_id: locatorHint.place_id,
+        naver_summary_checked: locatorHint.summary_checked,
+        naver_summary_status: locatorHint.summary_status,
+        naver_identity_verified: locatorHint.identity_verified,
+        naver_summary_category: locatorHint.identity_verified ? locatorHint.category : null,
+
         business_id: business.id,
         candidate_service_count: services.length,
         candidate_service_keys: candidateKeys,
