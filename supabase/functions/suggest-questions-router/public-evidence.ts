@@ -680,6 +680,10 @@ export async function ensureMarketPublicEvidence(
       "An independent third-party business/service listing may count only when it explicitly identifies the exact business/location and explicitly states that the business offers the specific automotive service; a generic category/tag/directory classification alone is not enough.",
       "Only an actual service menu, services listed on an official profile, real work/installation/repair cases, customer reviews of using the service at this exact business, or an explicit third-party service listing for this exact business count as customer-facing service evidence.",
       "For every returned item set evidence_kind to the kind of page the evidence came from, and set customer_facing_service_explicit to true only when that page explicitly shows a customer-facing service of this exact business.",
+      "registered_locator holds the registered map place identifiers for this exact business. Use its place id, name and address only to pin the exact business and to retrieve its pages. The registered map category itself is NEVER service evidence and must never be returned as a verified service.",
+      mode === "candidate_verification"
+        ? "Search actively by combining the exact business name, address/location and registered place id with each candidate service label and its question anchors, so that a candidate is verified only from pages that clearly belong to this exact business."
+        : "Search actively by combining the exact business name, address/location and registered place id with service labels and question anchors from the taxonomy.",
       JSON.stringify({
         business: {
           name: business.name,
@@ -693,15 +697,35 @@ export async function ensureMarketPublicEvidence(
           naver_place_url: business.naver_place_url ?? null,
           google_maps_url: business.google_maps_url ?? null,
         },
+        registered_locator: {
+          naver_place_id: locatorHint.place_id,
+          summary_checked: locatorHint.summary_checked,
+          identity_verified: locatorHint.identity_verified,
+          registered_map_name: locatorHint.identity_verified ? locatorHint.name : null,
+          registered_map_address: locatorHint.identity_verified ? locatorHint.address : null,
+          registered_map_category_identity_hint_only: locatorHint.identity_verified ? locatorHint.category : null,
+          category_is_not_service_evidence: true,
+        },
         identity_hints: {
           exact_address_must_match_for_name_variant: true,
           known_urls_are_strong_link: true,
           never_merge_branches_or_namesakes: true,
         },
         search_mode: mode,
-        candidate_services: mode === "candidate_verification" ? services : [],
-        known_service_taxonomy: allowedTaxonomy.map((t) => ({ service_key: t.key, label: t.label })),
+        candidate_services:
+          mode === "candidate_verification"
+            ? services.map((s) => ({
+                ...s,
+                question_anchors: taxonomyRows.find((t) => t.key === s.key)?.anchors ?? [],
+              }))
+            : [],
+        known_service_taxonomy: allowedTaxonomy.map((t) => ({
+          service_key: t.key,
+          label: t.label,
+          question_anchors: t.anchors,
+        })),
       }),
+
     ].join("\n");
 
     webSearchCallCount += 1;
