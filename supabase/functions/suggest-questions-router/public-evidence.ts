@@ -578,6 +578,7 @@ export async function ensureMarketPublicEvidence(
       accepted_supporting_evidence_count: 0,
       unmapped_service_candidate_count: 0,
       rejected_non_service_evidence_count: 0,
+      rejected_low_confidence_discovery_count: 0,
     };
     passStats.push(stats);
 
