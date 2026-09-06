@@ -631,6 +631,8 @@ export async function ensureMarketPublicEvidence(
   let webSearchCallCount = 0;
   let fallbackTriggered = false;
   const passStats: PassStats[] = [];
+  const locatorHint = await fetchRegisteredLocatorHint(business);
+
 
   const runPass = async (mode: SearchMode, allowedKeys: string[]): Promise<PassStats> => {
     const stats: PassStats = {
