@@ -413,7 +413,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_8_1_candidate_prompt_fix",
+    evidence_search_version: "v0_9_candidate_verification_fallback",
     bootstrap_discovery: bootstrapDiscovery,
     taxonomy_signature: taxonomySignature,
     region: clean(business.region),
@@ -447,6 +447,8 @@ export async function ensureMarketPublicEvidence(
   }
 
   const taxonomyKeys = taxonomyRows.map((t) => t.key);
+  const taxonomyKeySet = new Set(taxonomyKeys);
+  const candidateKeys = services.map((s) => s.key).filter((k) => taxonomyKeySet.has(k));
   const EVIDENCE_KINDS = [
     "customer_service_page",
     "work_case",
@@ -460,7 +462,8 @@ export async function ensureMarketPublicEvidence(
     "directory_category_only",
     "other_non_service",
   ];
-  const schema = {
+
+  const buildSchema = (allowedKeys: string[]) => ({
     type: "object",
     additionalProperties: false,
     properties: {
@@ -471,7 +474,8 @@ export async function ensureMarketPublicEvidence(
           type: "object",
           additionalProperties: false,
           properties: {
-            service_key: { type: "string", enum: taxonomyKeys },
+            // Deterministic guard: a non-allowed service key cannot be produced at all.
+            service_key: { type: "string", enum: allowedKeys },
             source_urls: {
               type: "array",
               minItems: 1,
@@ -520,7 +524,7 @@ export async function ensureMarketPublicEvidence(
       },
     },
     required: ["services", "unmapped_services"],
-  };
+  });
 
   const ACCEPTED_EVIDENCE_KINDS = new Set([
     "customer_service_page",
@@ -532,24 +536,59 @@ export async function ensureMarketPublicEvidence(
   const passesServiceOfferGate = (r: Record<string, unknown> | null): boolean =>
     r?.customer_facing_service_explicit === true && ACCEPTED_EVIDENCE_KINDS.has(clean(r?.evidence_kind));
 
+  type SearchMode = "candidate_verification" | "discovery_fallback" | "bootstrap_discovery";
 
+  type PassStats = {
+    search_mode: SearchMode;
+    allowed_service_key_count: number;
+    source_count: number;
+    parsed_service_candidate_count: number;
+    parsed_service_keys: string[];
+    parsed_unmapped_service_count: number;
+    service_source_url_hit_count: number;
+    service_source_url_miss_count: number;
+    service_source_url_invalid_count: number;
+    accepted_evidence_count: number;
+    accepted_strong_evidence_count: number;
+    accepted_supporting_evidence_count: number;
+    unmapped_service_candidate_count: number;
+    rejected_non_service_evidence_count: number;
+  };
 
   let inputTokens = 0;
   let outputTokens = 0;
-  let sourceCount = 0;
-  let acceptedEvidenceCount = 0;
-  let acceptedStrongEvidenceCount = 0;
-  let acceptedSupportingEvidenceCount = 0;
-  let unmappedServiceCandidateCount = 0;
-  let rejectedNonServiceEvidenceCount = 0;
-  let parsedServiceCandidateCount = 0;
-  let parsedUnmappedServiceCount = 0;
-  let parsedServiceKeys: string[] = [];
-  let serviceSourceUrlHitCount = 0;
-  let serviceSourceUrlMissCount = 0;
-  let serviceSourceUrlInvalidCount = 0;
+  let webSearchCallCount = 0;
+  let fallbackTriggered = false;
+  const passStats: PassStats[] = [];
 
-  try {
+  const runPass = async (mode: SearchMode, allowedKeys: string[]): Promise<PassStats> => {
+    const stats: PassStats = {
+      search_mode: mode,
+      allowed_service_key_count: allowedKeys.length,
+      source_count: 0,
+      parsed_service_candidate_count: 0,
+      parsed_service_keys: [],
+      parsed_unmapped_service_count: 0,
+      service_source_url_hit_count: 0,
+      service_source_url_miss_count: 0,
+      service_source_url_invalid_count: 0,
+      accepted_evidence_count: 0,
+      accepted_strong_evidence_count: 0,
+      accepted_supporting_evidence_count: 0,
+      unmapped_service_candidate_count: 0,
+      rejected_non_service_evidence_count: 0,
+    };
+    passStats.push(stats);
+
+    const allowedTaxonomy = taxonomyRows.filter((t) => allowedKeys.includes(t.key));
+
+    const modeInstruction =
+      mode === "candidate_verification"
+        ? "MODE: candidate verification. candidate_services are the ONLY services you may return in services. Verify each candidate against explicit customer-facing service evidence for this exact business. Do not return, suggest, or substitute any other service in services. If none of the candidates can be verified, return an empty services array."
+        : mode === "discovery_fallback"
+          ? "MODE: discovery fallback. The registration candidates could not be verified with explicit customer-facing service evidence. First confirm the exact business identity using name/address/known URLs, then discover the actual customer-facing automotive services of this exact business from the full known_service_taxonomy. Never infer services from the generic category or business name alone."
+          : "MODE: bootstrap discovery. candidate_services is empty because no service candidates were derived from registration data. First confirm the exact business identity using name/address/known URLs, then discover actual customer-facing automotive services from the full known_service_taxonomy. Never infer services from the generic category or business name alone.";
+
     const prompt = [
       "Verify public web evidence for the exact Korean automotive local business below.",
       "Search the web. Confirm only services that a public page explicitly connects to this exact business, using business name plus location/address/known URLs to avoid namesakes.",
@@ -558,10 +597,7 @@ export async function ensureMarketPublicEvidence(
       "If a service cannot be verified, omit it. If nothing can be verified, return an empty services array.",
       "The public trade name may differ from the registered business name. A brand_stem_hint is provided, but treat a name variant as the same business ONLY when the exact address or a known registered URL strongly links the variant to this business. Never merge different branches or same-name businesses. Services must still be explicitly connected to this exact business on the page.",
       "When several sources explicitly verify the same exact business and the same service, prefer source_urls in this order: registered profile / first-party official site > platform or directory listing > secondary or aggregator page. Never drop a service just because no strong source exists, and never relax the exact-business-identity or explicit-service-verification requirements for this preference.",
-      "candidate_services are only priority candidates derived from registration data. Any other service in known_service_taxonomy may also be returned in services when a public page explicitly connects it to this exact business.",
-      bootstrapDiscovery
-        ? "candidate_services is empty because no service candidates were derived from registration data. First confirm the exact business identity using name/address/known URLs, then discover actual customer-facing automotive services from the full known_service_taxonomy. Never infer services from the generic category or business name alone."
-        : "candidate_services is non-empty. Treat these as priority verification targets, not as confirmed services. Verify them first against explicit customer-facing service evidence for this exact business.",
+      modeInstruction,
       "Never let a broad registered category stand in for a specific service. For example generic tuning and software vehicle coding are separate service families and must not be merged.",
       "Return in unmapped_services ONLY an explicit automotive service that has no reasonable match anywhere in known_service_taxonomy. Never force an unmapped service into services, and never map it to a loosely related taxonomy key.",
       "Service evidence must explicitly show an automotive service a customer can actually receive from this exact business at this location.",
@@ -588,12 +624,13 @@ export async function ensureMarketPublicEvidence(
           known_urls_are_strong_link: true,
           never_merge_branches_or_namesakes: true,
         },
-        candidate_services: services,
-        known_service_taxonomy: taxonomyRows.map((t) => ({ service_key: t.key, label: t.label })),
+        search_mode: mode,
+        candidate_services: mode === "candidate_verification" ? services : [],
+        known_service_taxonomy: allowedTaxonomy.map((t) => ({ service_key: t.key, label: t.label })),
       }),
-
     ].join("\n");
 
+    webSearchCallCount += 1;
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" },
@@ -616,19 +653,26 @@ export async function ensureMarketPublicEvidence(
         reasoning: { effort: "low" },
         max_output_tokens: 1800,
         input: prompt,
-        text: { format: { type: "json_schema", name: "measurement_market_public_evidence_v01", strict: true, schema } },
+        text: {
+          format: {
+            type: "json_schema",
+            name: "measurement_market_public_evidence_v01",
+            strict: true,
+            schema: buildSchema(allowedKeys),
+          },
+        },
       }),
     });
 
     const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
     const usage = rec(payload.usage);
-    inputTokens = Number(usage?.input_tokens ?? 0) || 0;
-    outputTokens = Number(usage?.output_tokens ?? 0) || 0;
+    inputTokens += Number(usage?.input_tokens ?? 0) || 0;
+    outputTokens += Number(usage?.output_tokens ?? 0) || 0;
 
     if (!response.ok) throw new Error("WEB_EVIDENCE_SEARCH_FAILED");
 
     const sources = collectSources(payload);
-    sourceCount = sources.size;
+    stats.source_count = sources.size;
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(outputText(payload)) as Record<string, unknown>;
@@ -636,11 +680,11 @@ export async function ensureMarketPublicEvidence(
       throw new Error("WEB_EVIDENCE_OUTPUT_INVALID");
     }
 
-    const allowedServices = new Set(taxonomyKeys);
+    const allowedServices = new Set(allowedKeys);
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
     const parsedServices = Array.isArray(parsed.services) ? parsed.services : [];
-    parsedServiceCandidateCount = parsedServices.length;
+    stats.parsed_service_candidate_count = parsedServices.length;
     const parsedServiceKeySet = new Set<string>();
     for (const raw of parsedServices) {
       const r = rec(raw);
@@ -648,34 +692,34 @@ export async function ensureMarketPublicEvidence(
       if (serviceKey) parsedServiceKeySet.add(serviceKey);
       if (!allowedServices.has(serviceKey)) continue;
       if (!passesServiceOfferGate(r)) {
-        rejectedNonServiceEvidenceCount += 1;
+        stats.rejected_non_service_evidence_count += 1;
         continue;
       }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
       for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
         if (typeof rawUrl !== "string") {
-          serviceSourceUrlInvalidCount += 1;
+          stats.service_source_url_invalid_count += 1;
           continue;
         }
         const key = canonicalUrl(rawUrl);
         if (!key) {
-          serviceSourceUrlInvalidCount += 1;
+          stats.service_source_url_invalid_count += 1;
           continue;
         }
         if (seen.has(`${serviceKey}|${key}`)) continue;
         const source = sources.get(key);
         if (!source) {
-          serviceSourceUrlMissCount += 1;
+          stats.service_source_url_miss_count += 1;
           continue;
         }
-        serviceSourceUrlHitCount += 1;
+        stats.service_source_url_hit_count += 1;
         let domain = "";
         try { domain = new URL(source.url).hostname.toLowerCase(); } catch { continue; }
         if (!domain) continue;
         seen.add(`${serviceKey}|${key}`);
         const quality = classifySourceQuality(source.url, business);
-        if (quality.evidenceStrength === "strong") acceptedStrongEvidenceCount += 1;
-        else acceptedSupportingEvidenceCount += 1;
+        if (quality.evidenceStrength === "strong") stats.accepted_strong_evidence_count += 1;
+        else stats.accepted_supporting_evidence_count += 1;
         rows.push({
           business_identity_key: identityKey,
           service_key: serviceKey,
@@ -690,12 +734,12 @@ export async function ensureMarketPublicEvidence(
         });
       }
     }
-    parsedServiceKeys = Array.from(parsedServiceKeySet).sort();
+    stats.parsed_service_keys = Array.from(parsedServiceKeySet).sort();
 
     // Unmapped services never reach live questions; they only enter the internal review queue.
     const queuedLabels = new Set<string>();
     const parsedUnmapped = Array.isArray(parsed.unmapped_services) ? parsed.unmapped_services : [];
-    parsedUnmappedServiceCount = parsedUnmapped.length;
+    stats.parsed_unmapped_service_count = parsedUnmapped.length;
     for (const raw of parsedUnmapped) {
       const r = rec(raw);
       const candidateLabel = clean(r?.service_label);
@@ -703,7 +747,7 @@ export async function ensureMarketPublicEvidence(
       if (normalizedLabel.length < 2) continue;
       if (queuedLabels.has(normalizedLabel)) continue;
       if (!passesServiceOfferGate(r)) {
-        rejectedNonServiceEvidenceCount += 1;
+        stats.rejected_non_service_evidence_count += 1;
         continue;
       }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
@@ -736,10 +780,9 @@ export async function ensureMarketPublicEvidence(
       });
       if (queued) {
         queuedLabels.add(normalizedLabel);
-        unmappedServiceCandidateCount += 1;
+        stats.unmapped_service_candidate_count += 1;
       }
     }
-
 
     if (rows.length > 0) {
       const { error: insertErr } = await admin.from("measurement_market_public_evidence").upsert(rows, {
@@ -747,7 +790,30 @@ export async function ensureMarketPublicEvidence(
         ignoreDuplicates: false,
       });
       if (insertErr) throw new Error("WEB_EVIDENCE_SAVE_FAILED");
-      acceptedEvidenceCount = rows.length;
+      stats.accepted_evidence_count = rows.length;
+    }
+
+    return stats;
+  };
+
+  const sumStats = (field: keyof PassStats): number =>
+    passStats.reduce((total, s) => total + (typeof s[field] === "number" ? (s[field] as number) : 0), 0);
+
+  let acceptedEvidenceCount = 0;
+
+  try {
+    const firstMode: SearchMode = candidateKeys.length > 0 ? "candidate_verification" : "bootstrap_discovery";
+    const firstKeys = firstMode === "candidate_verification" ? candidateKeys : taxonomyKeys;
+
+    const first = await runPass(firstMode, firstKeys);
+    acceptedEvidenceCount = first.accepted_evidence_count;
+
+    // Discovery fallback runs at most once, and only when candidate verification produced
+    // no storable accepted evidence.
+    if (firstMode === "candidate_verification" && acceptedEvidenceCount === 0 && hasStrongLocator) {
+      fallbackTriggered = true;
+      const second = await runPass("discovery_fallback", taxonomyKeys);
+      acceptedEvidenceCount += second.accepted_evidence_count;
     }
 
     await writeCheck(
@@ -755,7 +821,7 @@ export async function ensureMarketPublicEvidence(
       identityKey,
       candidateSignature,
       acceptedEvidenceCount > 0 ? "completed" : "no_evidence",
-      sourceCount,
+      sumStats("source_count"),
       acceptedEvidenceCount,
     );
 
@@ -771,7 +837,7 @@ export async function ensureMarketPublicEvidence(
       reason: ready ? "verified" : "no_evidence",
     };
   } catch {
-    await writeCheck(admin, identityKey, candidateSignature, "failed", sourceCount, acceptedEvidenceCount);
+    await writeCheck(admin, identityKey, candidateSignature, "failed", sumStats("source_count"), acceptedEvidenceCount);
     return { ready: false, searched: true, acceptedEvidenceCount, reason: "check_failed" };
   } finally {
     await admin.from("cost_events").insert({
@@ -784,25 +850,32 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_8_bootstrap_discovery",
-        evidence_search_prompt_version: "v0_8_1_candidate_prompt_fix",
-        search_mode: bootstrapDiscovery ? "bootstrap_discovery" : "candidate_verification",
-        business_id: business.id,
-        web_search_call_limit: 1,
-        candidate_service_count: services.length,
+        feature: "measurement_market_public_evidence_v0_9_candidate_verification_fallback",
+        evidence_search_prompt_version: "v0_9_candidate_verification_fallback",
+        search_mode: passStats[0]?.search_mode ?? null,
+        search_modes: passStats.map((s) => s.search_mode),
+        web_search_call_count: webSearchCallCount,
+        web_search_call_limit: candidateKeys.length > 0 ? 2 : 1,
+        fallback_triggered: fallbackTriggered,
         bootstrap_discovery: bootstrapDiscovery,
-        source_count: sourceCount,
-        parsed_service_candidate_count: parsedServiceCandidateCount,
-        parsed_service_keys: parsedServiceKeys,
-        parsed_unmapped_service_count: parsedUnmappedServiceCount,
-        service_source_url_hit_count: serviceSourceUrlHitCount,
-        service_source_url_miss_count: serviceSourceUrlMissCount,
-        service_source_url_invalid_count: serviceSourceUrlInvalidCount,
+        business_id: business.id,
+        candidate_service_count: services.length,
+        candidate_service_keys: candidateKeys,
+        passes: passStats,
+        source_count: sumStats("source_count"),
+        parsed_service_candidate_count: sumStats("parsed_service_candidate_count"),
+        parsed_service_keys: Array.from(new Set(passStats.flatMap((s) => s.parsed_service_keys))).sort(),
+        parsed_unmapped_service_count: sumStats("parsed_unmapped_service_count"),
+        service_source_url_hit_count: sumStats("service_source_url_hit_count"),
+        service_source_url_miss_count: sumStats("service_source_url_miss_count"),
+        service_source_url_invalid_count: sumStats("service_source_url_invalid_count"),
         accepted_evidence_count: acceptedEvidenceCount,
-        accepted_strong_evidence_count: acceptedStrongEvidenceCount,
-        accepted_supporting_evidence_count: acceptedSupportingEvidenceCount,
-        unmapped_service_candidate_count: unmappedServiceCandidateCount,
-        rejected_non_service_evidence_count: rejectedNonServiceEvidenceCount,
+        accepted_strong_evidence_count: sumStats("accepted_strong_evidence_count"),
+        accepted_supporting_evidence_count: sumStats("accepted_supporting_evidence_count"),
+        unmapped_service_candidate_count: sumStats("unmapped_service_candidate_count"),
+        rejected_non_service_evidence_count: sumStats("rejected_non_service_evidence_count"),
+        total_input_tokens: inputTokens,
+        total_output_tokens: outputTokens,
       },
     });
   }
