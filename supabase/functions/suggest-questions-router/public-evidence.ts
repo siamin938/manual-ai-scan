@@ -720,8 +720,6 @@ export async function ensureMarketPublicEvidence(
         if (!domain) continue;
         seen.add(`${serviceKey}|${key}`);
         const quality = classifySourceQuality(source.url, business);
-        if (quality.evidenceStrength === "strong") stats.accepted_strong_evidence_count += 1;
-        else stats.accepted_supporting_evidence_count += 1;
         rows.push({
           business_identity_key: identityKey,
           service_key: serviceKey,
