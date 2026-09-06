@@ -37,6 +37,11 @@ function rec(v: unknown): Record<string, unknown> | null {
     : null;
 }
 
+async function sha256(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { status: 200, headers: corsHeaders });
@@ -45,7 +50,6 @@ Deno.serve(async (req) => {
 
   try {
     const auth = req.headers.get("Authorization") ?? "";
-    if (!auth.startsWith("Bearer ")) return json({ error: "UNAUTHORIZED" }, 401);
 
     const url = Deno.env.get("SUPABASE_URL")?.trim() ?? "";
     const pub =
@@ -62,23 +66,101 @@ Deno.serve(async (req) => {
 
     if (!url || !pub || !secret) return json({ error: "SERVER_NOT_CONFIGURED" }, 500);
 
-    const userClient = createClient(url, pub, {
-      global: { headers: { Authorization: auth } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
     const admin = createClient(url, secret, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData.user) return json({ error: "UNAUTHORIZED" }, 401);
 
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const orgId = typeof body?.orgId === "string" ? body.orgId : "";
     const businessId = typeof body?.businessId === "string" ? body.businessId : "";
     const count = Number(body?.count ?? 24);
+    const internalPilotNonce = typeof body?.internalPilotNonce === "string" ? body.internalPilotNonce : "";
 
     if (!orgId || !businessId || count !== 24) return json({ error: "INVALID_INPUT" }, 400);
+
+    // Temporary, nonce-gated internal pilot entry. This path still requires the
+    // organization to be explicitly enabled as internal_pilot and consumes the
+    // nonce exactly once. It never persists questions or starts measurements.
+    if (internalPilotNonce) {
+      if (!openai) return json({ error: "SERVER_NOT_CONFIGURED" }, 500);
+      const tokenHash = await sha256(internalPilotNonce);
+      const { data: consumed, error: nonceErr } = await admin.rpc(
+        "consume_measurement_market_shadow_nonce_v01",
+        { p_token_hash: tokenHash, p_org_id: orgId, p_business_id: businessId },
+      );
+      if (nonceErr || consumed !== true) return json({ error: "NONCE_INVALID_OR_EXPIRED" }, 403);
+
+      let pilotActive = false;
+      try {
+        const { data: flagRaw, error: flagErr } = await admin.rpc(
+          "get_measurement_market_feature_flag_v01",
+          { p_org_id: orgId },
+        );
+        const flag = rec(flagRaw);
+        if (
+          flagErr ||
+          flag?.enabled !== true ||
+          flag?.rolloutStage !== "internal_pilot" ||
+          flag?.internalPilotAllowed !== true
+        ) {
+          return json({ error: "PILOT_NOT_ENABLED" }, 409);
+        }
+        pilotActive = true;
+
+        const { data: biz, error: bizErr } = await admin
+          .from("businesses")
+          .select("id,name,category,country_code,region,city,address,website_url,naver_place_url,google_maps_url,is_client_business,active")
+          .eq("id", businessId)
+          .eq("org_id", orgId)
+          .eq("is_client_business", true)
+          .eq("active", true)
+          .maybeSingle();
+        if (bizErr || !biz) return json({ error: "BUSINESS_NOT_AVAILABLE" }, 404);
+
+        const evidence = await ensureMarketPublicEvidence(admin, openai, orgId, biz);
+        if (!evidence.ready) {
+          return json({
+            error:
+              evidence.reason === "check_failed" || evidence.reason === "profile_unavailable"
+                ? "PUBLIC_EVIDENCE_CHECK_FAILED"
+                : "PUBLIC_EVIDENCE_NOT_FOUND",
+            evidence,
+            persisted: false,
+            measurementRunCreated: false,
+          }, evidence.reason === "check_failed" || evidence.reason === "profile_unavailable" ? 502 : 422);
+        }
+
+        const result = await generateMarketSuggestions(admin, openai, orgId, biz as MarketBusiness);
+        return json({
+          ok: true,
+          suggestions: result.suggestions,
+          requestedCount: 24,
+          suggestionCount: result.suggestions.length,
+          intentCounts: result.intentCounts,
+          repairAttempts: result.repairAttempts,
+          portfolioVersion: result.portfolioVersion,
+          persisted: false,
+          measurementRunCreated: false,
+        });
+      } finally {
+        if (pilotActive) {
+          await admin
+            .from("measurement_market_feature_flags")
+            .update({ enabled: false, rollout_stage: "off", updated_at: new Date().toISOString() })
+            .eq("org_id", orgId);
+        }
+      }
+    }
+
+    if (!auth.startsWith("Bearer ")) return json({ error: "UNAUTHORIZED" }, 401);
+
+    const userClient = createClient(url, pub, {
+      global: { headers: { Authorization: auth } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData.user) return json({ error: "UNAUTHORIZED" }, 401);
 
     const { data: membership, error: memErr } = await userClient
       .from("organization_members")
