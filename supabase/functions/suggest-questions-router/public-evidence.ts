@@ -542,6 +542,12 @@ export async function ensureMarketPublicEvidence(
   let acceptedSupportingEvidenceCount = 0;
   let unmappedServiceCandidateCount = 0;
   let rejectedNonServiceEvidenceCount = 0;
+  let parsedServiceCandidateCount = 0;
+  let parsedUnmappedServiceCount = 0;
+  let parsedServiceKeys: string[] = [];
+  let serviceSourceUrlHitCount = 0;
+  let serviceSourceUrlMissCount = 0;
+  let serviceSourceUrlInvalidCount = 0;
 
   try {
     const prompt = [
@@ -553,7 +559,9 @@ export async function ensureMarketPublicEvidence(
       "The public trade name may differ from the registered business name. A brand_stem_hint is provided, but treat a name variant as the same business ONLY when the exact address or a known registered URL strongly links the variant to this business. Never merge different branches or same-name businesses. Services must still be explicitly connected to this exact business on the page.",
       "When several sources explicitly verify the same exact business and the same service, prefer source_urls in this order: registered profile / first-party official site > platform or directory listing > secondary or aggregator page. Never drop a service just because no strong source exists, and never relax the exact-business-identity or explicit-service-verification requirements for this preference.",
       "candidate_services are only priority candidates derived from registration data. Any other service in known_service_taxonomy may also be returned in services when a public page explicitly connects it to this exact business.",
-      "candidate_services is empty because no service candidates were derived from registration data. First confirm the exact business identity using name/address/known URLs, then discover actual customer-facing automotive services from the full known_service_taxonomy. Never infer services from the generic category or business name alone.",
+      bootstrapDiscovery
+        ? "candidate_services is empty because no service candidates were derived from registration data. First confirm the exact business identity using name/address/known URLs, then discover actual customer-facing automotive services from the full known_service_taxonomy. Never infer services from the generic category or business name alone."
+        : "candidate_services is non-empty. Treat these as priority verification targets, not as confirmed services. Verify them first against explicit customer-facing service evidence for this exact business.",
       "Never let a broad registered category stand in for a specific service. For example generic tuning and software vehicle coding are separate service families and must not be merged.",
       "Return in unmapped_services ONLY an explicit automotive service that has no reasonable match anywhere in known_service_taxonomy. Never force an unmapped service into services, and never map it to a loosely related taxonomy key.",
       "Service evidence must explicitly show an automotive service a customer can actually receive from this exact business at this location.",
@@ -632,9 +640,12 @@ export async function ensureMarketPublicEvidence(
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
     const parsedServices = Array.isArray(parsed.services) ? parsed.services : [];
+    parsedServiceCandidateCount = parsedServices.length;
+    const parsedServiceKeySet = new Set<string>();
     for (const raw of parsedServices) {
       const r = rec(raw);
       const serviceKey = clean(r?.service_key);
+      if (serviceKey) parsedServiceKeySet.add(serviceKey);
       if (!allowedServices.has(serviceKey)) continue;
       if (!passesServiceOfferGate(r)) {
         rejectedNonServiceEvidenceCount += 1;
@@ -642,12 +653,22 @@ export async function ensureMarketPublicEvidence(
       }
       const note = clean(r?.evidence_note).slice(0, 500) || null;
       for (const rawUrl of Array.isArray(r?.source_urls) ? r!.source_urls : []) {
-        if (typeof rawUrl !== "string") continue;
+        if (typeof rawUrl !== "string") {
+          serviceSourceUrlInvalidCount += 1;
+          continue;
+        }
         const key = canonicalUrl(rawUrl);
-        if (!key) continue;
+        if (!key) {
+          serviceSourceUrlInvalidCount += 1;
+          continue;
+        }
         if (seen.has(`${serviceKey}|${key}`)) continue;
         const source = sources.get(key);
-        if (!source) continue;
+        if (!source) {
+          serviceSourceUrlMissCount += 1;
+          continue;
+        }
+        serviceSourceUrlHitCount += 1;
         let domain = "";
         try { domain = new URL(source.url).hostname.toLowerCase(); } catch { continue; }
         if (!domain) continue;
@@ -669,10 +690,12 @@ export async function ensureMarketPublicEvidence(
         });
       }
     }
+    parsedServiceKeys = Array.from(parsedServiceKeySet).sort();
 
     // Unmapped services never reach live questions; they only enter the internal review queue.
     const queuedLabels = new Set<string>();
     const parsedUnmapped = Array.isArray(parsed.unmapped_services) ? parsed.unmapped_services : [];
+    parsedUnmappedServiceCount = parsedUnmapped.length;
     for (const raw of parsedUnmapped) {
       const r = rec(raw);
       const candidateLabel = clean(r?.service_label);
@@ -762,11 +785,19 @@ export async function ensureMarketPublicEvidence(
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
         feature: "measurement_market_public_evidence_v0_8_bootstrap_discovery",
+        evidence_search_prompt_version: "v0_8_1_candidate_prompt_fix",
+        search_mode: bootstrapDiscovery ? "bootstrap_discovery" : "candidate_verification",
         business_id: business.id,
         web_search_call_limit: 1,
         candidate_service_count: services.length,
         bootstrap_discovery: bootstrapDiscovery,
         source_count: sourceCount,
+        parsed_service_candidate_count: parsedServiceCandidateCount,
+        parsed_service_keys: parsedServiceKeys,
+        parsed_unmapped_service_count: parsedUnmappedServiceCount,
+        service_source_url_hit_count: serviceSourceUrlHitCount,
+        service_source_url_miss_count: serviceSourceUrlMissCount,
+        service_source_url_invalid_count: serviceSourceUrlInvalidCount,
         accepted_evidence_count: acceptedEvidenceCount,
         accepted_strong_evidence_count: acceptedStrongEvidenceCount,
         accepted_supporting_evidence_count: acceptedSupportingEvidenceCount,
