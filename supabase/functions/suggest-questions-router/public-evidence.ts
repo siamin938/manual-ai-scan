@@ -736,6 +736,38 @@ export async function ensureMarketPublicEvidence(
     }
     stats.parsed_service_keys = Array.from(parsedServiceKeySet).sort();
 
+    // Discovery fallback only: a service that was NOT a registration candidate needs either one
+    // strong source or two supporting sources on distinct domains. Precision over recall.
+    let acceptedRows = rows;
+    if (mode === "discovery_fallback") {
+      const candidateKeySet = new Set(candidateKeys);
+      const byService = new Map<string, Record<string, unknown>[]>();
+      for (const row of rows) {
+        const key = String(row.service_key);
+        const list = byService.get(key);
+        if (list) list.push(row);
+        else byService.set(key, [row]);
+      }
+      acceptedRows = [];
+      for (const [serviceKey, serviceRows] of byService) {
+        if (candidateKeySet.has(serviceKey)) {
+          acceptedRows.push(...serviceRows);
+          continue;
+        }
+        const hasStrong = serviceRows.some((r) => r.evidence_strength === "strong");
+        const supportingDomains = new Set(
+          serviceRows.filter((r) => r.evidence_strength !== "strong").map((r) => String(r.source_domain)),
+        );
+        if (hasStrong || supportingDomains.size >= 2) acceptedRows.push(...serviceRows);
+        else stats.rejected_low_confidence_discovery_count += 1;
+      }
+    }
+    for (const row of acceptedRows) {
+      if (row.evidence_strength === "strong") stats.accepted_strong_evidence_count += 1;
+      else stats.accepted_supporting_evidence_count += 1;
+    }
+
+
     // Unmapped services never reach live questions; they only enter the internal review queue.
     const queuedLabels = new Set<string>();
     const parsedUnmapped = Array.isArray(parsed.unmapped_services) ? parsed.unmapped_services : [];
