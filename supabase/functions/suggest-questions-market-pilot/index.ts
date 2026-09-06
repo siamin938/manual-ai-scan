@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { ensureMarketPublicEvidence } from "../suggest-questions-router/public-evidence.ts";
-import { generateMarketSuggestions, type MarketBusiness } from "../suggest-questions-router/market-generator.ts";
+import { ensureMarketPublicEvidence } from "./public-evidence.ts";
+import { generateMarketSuggestions, type MarketBusiness } from "./market-generator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
