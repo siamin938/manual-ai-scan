@@ -387,7 +387,7 @@ export async function ensureMarketPublicEvidence(
     return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
   if (services.length === 0 && !bootstrapDiscovery) {
-    return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
+    return { ready: false, searched: false,acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
 
   const { data: taxonomyRaw, error: taxonomyErr } = await admin
@@ -413,7 +413,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_8_bootstrap_discovery",
+    evidence_search_version: "v0_8_1_candidate_prompt_fix",
     bootstrap_discovery: bootstrapDiscovery,
     taxonomy_signature: taxonomySignature,
     region: clean(business.region),
