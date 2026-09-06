@@ -277,6 +277,71 @@ function profileHasPublicEvidence(profile: Record<string, unknown> | null): bool
   return profile?.webEvidenceStatus === "available";
 }
 
+type RegisteredLocatorHint = {
+  place_id: string | null;
+  summary_checked: boolean;
+  summary_status: number | null;
+  identity_verified: boolean;
+  category: string | null;
+  name: string | null;
+  address: string | null;
+};
+
+function looseMatch(a: string, b: string): boolean {
+  const na = normalizeServiceLabel(a);
+  const nb = normalizeServiceLabel(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+// Best-effort, single-shot public Naver place summary lookup.
+// Used ONLY as an identity/retrieval hint for the evidence search prompt.
+// It is never stored as service evidence and never retried.
+async function fetchRegisteredLocatorHint(business: PublicEvidenceBusiness): Promise<RegisteredLocatorHint> {
+  const hint: RegisteredLocatorHint = {
+    place_id: null,
+    summary_checked: false,
+    summary_status: null,
+    identity_verified: false,
+    category: null,
+    name: null,
+    address: null,
+  };
+
+  const known = parseHttpUrl(business.naver_place_url);
+  if (!known) return hint;
+  const placeId = naverPlaceId(known) ?? (known.searchParams.get("id") || "").match(/^\d+$/)?.[0] ?? null;
+  if (!placeId) return hint;
+  hint.place_id = placeId;
+
+  try {
+    hint.summary_checked = true;
+    const res = await fetch(`https://map.naver.com/p/api/place/summary/${placeId}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    hint.summary_status = res.status;
+    if (!res.ok) return hint;
+    const body = rec(await res.json().catch(() => null));
+    if (!body) return hint;
+    const node = rec(body.result) ?? rec(body.place) ?? body;
+    const name = clean(node?.name) || clean(node?.title) || null;
+    const address = clean(node?.roadAddress) || clean(node?.address) || null;
+    const category = clean(node?.category) || null;
+    hint.name = name;
+    hint.address = address;
+    hint.category = category;
+    // Deterministic identity match: place id resolved AND name or address agrees with registration.
+    const nameOk = !!name && looseMatch(name, business.name);
+    const addressOk = !!address && !!clean(business.address) && looseMatch(address, clean(business.address));
+    hint.identity_verified = nameOk || addressOk;
+  } catch {
+    // best effort only; never blocks the existing path
+  }
+  return hint;
+}
+
+
 function normalizeServiceLabel(value: string): string {
   return value
     .normalize("NFKC")
