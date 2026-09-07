@@ -15,12 +15,29 @@ type PublicEvidenceBusiness = {
 
 type Source = { url: string; title: string | null };
 
-type EvidenceCheckResult = {
+type EvidenceGenerationBasis = "public_evidence" | "registration_backed" | null;
+
+type EvidenceBasisResult = {
   ready: boolean;
+  publicEvidenceReady: boolean;
+  registrationBacked: boolean;
+  generationBasis: EvidenceGenerationBasis;
+};
+
+type EvidenceCheckResult = EvidenceBasisResult & {
   searched: boolean;
   acceptedEvidenceCount: number;
   reason: "already_available" | "verified" | "cached_no_evidence" | "no_evidence" | "check_failed" | "profile_unavailable";
 };
+
+// Fail-closed basis: no public evidence readiness and no registration-backed permission.
+const CLOSED_BASIS: EvidenceBasisResult = {
+  ready: false,
+  publicEvidenceReady: false,
+  registrationBacked: false,
+  generationBasis: null,
+};
+
 
 const MODEL = "gpt-5.6-luna";
 const NO_EVIDENCE_CACHE_MS = 24 * 60 * 60 * 1000;
