@@ -319,7 +319,13 @@ async function fetchRegisteredLocatorHint(business: PublicEvidenceBusiness): Pro
     hint.summary_checked = true;
     const res = await fetch(`https://map.naver.com/p/api/place/summary/${placeId}`, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        Referer: "https://map.naver.com/",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+      },
       signal: AbortSignal.timeout(2800),
     });
     hint.summary_status = res.status;
@@ -506,7 +512,8 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_9_1_naver_registered_locator",
+    evidence_search_version: "v0_9_2_naver_edge_headers",
+
 
     bootstrap_discovery: bootstrapDiscovery,
     taxonomy_signature: taxonomySignature,
@@ -1002,8 +1009,9 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_9_1_naver_registered_locator",
-        evidence_search_prompt_version: "v0_9_1_naver_registered_locator",
+        feature: "measurement_market_public_evidence_v0_9_2_naver_edge_headers",
+        evidence_search_prompt_version: "v0_9_2_naver_edge_headers",
+
         search_mode: passStats[0]?.search_mode ?? null,
         search_modes: passStats.map((s) => s.search_mode),
         web_search_call_count: webSearchCallCount,
