@@ -294,6 +294,54 @@ function profileHasPublicEvidence(profile: Record<string, unknown> | null): bool
   return profile?.webEvidenceStatus === "available";
 }
 
+// Pure decision helper. Public evidence semantics are unchanged: `ready` and
+// `publicEvidenceReady` stay true only for real public evidence. Registration-backed
+// generation is a separate, strictly gated permission and never promotes evidence.
+export function resolveEvidenceGenerationBasis(
+  profile: Record<string, unknown> | null,
+  activeTaxonomyKeys: string[],
+  publicEvidenceReady: boolean,
+): EvidenceBasisResult {
+  if (publicEvidenceReady) {
+    return {
+      ready: true,
+      publicEvidenceReady: true,
+      registrationBacked: false,
+      generationBasis: "public_evidence",
+    };
+  }
+  if (!profile) return { ...CLOSED_BASIS };
+  if (profile.inputSensitivityDetected === true) return { ...CLOSED_BASIS };
+
+  const taxonomyKeys = new Set(
+    (Array.isArray(activeTaxonomyKeys) ? activeTaxonomyKeys : []).map((k) => clean(k)).filter(Boolean),
+  );
+  if (taxonomyKeys.size === 0) return { ...CLOSED_BASIS };
+
+  const lists = [profile.coreServices, profile.candidateServices, profile.adjacentServices];
+  for (const list of lists) {
+    for (const raw of Array.isArray(list) ? list : []) {
+      const r = rec(raw);
+      if (!r) continue;
+      if (r.targetRegistrationMatch !== true) continue;
+      if (!(Number(r.registrationHits) >= 1)) continue;
+      const status = clean(r.evidenceStatus);
+      if (status !== "registration_only" && status !== "verification_pending") continue;
+      const key = clean(r.key);
+      if (!key || !taxonomyKeys.has(key)) continue;
+      return {
+        ready: false,
+        publicEvidenceReady: false,
+        registrationBacked: true,
+        generationBasis: "registration_backed",
+      };
+    }
+  }
+  return { ...CLOSED_BASIS };
+}
+
+
+
 type RegisteredLocatorHint = {
   place_id: string | null;
   summary_checked: boolean;
