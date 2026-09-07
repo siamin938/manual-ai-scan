@@ -709,6 +709,10 @@ export async function ensureMarketPublicEvidence(
   let inputTokens = 0;
   let outputTokens = 0;
   let webSearchCallCount = 0;
+  let fallbackTriggered = false;
+  const passStats: PassStats[] = [];
+  const locatorHint = await fetchRegisteredLocatorHint(business);
+
   const candidateSearchQueries = new Map<string, string[]>();
   for (const s of services) {
     const anchors = taxonomyRows.find((t) => t.key === s.key)?.anchors ?? [];
@@ -727,9 +731,7 @@ export async function ensureMarketPublicEvidence(
     (total, list) => total + list.length,
     0,
   );
-  let fallbackTriggered = false;
-  const passStats: PassStats[] = [];
-  const locatorHint = await fetchRegisteredLocatorHint(business);
+
 
 
   const runPass = async (mode: SearchMode, allowedKeys: string[]): Promise<PassStats> => {
