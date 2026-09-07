@@ -370,6 +370,55 @@ async function fetchRegisteredLocatorHint(business: PublicEvidenceBusiness): Pro
   return hint;
 }
 
+// Deterministic retrieval queries per candidate service (max 4 each).
+// These are prompt retrieval hints only — a query string or the map category is never
+// service evidence. Final acceptance still requires explicit customer-facing service
+// evidence plus exact source URL matching.
+function buildCandidateSearchQueries(args: {
+  business: PublicEvidenceBusiness;
+  brandStemHint: string | null;
+  locatorHint: RegisteredLocatorHint;
+  serviceLabel: string;
+  anchors: string[];
+}): string[] {
+  const { business, brandStemHint, locatorHint, serviceLabel, anchors } = args;
+  const name = clean(business.name);
+  const label = clean(serviceLabel);
+  const anchor = anchors.find((a) => !!clean(a)) ?? null;
+  const location = clean(business.city) || clean(business.region);
+  const queries: string[] = [];
+
+  if (name && label) queries.push(`${name} ${label}`);
+  if (name && location && anchor) queries.push(`${name} ${location} ${anchor}`);
+  if (name && locatorHint.identity_verified && locatorHint.address && label) {
+    queries.push(`${name} ${locatorHint.address} ${label}`);
+  }
+  if (name && locatorHint.identity_verified && locatorHint.place_id && anchor) {
+    queries.push(`${name} ${locatorHint.place_id} ${anchor}`);
+  }
+
+  // Only when the trade name genuinely differs from the registered name, replace
+  // one of the generic slots with a brand-stem variant.
+  const stem = clean(brandStemHint);
+  if (stem && name && exactNorm(stem) !== exactNorm(name) && location && anchor) {
+    const stemQuery = `${stem} ${location} ${anchor}`;
+    if (queries.length >= 2) queries[1] = stemQuery;
+    else queries.push(stemQuery);
+  }
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const q of queries) {
+    const trimmed = q.replace(/\s+/g, " ").trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
+
 
 
 function normalizeServiceLabel(value: string): string {
@@ -512,7 +561,7 @@ export async function ensureMarketPublicEvidence(
     services: services.map((s) => s.key).sort(),
     name: clean(business.name),
     brand_stem_hint: brandStemHint,
-    evidence_search_version: "v0_9_2_naver_edge_headers",
+    evidence_search_version: "v0_9_3_candidate_query_anchors",
 
 
     bootstrap_discovery: bootstrapDiscovery,
@@ -660,6 +709,24 @@ export async function ensureMarketPublicEvidence(
   let inputTokens = 0;
   let outputTokens = 0;
   let webSearchCallCount = 0;
+  const candidateSearchQueries = new Map<string, string[]>();
+  for (const s of services) {
+    const anchors = taxonomyRows.find((t) => t.key === s.key)?.anchors ?? [];
+    candidateSearchQueries.set(
+      s.key,
+      buildCandidateSearchQueries({
+        business,
+        brandStemHint,
+        locatorHint,
+        serviceLabel: s.label,
+        anchors,
+      }),
+    );
+  }
+  const candidateSearchQueryCount = Array.from(candidateSearchQueries.values()).reduce(
+    (total, list) => total + list.length,
+    0,
+  );
   let fallbackTriggered = false;
   const passStats: PassStats[] = [];
   const locatorHint = await fetchRegisteredLocatorHint(business);
@@ -713,8 +780,11 @@ export async function ensureMarketPublicEvidence(
       "For every returned item set evidence_kind to the kind of page the evidence came from, and set customer_facing_service_explicit to true only when that page explicitly shows a customer-facing service of this exact business.",
       "registered_locator holds the registered map place identifiers for this exact business. Use its place id, name and address only to pin the exact business and to retrieve its pages. The registered map category itself is NEVER service evidence and must never be returned as a verified service.",
       mode === "candidate_verification"
-        ? "Search actively by combining the exact business name, address/location and registered place id with each candidate service label and its question anchors, so that a candidate is verified only from pages that clearly belong to this exact business."
+        ? "Each candidate service carries a deterministic search_queries list. Use those strings as your primary retrieval queries and run at least one query per candidate service when possible, before trying any query of your own."
         : "Search actively by combining the exact business name, address/location and registered place id with service labels and question anchors from the taxonomy.",
+      mode === "candidate_verification"
+        ? "A search_queries string, a question anchor, or the registered map category is NEVER service evidence. Never conclude that a service exists just because the service name appeared inside a query you ran. A candidate is accepted only when explicit customer-facing service evidence for this exact business is found and the source URL you return actually appeared in your web search results."
+        : "A question anchor or the registered map category is NEVER service evidence.",
       JSON.stringify({
         business: {
           name: business.name,
@@ -748,6 +818,7 @@ export async function ensureMarketPublicEvidence(
             ? services.map((s) => ({
                 ...s,
                 question_anchors: taxonomyRows.find((t) => t.key === s.key)?.anchors ?? [],
+                search_queries: candidateSearchQueries.get(s.key) ?? [],
               }))
             : [],
         known_service_taxonomy: allowedTaxonomy.map((t) => ({
@@ -1009,14 +1080,15 @@ export async function ensureMarketPublicEvidence(
       metadata: {
         cost_source: "unpriced_usage",
         pricing_status: "not_yet_priced",
-        feature: "measurement_market_public_evidence_v0_9_2_naver_edge_headers",
-        evidence_search_prompt_version: "v0_9_2_naver_edge_headers",
+        feature: "measurement_market_public_evidence_v0_9_3_candidate_query_anchors",
+        evidence_search_prompt_version: "v0_9_3_candidate_query_anchors",
 
         search_mode: passStats[0]?.search_mode ?? null,
         search_modes: passStats.map((s) => s.search_mode),
         web_search_call_count: webSearchCallCount,
         web_search_call_limit: candidateKeys.length > 0 ? 2 : 1,
         fallback_triggered: fallbackTriggered,
+        candidate_search_query_count: candidateSearchQueryCount,
         bootstrap_discovery: bootstrapDiscovery,
         naver_place_id: locatorHint.place_id,
         naver_summary_checked: locatorHint.summary_checked,
