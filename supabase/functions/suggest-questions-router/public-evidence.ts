@@ -601,7 +601,7 @@ export async function ensureMarketPublicEvidence(
     return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
   if (services.length === 0 && !bootstrapDiscovery) {
-    return { ready: false, searched: false,acceptedEvidenceCount: 0, reason: "no_evidence" };
+    return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
 
   const { data: taxonomyRaw, error: taxonomyErr } = await admin
