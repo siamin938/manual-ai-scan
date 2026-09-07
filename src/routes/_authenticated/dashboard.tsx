@@ -15,6 +15,7 @@ import {
 } from "@/lib/visibility-repeat-context.helpers";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
+import type { BenchmarkSourceGroupDTO } from "@/lib/visibility-benchmark.types";
 import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
 import { ActionRecommendationsSection } from "@/components/action-recommendations-section";
 
@@ -72,6 +73,12 @@ function pct(value: number | null): string {
 /** 내부 intent 값은 노출하지 않고 기존 공용 라벨만 재사용한다. */
 function intentLabel(intentType: string): string {
   return (INTENT_LABELS as Record<string, string>)[intentType] ?? "기타";
+}
+
+/** 고노출 출처 패턴 그룹의 표시 라벨만 치환한다. key, 수치, 정렬은 그대로. */
+function benchmarkGroupLabel(g: BenchmarkSourceGroupDTO): string {
+  if (g.key === "other") return "업체·브랜드 홈페이지·독립 사이트";
+  return g.label;
 }
 
 const STATUS_LABEL: Record<"missing" | "partial", string> = {
@@ -667,9 +674,14 @@ function DashboardPage() {
                           className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium">{g.label}</p>
+                            <p className="text-sm font-medium">{benchmarkGroupLabel(g)}</p>
                             {siteLabels && (
                               <p className="mt-0.5 text-xs text-muted-foreground">{siteLabels}</p>
+                            )}
+                            {g.key === "other" && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                업체·브랜드 사이트와 기타 독립 사이트가 함께 포함될 수 있습니다.
+                              </p>
                             )}
                             <p className="mt-0.5 text-xs text-muted-foreground">
                               고노출 업체 {benchmark.highVisibilityEntityCount}곳 중{" "}
