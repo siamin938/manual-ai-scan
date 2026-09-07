@@ -576,12 +576,17 @@ export async function ensureMarketPublicEvidence(
     "resolve_measurement_market_profile_candidate_v02",
     { p_business_id: business.id },
   );
-  if (profileErr) return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "profile_unavailable" };
+  if (profileErr) return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "profile_unavailable" };
 
   const profile = rec(profileRaw);
-  if (!profile) return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "profile_unavailable" };
+  if (!profile) return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "profile_unavailable" };
   if (profileHasPublicEvidence(profile)) {
-    return { ready: true, searched: false, acceptedEvidenceCount: 0, reason: "already_available" };
+    return {
+      ...resolveEvidenceGenerationBasis(profile, [], true),
+      searched: false,
+      acceptedEvidenceCount: 0,
+      reason: "already_available",
+    };
   }
 
   const identityKey = clean(profile.businessIdentityKey);
