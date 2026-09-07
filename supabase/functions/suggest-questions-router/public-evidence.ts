@@ -15,12 +15,29 @@ type PublicEvidenceBusiness = {
 
 type Source = { url: string; title: string | null };
 
-type EvidenceCheckResult = {
+type EvidenceGenerationBasis = "public_evidence" | "registration_backed" | null;
+
+type EvidenceBasisResult = {
   ready: boolean;
+  publicEvidenceReady: boolean;
+  registrationBacked: boolean;
+  generationBasis: EvidenceGenerationBasis;
+};
+
+type EvidenceCheckResult = EvidenceBasisResult & {
   searched: boolean;
   acceptedEvidenceCount: number;
   reason: "already_available" | "verified" | "cached_no_evidence" | "no_evidence" | "check_failed" | "profile_unavailable";
 };
+
+// Fail-closed basis: no public evidence readiness and no registration-backed permission.
+const CLOSED_BASIS: EvidenceBasisResult = {
+  ready: false,
+  publicEvidenceReady: false,
+  registrationBacked: false,
+  generationBasis: null,
+};
+
 
 const MODEL = "gpt-5.6-luna";
 const NO_EVIDENCE_CACHE_MS = 24 * 60 * 60 * 1000;
@@ -277,6 +294,54 @@ function profileHasPublicEvidence(profile: Record<string, unknown> | null): bool
   return profile?.webEvidenceStatus === "available";
 }
 
+// Pure decision helper. Public evidence semantics are unchanged: `ready` and
+// `publicEvidenceReady` stay true only for real public evidence. Registration-backed
+// generation is a separate, strictly gated permission and never promotes evidence.
+export function resolveEvidenceGenerationBasis(
+  profile: Record<string, unknown> | null,
+  activeTaxonomyKeys: string[],
+  publicEvidenceReady: boolean,
+): EvidenceBasisResult {
+  if (publicEvidenceReady) {
+    return {
+      ready: true,
+      publicEvidenceReady: true,
+      registrationBacked: false,
+      generationBasis: "public_evidence",
+    };
+  }
+  if (!profile) return { ...CLOSED_BASIS };
+  if (profile.inputSensitivityDetected === true) return { ...CLOSED_BASIS };
+
+  const taxonomyKeys = new Set(
+    (Array.isArray(activeTaxonomyKeys) ? activeTaxonomyKeys : []).map((k) => clean(k)).filter(Boolean),
+  );
+  if (taxonomyKeys.size === 0) return { ...CLOSED_BASIS };
+
+  const lists = [profile.coreServices, profile.candidateServices, profile.adjacentServices];
+  for (const list of lists) {
+    for (const raw of Array.isArray(list) ? list : []) {
+      const r = rec(raw);
+      if (!r) continue;
+      if (r.targetRegistrationMatch !== true) continue;
+      if (!(Number(r.registrationHits) >= 1)) continue;
+      const status = clean(r.evidenceStatus);
+      if (status !== "registration_only" && status !== "verification_pending") continue;
+      const key = clean(r.key);
+      if (!key || !taxonomyKeys.has(key)) continue;
+      return {
+        ready: false,
+        publicEvidenceReady: false,
+        registrationBacked: true,
+        generationBasis: "registration_backed",
+      };
+    }
+  }
+  return { ...CLOSED_BASIS };
+}
+
+
+
 type RegisteredLocatorHint = {
   place_id: string | null;
   summary_checked: boolean;
@@ -511,12 +576,17 @@ export async function ensureMarketPublicEvidence(
     "resolve_measurement_market_profile_candidate_v02",
     { p_business_id: business.id },
   );
-  if (profileErr) return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "profile_unavailable" };
+  if (profileErr) return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "profile_unavailable" };
 
   const profile = rec(profileRaw);
-  if (!profile) return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "profile_unavailable" };
+  if (!profile) return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "profile_unavailable" };
   if (profileHasPublicEvidence(profile)) {
-    return { ready: true, searched: false, acceptedEvidenceCount: 0, reason: "already_available" };
+    return {
+      ...resolveEvidenceGenerationBasis(profile, [], true),
+      searched: false,
+      acceptedEvidenceCount: 0,
+      reason: "already_available",
+    };
   }
 
   const identityKey = clean(profile.businessIdentityKey);
@@ -528,10 +598,10 @@ export async function ensureMarketPublicEvidence(
   const bootstrapDiscovery = services.length === 0 && hasStrongLocator;
 
   if (!identityKey) {
-    return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
+    return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
   if (services.length === 0 && !bootstrapDiscovery) {
-    return { ready: false, searched: false,acceptedEvidenceCount: 0, reason: "no_evidence" };
+    return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "no_evidence" };
   }
 
   const { data: taxonomyRaw, error: taxonomyErr } = await admin
@@ -577,7 +647,7 @@ export async function ensureMarketPublicEvidence(
   // Fail closed when the central taxonomy cannot be read.
   if (taxonomyErr || taxonomyRows.length === 0) {
     await writeCheck(admin, identityKey, candidateSignature, "failed", 0, 0);
-    return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
+    return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
   }
 
   const { data: cached } = await admin
@@ -589,10 +659,21 @@ export async function ensureMarketPublicEvidence(
   if (cached && cached.candidate_signature === candidateSignature) {
     const age = Date.now() - new Date(cached.checked_at).getTime();
     if (cached.status === "no_evidence" && age >= 0 && age < NO_EVIDENCE_CACHE_MS) {
-      return { ready: false, searched: false, acceptedEvidenceCount: Number(cached.accepted_evidence_count ?? 0), reason: "cached_no_evidence" };
+      // Valid no_evidence cache: public evidence stays absent, but a fresh initial
+      // profile may still permit strictly gated registration-backed generation.
+      return {
+        ...resolveEvidenceGenerationBasis(
+          profile,
+          taxonomyRows.map((t) => t.key),
+          false,
+        ),
+        searched: false,
+        acceptedEvidenceCount: Number(cached.accepted_evidence_count ?? 0),
+        reason: "cached_no_evidence",
+      };
     }
     if (cached.status === "failed" && age >= 0 && age < FAILED_CACHE_MS) {
-      return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
+      return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
     }
   }
 
@@ -1062,15 +1143,17 @@ export async function ensureMarketPublicEvidence(
     });
     const refreshed = rec(refreshedRaw);
     const ready = profileHasPublicEvidence(refreshed);
+    // Basis is always computed from the refreshed profile.
+    const basis = resolveEvidenceGenerationBasis(refreshed, taxonomyKeys, ready);
     return {
-      ready,
+      ...basis,
       searched: true,
       acceptedEvidenceCount,
       reason: ready ? "verified" : "no_evidence",
     };
   } catch {
     await writeCheck(admin, identityKey, candidateSignature, "failed", sumStats("source_count"), acceptedEvidenceCount);
-    return { ready: false, searched: true, acceptedEvidenceCount, reason: "check_failed" };
+    return { ...CLOSED_BASIS, searched: true, acceptedEvidenceCount, reason: "check_failed" };
   } finally {
     await admin.from("cost_events").insert({
       org_id: orgId,

@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     if (bizErr || !biz) return json({ error: "BUSINESS_NOT_AVAILABLE" }, 404);
 
     const evidence = await ensureMarketPublicEvidence(admin, openai, orgId, biz);
-    if (!evidence.ready) {
+    if (evidence.generationBasis === null) {
       return json(
         {
           error:
