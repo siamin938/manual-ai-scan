@@ -15,6 +15,7 @@ import {
 } from "@/lib/visibility-repeat-context.helpers";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import type { VisibilityDiagnosticDTO } from "@/lib/visibility-diagnostic.types";
+import type { BenchmarkSourceGroupDTO } from "@/lib/visibility-benchmark.types";
 import { CompetitorDetailDialog } from "@/components/competitor-detail-dialog";
 import { ActionRecommendationsSection } from "@/components/action-recommendations-section";
 
