@@ -659,10 +659,21 @@ export async function ensureMarketPublicEvidence(
   if (cached && cached.candidate_signature === candidateSignature) {
     const age = Date.now() - new Date(cached.checked_at).getTime();
     if (cached.status === "no_evidence" && age >= 0 && age < NO_EVIDENCE_CACHE_MS) {
-      return { ready: false, searched: false, acceptedEvidenceCount: Number(cached.accepted_evidence_count ?? 0), reason: "cached_no_evidence" };
+      // Valid no_evidence cache: public evidence stays absent, but a fresh initial
+      // profile may still permit strictly gated registration-backed generation.
+      return {
+        ...resolveEvidenceGenerationBasis(
+          profile,
+          taxonomyRows.map((t) => t.key),
+          false,
+        ),
+        searched: false,
+        acceptedEvidenceCount: Number(cached.accepted_evidence_count ?? 0),
+        reason: "cached_no_evidence",
+      };
     }
     if (cached.status === "failed" && age >= 0 && age < FAILED_CACHE_MS) {
-      return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
+      return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
     }
   }
 
