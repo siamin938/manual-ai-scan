@@ -215,7 +215,7 @@ function gapHeadline(
   if (!rec) return null;
   const label = rec.title?.trim();
   if (!label) return null;
-  return `${prefix} ${customerText(label)}`;
+  return `${prefix} ${customerTitle(label)}`;
 }
 
 
@@ -323,7 +323,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             {customerText(rec.evidenceLabel)}
           </Badge>
         </div>
-        <CardTitle className="mt-2 text-base sm:text-lg">{customerText(rec.title)}</CardTitle>
+        <CardTitle className="mt-2 text-base sm:text-lg">{customerTitle(rec.title)}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
