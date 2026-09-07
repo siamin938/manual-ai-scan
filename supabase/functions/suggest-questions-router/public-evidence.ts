@@ -647,7 +647,7 @@ export async function ensureMarketPublicEvidence(
   // Fail closed when the central taxonomy cannot be read.
   if (taxonomyErr || taxonomyRows.length === 0) {
     await writeCheck(admin, identityKey, candidateSignature, "failed", 0, 0);
-    return { ready: false, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
+    return { ...CLOSED_BASIS, searched: false, acceptedEvidenceCount: 0, reason: "check_failed" };
   }
 
   const { data: cached } = await admin
