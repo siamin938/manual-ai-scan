@@ -674,9 +674,14 @@ function DashboardPage() {
                           className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium">{g.label}</p>
+                            <p className="text-sm font-medium">{benchmarkGroupLabel(g)}</p>
                             {siteLabels && (
                               <p className="mt-0.5 text-xs text-muted-foreground">{siteLabels}</p>
+                            )}
+                            {g.key === "other" && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                업체·브랜드 사이트와 기타 독립 사이트가 함께 포함될 수 있습니다.
+                              </p>
                             )}
                             <p className="mt-0.5 text-xs text-muted-foreground">
                               고노출 업체 {benchmark.highVisibilityEntityCount}곳 중{" "}
