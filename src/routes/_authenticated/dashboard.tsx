@@ -75,6 +75,12 @@ function intentLabel(intentType: string): string {
   return (INTENT_LABELS as Record<string, string>)[intentType] ?? "기타";
 }
 
+/** 고노출 출처 패턴 그룹의 표시 라벨만 치환한다. key, 수치, 정렬은 그대로. */
+function benchmarkGroupLabel(g: BenchmarkSourceGroupDTO): string {
+  if (g.key === "other") return "업체·브랜드 홈페이지·독립 사이트";
+  return g.label;
+}
+
 const STATUS_LABEL: Record<"missing" | "partial", string> = {
   missing: "이번 측정 미추천",
   partial: "가끔 추천",
