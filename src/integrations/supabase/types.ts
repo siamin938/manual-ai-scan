@@ -3152,6 +3152,10 @@ export type Database = {
         Args: { p_name: string; p_slug: string }
         Returns: string
       }
+      get_auto_business_brand_core_v01: {
+        Args: { p_name: string }
+        Returns: string
+      }
       get_benchmark_business_identity_key_v01: {
         Args: {
           p_address: string
