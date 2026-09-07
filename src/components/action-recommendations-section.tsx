@@ -37,6 +37,16 @@ const CUSTOMER_LABEL_OVERRIDES: Record<string, string> = {
   "기타 제3자 정보": "기타 웹사이트",
 };
 
+/** 액션 카드 제목을 고객이 바로 이해할 수 있는 표현으로만 바꾼다. */
+const CUSTOMER_TITLE_OVERRIDES: Record<string, string> = {
+  "업체를 믿고 맡길 수 있는 정보가 잘 보이는지 확인하기":
+    "경력·전문 분야·보증·작업 이력을 한 페이지에 공개하기",
+  "AS 기준을 공개하고 사후관리 사례와 실제 후기를 확보하기":
+    "AS 기준·사후관리 사례·실제 고객 후기를 공개하기",
+  "실제로 가능한 세부 서비스를 더 잘 발견되게 정리하기":
+    "세부 서비스별 시공 범위와 실제 작업 사례를 정리하기",
+};
+
 function customerLabel(label: string): string {
   return CUSTOMER_LABEL_OVERRIDES[label] ?? label;
 }
@@ -51,6 +61,11 @@ function customerText(text: string): string {
     .replace(/함께 관찰된 경쟁업체/g, "함께 관찰된 업체")
     .replace(/경쟁업체/g, "함께 관찰된 업체")
     .replace(/우선 시도/g, "우선 확인");
+}
+
+/** 액션 카드 제목용: 제목 오버라이드를 먼저 적용한 뒤 기존 치환도 유지한다. */
+function customerTitle(title: string): string {
+  return customerText(CUSTOMER_TITLE_OVERRIDES[title] ?? title);
 }
 
 /** 고객 표시용 intent 라벨 (표시 전용, 서버 판정과 무관). */
@@ -200,7 +215,7 @@ function gapHeadline(
   if (!rec) return null;
   const label = rec.title?.trim();
   if (!label) return null;
-  return `${prefix} ${customerText(label)}`;
+  return `${prefix} ${customerTitle(label)}`;
 }
 
 
@@ -308,7 +323,7 @@ function RecommendationCard({ rec }: { rec: ActionRecommendationDTO }) {
             {customerText(rec.evidenceLabel)}
           </Badge>
         </div>
-        <CardTitle className="mt-2 text-base sm:text-lg">{customerText(rec.title)}</CardTitle>
+        <CardTitle className="mt-2 text-base sm:text-lg">{customerTitle(rec.title)}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
