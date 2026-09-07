@@ -1143,15 +1143,17 @@ export async function ensureMarketPublicEvidence(
     });
     const refreshed = rec(refreshedRaw);
     const ready = profileHasPublicEvidence(refreshed);
+    // Basis is always computed from the refreshed profile.
+    const basis = resolveEvidenceGenerationBasis(refreshed, taxonomyKeys, ready);
     return {
-      ready,
+      ...basis,
       searched: true,
       acceptedEvidenceCount,
       reason: ready ? "verified" : "no_evidence",
     };
   } catch {
     await writeCheck(admin, identityKey, candidateSignature, "failed", sumStats("source_count"), acceptedEvidenceCount);
-    return { ready: false, searched: true, acceptedEvidenceCount, reason: "check_failed" };
+    return { ...CLOSED_BASIS, searched: true, acceptedEvidenceCount, reason: "check_failed" };
   } finally {
     await admin.from("cost_events").insert({
       org_id: orgId,
