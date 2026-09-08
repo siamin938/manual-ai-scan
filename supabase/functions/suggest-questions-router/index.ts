@@ -222,7 +222,11 @@ Deno.serve(async (req) => {
         suggestions: result.suggestions,
         requestedCount: 24,
         suggestionCount: result.suggestions.length,
+        ...(mode === "internal_remeasurement"
+          ? { generationMode: "internal_remeasurement" }
+          : {}),
       });
+
     } catch (e) {
       return json(
         { error: e instanceof Error ? e.message : "MARKET_GENERATION_FAILED" },
