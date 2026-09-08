@@ -230,7 +230,12 @@ function QuestionsPage() {
   const suggestAi = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("suggest-questions-router", {
-        body: { orgId: activeOrgId, businessId, count: 24 },
+        body: {
+          orgId: activeOrgId,
+          businessId,
+          count: 24,
+          ...(genMode === "internal_remeasurement" ? { mode: "internal_remeasurement" } : {}),
+        },
       });
       if (error) throw new Error(error.message);
       return data as {
@@ -250,10 +255,16 @@ function QuestionsPage() {
       }
       setCandidates(list);
       const today = new Date().toISOString().slice(0, 10);
-      setNewSetName(`${selectedBusiness?.name ?? "업체"} AI 검색 질문 ${today}`);
+      const baseName = selectedBusiness?.name ?? "업체";
+      setNewSetName(
+        genMode === "internal_remeasurement"
+          ? `${baseName} 최신 Market 질문 ${today}`
+          : `${baseName} AI 검색 질문 ${today}`,
+      );
       setOpenConfirmAi(false);
       setOpenReview(true);
     },
+
     onError: (e: Error) => toast.error(mapSuggestError(e.message)),
   });
 
