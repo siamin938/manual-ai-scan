@@ -341,13 +341,34 @@ function QuestionsPage() {
           />
           <div className="ml-auto flex items-center gap-3">
             {canWrite ? (
-              <Button disabled={!businessId} onClick={() => setOpenConfirmAi(true)}>
-                추천 검색 질문 만들기
-              </Button>
+              <>
+                <Button
+                  disabled={!businessId}
+                  onClick={() => {
+                    setGenMode("default");
+                    setOpenConfirmAi(true);
+                  }}
+                >
+                  추천 검색 질문 만들기
+                </Button>
+                {isInternalOperator && (
+                  <Button
+                    variant="outline"
+                    disabled={!businessId}
+                    onClick={() => {
+                      setGenMode("internal_remeasurement");
+                      setOpenConfirmAi(true);
+                    }}
+                  >
+                    최신 Market 질문 새 세트 만들기
+                  </Button>
+                )}
+              </>
             ) : (
               <Badge variant="secondary">조회 전용 권한</Badge>
             )}
           </div>
+
           <p className="w-full text-xs text-muted-foreground">
             지역·추천·서비스·후기·신뢰·비교·가격·탐색 등 다양한 상황의 검색 질문 24개를 자동으로 만듭니다.
           </p>
