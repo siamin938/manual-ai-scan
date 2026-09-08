@@ -77,8 +77,18 @@ Deno.serve(async (req) => {
     const orgId = typeof body?.orgId === "string" ? body.orgId : "";
     const businessId = typeof body?.businessId === "string" ? body.businessId : "";
     const count = Number(body?.count ?? 24);
+    const modeRaw = body?.mode;
+    const mode =
+      modeRaw === undefined || modeRaw === null || modeRaw === "default"
+        ? "default"
+        : modeRaw === "internal_remeasurement"
+          ? "internal_remeasurement"
+          : null;
 
-    if (!orgId || !businessId || count !== 24) return json({ error: "INVALID_INPUT" }, 400);
+    if (!orgId || !businessId || count !== 24 || mode === null) {
+      return json({ error: "INVALID_INPUT" }, 400);
+    }
+
 
     const { data: membership, error: memErr } = await userClient
       .from("organization_members")
