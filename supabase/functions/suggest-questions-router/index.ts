@@ -77,8 +77,18 @@ Deno.serve(async (req) => {
     const orgId = typeof body?.orgId === "string" ? body.orgId : "";
     const businessId = typeof body?.businessId === "string" ? body.businessId : "";
     const count = Number(body?.count ?? 24);
+    const modeRaw = body?.mode;
+    const mode =
+      modeRaw === undefined || modeRaw === null || modeRaw === "default"
+        ? "default"
+        : modeRaw === "internal_remeasurement"
+          ? "internal_remeasurement"
+          : null;
 
-    if (!orgId || !businessId || count !== 24) return json({ error: "INVALID_INPUT" }, 400);
+    if (!orgId || !businessId || count !== 24 || mode === null) {
+      return json({ error: "INVALID_INPUT" }, 400);
+    }
+
 
     const { data: membership, error: memErr } = await userClient
       .from("organization_members")
@@ -111,7 +121,20 @@ Deno.serve(async (req) => {
 
     let useMarket = internalPilot;
 
-    if (newBusinessFirst) {
+    if (mode === "internal_remeasurement") {
+      if (origin !== "internal_observation") return json({ error: "FORBIDDEN" }, 403);
+      if (String(membership.role) !== "owner") return json({ error: "FORBIDDEN" }, 403);
+
+      const { data: adminAllowed, error: adminErr } = await userClient.rpc(
+        "can_view_data_asset_admin_v01",
+      );
+      if (adminErr) return json({ error: "INTERNAL_ACCESS_CHECK_FAILED" }, 500);
+      if (adminAllowed !== true) return json({ error: "FORBIDDEN" }, 403);
+
+      useMarket = true;
+    }
+
+    if (newBusinessFirst && mode !== "internal_remeasurement") {
       const { data: eligibilityRaw, error: eligibilityErr } = await admin.rpc(
         "get_measurement_market_generation_eligibility_v01",
         { p_org_id: orgId, p_business_id: businessId },
@@ -129,6 +152,7 @@ Deno.serve(async (req) => {
         return json({ error: "MARKET_FIRST_GENERATION_NOT_AVAILABLE" }, 409);
       }
     }
+
 
     if (!useMarket) {
       const forwarded = await fetch(`${url}/functions/v1/suggest-questions`, {
@@ -198,7 +222,11 @@ Deno.serve(async (req) => {
         suggestions: result.suggestions,
         requestedCount: 24,
         suggestionCount: result.suggestions.length,
+        ...(mode === "internal_remeasurement"
+          ? { generationMode: "internal_remeasurement" }
+          : {}),
       });
+
     } catch (e) {
       return json(
         { error: e instanceof Error ? e.message : "MARKET_GENERATION_FAILED" },

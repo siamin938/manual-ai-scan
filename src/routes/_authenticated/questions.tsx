@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { canViewDataAssetAdmin } from "@/lib/data-asset-admin.functions";
 import { useOrg } from "@/lib/org";
+
 import {
   BusinessSelector,
   useClientBusinessSelection,
@@ -88,6 +91,22 @@ function QuestionsPage() {
   const [openReview, setOpenReview] = useState(false);
   const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
   const [newSetName, setNewSetName] = useState("");
+  const [genMode, setGenMode] = useState<"default" | "internal_remeasurement">("default");
+
+  const checkInternalAccess = useServerFn(canViewDataAssetAdmin);
+  const { data: internalAccess } = useQuery({
+    queryKey: ["questions-internal-access"],
+    queryFn: async () => {
+      try {
+        const res = await checkInternalAccess({ data: undefined });
+        return res?.allowed === true;
+      } catch {
+        return false;
+      }
+    },
+  });
+  const isInternalOperator = internalAccess === true;
+
 
   const { data: selectedBusiness = null } = useQuery({
     queryKey: ["business-locale", activeOrgId, businessId],
@@ -211,7 +230,12 @@ function QuestionsPage() {
   const suggestAi = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("suggest-questions-router", {
-        body: { orgId: activeOrgId, businessId, count: 24 },
+        body: {
+          orgId: activeOrgId,
+          businessId,
+          count: 24,
+          ...(genMode === "internal_remeasurement" ? { mode: "internal_remeasurement" } : {}),
+        },
       });
       if (error) throw new Error(error.message);
       return data as {
@@ -231,10 +255,16 @@ function QuestionsPage() {
       }
       setCandidates(list);
       const today = new Date().toISOString().slice(0, 10);
-      setNewSetName(`${selectedBusiness?.name ?? "업체"} AI 검색 질문 ${today}`);
+      const baseName = selectedBusiness?.name ?? "업체";
+      setNewSetName(
+        genMode === "internal_remeasurement"
+          ? `${baseName} 최신 Market 질문 ${today}`
+          : `${baseName} AI 검색 질문 ${today}`,
+      );
       setOpenConfirmAi(false);
       setOpenReview(true);
     },
+
     onError: (e: Error) => toast.error(mapSuggestError(e.message)),
   });
 
@@ -311,13 +341,34 @@ function QuestionsPage() {
           />
           <div className="ml-auto flex items-center gap-3">
             {canWrite ? (
-              <Button disabled={!businessId} onClick={() => setOpenConfirmAi(true)}>
-                추천 검색 질문 만들기
-              </Button>
+              <>
+                <Button
+                  disabled={!businessId}
+                  onClick={() => {
+                    setGenMode("default");
+                    setOpenConfirmAi(true);
+                  }}
+                >
+                  추천 검색 질문 만들기
+                </Button>
+                {isInternalOperator && (
+                  <Button
+                    variant="outline"
+                    disabled={!businessId}
+                    onClick={() => {
+                      setGenMode("internal_remeasurement");
+                      setOpenConfirmAi(true);
+                    }}
+                  >
+                    최신 Market 질문 새 세트 만들기
+                  </Button>
+                )}
+              </>
             ) : (
               <Badge variant="secondary">조회 전용 권한</Badge>
             )}
           </div>
+
           <p className="w-full text-xs text-muted-foreground">
             지역·추천·서비스·후기·신뢰·비교·가격·탐색 등 다양한 상황의 검색 질문 24개를 자동으로 만듭니다.
           </p>
@@ -487,17 +538,25 @@ function QuestionsPage() {
       <Dialog open={openConfirmAi} onOpenChange={(v) => !suggestAi.isPending && setOpenConfirmAi(v)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>AI 검색 질문을 만들까요?</DialogTitle>
+            <DialogTitle>
+              {genMode === "internal_remeasurement"
+                ? "최신 Market 질문 새 세트를 만들까요?"
+                : "AI 검색 질문을 만들까요?"}
+            </DialogTitle>
             <DialogDescription>
-              등록한 업체의 업종과 지역을 바탕으로, 실제 고객이 AI에 물어볼 만한 검색 질문 24개를 만듭니다.
+              {genMode === "internal_remeasurement"
+                ? "기존 질문 세트와 기존 측정 결과는 그대로 보존되며, 새 24문항 후보만 만듭니다."
+                : "등록한 업체의 업종과 지역을 바탕으로, 실제 고객이 AI에 물어볼 만한 검색 질문 24개를 만듭니다."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
             <p className="text-xs">
-              만들어진 질문은 측정 전에 확인할 수 있습니다. 첫 측정을 시작하면 정확한 반복 비교를 위해 질문이
-              고정됩니다.
+              {genMode === "internal_remeasurement"
+                ? "이 단계에서는 측정이 시작되지 않고 측정권도 사용되지 않습니다. 저장 후에도 측정은 자동으로 실행되지 않습니다."
+                : "만들어진 질문은 측정 전에 확인할 수 있습니다. 첫 측정을 시작하면 정확한 반복 비교를 위해 질문이 고정됩니다."}
             </p>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenConfirmAi(false)} disabled={suggestAi.isPending}>
               취소
