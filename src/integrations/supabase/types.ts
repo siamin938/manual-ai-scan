@@ -3218,6 +3218,38 @@ export type Database = {
         }[]
       }
       get_data_asset_admin_overview_v01: { Args: never; Returns: Json }
+      get_first_run_content_source_observations_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
+      get_first_run_profile_source_observations_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
       get_global_high_visibility_source_patterns_legacy_v01: {
         Args: { p_business_id: string; p_requesting_org_id: string }
         Returns: Json
@@ -3256,6 +3288,15 @@ export type Database = {
           daily_requests: number
           monthly_actual_cost_usd: number
           monthly_reserved_cost_usd: number
+        }[]
+      }
+      get_visibility_domain_sharedness_v01: {
+        Args: { p_domains: string[] }
+        Returns: {
+          distinct_entity_keys: number
+          domain: string
+          linked_response_count: number
+          target_business_contexts: number
         }[]
       }
       get_visibility_repeat_aggregate_v01: {
