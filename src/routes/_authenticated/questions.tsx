@@ -91,6 +91,22 @@ function QuestionsPage() {
   const [openReview, setOpenReview] = useState(false);
   const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
   const [newSetName, setNewSetName] = useState("");
+  const [genMode, setGenMode] = useState<"default" | "internal_remeasurement">("default");
+
+  const checkInternalAccess = useServerFn(canViewDataAssetAdmin);
+  const { data: internalAccess } = useQuery({
+    queryKey: ["questions-internal-access"],
+    queryFn: async () => {
+      try {
+        const res = await checkInternalAccess({ data: undefined });
+        return res?.allowed === true;
+      } catch {
+        return false;
+      }
+    },
+  });
+  const isInternalOperator = internalAccess === true;
+
 
   const { data: selectedBusiness = null } = useQuery({
     queryKey: ["business-locale", activeOrgId, businessId],
