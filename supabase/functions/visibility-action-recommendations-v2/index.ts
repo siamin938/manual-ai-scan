@@ -383,7 +383,13 @@ function recommendationScore(rec: unknown) {
   const level = typeof rec.evidenceLevel === "string" ? rec.evidenceLevel : "";
   const id = typeof rec.id === "string" ? rec.id : "";
 
-  let score = id.startsWith("observation:content:") ? 600 : kind === "source_gap" ? 1000 : 600;
+  let score = id.startsWith("observation:content:")
+    ? 600
+    : id.startsWith("observation:profile:")
+      ? 850
+      : kind === "source_gap"
+        ? 1000
+        : 600;
   if (level === "priority_try") score += 400;
   else if (level === "worth_review") score += 200;
   score += gap * 40 + distinct * 60 + competitor * 20;
@@ -393,6 +399,7 @@ function recommendationScore(rec: unknown) {
 function rerank(recommendations: unknown[]) {
   return [...recommendations]
     .sort((a, b) => recommendationScore(b) - recommendationScore(a))
+    .slice(0, MAX_RECOMMENDATIONS)
     .map((rec, index) => (isObj(rec) ? { ...rec, rank: index + 1 } : rec));
 }
 
@@ -483,6 +490,34 @@ Deno.serve(async (req) => {
           if (!rec || existingIds.has(rec.id)) continue;
           recommendations.push(rec);
           existingIds.add(rec.id);
+        }
+      }
+
+      const { data: profileObservations, error: profileObservationError } = await db.rpc(
+        "get_first_run_profile_source_observations_v01",
+        { p_org_id: orgId, p_business_id: businessId, p_run_id: latestRunId },
+      );
+      if (profileObservationError) {
+        console.error(
+          JSON.stringify({
+            function: "visibility-action-recommendations-v2",
+            code: "PROFILE_OBSERVATION_RPC_FAILED",
+            message: profileObservationError.message,
+          }),
+        );
+      } else {
+        const existingIds = new Set(
+          recommendations.filter(isObj).map((rec) => (typeof rec.id === "string" ? rec.id : "")),
+        );
+        const takenPlatformKeys = existingPlatformKeys(recommendations);
+        for (const raw of Array.isArray(profileObservations) ? profileObservations : []) {
+          const rec = buildFirstRunProfileRecommendation(raw, validCount);
+          if (!rec || existingIds.has(rec.id)) continue;
+          const platformKey = isObj(raw) && typeof raw.source_key === "string" ? raw.source_key.trim() : "";
+          if (platformKey && takenPlatformKeys.has(platformKey)) continue;
+          recommendations.push(rec);
+          existingIds.add(rec.id);
+          if (platformKey) takenPlatformKeys.add(platformKey);
         }
       }
     }
