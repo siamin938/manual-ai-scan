@@ -20,7 +20,7 @@ import type {
 
 type UserClient = SupabaseClient<Database>;
 
-const ACTIONS_FUNCTION = "visibility-action-recommendations";
+const ACTIONS_FUNCTION = "visibility-action-recommendations-v2";
 
 type Obj = Record<string, unknown>;
 
