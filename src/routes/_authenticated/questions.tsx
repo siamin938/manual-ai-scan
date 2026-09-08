@@ -538,17 +538,25 @@ function QuestionsPage() {
       <Dialog open={openConfirmAi} onOpenChange={(v) => !suggestAi.isPending && setOpenConfirmAi(v)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>AI 검색 질문을 만들까요?</DialogTitle>
+            <DialogTitle>
+              {genMode === "internal_remeasurement"
+                ? "최신 Market 질문 새 세트를 만들까요?"
+                : "AI 검색 질문을 만들까요?"}
+            </DialogTitle>
             <DialogDescription>
-              등록한 업체의 업종과 지역을 바탕으로, 실제 고객이 AI에 물어볼 만한 검색 질문 24개를 만듭니다.
+              {genMode === "internal_remeasurement"
+                ? "기존 질문 세트와 기존 측정 결과는 그대로 보존되며, 새 24문항 후보만 만듭니다."
+                : "등록한 업체의 업종과 지역을 바탕으로, 실제 고객이 AI에 물어볼 만한 검색 질문 24개를 만듭니다."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm text-muted-foreground">
             <p className="text-xs">
-              만들어진 질문은 측정 전에 확인할 수 있습니다. 첫 측정을 시작하면 정확한 반복 비교를 위해 질문이
-              고정됩니다.
+              {genMode === "internal_remeasurement"
+                ? "이 단계에서는 측정이 시작되지 않고 측정권도 사용되지 않습니다. 저장 후에도 측정은 자동으로 실행되지 않습니다."
+                : "만들어진 질문은 측정 전에 확인할 수 있습니다. 첫 측정을 시작하면 정확한 반복 비교를 위해 질문이 고정됩니다."}
             </p>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenConfirmAi(false)} disabled={suggestAi.isPending}>
               취소
