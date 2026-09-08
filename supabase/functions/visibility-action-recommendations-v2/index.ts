@@ -11,7 +11,7 @@ const LEGACY_SOURCE_ID = "source:dedicated_site_candidate:trust";
 const LEGACY_GROUP_KEY = "dedicated_site_candidate";
 const MARKET_GROUP_KEY = "business_brand_site";
 const PRELIMINARY_SITE_LABEL = "여러 답변에서 연결";
-const FILTER_VERSION = "0.2";
+const FILTER_VERSION = "0.3";
 
 type Obj = Record<string, unknown>;
 type SharednessRow = {
@@ -70,6 +70,26 @@ function normDomain(v: unknown) {
   return (typeof v === "string" ? v.trim().toLowerCase() : "").replace(/^www\./, "");
 }
 
+function stringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : [];
+}
+
+function linkedCompetitors(v: unknown) {
+  if (!Array.isArray(v)) return [] as { name: string; url: string | null }[];
+  const out: { name: string; url: string | null }[] = [];
+  const seen = new Set<string>();
+  for (const item of v) {
+    if (!isObj(item) || typeof item.name !== "string" || !item.name.trim()) continue;
+    const name = item.name.trim();
+    const url = typeof item.url === "string" && /^https?:\/\//i.test(item.url) ? item.url : null;
+    const key = `${name}|${url ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, url });
+  }
+  return out;
+}
+
 function hasLegacyHomepageGroup(rec: unknown) {
   if (!isObj(rec)) return false;
   if (rec.id === LEGACY_SOURCE_ID) return true;
@@ -100,9 +120,6 @@ function isSharedThirdPartyDomain(row: SharednessRow | undefined) {
   if (!row) return true;
   const entities = n(row.distinct_entity_keys);
   const contexts = n(row.target_business_contexts);
-  // Precision-first: a domain seen with 3+ entity keys, or with multiple entity keys
-  // across multiple target-business measurement contexts, behaves like a shared
-  // information/directory surface rather than one business's dedicated site.
   return entities >= 3 || (entities >= 2 && contexts >= 2);
 }
 
@@ -168,6 +185,93 @@ function enrichHomepageRecommendation(rec: unknown, marketText: string | null, r
   return { ...rec, summary: nextSummary, sourceGroups };
 }
 
+function buildFirstRunContentRecommendation(raw: unknown, validCount: number) {
+  if (!isObj(raw)) return null;
+  const sourceKey = typeof raw.source_key === "string" ? raw.source_key : "";
+  const sourceName = typeof raw.source_name === "string" ? raw.source_name : "";
+  const competitorResponseCount = n(raw.competitor_response_count);
+  const distinctCompetitorCount = n(raw.distinct_competitor_count);
+  const intentCount = n(raw.intent_count);
+  const questionCount = n(raw.question_count);
+  const clientResponseCount = n(raw.client_response_count);
+  if (!sourceKey || !sourceName || competitorResponseCount < 3 || intentCount < 2 || clientResponseCount > 0) {
+    return null;
+  }
+
+  const domains = stringArray(raw.domains).map(normDomain).filter(Boolean);
+  const competitors = linkedCompetitors(raw.linked_competitors);
+  const samples = stringArray(raw.sample_questions).slice(0, 2);
+  const competitorLabel =
+    competitors.length === 1
+      ? competitors[0]!.name
+      : competitors.length > 1
+        ? `${competitors.length}개 관련 업체`
+        : "관련 업체";
+  const concentratedNote = distinctCompetitorCount === 1 ? "현재 특정 업체 한 곳에 집중된 신호라" : "현재 여러 관련 업체에서 관찰됐지만";
+  const reason = `1차 측정에서 ${sourceName} 출처가 관련 업체와 연결된 답변 ${competitorResponseCount}개, ${intentCount}개 검색 상황에서 관찰됐고 내 업체와 연결된 답변은 확인되지 않았습니다. ${concentratedNote} 콘텐츠 운영 자체를 권장하는 근거가 아니라 실제 공개 정보를 확인할 단서입니다.`;
+
+  const platform = {
+    key: sourceKey,
+    name: sourceName,
+    actionType: "publish_candidate",
+    actionLabel: "콘텐츠 확인",
+    evidenceGrade: "candidate",
+    evidenceLabel: "여러 답변에서 관찰",
+    scopeLabel: "같은 측정에서 내 업체 미관찰",
+    responseCount: competitorResponseCount,
+    relatedResponseTotal: validCount,
+    citationCount: competitorResponseCount,
+    distinctCompetitorCount,
+    clientOverallResponseCount: clientResponseCount,
+    domains,
+    linkedCompetitors: competitors,
+  };
+
+  const sourceGroup = {
+    key: `content_observation:${sourceKey}`,
+    name: "콘텐츠 출처",
+    actionType: "publish_candidate",
+    actionLabel: "콘텐츠 확인",
+    evidenceGrade: "candidate",
+    evidenceLabel: "1차 관찰",
+    scopeLabel: "같은 측정에서 내 업체 미관찰",
+    reason,
+    responseCount: competitorResponseCount,
+    relatedResponseTotal: validCount,
+    citationCount: competitorResponseCount,
+    distinctCompetitorCount,
+    clientOverallResponseCount: clientResponseCount,
+    platforms: [platform],
+  };
+
+  return {
+    id: `observation:content:${sourceKey}`,
+    rank: 0,
+    kind: "source_gap",
+    title: `${sourceName}에서 여러 답변에 연결된 경쟁업체 정보를 확인해보기`,
+    evidenceLevel: "observe_more",
+    evidenceLabel: "1차 관찰",
+    summary: `1차 측정에서 ${sourceName} 출처가 ${competitorLabel}과 연결된 답변 ${competitorResponseCount}개, ${intentCount}개 검색 상황에서 관찰됐고 내 업체와 연결된 답변은 0개였습니다. ${concentratedNote} ${sourceName} 운영 자체를 권장하는 근거는 아니며, 어떤 서비스·작업 사례·후기·전문성 정보가 공개되어 있는지 먼저 확인할 단서입니다.`,
+    steps: [
+      `${sourceName} 페이지에서 실제로 공개된 서비스·작업 사례·후기·전문성 정보를 확인하세요.`,
+      "그대로 따라 하기보다 내 업체의 사실 기반 공개 정보에서 빠진 항목이 있는지 대조하세요.",
+      "2차 측정에서 같은 출처 패턴이 다시 관찰되는지 확인한 뒤 콘텐츠 보강 여부를 판단하세요.",
+    ],
+    sampleQuestions: samples,
+    evidence: {
+      clientResponseCount,
+      competitorResponseCount,
+      distinctCompetitorCount,
+      measurementCount: validCount,
+      questionCount,
+      domains,
+    },
+    sourceGroups: [sourceGroup],
+    referenceSourceGroups: [],
+    channelSuggestions: [],
+  };
+}
+
 function recommendationScore(rec: unknown) {
   if (!isObj(rec)) return 0;
   const evidence = isObj(rec.evidence) ? rec.evidence : {};
@@ -177,8 +281,9 @@ function recommendationScore(rec: unknown) {
   const gap = Math.max(0, competitor - client);
   const kind = typeof rec.kind === "string" ? rec.kind : "";
   const level = typeof rec.evidenceLevel === "string" ? rec.evidenceLevel : "";
+  const id = typeof rec.id === "string" ? rec.id : "";
 
-  let score = kind === "source_gap" ? 1000 : 600;
+  let score = id.startsWith("observation:content:") ? 600 : kind === "source_gap" ? 1000 : 600;
   if (level === "priority_try") score += 400;
   else if (level === "worth_review") score += 200;
   score += gap * 40 + distinct * 60 + competitor * 20;
@@ -246,15 +351,41 @@ Deno.serve(async (req) => {
   }
 
   const repetitions = isObj(basePayload.scope) ? n(basePayload.scope.repetitions) : 0;
+  const validCount = isObj(basePayload.scope) ? n(basePayload.scope.validCount) : 0;
+  const latestRunId = isObj(basePayload.scope) && typeof basePayload.scope.runId === "string" ? basePayload.scope.runId : "";
   const db = createClient(e.url, e.secret, { auth: { persistSession: false, autoRefreshToken: false } });
   let recommendations = Array.isArray(basePayload.recommendations) ? [...basePayload.recommendations] : [];
 
-  // First-run intent-only gaps are observations, not top execution recommendations.
-  // The dashboard already exposes these gaps in question-group / missed-question sections.
   if (repetitions < 2) {
     recommendations = recommendations.filter(
       (rec) => !(isObj(rec) && rec.kind === "intent_gap"),
     );
+
+    if (UUID_RE.test(latestRunId)) {
+      const { data: contentObservations, error: contentObservationError } = await db.rpc(
+        "get_first_run_content_source_observations_v01",
+        { p_org_id: orgId, p_business_id: businessId, p_run_id: latestRunId },
+      );
+      if (contentObservationError) {
+        console.error(
+          JSON.stringify({
+            function: "visibility-action-recommendations-v2",
+            code: "CONTENT_OBSERVATION_RPC_FAILED",
+            message: contentObservationError.message,
+          }),
+        );
+      } else {
+        const existingIds = new Set(
+          recommendations.filter(isObj).map((rec) => (typeof rec.id === "string" ? rec.id : "")),
+        );
+        for (const raw of Array.isArray(contentObservations) ? contentObservations : []) {
+          const rec = buildFirstRunContentRecommendation(raw, validCount);
+          if (!rec || existingIds.has(rec.id)) continue;
+          recommendations.push(rec);
+          existingIds.add(rec.id);
+        }
+      }
+    }
   }
 
   const homepageRecs = recommendations.filter(hasLegacyHomepageGroup);
@@ -288,7 +419,6 @@ Deno.serve(async (req) => {
             linked_response_count: n(raw.linked_response_count),
           });
         }
-        // Precision-first: every domain supporting a homepage action must look dedicated.
         homepageAllowed = domains.every((domain) => !isSharedThirdPartyDomain(byDomain.get(domain)));
       }
     }
@@ -324,7 +454,7 @@ Deno.serve(async (req) => {
 
   const disclaimer =
     repetitions < 2
-      ? "현재는 동일 조건 1회 측정의 1차 관찰입니다. 상위 액션에는 실제 출처 연결 차이가 확인된 항목만 표시하고, 질문군별 미노출은 추가 관찰 영역으로 분리합니다. 질문군이나 출처가 추천 원인이라는 뜻은 아니며, 동일 질문 세트로 재측정해 반복성을 확인해야 합니다."
+      ? "현재는 동일 조건 1회 측정의 1차 관찰입니다. 상위 액션에는 실제 출처 연결 차이가 확인된 항목과 여러 답변·여러 검색 상황에서 반복 관찰된 콘텐츠 출처만 표시합니다. 질문군별 미노출은 추가 관찰 영역으로 분리하며, 질문군이나 출처가 추천 원인이라는 뜻은 아닙니다. 동일 질문 세트로 재측정해 반복성을 확인해야 합니다."
       : basePayload.disclaimer;
 
   return json({
