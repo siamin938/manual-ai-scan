@@ -11,7 +11,8 @@ const LEGACY_SOURCE_ID = "source:dedicated_site_candidate:trust";
 const LEGACY_GROUP_KEY = "dedicated_site_candidate";
 const MARKET_GROUP_KEY = "business_brand_site";
 const PRELIMINARY_SITE_LABEL = "여러 답변에서 연결";
-const FILTER_VERSION = "0.3";
+const FILTER_VERSION = "0.4";
+const MAX_RECOMMENDATIONS = 4;
 
 type Obj = Record<string, unknown>;
 type SharednessRow = {
@@ -270,6 +271,105 @@ function buildFirstRunContentRecommendation(raw: unknown, validCount: number) {
     referenceSourceGroups: [],
     channelSuggestions: [],
   };
+}
+
+function buildFirstRunProfileRecommendation(raw: unknown, validCount: number) {
+  if (!isObj(raw)) return null;
+  const sourceKey = typeof raw.source_key === "string" ? raw.source_key : "";
+  const sourceName = typeof raw.source_name === "string" ? raw.source_name : "";
+  const competitorResponseCount = n(raw.competitor_response_count);
+  const distinctCompetitorCount = n(raw.distinct_competitor_count);
+  const intentCount = n(raw.intent_count);
+  const questionCount = n(raw.question_count);
+  const clientResponseCount = n(raw.client_response_count);
+  if (!sourceKey || !sourceName || competitorResponseCount < 3 || intentCount < 2 || clientResponseCount > 0) {
+    return null;
+  }
+
+  const domains = stringArray(raw.domains).map(normDomain).filter(Boolean);
+  const competitors = linkedCompetitors(raw.linked_competitors);
+  const samples = stringArray(raw.sample_questions).slice(0, 2);
+  const reason = `1차 측정에서 ${sourceName} 출처가 관련 업체와 연결된 답변 ${competitorResponseCount}개, ${intentCount}개 검색 상황에서 관찰됐고 내 업체와 연결된 답변은 확인되지 않았습니다. 등록이나 프로필이 AI 노출의 원인이라는 뜻은 아니며, 내 업체 정보 상태를 먼저 확인할 단서입니다.`;
+
+  const platform = {
+    key: sourceKey,
+    name: sourceName,
+    actionType: "profile_check",
+    actionLabel: "업체 정보 확인",
+    evidenceGrade: "candidate",
+    evidenceLabel: "1차 관찰",
+    scopeLabel: "같은 측정에서 내 업체 미관찰",
+    responseCount: competitorResponseCount,
+    relatedResponseTotal: validCount,
+    citationCount: competitorResponseCount,
+    distinctCompetitorCount,
+    clientOverallResponseCount: clientResponseCount,
+    domains,
+    linkedCompetitors: competitors,
+  };
+
+  const sourceGroup = {
+    key: `profile_observation:${sourceKey}`,
+    name: "업체 프로필 출처",
+    actionType: "profile_check",
+    actionLabel: "업체 정보 확인",
+    evidenceGrade: "candidate",
+    evidenceLabel: "1차 관찰",
+    scopeLabel: "같은 측정에서 내 업체 미관찰",
+    reason,
+    responseCount: competitorResponseCount,
+    relatedResponseTotal: validCount,
+    citationCount: competitorResponseCount,
+    distinctCompetitorCount,
+    clientOverallResponseCount: clientResponseCount,
+    platforms: [platform],
+  };
+
+  return {
+    id: `observation:profile:${sourceKey}`,
+    rank: 0,
+    kind: "source_gap",
+    title: `${sourceName}에서 내 업체 프로필·정보 상태를 확인해보기`,
+    evidenceLevel: "observe_more",
+    evidenceLabel: "1차 관찰",
+    summary: `1차 측정에서 ${sourceName} 출처가 관련 업체와 연결된 답변 ${competitorResponseCount}개, ${intentCount}개 검색 상황에서 관찰됐고 내 업체와 연결된 답변은 0개였습니다. 등록이나 프로필 상태가 AI 노출의 원인이라는 뜻은 아니며, 내 업체 정보가 어떻게 표시되는지 먼저 확인할 단서입니다.`,
+    steps: [
+      `${sourceName}에 내 업체가 등록되어 있는지, 어떻게 표시되는지 확인하세요.`,
+      "관련 업체 프로필에 공개된 사실 정보(영업시간, 서비스, 사진, 후기 등) 항목과 대조하세요.",
+      "내 업체가 직접 수정할 수 있는 사실 정보만 정확하게 보강하세요.",
+      "동일 질문 세트로 2차 측정해 같은 패턴이 반복되는지 확인하세요.",
+    ],
+    sampleQuestions: samples,
+    evidence: {
+      clientResponseCount,
+      competitorResponseCount,
+      distinctCompetitorCount,
+      measurementCount: validCount,
+      questionCount,
+      domains,
+    },
+    sourceGroups: [sourceGroup],
+    referenceSourceGroups: [],
+    channelSuggestions: [],
+  };
+}
+
+function existingPlatformKeys(recommendations: unknown[]) {
+  const keys = new Set<string>();
+  for (const rec of recommendations) {
+    if (!isObj(rec)) continue;
+    const groups = Array.isArray(rec.sourceGroups) ? rec.sourceGroups : [];
+    for (const group of groups) {
+      if (!isObj(group)) continue;
+      const platforms = Array.isArray(group.platforms) ? group.platforms : [];
+      for (const platform of platforms) {
+        if (isObj(platform) && typeof platform.key === "string" && platform.key.trim()) {
+          keys.add(platform.key.trim());
+        }
+      }
+    }
+  }
+  return keys;
 }
 
 function recommendationScore(rec: unknown) {
