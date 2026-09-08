@@ -2,3 +2,6 @@ project_id = "qoirkwmnyolquvsgbian"
 
 [functions.suggest-questions-router]
 verify_jwt = true
+
+[functions.visibility-action-recommendations-v2]
+verify_jwt = true
