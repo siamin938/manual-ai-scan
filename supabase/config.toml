@@ -5,3 +5,8 @@ verify_jwt = true
 
 [functions.visibility-action-recommendations-v2]
 verify_jwt = true
+
+# Internal postprocess-only Edge Function. It authenticates with
+# x-visibility-postprocess-token instead of a user JWT.
+[functions.visibility-citation-attribution]
+verify_jwt = false
