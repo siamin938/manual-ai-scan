@@ -88,7 +88,7 @@ function classifyCompetitorDisplay(c: {
   responseCount: number;
   priorRunPresenceCount: number;
 }): CompetitorDisplayCategory {
-  if (c.tier === "core") return "repeated";
+  if (c.priorRunPresenceCount > 0) return "repeated";
   if (c.responseCount === 1 && c.priorRunPresenceCount === 0) return "additional";
   return "notable";
 }

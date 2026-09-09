@@ -11,7 +11,7 @@ const LEGACY_SOURCE_ID = "source:dedicated_site_candidate:trust";
 const LEGACY_GROUP_KEY = "dedicated_site_candidate";
 const MARKET_GROUP_KEY = "business_brand_site";
 const PRELIMINARY_SITE_LABEL = "여러 답변에서 연결";
-const FILTER_VERSION = "0.7";
+const FILTER_VERSION = "0.8";
 const MAX_RECOMMENDATIONS = 4;
 
 type Obj = Record<string, unknown>;
