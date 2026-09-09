@@ -3234,6 +3234,38 @@ export type Database = {
           source_name: string
         }[]
       }
+      get_first_run_independent_site_observations_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
+      get_first_run_independent_site_observations_v02: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
       get_first_run_profile_source_observations_v01: {
         Args: { p_business_id: string; p_org_id: string; p_run_id: string }
         Returns: {
@@ -3278,6 +3310,10 @@ export type Database = {
         Args: { p_limit?: number; p_query?: string }
         Returns: Json
       }
+      get_measurement_evidence_density_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: Json
+      }
       get_measurement_market_feature_flag_v01: {
         Args: { p_org_id: string }
         Returns: Json
@@ -3294,6 +3330,44 @@ export type Database = {
           monthly_reserved_cost_usd: number
         }[]
       }
+      get_repeat_independent_site_observations_v01: {
+        Args: { p_business_id: string; p_org_id: string }
+        Returns: {
+          client_response_count: number
+          client_run_presence_count: number
+          compatible_run_count: number
+          competitor_response_count: number
+          competitor_run_presence_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
+      get_repeat_independent_site_observations_v02: {
+        Args: { p_business_id: string; p_org_id: string }
+        Returns: {
+          client_response_count: number
+          client_run_presence_count: number
+          compatible_run_count: number
+          competitor_response_count: number
+          competitor_run_presence_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
       get_visibility_domain_sharedness_v01: {
         Args: { p_domains: string[] }
         Returns: {
@@ -3303,6 +3377,7 @@ export type Database = {
           target_business_contexts: number
         }[]
       }
+      get_visibility_release_regression_v01: { Args: never; Returns: Json }
       get_visibility_repeat_aggregate_v01: {
         Args: { p_business_id: string; p_org_id: string }
         Returns: Json
