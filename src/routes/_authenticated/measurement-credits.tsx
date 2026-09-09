@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -79,10 +79,17 @@ function MeasurementCreditsPage() {
   const [amount, setAmount] = useState("1");
   const [note, setNote] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 280);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const overviewQuery = useQuery({
-    queryKey: ["measurement-credit-admin-overview"],
-    queryFn: () => fetchOverview({ data: undefined }),
+    queryKey: ["measurement-credit-admin-overview", searchQuery],
+    queryFn: () => fetchOverview({ data: { query: searchQuery } }),
     retry: false,
   });
 
