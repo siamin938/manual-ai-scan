@@ -28,9 +28,9 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const NAV = [
-  { to: "/dashboard", label: "내 AI 노출" },
-  { to: "/businesses", label: "내 업체" },
-  { to: "/questions", label: "검색 질문" },
+  { to: "/dashboard", label: "AI 노출 진단" },
+  { to: "/businesses", label: "업체 등록" },
+  { to: "/questions", label: "질문 생성" },
   { to: "/runs", label: "측정하기" },
 ] as const;
 

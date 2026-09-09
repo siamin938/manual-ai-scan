@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -79,10 +79,17 @@ function MeasurementCreditsPage() {
   const [amount, setAmount] = useState("1");
   const [note, setNote] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 280);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const overviewQuery = useQuery({
-    queryKey: ["measurement-credit-admin-overview"],
-    queryFn: () => fetchOverview({ data: undefined }),
+    queryKey: ["measurement-credit-admin-overview", searchQuery],
+    queryFn: () => fetchOverview({ data: { query: searchQuery } }),
     retry: false,
   });
 
@@ -164,9 +171,21 @@ function MeasurementCreditsPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">조직 목록</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="조직명·가입자 이름·이메일 검색"
+            />
+            <p className="text-xs text-muted-foreground">
+              {searchQuery
+                ? `검색 결과 ${overview.overview.totalMatches}건`
+                : `총 ${overview.overview.totalMatches}개 조직`}
+            </p>
             {orgs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">표시할 조직이 없습니다.</p>
+              <p className="text-sm text-muted-foreground">
+                {searchQuery ? "검색 결과가 없습니다." : "표시할 조직이 없습니다."}
+              </p>
             ) : (
               orgs.map((o) => {
                 const active = o.orgId === selectedOrgId;
@@ -183,6 +202,11 @@ function MeasurementCreditsPage() {
                       <span className="text-sm font-medium">{o.name}</span>
                       <Badge variant="outline">{ORIGIN_LABELS[o.dataOrigin]}</Badge>
                     </div>
+                    {(o.ownerName || o.ownerEmail) && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        대표 계정 {[o.ownerName, o.ownerEmail].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
                     <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-4">
                       <span className="tabular-nums">잔액 {o.balance}</span>
                       <span className="tabular-nums">누적 지급 {o.lifetimeGranted}</span>

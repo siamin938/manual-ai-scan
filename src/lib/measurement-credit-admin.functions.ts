@@ -13,11 +13,15 @@ export type CreditOrgDTO = {
   lifetimeConsumed: number;
   clientBusinessCount: number;
   latestLedgerAt: string | null;
+  ownerName: string | null;
+  ownerEmail: string | null;
 };
 
 export type CreditOverviewDTO = {
   version: string;
   generatedAt: string;
+  query: string;
+  totalMatches: number;
   organizations: CreditOrgDTO[];
 };
 
@@ -84,6 +88,8 @@ function parseOrg(v: unknown): CreditOrgDTO | null {
   const lifetimeConsumed = num(v['lifetimeConsumed']);
   const clientBusinessCount = num(v['clientBusinessCount']);
   const latestLedgerAt = nullableStr(v['latestLedgerAt']);
+  const ownerName = nullableStr(v['ownerName']);
+  const ownerEmail = nullableStr(v['ownerEmail']);
   if (
     !orgId ||
     !name ||
@@ -95,7 +101,9 @@ function parseOrg(v: unknown): CreditOrgDTO | null {
     lifetimeGranted === null ||
     lifetimeConsumed === null ||
     clientBusinessCount === null ||
-    latestLedgerAt === undefined
+    latestLedgerAt === undefined ||
+    ownerName === undefined ||
+    ownerEmail === undefined
   ) {
     return null;
   }
@@ -110,6 +118,8 @@ function parseOrg(v: unknown): CreditOrgDTO | null {
     lifetimeConsumed,
     clientBusinessCount,
     latestLedgerAt,
+    ownerName,
+    ownerEmail,
   };
 }
 
@@ -117,15 +127,17 @@ function parseOverview(payload: unknown): CreditOverviewDTO | null {
   if (!isRecord(payload)) return null;
   const version = str(payload['version']);
   const generatedAt = str(payload['generatedAt']);
+  const query = str(payload['query']);
+  const totalMatches = num(payload['totalMatches']);
   const orgsRaw = payload['organizations'];
-  if (!version || !generatedAt || !Array.isArray(orgsRaw)) return null;
+  if (!version || !generatedAt || query === null || totalMatches === null || !Array.isArray(orgsRaw)) return null;
   const organizations: CreditOrgDTO[] = [];
   for (const raw of orgsRaw) {
     const parsed = parseOrg(raw);
     if (!parsed) return null;
     organizations.push(parsed);
   }
-  return { version, generatedAt, organizations };
+  return { version, generatedAt, query, totalMatches, organizations };
 }
 
 function parseEntry(v: unknown): CreditLedgerEntryDTO | null {
@@ -162,14 +174,25 @@ async function isAdmin(client: RpcCaller): Promise<boolean> {
   return data === true;
 }
 
-/** 조직별 측정권 개요. */
+/** 조직별 측정권 개요(검색 지원). */
 export const getMeasurementCreditAdminOverview = createServerFn({ method: "POST" })
+  .inputValidator((input: { query?: string } | undefined) => {
+    if (input === undefined || input === null) return { query: null };
+    if (!isRecord(input)) throw new Error("INVALID_INPUT");
+    const q = input['query'];
+    if (q === undefined || q === null) return { query: null };
+    if (typeof q !== "string") throw new Error("INVALID_INPUT");
+    const trimmed = q.trim();
+    if (trimmed.length > 100) throw new Error("INVALID_INPUT");
+    return { query: trimmed.length > 0 ? trimmed : null };
+  })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<CreditOverviewResponseDTO> => {
+  .handler(async ({ data: input, context }): Promise<CreditOverviewResponseDTO> => {
     const client = context.supabase as unknown as RpcCaller;
     if (!(await isAdmin(client))) return { ok: false, error: "FORBIDDEN" };
 
-    const { data, error } = await client.rpc("get_measurement_credit_admin_overview_v01", {
+    const { data, error } = await client.rpc("get_measurement_credit_admin_overview_v02", {
+      p_query: input.query,
       p_limit: 100,
     });
     if (error) return { ok: false, error: "NOT_AVAILABLE" };
