@@ -174,14 +174,25 @@ async function isAdmin(client: RpcCaller): Promise<boolean> {
   return data === true;
 }
 
-/** 조직별 측정권 개요. */
+/** 조직별 측정권 개요(검색 지원). */
 export const getMeasurementCreditAdminOverview = createServerFn({ method: "POST" })
+  .inputValidator((input: { query?: string } | undefined) => {
+    if (input === undefined || input === null) return { query: null };
+    if (!isRecord(input)) throw new Error("INVALID_INPUT");
+    const q = input['query'];
+    if (q === undefined || q === null) return { query: null };
+    if (typeof q !== "string") throw new Error("INVALID_INPUT");
+    const trimmed = q.trim();
+    if (trimmed.length > 100) throw new Error("INVALID_INPUT");
+    return { query: trimmed.length > 0 ? trimmed : null };
+  })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<CreditOverviewResponseDTO> => {
+  .handler(async ({ data: input, context }): Promise<CreditOverviewResponseDTO> => {
     const client = context.supabase as unknown as RpcCaller;
     if (!(await isAdmin(client))) return { ok: false, error: "FORBIDDEN" };
 
-    const { data, error } = await client.rpc("get_measurement_credit_admin_overview_v01", {
+    const { data, error } = await client.rpc("get_measurement_credit_admin_overview_v02", {
+      p_query: input.query,
       p_limit: 100,
     });
     if (error) return { ok: false, error: "NOT_AVAILABLE" };
