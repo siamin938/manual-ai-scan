@@ -11,7 +11,7 @@ const LEGACY_SOURCE_ID = "source:dedicated_site_candidate:trust";
 const LEGACY_GROUP_KEY = "dedicated_site_candidate";
 const MARKET_GROUP_KEY = "business_brand_site";
 const PRELIMINARY_SITE_LABEL = "여러 답변에서 연결";
-const FILTER_VERSION = "0.5";
+const FILTER_VERSION = "0.6";
 const MAX_RECOMMENDATIONS = 4;
 
 type Obj = Record<string, unknown>;
@@ -354,6 +354,95 @@ function buildFirstRunProfileRecommendation(raw: unknown, validCount: number) {
   };
 }
 
+function buildFirstRunIndependentSiteRecommendation(raw: unknown, validCount: number) {
+  if (!isObj(raw)) return null;
+  const sourceKey = typeof raw.source_key === "string" ? raw.source_key : "";
+  const sourceName = typeof raw.source_name === "string" ? raw.source_name : "";
+  const competitorResponseCount = n(raw.competitor_response_count);
+  const distinctCompetitorCount = n(raw.distinct_competitor_count);
+  const intentCount = n(raw.intent_count);
+  const questionCount = n(raw.question_count);
+  const clientResponseCount = n(raw.client_response_count);
+  if (
+    !sourceKey ||
+    !sourceName ||
+    competitorResponseCount < 2 ||
+    intentCount < 2 ||
+    distinctCompetitorCount !== 1 ||
+    clientResponseCount > 0
+  ) {
+    return null;
+  }
+
+  const domains = stringArray(raw.domains).map(normDomain).filter(Boolean);
+  const competitors = linkedCompetitors(raw.linked_competitors);
+  if (competitors.length !== 1) return null;
+  const samples = stringArray(raw.sample_questions).slice(0, 2);
+  const competitorName = competitors[0]!.name;
+  const reason = `1차 측정에서 ${sourceName}이 ${competitorName}과 연결된 답변 ${competitorResponseCount}개, ${intentCount}개 검색 상황에서 관찰됐고 내 업체와 연결된 답변은 확인되지 않았습니다. 이 사이트가 추천 원인이라는 뜻은 아니며, 해당 업체가 실제로 공개한 정보를 확인할 단서입니다.`;
+
+  const platform = {
+    key: sourceKey,
+    name: sourceName,
+    actionType: "observe_only",
+    actionLabel: "독립 사이트 확인",
+    evidenceGrade: "candidate",
+    evidenceLabel: "1차 관찰",
+    scopeLabel: "같은 측정에서 내 업체 미관찰",
+    responseCount: competitorResponseCount,
+    relatedResponseTotal: validCount,
+    citationCount: competitorResponseCount,
+    distinctCompetitorCount,
+    clientOverallResponseCount: clientResponseCount,
+    domains,
+    linkedCompetitors: competitors,
+  };
+
+  const referenceGroup = {
+    key: `independent_site_observation:${sourceKey}`,
+    name: "업체 독립 사이트",
+    actionType: "observe_only",
+    actionLabel: "독립 사이트 확인",
+    evidenceGrade: "candidate",
+    evidenceLabel: "1차 관찰",
+    scopeLabel: "같은 측정에서 내 업체 미관찰",
+    reason,
+    responseCount: competitorResponseCount,
+    relatedResponseTotal: validCount,
+    citationCount: competitorResponseCount,
+    distinctCompetitorCount,
+    clientOverallResponseCount: clientResponseCount,
+    platforms: [platform],
+  };
+
+  return {
+    id: `observation:${sourceKey}`,
+    rank: 0,
+    kind: "source_gap",
+    title: `${sourceName}에서 함께 관찰된 업체의 공개 정보를 확인해보기`,
+    evidenceLevel: "observe_more",
+    evidenceLabel: "1차 관찰",
+    summary: `1차 측정에서 ${sourceName}이 ${competitorName}과 연결된 답변 ${competitorResponseCount}개, ${intentCount}개 검색 상황에서 관찰됐고 내 업체와 연결된 답변은 0개였습니다. 홈페이지나 독립 사이트 운영이 AI 추천의 원인이라는 뜻은 아니며, 해당 업체가 공개한 서비스·작업 사례·후기·보증·연락처 정보를 확인할 단서입니다.`,
+    steps: [
+      `${sourceName}에서 ${competitorName}이 실제로 공개한 서비스·작업 사례·후기·보증·연락처 정보를 확인하세요.`,
+      "내 업체의 기존 공개 정보와 비교해 빠진 사실 정보가 있는지만 확인하세요. 그대로 복제하거나 사이트 존재 자체를 원인으로 보지 마세요.",
+      "동일 질문 세트로 2차 측정해 이 독립 사이트 연결이 다시 관찰되는지 확인하세요.",
+    ],
+    sampleQuestions: samples,
+    evidence: {
+      clientResponseCount,
+      competitorResponseCount,
+      distinctCompetitorCount,
+      measurementCount: validCount,
+      questionCount,
+      domains,
+    },
+    sourceGroups: [],
+    referenceSourceGroups: [referenceGroup],
+    channelSuggestions: [],
+  };
+}
+
 function existingPlatformKeys(recommendations: unknown[]) {
   const keys = new Set<string>();
   for (const rec of recommendations) {
@@ -387,9 +476,11 @@ function recommendationScore(rec: unknown) {
     ? 600
     : id.startsWith("observation:profile:")
       ? 850
-      : kind === "source_gap"
-        ? 1000
-        : 600;
+      : id.startsWith("observation:independent_site:")
+        ? 700
+        : kind === "source_gap"
+          ? 1000
+          : 600;
   if (level === "priority_try") score += 400;
   else if (level === "worth_review") score += 200;
   score += gap * 40 + distinct * 60 + competitor * 20;
@@ -548,6 +639,33 @@ Deno.serve(async (req) => {
           if (platformKey) takenPlatformKeys.add(platformKey);
         }
       }
+
+      if (!recommendations.some(hasLegacyHomepageGroup)) {
+        const { data: independentSiteObservations, error: independentSiteObservationError } = await db.rpc(
+          "get_first_run_independent_site_observations_v01",
+          { p_org_id: orgId, p_business_id: businessId, p_run_id: latestRunId },
+        );
+        if (independentSiteObservationError) {
+          console.error(
+            JSON.stringify({
+              function: "visibility-action-recommendations-v2",
+              code: "INDEPENDENT_SITE_OBSERVATION_RPC_FAILED",
+              message: independentSiteObservationError.message,
+            }),
+          );
+        } else {
+          const existingIds = new Set(
+            recommendations.filter(isObj).map((rec) => (typeof rec.id === "string" ? rec.id : "")),
+          );
+          const rows = Array.isArray(independentSiteObservations) ? independentSiteObservations.slice(0, 1) : [];
+          for (const raw of rows) {
+            const rec = buildFirstRunIndependentSiteRecommendation(raw, validCount);
+            if (!rec || existingIds.has(rec.id)) continue;
+            recommendations.push(rec);
+            existingIds.add(rec.id);
+          }
+        }
+      }
     }
   }
 
@@ -618,7 +736,7 @@ Deno.serve(async (req) => {
 
   const disclaimer =
     repetitions < 2
-      ? "현재는 동일 조건 1회 측정의 1차 관찰입니다. 상위 액션에는 실제 출처 연결 차이가 확인된 항목과 여러 답변·여러 검색 상황에서 반복 관찰된 콘텐츠·업체 프로필형 출처만 표시합니다. 업체 프로필형 채널도 실제 답변에 연결된 출처가 반복 관찰됐다는 확인 단서일 뿐, 등록이나 프로필이 추천 원인이라는 뜻은 아닙니다. 질문군별 미노출은 추가 관찰 영역으로 분리하며, 질문군이나 출처가 추천 원인이라는 뜻은 아닙니다. 동일 질문 세트로 재측정해 반복성을 확인해야 합니다."
+      ? "현재는 동일 조건 1회 측정의 1차 관찰입니다. 상위 액션에는 실제 출처 연결 차이가 확인된 항목과 여러 답변·여러 검색 상황에서 반복 관찰된 콘텐츠·업체 프로필형 출처를 표시합니다. 또한 최근 데이터에서 단일 업체와만 연결되고 2개 이상 답변·2개 이상 검색 상황에서 관찰된 독립 사이트는 확인 단서로만 표시할 수 있습니다. 독립 사이트나 홈페이지 운영 자체가 추천 원인이라는 뜻은 아닙니다. 질문군별 미노출은 추가 관찰 영역으로 분리하며, 동일 질문 세트로 재측정해 반복성을 확인해야 합니다."
       : basePayload.disclaimer;
 
   return json({
