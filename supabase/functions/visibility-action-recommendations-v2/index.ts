@@ -11,7 +11,7 @@ const LEGACY_SOURCE_ID = "source:dedicated_site_candidate:trust";
 const LEGACY_GROUP_KEY = "dedicated_site_candidate";
 const MARKET_GROUP_KEY = "business_brand_site";
 const PRELIMINARY_SITE_LABEL = "여러 답변에서 연결";
-const FILTER_VERSION = "0.4";
+const FILTER_VERSION = "0.5";
 const MAX_RECOMMENDATIONS = 4;
 
 type Obj = Record<string, unknown>;
@@ -403,6 +403,34 @@ function rerank(recommendations: unknown[]) {
     .map((rec, index) => (isObj(rec) ? { ...rec, rank: index + 1 } : rec));
 }
 
+function dedupeRankedSourceGroups(recommendations: unknown[]) {
+  const usedPlatformKeys = new Set<string>();
+
+  return recommendations.map((rec) => {
+    if (!isObj(rec) || !Array.isArray(rec.sourceGroups)) return rec;
+
+    const currentPlatformKeys = new Set<string>();
+    const sourceGroups = rec.sourceGroups.flatMap((group) => {
+      if (!isObj(group) || !Array.isArray(group.platforms)) return [group];
+
+      const platforms = group.platforms.filter((platform) => {
+        if (!isObj(platform) || typeof platform.key !== "string" || !platform.key.trim()) {
+          return true;
+        }
+        const key = platform.key.trim();
+        if (usedPlatformKeys.has(key)) return false;
+        currentPlatformKeys.add(key);
+        return true;
+      });
+
+      return platforms.length > 0 ? [{ ...group, platforms }] : [];
+    });
+
+    for (const key of currentPlatformKeys) usedPlatformKeys.add(key);
+    return { ...rec, sourceGroups };
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
@@ -586,6 +614,7 @@ Deno.serve(async (req) => {
     enrichHomepageRecommendation(rec, marketText, repetitions),
   );
   recommendations = rerank(recommendations);
+  recommendations = dedupeRankedSourceGroups(recommendations);
 
   const disclaimer =
     repetitions < 2
