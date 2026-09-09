@@ -88,6 +88,8 @@ function parseOrg(v: unknown): CreditOrgDTO | null {
   const lifetimeConsumed = num(v['lifetimeConsumed']);
   const clientBusinessCount = num(v['clientBusinessCount']);
   const latestLedgerAt = nullableStr(v['latestLedgerAt']);
+  const ownerName = nullableStr(v['ownerName']);
+  const ownerEmail = nullableStr(v['ownerEmail']);
   if (
     !orgId ||
     !name ||
@@ -99,7 +101,9 @@ function parseOrg(v: unknown): CreditOrgDTO | null {
     lifetimeGranted === null ||
     lifetimeConsumed === null ||
     clientBusinessCount === null ||
-    latestLedgerAt === undefined
+    latestLedgerAt === undefined ||
+    ownerName === undefined ||
+    ownerEmail === undefined
   ) {
     return null;
   }
@@ -114,6 +118,8 @@ function parseOrg(v: unknown): CreditOrgDTO | null {
     lifetimeConsumed,
     clientBusinessCount,
     latestLedgerAt,
+    ownerName,
+    ownerEmail,
   };
 }
 
@@ -121,15 +127,17 @@ function parseOverview(payload: unknown): CreditOverviewDTO | null {
   if (!isRecord(payload)) return null;
   const version = str(payload['version']);
   const generatedAt = str(payload['generatedAt']);
+  const query = str(payload['query']);
+  const totalMatches = num(payload['totalMatches']);
   const orgsRaw = payload['organizations'];
-  if (!version || !generatedAt || !Array.isArray(orgsRaw)) return null;
+  if (!version || !generatedAt || query === null || totalMatches === null || !Array.isArray(orgsRaw)) return null;
   const organizations: CreditOrgDTO[] = [];
   for (const raw of orgsRaw) {
     const parsed = parseOrg(raw);
     if (!parsed) return null;
     organizations.push(parsed);
   }
-  return { version, generatedAt, organizations };
+  return { version, generatedAt, query, totalMatches, organizations };
 }
 
 function parseEntry(v: unknown): CreditLedgerEntryDTO | null {
