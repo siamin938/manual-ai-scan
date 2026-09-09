@@ -207,7 +207,7 @@ function parseCompetitor(o: Obj): VisibilityCompetitorDTO | null {
     mentionCount === null ||
     responseCount === null ||
     !responseRatePct.ok ||
-    (tier !== "core" && tier !== "notable") ||
+    (tier !== "core" && tier !== "notable" && tier !== "watch") ||
     tierLabel === null ||
     questionCount === null ||
     top3ResponseCount === null ||

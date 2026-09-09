@@ -84,7 +84,7 @@ type CompetitorDisplayCategory = "repeated" | "notable" | "additional";
 
 /** 행 badge와 동일한 표시 규칙으로 분류한다(판정/점수는 서버 DTO 그대로). */
 function classifyCompetitorDisplay(c: {
-  tier: "core" | "notable";
+  tier: "core" | "notable" | "watch";
   responseCount: number;
   priorRunPresenceCount: number;
 }): CompetitorDisplayCategory {
