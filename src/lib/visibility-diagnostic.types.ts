@@ -51,8 +51,8 @@ export type VisibilityCompetitorDTO = {
   mentionCount: number;
   responseCount: number;
   responseRatePct: number | null;
-  /** Competitor Significance Gate v0.1 — 계산 규칙은 서버에만 존재 */
-  tier: "core" | "notable";
+  /** Competitor Significance Gate v0.1 — 3단계 표시 계약(core|notable|watch). 계산 규칙은 서버에만 존재. */
+  tier: "core" | "notable" | "watch";
   tierLabel: string;
   questionCount: number;
   top3ResponseCount: number;
@@ -60,7 +60,7 @@ export type VisibilityCompetitorDTO = {
   isNew: boolean;
 };
 
-/** Competitor Significance Gate v0.1 집계 요약 (watchCount는 목록 미노출). */
+/** Competitor Significance Gate v0.1 집계 요약. watch 단계는 고객 화면에서 "추가 관찰"로 표시될 수 있다. */
 export type VisibilityCompetitorGateDTO = {
   version: "0.1";
   coreCount: number;

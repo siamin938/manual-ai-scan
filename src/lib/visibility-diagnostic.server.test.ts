@@ -91,4 +91,51 @@ describe("parseVisibilityDiagnosticResponse", () => {
     );
     expect(result.diagnostic.diagnostic.referenceSources[0]).not.toHaveProperty("internalScore");
   });
+
+  it("tier=watch competitor를 정상 계약으로 허용한다", () => {
+    const result = parseVisibilityDiagnosticResponse(
+      payload({
+        competitors: [
+          {
+            name: "관찰업체",
+            mentionCount: 1,
+            responseCount: 1,
+            responseRatePct: 4.2,
+            tier: "watch",
+            tierLabel: "추가 관찰",
+            questionCount: 1,
+            top3ResponseCount: 0,
+            priorRunPresenceCount: 0,
+            isNew: true,
+          },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.diagnostic.diagnostic.competitors[0]?.tier).toBe("watch");
+  });
+
+  it("계약 외 tier는 INVALID_DTO", () => {
+    expect(
+      parseVisibilityDiagnosticResponse(
+        payload({
+          competitors: [
+            {
+              name: "잘못된업체",
+              mentionCount: 1,
+              responseCount: 1,
+              responseRatePct: 4.2,
+              tier: "unknown",
+              tierLabel: "???",
+              questionCount: 1,
+              top3ResponseCount: 0,
+              priorRunPresenceCount: 0,
+              isNew: true,
+            },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: false, error: "INVALID_DTO" });
+  });
 });
