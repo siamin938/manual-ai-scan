@@ -3274,6 +3274,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      get_measurement_credit_admin_overview_v02: {
+        Args: { p_limit?: number; p_query?: string }
+        Returns: Json
+      }
       get_measurement_market_feature_flag_v01: {
         Args: { p_org_id: string }
         Returns: Json
