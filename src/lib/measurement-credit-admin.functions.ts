@@ -13,11 +13,15 @@ export type CreditOrgDTO = {
   lifetimeConsumed: number;
   clientBusinessCount: number;
   latestLedgerAt: string | null;
+  ownerName: string | null;
+  ownerEmail: string | null;
 };
 
 export type CreditOverviewDTO = {
   version: string;
   generatedAt: string;
+  query: string;
+  totalMatches: number;
   organizations: CreditOrgDTO[];
 };
 
