@@ -83,6 +83,28 @@ describe("Entity Engine v2 candidate extractor", () => {
     expect(tire?.observedSurface).toContain("금촌·조리 쪽");
   });
 
+  it("does not turn metadata/detail values into sibling entity candidates", () => {
+    const nodes = parseResponseStructure(
+      [
+        "### 3. 그린카서비스",
+        "- **주소:** 경기도 성남시 분당구 정자동 242-1",
+        "- **전화:** 031-712-6522",
+        "- **특징:** 수입차 정비 전문점",
+        "- **서비스:** 엔진오일, 냉각수, 브레이크오일",
+      ].join("\n"),
+    );
+    const candidates = extractEntityCandidatesV2(nodes, []);
+    const identities = candidates.map((candidate) => candidate.identitySurface);
+
+    expect(identities).toContain("그린카서비스");
+    expect(identities).not.toContain("경기도 성남시 분당구 정자동 242-1");
+    expect(identities).not.toContain("031-712-6522");
+    expect(identities).not.toContain("수입차 정비 전문점");
+    expect(identities).not.toContain("엔진오일");
+    expect(identities).not.toContain("냉각수");
+    expect(identities).not.toContain("브레이크오일");
+  });
+
   it("splits multiple unregistered businesses in one criterion body", () => {
     const nodes = parseResponseStructure(
       "- **운정·교하에서 최대한 가까운 곳:** 티스테이션 파주교하점, 금호타이어 운정신도시점",
