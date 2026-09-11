@@ -1,0 +1,83 @@
+{
+  "snapshotDateKst": "2026-09-12",
+  "projectId": "qoirkwmnyolquvsgbian",
+  "purpose": "Track deploy/auth contract drift between GitHub and live Supabase. This file is descriptive and must be refreshed after intentional deployments.",
+  "criticalFunctions": [
+    {
+      "slug": "process-measurement-job",
+      "liveVersion": 11,
+      "liveSha256": "e9e84cc7a92af2f66e2d5a9dfd6a36add3185c09eeab678835024a0b86ee1f72",
+      "liveVerifyJwt": false,
+      "expectedVerifyJwt": false,
+      "authMode": "x-internal-secret",
+      "deployableSourcePresentOnMain": false,
+      "risk": "HIGH",
+      "note": "Production measurement worker and parser caller. Live source exists in Supabase but is not currently represented as deployable source under supabase/functions on main."
+    },
+    {
+      "slug": "reparse-measurements",
+      "liveVersion": 14,
+      "liveSha256": "f9b427907f754d8fda5874420dd011f4dcb1171ba1ca3e6d0928b27cab59a220",
+      "liveVerifyJwt": false,
+      "expectedVerifyJwt": false,
+      "authMode": "body validates user bearer JWT and org role",
+      "deployableSourcePresentOnMain": false,
+      "risk": "HIGH",
+      "note": "Contains the live parser v1.2.3 bundle used for replay. GitHub lacks the current deployable function source."
+    },
+    {
+      "slug": "visibility-postprocess",
+      "liveVersion": 9,
+      "liveSha256": "b9ed58d3532825cf434b99874e59b9ed90364e9803419bbe162791382751e8f6",
+      "liveVerifyJwt": false,
+      "expectedVerifyJwt": false,
+      "authMode": "x-visibility-postprocess-token",
+      "deployableSourcePresentOnMain": false,
+      "risk": "HIGH",
+      "note": "Production verifier/resolver orchestration. Only historical deploy snapshots are present on main."
+    },
+    {
+      "slug": "visibility-citation-attribution",
+      "liveVersion": 14,
+      "liveSha256": "3093202e69fbb5af118d33ee551c51d09eee1484145a542be778cd7d0a4d246d",
+      "liveVerifyJwt": false,
+      "expectedVerifyJwt": false,
+      "authMode": "x-visibility-postprocess-token",
+      "deployableSourcePresentOnMain": true,
+      "risk": "MEDIUM"
+    },
+    {
+      "slug": "visibility-diagnostic",
+      "liveVersion": 16,
+      "liveSha256": "cf0512da7108b64260b9ff1c45cf23f0dfd1a769c426d7c843d050dc0adcf48a",
+      "liveVerifyJwt": true,
+      "expectedVerifyJwt": true,
+      "authMode": "platform JWT + body membership check",
+      "deployableSourcePresentOnMain": true,
+      "risk": "MEDIUM"
+    },
+    {
+      "slug": "visibility-action-recommendations-v2",
+      "liveVersion": 29,
+      "liveSha256": "4e2d398e123a5f67636457b5b8a43c04384416765ee5ce8113f2b8f9209d617c",
+      "liveVerifyJwt": true,
+      "expectedVerifyJwt": true,
+      "authMode": "platform JWT + body membership check",
+      "deployableSourcePresentOnMain": true,
+      "risk": "MEDIUM"
+    },
+    {
+      "slug": "create-organization-with-owner",
+      "liveVersion": 2,
+      "liveSha256": "ba373bfb46054d59d08f638ab26e59fbf704607f1a359c74cd07492102a6d986",
+      "liveVerifyJwt": false,
+      "expectedVerifyJwt": true,
+      "authMode": "expected platform JWT plus body user validation",
+      "deployableSourcePresentOnMain": true,
+      "risk": "HIGH",
+      "drift": true,
+      "note": "GitHub sync redeployed the function with verify_jwt=false because the function was not declared in config.toml. Foundation branch adds the missing config entry. Do not merge without a controlled deployment check."
+    }
+  ],
+  "mergeRule": "Do not merge this branch to main until live-only critical sources are restored or an explicit deployment plan is approved."
+}
