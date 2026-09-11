@@ -32,6 +32,14 @@ function compact(value: string): string {
     .replace(/[^0-9a-z가-힣]/giu, "");
 }
 
+function normalizeSurface(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/\s+/gu, " ")
+    .replace(/^[\s*_`~]+|[\s*_`~]+$/gu, "")
+    .trim();
+}
+
 function escapeRegexChar(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -79,7 +87,7 @@ function findRegisteredMatches(
       if (!match?.[0]) continue;
 
       matches.push({
-        surface: match[0].trim(),
+        surface: normalizeSurface(match[0]),
         alias,
         businessId: business.id,
         index: match.index,
@@ -95,6 +103,18 @@ function findRegisteredMatches(
       compact(b.alias).length - compact(a.alias).length ||
       a.businessId.localeCompare(b.businessId),
   );
+}
+
+function splitCandidateSegments(value: string): string[] {
+  const normalized = normalizeSurface(value);
+  if (!normalized) return [];
+
+  const parts = normalized
+    .split(/\s*(?:,|、|;|；)\s*|\s+(?:또는|및)\s+/u)
+    .map(normalizeSurface)
+    .filter((part) => compact(part).length >= 2);
+
+  return parts.length > 1 ? parts : [normalized];
 }
 
 function isLikelyTableHeader(value: string): boolean {
@@ -128,6 +148,65 @@ function dedupeCandidates(candidates: EntityCandidateV2[]): EntityCandidateV2[] 
   return [...out.values()];
 }
 
+function emitRegisteredCandidates(
+  candidates: EntityCandidateV2[],
+  node: ResponseNode,
+  segment: string,
+  businesses: CandidateBusinessRef[],
+): boolean {
+  const registered = findRegisteredMatches(segment, businesses);
+  if (registered.length === 0) return false;
+
+  const grouped = new Map<string, typeof registered>();
+
+  for (const match of registered) {
+    const surfaceKey = compact(match.surface);
+    const current = grouped.get(surfaceKey) ?? [];
+    current.push(match);
+    grouped.set(surfaceKey, current);
+  }
+
+  for (const group of grouped.values()) {
+    const first = group[0]!;
+    const businessIds = [...new Set(group.map((item) => item.businessId))];
+
+    candidates.push({
+      id: `${node.id}:registered:${compact(first.surface)}`,
+      nodeId: node.id,
+      nodeKind: node.kind,
+      role: "registered_subspan",
+      observedSurface: node.text,
+      identitySurface: first.surface,
+      matchedBusinessIds: businessIds,
+      matchedAlias: first.alias,
+      structuralScope: node.kind,
+    });
+  }
+
+  return true;
+}
+
+function emitUnregisteredCandidate(
+  candidates: EntityCandidateV2[],
+  node: ResponseNode,
+  role: Exclude<CandidateRole, "registered_subspan">,
+  segment: string,
+): void {
+  const identitySurface = normalizeSurface(segment);
+  if (compact(identitySurface).length < 2) return;
+
+  candidates.push({
+    id: `${node.id}:${role}:${compact(identitySurface)}`,
+    nodeId: node.id,
+    nodeKind: node.kind,
+    role,
+    observedSurface: node.text,
+    identitySurface,
+    matchedBusinessIds: [],
+    structuralScope: node.kind,
+  });
+}
+
 export function extractEntityCandidatesV2(
   nodes: ResponseNode[],
   businesses: CandidateBusinessRef[],
@@ -135,101 +214,36 @@ export function extractEntityCandidatesV2(
   const candidates: EntityCandidateV2[] = [];
 
   for (const node of nodes) {
-    const searchSurface =
-      node.kind === "list_item" && node.criterionBody
-        ? node.criterionBody
-        : node.text;
-
-    const registered = findRegisteredMatches(searchSurface, businesses);
-
-    if (registered.length > 0) {
-      const grouped = new Map<string, typeof registered>();
-
-      for (const match of registered) {
-        const surfaceKey = compact(match.surface);
-        const current = grouped.get(surfaceKey) ?? [];
-        current.push(match);
-        grouped.set(surfaceKey, current);
-      }
-
-      for (const group of grouped.values()) {
-        const first = group[0]!;
-        const businessIds = [...new Set(group.map((item) => item.businessId))];
-
-        candidates.push({
-          id: `${node.id}:registered:${compact(first.surface)}`,
-          nodeId: node.id,
-          nodeKind: node.kind,
-          role: "registered_subspan",
-          observedSurface: node.text,
-          identitySurface: first.surface,
-          matchedBusinessIds: businessIds,
-          matchedAlias: first.alias,
-          structuralScope: node.kind,
-        });
-      }
-
-      // Registered identity is authoritative for extraction. Do not also emit the
-      // whole descriptive heading/criterion as a competing identity candidate.
-      continue;
-    }
-
     if (node.kind === "table_row") {
-      const primary = node.cells?.[0]?.trim() ?? "";
-      if (primary && !isLikelyTableHeader(primary)) {
-        candidates.push({
-          id: `${node.id}:table:${compact(primary)}`,
-          nodeId: node.id,
-          nodeKind: node.kind,
-          role: "table_primary_cell",
-          observedSurface: node.text,
-          identitySurface: primary,
-          matchedBusinessIds: [],
-          structuralScope: node.kind,
-        });
+      const primary = normalizeSurface(node.cells?.[0]?.trim() ?? "");
+      if (!primary || isLikelyTableHeader(primary)) continue;
+
+      if (!emitRegisteredCandidates(candidates, node, primary, businesses)) {
+        emitUnregisteredCandidate(candidates, node, "table_primary_cell", primary);
       }
       continue;
     }
 
     if (node.kind === "heading") {
-      candidates.push({
-        id: `${node.id}:heading:${compact(node.text)}`,
-        nodeId: node.id,
-        nodeKind: node.kind,
-        role: "heading_surface",
-        observedSurface: node.text,
-        identitySurface: node.text,
-        matchedBusinessIds: [],
-        structuralScope: node.kind,
-      });
-      continue;
-    }
+      const surface = normalizeSurface(node.text);
+      if (!surface) continue;
 
-    if (node.kind === "list_item" && node.criterionBody) {
-      candidates.push({
-        id: `${node.id}:criterion:${compact(node.criterionBody)}`,
-        nodeId: node.id,
-        nodeKind: node.kind,
-        role: "criterion_body",
-        observedSurface: node.text,
-        identitySurface: node.criterionBody,
-        matchedBusinessIds: [],
-        structuralScope: node.kind,
-      });
+      if (!emitRegisteredCandidates(candidates, node, surface, businesses)) {
+        emitUnregisteredCandidate(candidates, node, "heading_surface", surface);
+      }
       continue;
     }
 
     if (node.kind === "list_item") {
-      candidates.push({
-        id: `${node.id}:list:${compact(node.text)}`,
-        nodeId: node.id,
-        nodeKind: node.kind,
-        role: "list_item_surface",
-        observedSurface: node.text,
-        identitySurface: node.text,
-        matchedBusinessIds: [],
-        structuralScope: node.kind,
-      });
+      const source = normalizeSurface(node.criterionBody ?? node.text);
+      const role: Exclude<CandidateRole, "registered_subspan" | "table_primary_cell" | "heading_surface"> =
+        node.criterionBody ? "criterion_body" : "list_item_surface";
+
+      for (const segment of splitCandidateSegments(source)) {
+        if (!emitRegisteredCandidates(candidates, node, segment, businesses)) {
+          emitUnregisteredCandidate(candidates, node, role, segment);
+        }
+      }
     }
   }
 
