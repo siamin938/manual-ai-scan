@@ -374,16 +374,13 @@ function DashboardPage() {
                   </TableHeader>
                   <TableBody>
                     {d.competitors.map((c) => {
-                      const isAdditionalObservation =
-                        c.tier !== "core" &&
-                        c.responseCount === 1 &&
-                        (c.priorRunPresenceCount ?? 0) === 0;
+                      const category = classifyCompetitorDisplay(c);
                       let badgeVariant: "default" | "secondary" | "outline" = "secondary";
                       let badgeLabel = "주목 관찰 업체";
-                      if (c.tier === "core") {
+                      if (category === "repeated") {
                         badgeVariant = "default";
-                        badgeLabel = coreObservationLabel;
-                      } else if (isAdditionalObservation) {
+                        badgeLabel = "반복 측정에서도 관찰";
+                      } else if (category === "additional") {
                         badgeVariant = "outline";
                         badgeLabel = "추가 관찰";
                       }
