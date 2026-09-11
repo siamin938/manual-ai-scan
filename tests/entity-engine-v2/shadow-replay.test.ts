@@ -92,11 +92,21 @@ describe("Entity Engine v2 historical shadow replay", () => {
     expect(normalized?.v2IdentitySurface).toBe("타이어프로 봉일천점");
   });
 
+  it("has only the reviewed new-confirmed sibling in the sample", () => {
+    const newConfirmed = report.diffs
+      .filter((diff) => diff.category === "v2_new_confirmed")
+      .map((diff) => `${diff.measurementId}:${diff.v2IdentitySurface}`)
+      .sort();
+
+    expect(newConfirmed).toEqual([
+      "62c9fe7e-5c73-410e-98f0-492a21cb23e2:더타이어샵 봉일천점",
+    ]);
+  });
+
   it("produces a stable summary over the sample corpus", () => {
     expect(report.summary.measurementCount).toBe(dataset.rows.length);
     expect(report.summary.v1EntityCount).toBe(8);
     expect(report.summary.diffCounts.v1_confirmed_to_v2_dropped).toBe(1);
     expect(report.summary.diffCounts.canonical_surface_normalized).toBe(2);
-    expect(report.summary.diffCounts.v2_new_confirmed).toBe(1);
   });
 });
