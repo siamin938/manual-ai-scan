@@ -1,0 +1,32 @@
+name: Entity Engine v2
+
+on:
+  pull_request:
+    paths:
+      - "supabase/functions/_shared/entity-engine-v2/**"
+      - "tests/entity-engine-v2/**"
+      - "tests/fixtures/entity-golden-corpus-v0.1.json"
+      - ".github/workflows/entity-engine-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  entity-engine-v2-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run Entity Engine v2 tests
+        run: bun run test -- tests/entity-engine-v2
