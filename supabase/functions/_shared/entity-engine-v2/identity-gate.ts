@@ -92,6 +92,11 @@ function isGenericOfficialNetwork(value: string): boolean {
   return /(공식|공인).*(인증점|취급점|시공점|대리점|판매점|협력점)$/u.test(key);
 }
 
+function isGenericRegionalBranchPlaceholder(value: string): boolean {
+  const key = compact(value);
+  return /(?:권|인근|지역|주변|일대)(?:지점|점)$/u.test(key);
+}
+
 function isGenericHeading(value: string): boolean {
   const key = compact(value);
   if (!key) return true;
@@ -318,6 +323,16 @@ export function evaluateIdentityCandidateV2(
       identitySurface: candidate.identitySurface,
       evidence: [],
       reasons: ["GENERIC_OFFICIAL_NETWORK"],
+    };
+  }
+
+  if (isGenericRegionalBranchPlaceholder(candidate.identitySurface)) {
+    return {
+      candidateId: candidate.id,
+      decision: "unresolved",
+      identitySurface: candidate.identitySurface,
+      evidence: [],
+      reasons: ["GENERIC_REGIONAL_BRANCH_PLACEHOLDER"],
     };
   }
 
