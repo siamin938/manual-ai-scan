@@ -100,7 +100,7 @@ describe("Entity Engine v2 response structure parser", () => {
       (node) => node.kind === "list_item" && node.criterionLabel === "주소",
     );
 
-    expect(heading?.text).toBe("3. 그린카서비스");
+    expect(heading?.text).toBe("그린카서비스");
     expect(heading?.scopeText).not.toContain("031-712-6522");
     expect(address?.criterionBody).toBe("경기도 성남시 분당구 정자동 242-1");
     expect(address?.parentId).toBe(heading?.id);
