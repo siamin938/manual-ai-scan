@@ -113,7 +113,7 @@ describe("Entity Engine v2 single-authority identity gate", () => {
     expect(decisionFor(text, "트윈모터스")).toBe("confirmed_business");
   });
 
-  it("treats generic official installer wording as a network, not a local business", () => {
+  it("keeps non-unique official installer wording fail-closed, never as a local business", () => {
     const text = [
       "### 2. 3M 공식 썬팅 시공점 — 일산동구 풍동",
       "- 3M 크리스탈라인, 블랙박스, PPF를 함께 시공한다고 안내합니다.",
@@ -124,7 +124,7 @@ describe("Entity Engine v2 single-authority identity gate", () => {
       item.identitySurface.startsWith("3M 공식 썬팅 시공점"),
     );
 
-    expect(result?.decision).toBe("brand_network");
+    expect(result?.decision).toBe("unresolved");
     expect(result?.decision).not.toBe("confirmed_business");
   });
 
