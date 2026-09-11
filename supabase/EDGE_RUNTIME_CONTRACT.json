@@ -11,8 +11,11 @@
       "expectedVerifyJwt": false,
       "authMode": "x-internal-secret",
       "deployableSourcePresentOnMain": false,
+      "deployableSourcePresentOnFoundation": false,
+      "liveParserVersion": "1.2.3",
       "risk": "HIGH",
-      "note": "Production measurement worker and parser caller. Live source exists in Supabase but is not currently represented as deployable source under supabase/functions on main."
+      "restoreRequirement": "Use `supabase functions download process-measurement-job --project-ref qoirkwmnyolquvsgbian` before merge. The API source view omits at least one type-only dependency, so a hand-reconstructed deploy package is not accepted as source-of-truth.",
+      "note": "Production measurement worker and first parser caller. Live code was inspected and is used for architecture analysis only until the official CLI download is committed."
     },
     {
       "slug": "reparse-measurements",
@@ -22,8 +25,11 @@
       "expectedVerifyJwt": false,
       "authMode": "body validates user bearer JWT and org role",
       "deployableSourcePresentOnMain": false,
+      "deployableSourcePresentOnFoundation": false,
+      "liveParserVersion": "1.2.3",
       "risk": "HIGH",
-      "note": "Contains the live parser v1.2.3 bundle used for replay. GitHub lacks the current deployable function source."
+      "restoreRequirement": "Use `supabase functions download reparse-measurements --project-ref qoirkwmnyolquvsgbian` before merge. The API source view omits at least one type-only dependency, so a hand-reconstructed deploy package is not accepted as source-of-truth.",
+      "note": "Stored-answer replay path. Live code inspection confirms Parser 1.2.3 and no provider API call in dry-run, but exact deployable source still requires official CLI download."
     },
     {
       "slug": "visibility-postprocess",
@@ -33,8 +39,13 @@
       "expectedVerifyJwt": false,
       "authMode": "x-visibility-postprocess-token",
       "deployableSourcePresentOnMain": false,
-      "risk": "HIGH",
-      "note": "Production verifier/resolver orchestration. Only historical deploy snapshots are present on main."
+      "deployableSourcePresentOnFoundation": true,
+      "livePipelineVersion": "0.1.4",
+      "liveVerifierVersion": "0.1.5",
+      "liveResolverVersion": "0.1.1",
+      "risk": "MEDIUM",
+      "restoreMode": "Exact single-file source copied from live Supabase source view into the foundation branch; no deploy performed.",
+      "note": "This makes the current verifier/resolver orchestration reviewable in the foundation PR. Main remains unchanged."
     },
     {
       "slug": "visibility-citation-attribution",
@@ -79,5 +90,12 @@
       "note": "GitHub sync redeployed the function with verify_jwt=false because the function was not declared in config.toml. Foundation branch adds the missing config entry. Do not merge without a controlled deployment check."
     }
   ],
-  "mergeRule": "Do not merge this branch to main until live-only critical sources are restored or an explicit deployment plan is approved."
+  "parserContract": {
+    "processMeasurementJob": "1.2.3",
+    "reparseMeasurements": "1.2.3",
+    "postprocessVerifier": "0.1.5",
+    "postprocessResolver": "0.1.1",
+    "architectureFinding": "Production currently has two serial business-identity authorities: Parser 1.2.3 and Verifier 0.1.5. Entity Engine v2 is designed to replace this duplicated truth decision with one identity gate after structural parsing/candidate extraction."
+  },
+  "mergeRule": "Do not merge this branch to main until process-measurement-job and reparse-measurements are restored via official CLI download, replay evidence is reviewed, and a controlled deployment plan is explicitly approved."
 }
