@@ -131,6 +131,15 @@ function isLikelyTableHeader(value: string): boolean {
   ].includes(key);
 }
 
+function isMetadataDetailLabel(value: string | undefined): boolean {
+  const label = normalizeSurface(value ?? "");
+  if (!label) return false;
+
+  return /^(?:주소|도로명|지번|전화|연락처|위치|지역|특징|서비스|주요\s*서비스|장점|단점|추천\s*(?:이유|포인트|대상|작업)|영업시간|운영시간|홈페이지|웹사이트|가격|비용|작업(?:\s*범위)?|시공(?:\s*범위)?|취급(?:\s*항목)?|전문(?:\s*분야|성)|후기|평점|예약|참고)$/u.test(
+    label,
+  );
+}
+
 function dedupeCandidates(candidates: EntityCandidateV2[]): EntityCandidateV2[] {
   const out = new Map<string, EntityCandidateV2>();
 
@@ -235,6 +244,13 @@ export function extractEntityCandidatesV2(
     }
 
     if (node.kind === "list_item") {
+      // Detail/metadata fields describe the parent entity. Their values can be
+      // evidence for that parent, but they must never become sibling entity
+      // candidates themselves (e.g. `특징: 수입차 정비 전문점`).
+      if (node.criterionBody && isMetadataDetailLabel(node.criterionLabel)) {
+        continue;
+      }
+
       const source = normalizeSurface(node.criterionBody ?? node.text);
       const role: Exclude<CandidateRole, "registered_subspan" | "table_primary_cell" | "heading_surface"> =
         node.criterionBody ? "criterion_body" : "list_item_surface";
