@@ -9,6 +9,24 @@ verify_jwt = true
 [functions.visibility-diagnostic]
 verify_jwt = true
 
+# Browser-facing onboarding endpoint. Platform JWT verification is required,
+# and the function body also validates the user token before using service-role RPCs.
+[functions.create-organization-with-owner]
+verify_jwt = true
+
+# Internal worker endpoint. It authenticates with x-internal-secret instead of a user JWT.
+[functions.process-measurement-job]
+verify_jwt = false
+
+# Internal/controlled reparse endpoint. The body validates the supplied user JWT and org role.
+[functions.reparse-measurements]
+verify_jwt = false
+
+# Internal postprocess-only Edge Function. It authenticates with
+# x-visibility-postprocess-token instead of a user JWT.
+[functions.visibility-postprocess]
+verify_jwt = false
+
 # Internal postprocess-only Edge Function. It authenticates with
 # x-visibility-postprocess-token instead of a user JWT.
 [functions.visibility-citation-attribution]
