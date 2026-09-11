@@ -83,6 +83,40 @@ describe("Entity Engine v2 candidate extractor", () => {
     expect(tire?.observedSurface).toContain("금촌·조리 쪽");
   });
 
+  it("splits multiple unregistered businesses in one criterion body", () => {
+    const nodes = parseResponseStructure(
+      "- **운정·교하에서 최대한 가까운 곳:** 티스테이션 파주교하점, 금호타이어 운정신도시점",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, []);
+    const identities = candidates.map((candidate) => candidate.identitySurface);
+
+    expect(identities).toContain("티스테이션 파주교하점");
+    expect(identities).toContain("금호타이어 운정신도시점");
+    expect(identities).not.toContain(
+      "티스테이션 파주교하점, 금호타이어 운정신도시점",
+    );
+  });
+
+  it("keeps unregistered siblings when one business in the same criterion is registered", () => {
+    const nodes = parseResponseStructure(
+      "- **조리·봉일천 쪽:** 타이어프로 봉일천점, 더타이어샵 봉일천점",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, businesses);
+
+    const registered = candidates.find((candidate) =>
+      candidate.matchedBusinessIds.includes(
+        "483022a4-30c9-4f6d-9cf4-19a30c2f58d2",
+      ),
+    );
+    const sibling = candidates.find(
+      (candidate) => candidate.identitySurface === "더타이어샵 봉일천점",
+    );
+
+    expect(registered?.identitySurface).toBe("타이어프로 봉일천점");
+    expect(sibling).toBeDefined();
+    expect(sibling?.matchedBusinessIds).toEqual([]);
+  });
+
   it("emits an unregistered table primary cell as a candidate without confirming it", () => {
     const nodes = parseResponseStructure(
       [
