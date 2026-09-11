@@ -63,6 +63,14 @@ describe("Entity Engine v2 historical shadow replay", () => {
     expect(report.releaseSignals.reviewNeedsReviewPromotions).toBeGreaterThan(0);
   });
 
+  it("does not promote a regional network placeholder into a concrete branch", () => {
+    const placeholder = report.diffs.find(
+      (diff) => diff.measurementId === "8e866de0-a6d3-4072-9ee1-0ae1bb4ff0cd",
+    );
+    expect(placeholder?.category).toBe("unchanged_needs_review");
+    expect(placeholder?.v2Decision).not.toBe("confirmed_business");
+  });
+
   it("keeps rejected-to-confirmed promotions as a blocking safety signal", () => {
     expect(report.releaseSignals.blockingRejectedPromotions).toBe(0);
     expect(report.releaseSignals.shadowHasBlockingPromotion).toBe(false);
@@ -86,7 +94,7 @@ describe("Entity Engine v2 historical shadow replay", () => {
 
   it("produces a stable summary over the sample corpus", () => {
     expect(report.summary.measurementCount).toBe(dataset.rows.length);
-    expect(report.summary.v1EntityCount).toBe(9);
+    expect(report.summary.v1EntityCount).toBe(8);
     expect(report.summary.diffCounts.v1_confirmed_to_v2_dropped).toBe(1);
     expect(report.summary.diffCounts.canonical_surface_normalized).toBe(2);
     expect(report.summary.diffCounts.v2_new_confirmed).toBe(1);
