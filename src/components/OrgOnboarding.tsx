@@ -34,6 +34,12 @@ function generateInternalSlug(): string {
   return `biz-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 }
 
+function readCreatedOrgId(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const row = payload as Record<string, unknown>;
+  return row.ok === true && typeof row.orgId === "string" ? row.orgId : null;
+}
+
 export function OrgOnboarding() {
   const { refetch } = useOrg();
   const [name, setName] = useState("");
@@ -52,16 +58,19 @@ export function OrgOnboarding() {
     let orgId = createdOrgId;
 
     if (!orgId) {
-      const { data, error } = await supabase.rpc("create_organization_with_owner", {
-        p_name: normalizedName,
-        p_slug: generateInternalSlug(),
+      const { data, error } = await supabase.functions.invoke("create-organization-with-owner", {
+        body: {
+          name: normalizedName,
+          slug: generateInternalSlug(),
+        },
       });
-      if (error || !data) {
+      const created = readCreatedOrgId(data);
+      if (error || !created) {
         setBusy(false);
         toast.error(SETUP_ERROR_MESSAGE);
         return;
       }
-      orgId = data as unknown as string;
+      orgId = created;
       setCreatedOrgId(orgId);
     }
 
