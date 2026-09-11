@@ -69,10 +69,18 @@ function compact(value: string): string {
     .replace(/[^0-9a-z가-힣]/giu, "");
 }
 
-function sameExpectedSurface(actual: string, expected: string): boolean {
+function exactSurface(actual: string, expected: string): boolean {
+  return compact(actual) === compact(expected);
+}
+
+function requiredSurface(actual: string, expected: string): boolean {
   const a = compact(actual);
   const e = compact(expected);
-  return a === e || a.startsWith(e) || e.startsWith(a);
+
+  // Prefer the exact identity. A one-way suffix allowance supports response
+  // headings such as "3M 공식 썬팅 시공점 — 일산동구 풍동" without ever
+  // treating a shorter registered subspan as equal to a forbidden larger phrase.
+  return a === e || a.startsWith(e);
 }
 
 function evaluateCase(item: GoldenCase) {
@@ -92,7 +100,7 @@ describe("Entity Engine v2 golden corpus identity decisions", () => {
         const collisions = results.filter(
           (result) =>
             result.decision === "confirmed_business" &&
-            sameExpectedSurface(result.identitySurface, forbidden),
+            exactSurface(result.identitySurface, forbidden),
         );
 
         expect(collisions, forbidden).toEqual([]);
@@ -103,9 +111,14 @@ describe("Entity Engine v2 golden corpus identity decisions", () => {
       const { results } = evaluateCase(item);
 
       for (const required of item.requiredEntities) {
-        const result = results.find((candidate) =>
-          sameExpectedSurface(candidate.identitySurface, required.surface),
+        const exact = results.find((candidate) =>
+          exactSurface(candidate.identitySurface, required.surface),
         );
+        const result =
+          exact ??
+          results.find((candidate) =>
+            requiredSurface(candidate.identitySurface, required.surface),
+          );
 
         expect(result, required.surface).toBeDefined();
         expect(result?.decision, required.surface).toBe(required.decision);
