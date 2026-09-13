@@ -76,9 +76,19 @@ function detectAddress(text: string): string | null {
   return road?.[0]?.trim() ?? null;
 }
 
+/**
+ * Branch identity is intentionally narrower than "ends with 점".
+ * Korean nouns such as 시점/장점/관점 also end in 점 and must never become
+ * local businesses merely because of their final character.
+ */
 function hasBranchMarker(value: string): boolean {
   const text = value.trim();
-  return /(?:본점|지점|분점|직영점|대리점|전문점|[가-힣A-Za-z0-9]{2,}점)$/u.test(text);
+  if (!text) return false;
+
+  if (/(?:본점|지점|분점|직영점|대리점|전문점)$/u.test(text)) return true;
+
+  const lastToken = text.split(/\s+/u).filter(Boolean).at(-1) ?? "";
+  return /^[가-힣A-Za-z0-9]{3,}점$/u.test(lastToken);
 }
 
 function hasBusinessDescriptor(value: string): boolean {
@@ -89,12 +99,34 @@ function hasBusinessDescriptor(value: string): boolean {
 
 function isGenericOfficialNetwork(value: string): boolean {
   const key = compact(value);
-  return /(공식|공인).*(인증점|취급점|시공점|대리점|판매점|협력점)$/u.test(key);
+  return /(?:공식점|공인점|(?:공식|공인).*(?:인증점|취급점|시공점|대리점|판매점|협력점))$/u.test(
+    key,
+  );
 }
 
 function isGenericRegionalBranchPlaceholder(value: string): boolean {
   const key = compact(value);
-  return /(?:권|인근|지역|주변|일대)(?:지점|점)$/u.test(key);
+  return /(?:권|인근|지역|주변|일대).*(?:지점|제휴점|튜닝점|시공점|전문점|정비소|카센터|매장|업체|점)$/u.test(
+    key,
+  );
+}
+
+function isGenericShopDescription(value: string): boolean {
+  const key = compact(value);
+  return /^(?:동네|일반|지역|주변|근처|가까운|저렴한|후기좋은|평점높은).*(?:카센터|카센타|정비소|공업사|썬팅점|튜닝점|전문점|시공점|매장|업체|점)$/u.test(
+    key,
+  );
+}
+
+function isQualifiedBranchIdentity(value: string): boolean {
+  if (!hasBranchMarker(value)) return false;
+
+  const tokens = value.trim().split(/\s+/u).filter(Boolean);
+  return (
+    tokens.length >= 2 ||
+    hasBusinessDescriptor(value) ||
+    /[A-Za-z0-9]/u.test(value)
+  );
 }
 
 function isGenericHeading(value: string): boolean {
@@ -336,6 +368,16 @@ export function evaluateIdentityCandidateV2(
     };
   }
 
+  if (isGenericShopDescription(candidate.identitySurface)) {
+    return {
+      candidateId: candidate.id,
+      decision: "non_business",
+      identitySurface: candidate.identitySurface,
+      evidence: [],
+      reasons: ["GENERIC_SHOP_DESCRIPTION"],
+    };
+  }
+
   if (candidate.role === "heading_surface" && isGenericHeading(candidate.identitySurface)) {
     return {
       candidateId: candidate.id,
@@ -366,11 +408,12 @@ export function evaluateIdentityCandidateV2(
     item.type === "address" || item.type === "phone" || item.type === "url",
   );
   const branch = hasBranchMarker(candidate.identitySurface);
+  const qualifiedBranch = isQualifiedBranchIdentity(candidate.identitySurface);
   const descriptor = hasBusinessDescriptor(candidate.identitySurface);
 
   if (
     candidate.role === "table_primary_cell" &&
-    (hasStrongStructured || branch || descriptor)
+    (hasStrongStructured || qualifiedBranch || descriptor)
   ) {
     return {
       candidateId: candidate.id,
@@ -385,7 +428,7 @@ export function evaluateIdentityCandidateV2(
   if (
     candidate.role === "heading_surface" &&
     !isGenericHeading(candidate.identitySurface) &&
-    (hasStrongStructured || branch)
+    (hasStrongStructured || qualifiedBranch)
   ) {
     return {
       candidateId: candidate.id,
@@ -399,7 +442,7 @@ export function evaluateIdentityCandidateV2(
 
   if (
     (candidate.role === "list_item_surface" || candidate.role === "criterion_body") &&
-    branch &&
+    qualifiedBranch &&
     !isGenericHeading(candidate.identitySurface)
   ) {
     return {
@@ -416,7 +459,7 @@ export function evaluateIdentityCandidateV2(
     candidateId: candidate.id,
     decision: "unresolved",
     identitySurface: candidate.identitySurface,
-    evidence,
+    evidence: branch ? evidence : evidence.filter((item) => item.type !== "branch"),
     reasons: ["INSUFFICIENT_SCOPED_IDENTITY_EVIDENCE"],
   };
 }

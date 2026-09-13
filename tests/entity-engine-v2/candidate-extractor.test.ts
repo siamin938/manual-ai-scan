@@ -169,4 +169,40 @@ describe("Entity Engine v2 candidate extractor", () => {
     expect(heading?.role).toBe("heading_surface");
     expect(heading?.matchedBusinessIds).toEqual([]);
   });
+
+  it("separates an unregistered business identity from a spaced heading annotation", () => {
+    const nodes = parseResponseStructure(
+      [
+        "### 3. 5디테일 영등포점 — 영등포구",
+        "- **주소:** 서울 영등포구 문래북로 54, 1층",
+        "- **전화:** 010-8563-2787",
+      ].join("\n"),
+    );
+    const candidates = extractEntityCandidatesV2(nodes, []);
+    const business = candidates.find(
+      (candidate) => candidate.identitySurface === "5디테일 영등포점",
+    );
+
+    expect(business?.role).toBe("heading_surface");
+    expect(business?.observedSurface).toBe("5디테일 영등포점 — 영등포구");
+    expect(
+      candidates.some(
+        (candidate) => candidate.identitySurface === "5디테일 영등포점 — 영등포구",
+      ),
+    ).toBe(false);
+  });
+
+  it("uses a named branch as the heading identity even when the suffix is a work-purpose note", () => {
+    const nodes = parseResponseStructure(
+      "### 1. BMS타이어 파주점 — 타이어·휠 작업 중심",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, []);
+
+    expect(candidates.map((candidate) => candidate.identitySurface)).toContain(
+      "BMS타이어 파주점",
+    );
+    expect(candidates.map((candidate) => candidate.identitySurface)).not.toContain(
+      "BMS타이어 파주점 — 타이어·휠 작업 중심",
+    );
+  });
 });

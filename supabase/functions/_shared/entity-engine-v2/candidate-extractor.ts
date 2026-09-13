@@ -40,6 +40,26 @@ function normalizeSurface(value: string): string {
     .trim();
 }
 
+/**
+ * Headings often append a human-facing annotation after the actual business
+ * identity, e.g. `레이노 구로동로점 — 구로구` or
+ * `BMS타이어 파주점 — 타이어·휠 작업 중심`.
+ *
+ * Keep the full node text as observedSurface, but use only the left structural
+ * head as identitySurface. We deliberately split only on spaced structural
+ * separators, never on ordinary hyphens inside a business name.
+ */
+function headingIdentityHead(value: string): string {
+  const normalized = normalizeSurface(value);
+  if (!normalized) return "";
+
+  const separated = normalized.match(/^(.{2,120}?)\s+(?:—|–|\|)\s+(.+)$/u);
+  if (!separated?.[1]) return normalized;
+
+  const head = normalizeSurface(separated[1]);
+  return compact(head).length >= 2 ? head : normalized;
+}
+
 function escapeRegexChar(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -237,8 +257,17 @@ export function extractEntityCandidatesV2(
       const surface = normalizeSurface(node.text);
       if (!surface) continue;
 
+      // Registered identities are searched against the full heading first so
+      // an exact registered subspan is not lost. Unregistered identities use
+      // the structural head only, keeping geography/purpose annotations out
+      // of the canonical surface.
       if (!emitRegisteredCandidates(candidates, node, surface, businesses)) {
-        emitUnregisteredCandidate(candidates, node, "heading_surface", surface);
+        emitUnregisteredCandidate(
+          candidates,
+          node,
+          "heading_surface",
+          headingIdentityHead(surface),
+        );
       }
       continue;
     }
