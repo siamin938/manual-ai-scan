@@ -22,6 +22,7 @@ export interface ResponseNode {
 
 const HEADING_RE = /^(\s*)(#{1,6})\s+(.+?)\s*$/u;
 const LIST_RE = /^(\s*)[-*•▪◦]\s+(.+?)\s*$/u;
+const ORDERED_LIST_RE = /^(\s*)(?:(?:\d{1,2}[.)])|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳])\s+(.+?)\s*$/u;
 const TABLE_SEPARATOR_CELL_RE = /^:?-{2,}:?$/u;
 
 function normalizeInline(value: string): string {
@@ -205,7 +206,9 @@ export function parseResponseStructure(text: string): ResponseNode[] {
       continue;
     }
 
-    const list = raw.match(LIST_RE);
+    const unorderedList = raw.match(LIST_RE);
+    const orderedList = raw.match(ORDERED_LIST_RE);
+    const list = unorderedList ?? orderedList;
     if (list) {
       const indent = leadingSpaces(list[1] ?? "");
       const body = normalizeInline(list[2]!);
