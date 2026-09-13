@@ -88,7 +88,10 @@ function hasBranchMarker(value: string): boolean {
   if (/(?:본점|지점|분점|직영점|대리점|전문점)$/u.test(text)) return true;
 
   const lastToken = text.split(/\s+/u).filter(Boolean).at(-1) ?? "";
-  return /^[가-힣A-Za-z0-9]{3,}점$/u.test(lastToken);
+  // Two or more identity characters before `점` accepts real location tokens
+  // such as 파주점/사당점 while excluding lexical words such as 시점/장점.
+  // Bare location labels are still rejected later by isQualifiedBranchIdentity.
+  return /^[가-힣A-Za-z0-9]{2,}점$/u.test(lastToken);
 }
 
 function hasBusinessDescriptor(value: string): boolean {
