@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const MIGRATION = resolve(
   process.cwd(),
-  "supabase/migrations/20260913145500_first_run_source_clue_consistency_v03.sql",
+  "supabase/migrations/20260913142750_first_run_source_clue_consistency_v03.sql",
 );
 const sql = readFileSync(MIGRATION, "utf8");
 
