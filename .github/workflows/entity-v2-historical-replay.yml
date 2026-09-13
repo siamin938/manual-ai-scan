@@ -1,0 +1,43 @@
+name: Entity v2 Historical Replay
+
+on:
+  push:
+    branches:
+      - chore/entity-engine-v2-foundation
+    paths:
+      - ".github/workflows/entity-v2-historical-replay.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  credential-probe:
+    if: github.ref == 'refs/heads/chore/entity-engine-v2-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Check read-only replay credential availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          has_database_url=false
+          has_supabase_db_url=false
+          has_service_role=false
+          has_secret_key=false
+          [ -n "${DATABASE_URL:-}" ] && has_database_url=true
+          [ -n "${SUPABASE_DB_URL:-}" ] && has_supabase_db_url=true
+          [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] && has_service_role=true
+          [ -n "${SUPABASE_SECRET_KEY:-}" ] && has_secret_key=true
+          echo "DATABASE_URL available: ${has_database_url}"
+          echo "SUPABASE_DB_URL available: ${has_supabase_db_url}"
+          echo "SUPABASE_SERVICE_ROLE_KEY available: ${has_service_role}"
+          echo "SUPABASE_SECRET_KEY available: ${has_secret_key}"
+          if [ "${has_database_url}" = false ] && [ "${has_supabase_db_url}" = false ] && [ "${has_service_role}" = false ] && [ "${has_secret_key}" = false ]; then
+            echo "No GitHub-hosted read-only credential is available for production replay."
+          fi
