@@ -1,7 +1,7 @@
 {
-  "snapshotDateKst": "2026-09-12",
+  "snapshotDateKst": "2026-09-13",
   "projectId": "qoirkwmnyolquvsgbian",
-  "purpose": "Track deploy/auth contract drift between GitHub and live Supabase. This file is descriptive and must be refreshed after intentional deployments.",
+  "purpose": "Track deploy/auth/source-recovery contract drift between GitHub and live Supabase. This file is descriptive and must be refreshed after intentional deployments.",
   "criticalFunctions": [
     {
       "slug": "process-measurement-job",
@@ -11,11 +11,14 @@
       "expectedVerifyJwt": false,
       "authMode": "x-internal-secret",
       "deployableSourcePresentOnMain": false,
-      "deployableSourcePresentOnFoundation": false,
+      "runtimeBehaviorSourcePresentOnFoundation": true,
+      "deployCandidatePresentOnFoundation": true,
+      "exactOriginalSourceRecoverable": false,
       "liveParserVersion": "1.2.3",
       "risk": "HIGH",
-      "restoreRequirement": "Use `supabase functions download process-measurement-job --project-ref qoirkwmnyolquvsgbian` before merge. The API source view omits at least one type-only dependency, so a hand-reconstructed deploy package is not accepted as source-of-truth.",
-      "note": "Production measurement worker and first parser caller. Live code was inspected and is used for architecture analysis only until the official CLI download is committed."
+      "sourceRecoveryMode": "Supabase Management API deployed-function body/unbundle. Runtime modules were recovered into the function-local source tree. The deployed bundle omits the type-only _shared/types.ts module; that compile-only module is explicitly marked RECONSTRUCTED_COMPILE_ONLY and is not claimed to be byte-identical to the lost original.",
+      "compileOnlySourceGap": ["_shared/types.ts original text"],
+      "note": "Production measurement worker and first parser caller. Runtime behavior source is now reviewable on the foundation branch. No deploy was performed."
     },
     {
       "slug": "reparse-measurements",
@@ -25,11 +28,14 @@
       "expectedVerifyJwt": false,
       "authMode": "body validates user bearer JWT and org role",
       "deployableSourcePresentOnMain": false,
-      "deployableSourcePresentOnFoundation": false,
+      "runtimeBehaviorSourcePresentOnFoundation": true,
+      "deployCandidatePresentOnFoundation": true,
+      "exactOriginalSourceRecoverable": false,
       "liveParserVersion": "1.2.3",
       "risk": "HIGH",
-      "restoreRequirement": "Use `supabase functions download reparse-measurements --project-ref qoirkwmnyolquvsgbian` before merge. The API source view omits at least one type-only dependency, so a hand-reconstructed deploy package is not accepted as source-of-truth.",
-      "note": "Stored-answer replay path. Live code inspection confirms Parser 1.2.3 and no provider API call in dry-run, but exact deployable source still requires official CLI download."
+      "sourceRecoveryMode": "Supabase Management API deployed-function body/unbundle. Reparse entrypoint/runtime helpers were recovered; Parser 1.2.3 behavioral source is shared with the recovered process-worker parser contract. The deployed bundle omits the type-only _shared/types.ts module; that compile-only module is explicitly marked RECONSTRUCTED_COMPILE_ONLY.",
+      "compileOnlySourceGap": ["_shared/types.ts original text"],
+      "note": "Stored-answer replay path. Default is dry_run unless dry_run=false; no paid provider call is made by the reparse function. No deploy was performed."
     },
     {
       "slug": "visibility-postprocess",
@@ -39,13 +45,14 @@
       "expectedVerifyJwt": false,
       "authMode": "x-visibility-postprocess-token",
       "deployableSourcePresentOnMain": false,
-      "deployableSourcePresentOnFoundation": true,
+      "runtimeBehaviorSourcePresentOnFoundation": true,
+      "deployCandidatePresentOnFoundation": true,
       "livePipelineVersion": "0.1.4",
       "liveVerifierVersion": "0.1.5",
       "liveResolverVersion": "0.1.1",
       "risk": "MEDIUM",
-      "restoreMode": "Exact single-file source copied from live Supabase source view into the foundation branch; no deploy performed.",
-      "note": "This makes the current verifier/resolver orchestration reviewable in the foundation PR. Main remains unchanged."
+      "sourceRecoveryMode": "Exact single-file source copied from live Supabase source view into the foundation branch; no deploy performed.",
+      "note": "Current verifier/resolver orchestration is reviewable in the foundation PR. Main remains unchanged."
     },
     {
       "slug": "visibility-citation-attribution",
@@ -90,6 +97,10 @@
       "note": "GitHub sync redeployed the function with verify_jwt=false because the function was not declared in config.toml. Foundation branch adds the missing config entry. Do not merge without a controlled deployment check."
     }
   ],
+  "sourceRecoveryFinding": {
+    "managementApiAndCliRelationship": "Supabase CLI functions download uses the deployed function body/unbundle path. A type-only module eliminated from the deployed bundle is not guaranteed to be recoverable by switching from the Management API source view to CLI download.",
+    "policy": "Never present reconstructed compile-only declarations as byte-identical live originals. Runtime behavior source and compile-only reconstruction are tracked separately."
+  },
   "parserContract": {
     "processMeasurementJob": "1.2.3",
     "reparseMeasurements": "1.2.3",
@@ -97,5 +108,5 @@
     "postprocessResolver": "0.1.1",
     "architectureFinding": "Production currently has two serial business-identity authorities: Parser 1.2.3 and Verifier 0.1.5. Entity Engine v2 is designed to replace this duplicated truth decision with one identity gate after structural parsing/candidate extraction."
   },
-  "mergeRule": "Do not merge this branch to main until process-measurement-job and reparse-measurements are restored via official CLI download, replay evidence is reviewed, and a controlled deployment plan is explicitly approved."
+  "mergeRule": "Do not merge this branch to main until the recovered runtime/deploy-candidate source contract passes CI, full historical replay evidence is reviewed through the blocking release gate, and a controlled deployment/cutover plan is explicitly approved."
 }
