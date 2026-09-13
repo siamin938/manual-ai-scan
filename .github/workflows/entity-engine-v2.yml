@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "supabase/functions/_shared/entity-engine-v2/**"
+      - "supabase/functions/process-measurement-job/**"
+      - "supabase/functions/reparse-measurements/**"
+      - "supabase/EDGE_RUNTIME_CONTRACT.json"
       - "tests/entity-engine-v2/**"
       - "tests/fixtures/entity-golden-corpus*.json"
       - "tests/fixtures/entity-v2-shadow-*.json"
