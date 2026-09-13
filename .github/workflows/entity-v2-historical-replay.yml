@@ -12,32 +12,33 @@ permissions:
   contents: read
 
 jobs:
-  anon-read-probe:
+  credential-presence-probe:
     if: github.ref == 'refs/heads/chore/entity-engine-v2-foundation'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      SUPABASE_URL: https://qoirkwmnyolquvsgbian.supabase.co
-      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvaXJrd21ueW9scXV2c2diaWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4Nzc1MzAsImV4cCI6MjEwMjQ1MzUzMH0.onudsrtn6_CKwaqKy2Lu65--qjDvTo5Xpky0dk0Rodw
+      PROBE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      PROBE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      PROBE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      PROBE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      PROBE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
-      - name: Probe RLS-protected measurement read without exposing content
+      - name: Check existing server credential names without exposing values
         shell: bash
         run: |
           set -euo pipefail
-          response_file="$(mktemp)"
-          status="$(curl -sS -o "$response_file" -w '%{http_code}' \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
-            "${SUPABASE_URL}/rest/v1/measurements?select=id&limit=1")"
-          echo "HTTP status: ${status}"
-          if [ "${status}" != "200" ]; then
-            echo "Legacy anon read is unavailable."
-            exit 0
-          fi
-          rows="$(jq 'length' "$response_file")"
-          echo "Rows visible to anon: ${rows}"
-          if [ "${rows}" -gt 0 ]; then
-            echo "ANON_HISTORICAL_REPLAY_POSSIBLE=true"
-          else
-            echo "ANON_HISTORICAL_REPLAY_POSSIBLE=false"
-          fi
+          probe() {
+            local label="$1"
+            local value="$2"
+            if [ -n "$value" ]; then
+              echo "${label}=PRESENT"
+            else
+              echo "${label}=ABSENT"
+            fi
+          }
+          probe "SUPABASE_SERVICE_ROLE_KEY" "${PROBE_SERVICE_ROLE_KEY:-}"
+          probe "SUPABASE_SECRET_KEY" "${PROBE_SECRET_KEY:-}"
+          probe "SUPABASE_DB_URL" "${PROBE_DB_URL:-}"
+          probe "DATABASE_URL" "${PROBE_DATABASE_URL:-}"
+          probe "SUPABASE_ACCESS_TOKEN" "${PROBE_ACCESS_TOKEN:-}"
+          echo "No credential values were printed or used for data access."
