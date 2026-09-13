@@ -27,14 +27,13 @@ jobs:
       - name: Checkout foundation branch
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: npm
+          bun-version: latest
 
       - name: Install locked dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Report replay credential presence without exposing it
         shell: bash
@@ -50,7 +49,7 @@ jobs:
           fi
 
       - name: Run isolated Entity v2 historical replay harness
-        run: npx vitest run --config vitest.entity-v2-historical.config.ts
+        run: bunx vitest run --config vitest.entity-v2-historical.config.ts
 
       - name: Upload review-only release artifact
         if: always() && env.ENTITY_V2_REPLAY_DATABASE_URL != ''
