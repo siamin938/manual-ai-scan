@@ -24,19 +24,28 @@ type GoldenCase = {
   requiredEntities: RequiredEntity[];
 };
 
-type GoldenCorpus = {
+type GoldenCorpusShard = {
   version: string;
   cases: GoldenCase[];
 };
 
-const fixtureUrl = new URL(
-  "../fixtures/entity-golden-corpus-v0.1.json",
-  import.meta.url,
-);
+function readShard(relative: string): GoldenCorpusShard {
+  const url = new URL(relative, import.meta.url);
+  return JSON.parse(readFileSync(fileURLToPath(url), "utf8")) as GoldenCorpusShard;
+}
 
-const corpus = JSON.parse(
-  readFileSync(fileURLToPath(fixtureUrl), "utf8"),
-) as GoldenCorpus;
+const shards = [
+  readShard("../fixtures/entity-golden-corpus-v0.1.json"),
+  readShard("../fixtures/entity-golden-corpus-expansion-v0.2-a.json"),
+  readShard("../fixtures/entity-golden-corpus-expansion-v0.2-b1.json"),
+  readShard("../fixtures/entity-golden-corpus-expansion-v0.2-b2.json"),
+  readShard("../fixtures/entity-golden-corpus-expansion-v0.2-c.json"),
+];
+
+const corpus = {
+  version: "0.2",
+  cases: shards.flatMap((shard) => shard.cases),
+};
 
 const businessesByCase: Record<string, CandidateBusinessRef[]> = {
   "registered-business-inside-section-title": [
@@ -76,10 +85,6 @@ function exactSurface(actual: string, expected: string): boolean {
 function requiredSurface(actual: string, expected: string): boolean {
   const a = compact(actual);
   const e = compact(expected);
-
-  // Prefer the exact identity. A one-way suffix allowance supports response
-  // headings such as "3M 공식 썬팅 시공점 — 일산동구 풍동" without ever
-  // treating a shorter registered subspan as equal to a forbidden larger phrase.
   return a === e || a.startsWith(e);
 }
 
@@ -92,6 +97,11 @@ function evaluateCase(item: GoldenCase) {
 }
 
 describe("Entity Engine v2 golden corpus identity decisions", () => {
+  it("loads the expanded v0.2 corpus", () => {
+    expect(corpus.version).toBe("0.2");
+    expect(corpus.cases.length).toBeGreaterThanOrEqual(25);
+  });
+
   for (const item of corpus.cases) {
     it(`${item.id}: never confirms forbidden surfaces`, () => {
       const { results } = evaluateCase(item);
