@@ -1,0 +1,18 @@
+{
+  "version": "review-v0.1",
+  "approvedConfirmedDrops": [
+    {
+      "measurementId": "889f16ae-e0f1-470f-b720-2538eb281a73",
+      "surface": "로 문의해볼 곳",
+      "rationale": "Reviewed false positive: a ranked section heading was incorrectly stored as a business in v1."
+    }
+  ],
+  "approvedNewConfirmed": [
+    {
+      "measurementId": "62c9fe7e-5c73-410e-98f0-492a21cb23e2",
+      "surface": "더타이어샵 봉일천점",
+      "rationale": "Reviewed sibling business: v1 overcaptured the whole criterion around the registered 타이어프로 entity and dropped the second named branch."
+    }
+  ],
+  "approvedNeedsReviewPromotions": []
+}

@@ -6,7 +6,7 @@ on:
       - "supabase/functions/_shared/entity-engine-v2/**"
       - "tests/entity-engine-v2/**"
       - "tests/fixtures/entity-golden-corpus*.json"
-      - "tests/fixtures/entity-v2-shadow-replay*.json"
+      - "tests/fixtures/entity-v2-shadow-*.json"
       - "scripts/entity-v2-shadow-replay.ts"
       - ".github/workflows/entity-engine-v2.yml"
   workflow_dispatch:
