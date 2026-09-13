@@ -64,7 +64,7 @@ describe("Entity Engine v2 shadow release gate", () => {
 
   it("auto-qualifies a needs-review promotion only when scoped structured evidence exists", () => {
     const promotion = report.diffs.find(
-      (diff) => diff.measurementId === "544f3240-91dc-4eeb-a189-592a983d43ddd7",
+      (diff) => diff.measurementId === "544f3240-91dc-4eeb-a189-592a983d43cd",
     );
     expect(promotion?.category).toBe("v1_needs_review_to_v2_confirmed");
     expect(

@@ -8,6 +8,7 @@ on:
       - "tests/fixtures/entity-golden-corpus*.json"
       - "tests/fixtures/entity-v2-shadow-*.json"
       - "scripts/entity-v2-shadow-replay.ts"
+      - "scripts/sql/export-entity-v2-replay.sql"
       - ".github/workflows/entity-engine-v2.yml"
   workflow_dispatch:
 

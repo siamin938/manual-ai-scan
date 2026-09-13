@@ -3,10 +3,13 @@
 --
 -- Recommended usage:
 --   psql "$DATABASE_URL" -At -f scripts/sql/export-entity-v2-replay.sql \
---     > .tmp/entity-v2-replay.ndjson
+--     > .tmp/entity-v2-replay.json
 --
--- Each output line is one JSON replay row. Do NOT commit the generated output: it
--- contains stored AI answer text and organization-scoped measurement data.
+-- Output is one wrapped JSON dataset that can be passed directly to:
+--   bun scripts/entity-v2-shadow-replay.ts .tmp/entity-v2-replay.json [review-registry.json]
+--
+-- Do NOT commit the generated output: it contains stored AI answer text and
+-- organization-scoped measurement data.
 
 with eligible_measurements as (
   select
@@ -93,16 +96,28 @@ with eligible_measurements as (
         and mm2.matched_business_id is not null
    )
   group by em.measurement_id
+), replay_rows as (
+  select
+    em.run_id,
+    em.measurement_id,
+    jsonb_build_object(
+      'measurementId', em.measurement_id,
+      'runId', em.run_id,
+      'clientBusinessId', em.business_id,
+      'responseText', em.response_text,
+      'businesses', coalesce(bc.businesses,'[]'::jsonb),
+      'v1Entities', coalesce(v1.entities,'[]'::jsonb)
+    ) as row_json
+  from eligible_measurements em
+  left join v1_entities v1 on v1.measurement_id=em.measurement_id
+  left join business_context bc on bc.measurement_id=em.measurement_id
 )
 select jsonb_build_object(
-  'measurementId', em.measurement_id,
-  'runId', em.run_id,
-  'clientBusinessId', em.business_id,
-  'responseText', em.response_text,
-  'businesses', coalesce(bc.businesses,'[]'::jsonb),
-  'v1Entities', coalesce(v1.entities,'[]'::jsonb)
+  'version', 'production-export-v0.1',
+  'source', 'Stored CHABOIM completed standalone audit measurements; read-only export.',
+  'rows', coalesce(
+    jsonb_agg(row_json order by run_id, measurement_id),
+    '[]'::jsonb
+  )
 )::text
-from eligible_measurements em
-left join v1_entities v1 on v1.measurement_id=em.measurement_id
-left join business_context bc on bc.measurement_id=em.measurement_id
-order by em.run_id,em.measurement_id;
+from replay_rows;
