@@ -76,13 +76,14 @@
     },
     {
       "slug": "visibility-action-recommendations-v2",
-      "liveVersion": 29,
-      "liveSha256": "4e2d398e123a5f67636457b5b8a43c04384416765ee5ce8113f2b8f9209d617c",
+      "liveVersion": 31,
+      "liveSha256": "a6ac40a9c882e3a6a4db5feaf6cae8dc68f2a9008e7854c34bda1cf4906ee0aa",
       "liveVerifyJwt": true,
       "expectedVerifyJwt": true,
       "authMode": "platform JWT + body membership check",
       "deployableSourcePresentOnMain": true,
-      "risk": "MEDIUM"
+      "risk": "MEDIUM",
+      "note": "Intentional controlled deployment of source-clue filter 1.1. Legacy homepage candidates are filtered first, then verified v03 independent-site observations can fill the homepage clue as one bundled card."
     },
     {
       "slug": "create-organization-with-owner",
