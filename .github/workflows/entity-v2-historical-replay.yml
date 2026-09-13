@@ -1,46 +1,67 @@
 name: Entity v2 Historical Replay
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - chore/entity-engine-v2-foundation
     paths:
-      - ".github/workflows/entity-v2-historical-replay.yml"
-  workflow_dispatch:
+      - ".github/entity-v2-historical-replay-trigger"
 
 permissions:
   contents: read
 
+concurrency:
+  group: entity-v2-historical-replay-foundation
+  cancel-in-progress: false
+
 jobs:
-  credential-presence-probe:
+  historical-replay:
     if: github.ref == 'refs/heads/chore/entity-engine-v2-foundation'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     env:
-      PROBE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      PROBE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-      PROBE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      PROBE_DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      PROBE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      PROBE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      ENTITY_V2_REPLAY_DATABASE_URL: ${{ secrets.ENTITY_V2_REPLAY_DATABASE_URL }}
+      ENTITY_V2_REPLAY_REVIEW_OUTPUT: /tmp/entity-v2-historical-replay-review.json
     steps:
-      - name: Check existing server credential names without exposing values
+      - name: Checkout foundation branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Report replay credential presence without exposing it
         shell: bash
         run: |
           set -euo pipefail
-          probe() {
-            local label="$1"
-            local value="$2"
-            if [ -n "$value" ]; then
-              echo "${label}=PRESENT"
-            else
-              echo "${label}=ABSENT"
-            fi
-          }
-          probe "SUPABASE_SERVICE_ROLE_KEY" "${PROBE_SERVICE_ROLE_KEY:-}"
-          probe "SUPABASE_SECRET_KEY" "${PROBE_SECRET_KEY:-}"
-          probe "SUPABASE_DB_URL" "${PROBE_DB_URL:-}"
-          probe "DATABASE_URL" "${PROBE_DATABASE_URL:-}"
-          probe "SUPABASE_DB_PASSWORD" "${PROBE_DB_PASSWORD:-}"
-          probe "SUPABASE_ACCESS_TOKEN" "${PROBE_ACCESS_TOKEN:-}"
-          echo "No credential values were printed or used for data access."
+          if [ -n "${ENTITY_V2_REPLAY_DATABASE_URL:-}" ]; then
+            echo "ENTITY_V2_REPLAY_DATABASE_URL=PRESENT"
+            echo "Historical replay credential is configured. The harness will use a read-only transaction." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ENTITY_V2_REPLAY_DATABASE_URL=ABSENT"
+            echo "Historical replay NOT EXECUTED: the dedicated temporary read-only credential is not configured." >> "$GITHUB_STEP_SUMMARY"
+            echo "The harness will still be transformed by Vitest, but the production replay test is skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Run isolated Entity v2 historical replay harness
+        run: npx vitest run --config vitest.entity-v2-historical.config.ts
+
+      - name: Upload review-only release artifact
+        if: always() && env.ENTITY_V2_REPLAY_DATABASE_URL != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: entity-v2-historical-replay-review
+          path: /tmp/entity-v2-historical-replay-review.json
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Remove ephemeral replay output
+        if: always()
+        shell: bash
+        run: rm -f /tmp/entity-v2-historical-replay-review.json
