@@ -1,5 +1,5 @@
 {
-  "snapshotDateKst": "2026-09-13",
+  "snapshotDateKst": "2026-09-14",
   "projectId": "qoirkwmnyolquvsgbian",
   "purpose": "Track deploy/auth/source-recovery contract drift between GitHub and live Supabase. This file is descriptive and must be refreshed after intentional deployments.",
   "criticalFunctions": [
@@ -76,14 +76,14 @@
     },
     {
       "slug": "visibility-action-recommendations-v2",
-      "liveVersion": 31,
-      "liveSha256": "a6ac40a9c882e3a6a4db5feaf6cae8dc68f2a9008e7854c34bda1cf4906ee0aa",
+      "liveVersion": 32,
+      "liveSha256": "5c64915be5b003fa18307d34367151df889cc4f4004388fb7291a993cd8dd52d",
       "liveVerifyJwt": true,
       "expectedVerifyJwt": true,
       "authMode": "platform JWT + body membership check",
       "deployableSourcePresentOnMain": true,
       "risk": "MEDIUM",
-      "note": "Intentional controlled deployment of source-clue filter 1.1. Legacy homepage candidates are filtered first, then verified v03 independent-site observations can fill the homepage clue as one bundled card."
+      "note": "Source clue filter 1.2. First-run website/profile clues require confirmed competitor alignment in the same measurement; independent-site bundle headline uses exact measurement-id union."
     },
     {
       "slug": "create-organization-with-owner",
