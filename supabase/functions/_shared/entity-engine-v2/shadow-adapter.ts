@@ -2,16 +2,16 @@ import {
   extractEntityCandidatesV2,
   type CandidateBusinessRef,
   type EntityCandidateV2,
-} from "./candidate-extractor";
+} from "./candidate-extractor.ts";
 import {
   evaluateIdentityCandidatesV2,
   type IdentityDecisionV2,
   type IdentityEvidenceV2,
-} from "./identity-gate";
+} from "./identity-gate.ts";
 import {
   parseResponseStructure,
   type ResponseNodeKind,
-} from "./response-structure";
+} from "./response-structure.ts";
 
 export const ENTITY_V2_SHADOW_ADAPTER_VERSION = "0.1" as const;
 
@@ -59,13 +59,6 @@ function emptyDecisionCounts(): Record<IdentityDecisionV2, number> {
   };
 }
 
-/**
- * Pure, side-effect-free adapter for running Entity Engine v2 in shadow mode.
- *
- * This function intentionally performs no database writes, network calls, AI calls,
- * canonicalization writes, or customer-facing state changes. Runtime callers may use
- * the result for comparison/telemetry while the existing v1 path remains authoritative.
- */
 export function runEntityV2ShadowAdapter(
   input: EntityV2ShadowAdapterInput,
 ): EntityV2ShadowAdapterResult {
