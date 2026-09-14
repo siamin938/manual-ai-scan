@@ -2,8 +2,8 @@ import {
   ENTITY_V2_SHADOW_ADAPTER_VERSION,
   runEntityV2ShadowAdapter,
   type EntityV2ShadowAdapterResult,
-} from "./shadow-adapter";
-import type { CandidateBusinessRef } from "./candidate-extractor";
+} from "./shadow-adapter.ts";
+import type { CandidateBusinessRef } from "./candidate-extractor.ts";
 
 export const ENTITY_V2_RUNTIME_SHADOW_VERSION = "0.1" as const;
 
@@ -78,13 +78,6 @@ function unregisteredNameMap(values: string[]): Map<string, string> {
   return out;
 }
 
-/**
- * Compare the current authoritative v1 confirmed-business output with Entity Engine v2.
- *
- * This helper is intentionally pure: no database writes, network calls, provider calls,
- * customer-facing state changes, or release decisions. It is safe to use from dry-run
- * preview paths while v1 remains authoritative.
- */
 export function runEntityV2RuntimeShadowComparison(
   input: EntityV2RuntimeShadowInput,
 ): EntityV2RuntimeShadowComparison {
