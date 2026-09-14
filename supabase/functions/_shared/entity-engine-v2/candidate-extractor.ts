@@ -1,4 +1,4 @@
-import type { ResponseNode } from "./response-structure";
+import type { ResponseNode } from "./response-structure.ts";
 
 export interface CandidateBusinessRef { id: string; name: string; aliases: string[]; }
 export type CandidateRole = "registered_subspan" | "table_primary_cell" | "heading_surface" | "criterion_body" | "list_item_surface";
