@@ -1,5 +1,5 @@
-import type { CandidateBusinessRef, EntityCandidateV2 } from "./candidate-extractor";
-import type { ResponseNode } from "./response-structure";
+import type { CandidateBusinessRef, EntityCandidateV2 } from "./candidate-extractor.ts";
+import type { ResponseNode } from "./response-structure.ts";
 export type IdentityDecisionV2="confirmed_business"|"non_business"|"unresolved"|"platform"|"brand_network";
 export type EvidenceProvenance="registered_exact_subspan"|"same_table_row"|"same_list_item"|"heading_detail_child"|"list_detail_child"|"branch_identity"|"descendant_branch_pattern";
 export interface IdentityEvidenceV2{type:"address"|"phone"|"url"|"registered"|"branch"|"network_pattern";provenance:EvidenceProvenance;nodeId:string;value?:string;}
