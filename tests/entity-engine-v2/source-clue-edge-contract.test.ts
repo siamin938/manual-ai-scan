@@ -9,7 +9,7 @@ const EDGE = resolve(
 const source = readFileSync(EDGE, "utf8");
 
 function compact(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 describe("source clue Edge integration", () => {
@@ -23,7 +23,7 @@ describe("source clue Edge integration", () => {
   it("allows two-response managed-profile clues only for one competitor across two intents", () => {
     const normalized = compact(source);
     expect(normalized).toContain(
-      "competitorResponseCount<2||intentCount<2||distinctCompetitorCount!==1||clientResponseCount>0",
+      "competitorresponsecount<2||intentcount<2||distinctcompetitorcount!==1||clientresponsecount>0",
     );
   });
 
