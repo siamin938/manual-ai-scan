@@ -86,6 +86,19 @@
       "note": "Source clue filter 1.2. First-run website/profile clues require confirmed competitor alignment in the same measurement; independent-site bundle headline uses exact measurement-id union."
     },
     {
+      "slug": "entity-v2-shadow-preview",
+      "liveVersion": 1,
+      "liveSha256": "a72c27c5962957b59dd9cddbb7838265a33dec7383bab3b18182ac875f474997",
+      "liveVerifyJwt": true,
+      "expectedVerifyJwt": true,
+      "authMode": "platform JWT + body owner/admin/analyst membership check",
+      "deployableSourcePresentOnMain": false,
+      "runtimeBehaviorSourcePresentOnFoundation": true,
+      "deployCandidatePresentOnFoundation": true,
+      "risk": "LOW",
+      "note": "Read-only Entity v2 shadow preview. Reads stored measurements and v1 mentions only; no provider call and no database mutation. Standalone audit runs only."
+    },
+    {
       "slug": "create-organization-with-owner",
       "liveVersion": 2,
       "liveSha256": "ba373bfb46054d59d08f638ab26e59fbf704607f1a359c74cd07492102a6d986",
