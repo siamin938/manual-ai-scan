@@ -171,7 +171,7 @@ function EntityV2ShadowPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-            <p>• 저장된 response_text와 v1 mention만 읽습니다.</p>
+            <p>• 저장된 AI 답변과 v1 판정만 읽습니다.</p>
             <p>• 새로운 AI 측정을 실행하지 않습니다.</p>
             <p>• 업체 노출률·점수·고객 화면·DB 데이터를 변경하지 않습니다.</p>
           </div>
