@@ -20,6 +20,12 @@ describe("Entity v2 shadow preview Edge contract", () => {
     expect(config).toContain("[functions.entity-v2-shadow-preview]\nverify_jwt = true");
   });
 
+  it("supports the current Supabase secret env formats", () => {
+    expect(source).toContain('readDefaultKey("SUPABASE_SECRET_KEYS")');
+    expect(source).toContain('Deno.env.get("SUPABASE_SECRET_KEY")');
+    expect(source).toContain('Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")');
+  });
+
   it("uses only stored measurements and v1 mentions for comparison", () => {
     expect(source).toContain('from("measurements")');
     expect(source).toContain('from("measurement_mentions")');
