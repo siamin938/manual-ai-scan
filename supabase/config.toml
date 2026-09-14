@@ -9,6 +9,11 @@ verify_jwt = true
 [functions.visibility-diagnostic]
 verify_jwt = true
 
+# Read-only authenticated preview for comparing stored v1 results with Entity Engine v2.
+# The function performs no provider calls and no database mutations.
+[functions.entity-v2-shadow-preview]
+verify_jwt = true
+
 # Browser-facing onboarding endpoint. Platform JWT verification is required,
 # and the function body also validates the user token before using service-role RPCs.
 [functions.create-organization-with-owner]
