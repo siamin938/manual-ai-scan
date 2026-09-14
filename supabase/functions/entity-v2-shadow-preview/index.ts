@@ -40,10 +40,30 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function readDefaultKey(envName: string): string | undefined {
+  const raw = Deno.env.get(envName)?.trim();
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const dictionary = parsed as Record<string, unknown>;
+    if (typeof dictionary.default === "string" && dictionary.default.trim()) {
+      return dictionary.default.trim();
+    }
+    for (const value of Object.values(dictionary)) {
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 function runtimeEnv(): { url: string; secret: string } {
   return {
     url: Deno.env.get("SUPABASE_URL")?.trim() ?? "",
     secret:
+      readDefaultKey("SUPABASE_SECRET_KEYS") ??
       Deno.env.get("SUPABASE_SECRET_KEY")?.trim() ??
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ??
       "",
