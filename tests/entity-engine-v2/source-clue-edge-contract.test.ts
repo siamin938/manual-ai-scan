@@ -13,11 +13,11 @@ function compact(value: string): string {
 }
 
 describe("source clue Edge integration", () => {
-  it("uses the reviewed independent-site v03 and profile v02 RPCs", () => {
-    expect(source).toContain("get_first_run_independent_site_observations_v03");
-    expect(source).toContain("get_first_run_profile_source_observations_v02");
-    expect(source).not.toContain("get_first_run_independent_site_observations_v02\",{p_org_id");
-    expect(source).not.toContain("get_first_run_profile_source_observations_v01\",{p_org_id");
+  it("uses the confirmed-alignment independent-site v04 and profile v03 RPCs", () => {
+    expect(source).toContain("get_first_run_independent_site_observations_v04");
+    expect(source).toContain("get_first_run_profile_source_observations_v03");
+    expect(source).not.toContain("get_first_run_independent_site_observations_v03\",{p_org_id");
+    expect(source).not.toContain("get_first_run_profile_source_observations_v02\",{p_org_id");
   });
 
   it("allows two-response managed-profile clues only for one competitor across two intents", () => {
@@ -27,26 +27,31 @@ describe("source clue Edge integration", () => {
     );
   });
 
-  it("runs the verified v03 homepage fallback only after legacy shared-domain filtering", () => {
+  it("runs the verified v04 homepage fallback only after legacy shared-domain filtering", () => {
     const sharednessCall = source.indexOf("get_visibility_domain_sharedness_v01");
-    const v03Call = source.indexOf("get_first_run_independent_site_observations_v03");
+    const v04Call = source.indexOf("get_first_run_independent_site_observations_v04");
 
     expect(sharednessCall).toBeGreaterThan(0);
-    expect(v03Call).toBeGreaterThan(sharednessCall);
+    expect(v04Call).toBeGreaterThan(sharednessCall);
     expect(source).toContain(
       "!recommendations.some(hasLegacyHomepageGroup)",
     );
   });
 
-  it("bundles all verified first-run independent sites instead of taking only the first domain", () => {
+  it("bundles verified sites and uses the exact measurement-id union for the headline response count", () => {
+    const normalized = compact(source);
     expect(source).toContain("buildFirstRunIndependentSiteBundleRecommendation");
-    expect(source).toContain("검증된 경쟁업체 홈페이지·독립 사이트");
-    expect(source).not.toContain(
-      "Array.isArray(independentSiteObservations)?independentSiteObservations.slice(0,1):[]",
+    expect(source).toContain("measurementIds:stringArray(raw.measurement_ids)");
+    expect(normalized).toContain(
+      "responseids=[...new set(deduped.flatmap(row=>row.measurementids))]",
     );
+    expect(normalized).toContain(
+      "competitorresponsecount=responseids.length>0?responseids.length:math.max",
+    );
+    expect(source).toContain("검증된 경쟁업체 홈페이지·독립 사이트");
   });
 
   it("keeps the customer-facing source clue filter version explicit", () => {
-    expect(source).toContain('const FILTER_VERSION = "1.1";');
+    expect(source).toContain('const FILTER_VERSION = "1.2";');
   });
 });
