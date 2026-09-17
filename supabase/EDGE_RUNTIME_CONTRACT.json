@@ -1,5 +1,5 @@
 {
-  "snapshotDateKst": "2026-09-15",
+  "snapshotDateKst": "2026-09-17",
   "projectId": "qoirkwmnyolquvsgbian",
   "purpose": "Track deploy/auth/source-recovery contract drift between GitHub and live Supabase. This file is descriptive and must be refreshed after intentional deployments.",
   "criticalFunctions": [
@@ -120,14 +120,14 @@
     },
     {
       "slug": "visibility-action-recommendations-v2",
-      "liveVersion": 32,
-      "liveSha256": "5c64915be5b003fa18307d34367151df889cc4f4004388fb7291a993cd8dd52d",
+      "liveVersion": 33,
+      "liveSha256": "7f5e56b5d11cc74b315bebb7de74de37ef7795d6a7c0c2850b407b6957d99c30",
       "liveVerifyJwt": true,
       "expectedVerifyJwt": true,
       "authMode": "platform JWT + body membership check",
       "deployableSourcePresentOnMain": true,
       "risk": "MEDIUM",
-      "note": "Source clue filter 1.2. First-run website/profile clues require confirmed competitor alignment in the same measurement; independent-site bundle headline uses exact measurement-id union."
+      "note": "Source clue filter 1.3. Managed-profile clues trust profile v03 validation and no longer re-impose an exact-one-competitor Edge gate; homepage/independent-site ownership gates remain strict. First-run independent-site bundle still uses exact measurement-id union."
     },
     {
       "slug": "entity-v2-shadow-preview",
