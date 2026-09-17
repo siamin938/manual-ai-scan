@@ -1,3 +1,4 @@
+import { parseVisibilityComparison } from "./visibility-comparison.server";
 // Core Engine Isolation: 이 파일은 Supabase Edge Function `visibility-diagnostic`
 // 호출 wrapper이다. 대표 run 선택, 경쟁업체 판정, 출처 집계, 우선순위 산식 등
 // 계산 규칙은 이 저장소에 없다. 요청은 현재 사용자 JWT로 전송되며
@@ -381,7 +382,11 @@ export function parseVisibilityDiagnosticResponse(
   const diagnostic = parseDiagnosticBody(payload["diagnostic"]);
   if (diagnostic === null) return { ok: false, error: "INVALID_DTO" };
 
-  return { ok: true, diagnostic: { generatedAt, business, diagnostic, trend } };
+  const history = payload["history"] === undefined ? trend : strictArray(payload["history"], parseTrendPoint);
+  const comparison = payload["comparison"] === undefined ? undefined : parseVisibilityComparison(payload["comparison"]);
+  if (history === null || comparison === null) return { ok: false, error: "INVALID_DTO" };
+  return { ok: true, diagnostic: { generatedAt, business, diagnostic, trend, history,
+    ...(comparison ? { comparison } : {}) } };
 }
 
 export type VisibilityDiagnosticResult = VisibilityDiagnosticResponseDTO;
@@ -421,3 +426,4 @@ export async function fetchVisibilityDiagnostic(args: {
 }
 
 export type { VisibilityDiagnosticDTO };
+

@@ -1,3 +1,4 @@
+import { parseVisibilityComparison } from "./visibility-comparison.server";
 // Core Engine Isolation: 이 파일은 Supabase Edge Function
 // `visibility-action-recommendations` 호출 wrapper이다. 추천 생성/순위/근거 수준
 // 판정 규칙은 이 저장소에 없다. 요청은 현재 사용자 JWT로 `{ orgId, businessId }`
@@ -430,9 +431,17 @@ export function parseActionRecommendationsResponse(
     recommendations.push(parsed);
   }
 
+  const comparison = payload["comparison"] === undefined ? undefined : parseVisibilityComparison(payload["comparison"]);
+  const availability = payload["availability"] ?? "complete";
+  const unavailableSections = payload["unavailableSections"] === undefined ? [] : strArray(payload["unavailableSections"]);
+  if (comparison === null || (availability !== "complete" && availability !== "partial") || unavailableSections === null ||
+      (availability === "partial" && unavailableSections.length === 0) || (availability === "complete" && unavailableSections.length > 0)) {
+    return { ok: false, error: "INVALID_DTO" };
+  }
   return {
     ok: true,
-    data: { generatedAt, business, scope: scope.value, recommendations, disclaimer },
+    data: { generatedAt, business, scope: scope.value, recommendations, disclaimer,
+      ...(comparison ? { comparison } : {}), availability, unavailableSections },
   };
 }
 
@@ -469,3 +478,4 @@ export async function fetchActionRecommendations(args: {
 
   return parseActionRecommendationsResponse(payload);
 }
+

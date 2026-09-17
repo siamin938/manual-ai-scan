@@ -773,7 +773,7 @@ function DashboardPage() {
               <CollapsibleContent>
                 <CardContent className="space-y-4">
                   <p className="text-xs text-muted-foreground">
-                    기준 측정: {d.scope.runName} · 반복 {d.scope.repetitions}회 · 완료{" "}
+                    기준 측정: {d.scope.runName} · 질문당 실행 {d.scope.repetitions}회 · 완료{" "}
                     {d.scope.completedJobs}/{d.scope.totalJobs}
                   </p>
 
@@ -824,8 +824,27 @@ function DashboardPage() {
 
 
                   <div className="space-y-3 rounded-md border p-3">
-                    <p className="text-sm font-medium">시간에 따른 AI 노출 변화</p>
-                    {payload.trend.length === 1 ? (
+                    <p className="text-sm font-medium">측정 이력과 AI 노출 변화</p>
+                    {payload.comparison?.status !== "verified" ? (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          {payload.comparison?.status === "unavailable"
+                            ? "비교 정보를 불러오지 못했습니다. 저장된 측정 결과는 아래에서 확인할 수 있습니다."
+                            : payload.comparison?.status === "single"
+                              ? "동일 조건으로 비교할 측정이 아직 1회입니다. 아래는 저장된 측정 이력입니다."
+                              : "저장된 측정 이력입니다. 일부 측정 조건 기록이 없어 동일 조건의 변화인지는 확인할 수 없습니다."}
+                        </p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {(payload.history ?? payload.trend).map((point) => (
+                            <div className="rounded-md border p-3" key={point.measuredAt}>
+                              <p className="text-xs text-muted-foreground">{formatSeoul(point.measuredAt)}</p>
+                              <p className="mt-1 text-2xl font-semibold tabular-nums">{pct(point.visibilityRatePct)}</p>
+                              <p className="text-xs text-muted-foreground">답변 {point.validCount}개 중 {point.mentionCount}개에서 추천</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : payload.trend.length <= 1 ? (
                       <p className="text-sm text-muted-foreground">
                         반복 측정이 더 쌓이면 시간에 따른 변화를 비교할 수 있습니다.
                       </p>
@@ -867,8 +886,8 @@ function DashboardPage() {
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    변화 추적은 비교 가능한 동일 질문 세트에서의 관찰값 비교일 뿐, 특정 작업의 개선
-                    효과를 의미하지 않습니다. 표시된 모든 값은 반복 측정된 AI 검색 결과에서 관찰된
+                    동일 조건으로 확인된 측정끼리만 변화 그래프로 비교합니다. 측정 이력의 차이만으로 특정 작업의 개선
+                    효과를 판단하지 않습니다. 표시된 값은 해당 측정의 AI 검색 결과에서 관찰된
                     상태이며, 모든 사용자가 같은 답변을 보게 된다는 뜻은 아니고 개선 효과를
                     보장하지도 않습니다.
                   </p>
@@ -914,13 +933,13 @@ function TwoPointTrend({
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-md border p-3">
-          <p className="text-xs text-muted-foreground">1차 측정</p>
+          <p className="text-xs text-muted-foreground">이전 측정</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">
             {pct(first.visibilityRatePct)}
           </p>
         </div>
         <div className="rounded-md border p-3">
-          <p className="text-xs text-muted-foreground">2차 측정</p>
+          <p className="text-xs text-muted-foreground">최근 측정</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">
             {pct(second.visibilityRatePct)}
           </p>
@@ -960,3 +979,4 @@ function MetricCard({
     </Card>
   );
 }
+

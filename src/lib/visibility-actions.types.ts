@@ -1,3 +1,4 @@
+import type { VisibilityComparisonDTO } from "./visibility-comparison.types";
 // Core Engine Isolation: 추천 순위/근거 수준/문구는 모두 서버가 결정한다.
 // 이 파일은 Edge Function `visibility-action-recommendations`의 응답 계약 타입만 정의한다.
 
@@ -103,6 +104,9 @@ export type ActionScopeDTO = {
 };
 
 export type ActionRecommendationsDTO = {
+  comparison?: VisibilityComparisonDTO;
+  availability?: "complete" | "partial";
+  unavailableSections?: string[];
   generatedAt: string;
   business: { id: string; name: string };
   scope: ActionScopeDTO | null;
@@ -115,3 +119,4 @@ export type ActionRecommendationsErrorCode = "FORBIDDEN" | "INVALID_DTO" | "INTE
 export type ActionRecommendationsResponseDTO =
   | { ok: true; data: ActionRecommendationsDTO }
   | { ok: false; error: ActionRecommendationsErrorCode };
+

@@ -1,3 +1,4 @@
+import type { VisibilityComparisonDTO } from "./visibility-comparison.types";
 /**
  * `visibility-diagnostic` Edge Function 응답 계약 (camelCase 그대로).
  * 계산/판정 규칙은 포함하지 않는다 (Core Engine Isolation).
@@ -113,6 +114,8 @@ export type VisibilityTrendPointDTO = {
 };
 
 export type VisibilityDiagnosticDTO = {
+  comparison?: VisibilityComparisonDTO;
+  history?: VisibilityTrendPointDTO[];
   generatedAt: string;
   business: VisibilityBusinessDTO;
   diagnostic: VisibilityDiagnosticBodyDTO;
@@ -161,4 +164,5 @@ export type VisibilityRepeatAggregateResponseDTO =
       aggregate: VisibilityRepeatAggregateDTO | null;
     }
   | { ok: false; error: string };
+
 

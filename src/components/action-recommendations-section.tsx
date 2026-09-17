@@ -6,6 +6,7 @@ import { formatSeoul } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 
 /** evidenceLevel은 Badge variant 선택에만 쓰고, 어떤 판정에도 쓰지 않는다. */
@@ -244,17 +245,20 @@ export function ActionRecommendationsSection({
     ? buildDisplayRecommendations(payload.recommendations)
     : [];
   const topRec = displayRecommendations[0];
-  const isPreliminary = (payload?.scope?.repetitions ?? 0) < 2;
+  const isPreliminary = payload?.comparison?.status !== "verified";
   const headline = gapHeadline(
     topRec,
-    isPreliminary ? "먼저 확인할 단서:" : "반복해서 확인된 우선 확인:",
+    "먼저 확인할 단서:",
   );
 
   return (
     <section className="space-y-4">
+      {payload?.comparison?.status === "unverified" && (
+        <p className="text-sm text-muted-foreground">이전 측정과 동일 조건인지 확인할 수 없어, 최근 측정에서 확인된 단서를 표시합니다.</p>
+      )}
       <div>
         <h2 className="text-lg font-semibold tracking-tight">
-          {isPreliminary ? "첫 측정에서 먼저 확인할 단서" : "AI 노출에서 먼저 확인할 단서"}
+          AI 노출에서 먼저 확인할 단서
         </h2>
         {headline && (
           <p className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
@@ -264,7 +268,7 @@ export function ActionRecommendationsSection({
         <p className="mt-1 text-sm text-muted-foreground">
           {isPreliminary
             ? "실제 답변에 연결된 출처 차이를 먼저 보여드립니다. 질문 유형이나 출처가 추천의 원인이라는 뜻은 아니며, 해당 페이지를 직접 확인한 뒤 동일 조건으로 다시 측정해 보세요."
-            : "반복 측정에서 실제 답변에 연결된 출처 차이를 우선해 정리했습니다. 인과로 단정하지 않으며, 먼저 확인해볼 지점입니다."}
+            : "최근 측정 단서와 반복해서 확인된 단서를 함께 보여드립니다. 각 카드의 측정 범위를 확인하세요."}
         </p>
       </div>
 
@@ -279,12 +283,21 @@ export function ActionRecommendationsSection({
         </Card>
       )}
 
-      {payload && displayRecommendations.length === 0 && (
+      {payload?.availability === "partial" && (
+        <Card role="status">
+          <CardContent className="space-y-2 py-4 text-sm">
+            <p>{payload.unavailableSections?.join(" · ")} 정보를 불러오지 못했습니다. 해당 단서가 없다는 뜻은 아닙니다.</p>
+            <Button variant="outline" size="sm" disabled={query.isFetching} onClick={() => void query.refetch()}>다시 불러오기</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {payload && payload.availability !== "partial" && displayRecommendations.length === 0 && (
         <Card>
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
             {isPreliminary
               ? customerText(
-                  "첫 측정에서 표시할 만큼 뚜렷한 경쟁업체 격차가 아직 없습니다. 동일 조건으로 한 번 더 측정하면 반복 여부를 확인합니다.",
+                  "최근 측정에서 표시할 만큼 뚜렷한 경쟁업체 격차가 아직 없습니다. 동일 조건으로 한 번 더 측정하면 반복 여부를 확인합니다.",
                 )
               : "아직 행동을 권할 만큼 반복적으로 확인된 격차가 없습니다. 측정 데이터가 더 쌓이면 우선순위를 제안합니다."}
           </CardContent>
@@ -301,8 +314,7 @@ export function ActionRecommendationsSection({
 
       {payload?.scope && (
         <p className="text-xs text-muted-foreground">
-          기준 측정: {payload.scope.runName} · {formatSeoul(payload.scope.measuredAt)} · 반복{" "}
-          {payload.scope.repetitions}회 · 유효 측정 {payload.scope.validCount}건 · 관찰 업체{" "}
+          기준 측정: {payload.scope.runName} · {formatSeoul(payload.scope.measuredAt)} · 최근 측정의 유효 답변 {payload.scope.validCount}건 · 관찰 업체{" "}
           {payload.scope.competitorCount}곳
         </p>
       )}
@@ -640,4 +652,5 @@ function ChannelCard({
     </div>
   );
 }
+
 
