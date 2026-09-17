@@ -127,6 +127,12 @@
       "authMode": "platform JWT + body membership check",
       "deployableSourcePresentOnMain": true,
       "risk": "MEDIUM",
+      "pendingCandidate": {
+        "filterVersion": "1.4",
+        "deployed": false,
+        "requiresExplicitProductionApproval": true,
+        "change": "When legacy returns scope:null and compatible runs are empty, select the authorized business's latest completed standalone audit for existing single-run clue RPCs. Preserve comparison eligibility, homepage ownership gates and existing non-null scopes."
+      },
       "note": "Source clue filter 1.3. Managed-profile clues trust profile v03 validation and no longer re-impose an exact-one-competitor Edge gate; homepage/independent-site ownership gates remain strict. First-run independent-site bundle still uses exact measurement-id union."
     },
     {

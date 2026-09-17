@@ -11,7 +11,7 @@ const LEGACY_SOURCE_ID = "source:dedicated_site_candidate:trust";
 const LEGACY_GROUP_KEY = "dedicated_site_candidate";
 const MARKET_GROUP_KEY = "business_brand_site";
 const PRELIMINARY_SITE_LABEL = "여러 답변에서 연결";
-const FILTER_VERSION = "1.3";
+const FILTER_VERSION = "1.4";
 const MAX_RECOMMENDATIONS = 4;
 
 type Obj = Record<string, unknown>;
@@ -45,12 +45,51 @@ function recommendationScore(rec:unknown){if(!isObj(rec))return 0;const evidence
 function rerank(recommendations:unknown[]){return[...recommendations].sort((a,b)=>recommendationScore(b)-recommendationScore(a)).slice(0,MAX_RECOMMENDATIONS).map((rec,index)=>(isObj(rec)?{...rec,rank:index+1}:rec));}
 function dedupeRankedSourceGroups(recommendations:unknown[]){const usedPlatformKeys=new Set<string>();return recommendations.map(rec=>{if(!isObj(rec)||!Array.isArray(rec.sourceGroups))return rec;const currentPlatformKeys=new Set<string>();const sourceGroups=rec.sourceGroups.flatMap(group=>{if(!isObj(group)||!Array.isArray(group.platforms))return[group];const platforms=group.platforms.filter(platform=>{if(!isObj(platform)||typeof platform.key!=="string"||!platform.key.trim())return true;const key=platform.key.trim();if(usedPlatformKeys.has(key))return false;currentPlatformKeys.add(key);return true;});return platforms.length>0?[{...group,platforms}]:[];});for(const key of currentPlatformKeys)usedPlatformKeys.add(key);return{...rec,sourceGroups};});}
 
+// Called only after legacy has validated the user, membership and target business.
+// Missing comparison payloads do not invalidate stored answers or single-run clues.
+// This selects one completed audit; it never declares two runs compatible.
+async function latestCompletedObservationScope(db: ReturnType<typeof createClient>, orgId: string, businessId: string) {
+  const { data: run, error: runError } = await db.from("measurement_runs")
+    .select("id,name,completed_at,created_at")
+    .eq("org_id", orgId).eq("business_id", businessId)
+    .eq("run_type", "audit").eq("phase", "standalone").eq("status", "completed")
+    .is("experiment_id", null)
+    .order("completed_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (runError) throw runError;
+  if (!run) return null;
+  const { count, error: countError } = await db.from("measurements")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId).eq("run_id", run.id).eq("valid", true);
+  if (countError) throw countError;
+  if (count === null) throw new Error("Missing observation count");
+  const { data: significance, error: significanceError } = await db.rpc("get_competitor_significance_v01", {
+    p_org_id: orgId, p_business_id: businessId, p_run_id: run.id,
+  });
+  if (significanceError) throw significanceError;
+  const competitors = new Set((Array.isArray(significance) ? significance : [])
+    .filter(row => isObj(row) && (row.tier === "core" || row.tier === "notable"))
+    .map(row => row.canonical_key));
+  return {
+    runId: run.id, runName: String(run.name ?? "최근 완료 측정"),
+    measuredAt: String(run.completed_at ?? run.created_at),
+    repetitions: 1, validCount: count, competitorCount: competitors.size,
+  };
+}
+
 Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:cors});if(req.method!=="POST")return json({ok:false,error:"METHOD_NOT_ALLOWED"},405);
  const auth=req.headers.get("authorization")??"";if(!auth.startsWith("Bearer "))return json({ok:false,error:"UNAUTHORIZED"},401);const e=env();if(!e.url||!e.secret)return json({ok:false,error:"SERVER_NOT_CONFIGURED"},500);
  let body:unknown;try{body=await req.json()}catch{return json({ok:false,error:"INVALID_REQUEST"},400)}if(!isObj(body))return json({ok:false,error:"INVALID_REQUEST"},400);const orgId=typeof body.orgId==="string"?body.orgId:"",businessId=typeof body.businessId==="string"?body.businessId:"";if(!UUID_RE.test(orgId)||!UUID_RE.test(businessId))return json({ok:false,error:"INVALID_REQUEST"},400);
  let baseResp:Response;try{baseResp=await fetch(`${e.url}/functions/v1/${LEGACY_FUNCTION}`,{method:"POST",headers:{authorization:auth,apikey:e.secret,"Content-Type":"application/json"},body:JSON.stringify({orgId,businessId})});}catch(err){console.error(JSON.stringify({function:"visibility-action-recommendations-v2",code:"LEGACY_FETCH_FAILED",message:err instanceof Error?err.message:String(err)}));return json({ok:false,error:"INTERNAL_ERROR"},500)}let basePayload:unknown;try{basePayload=await baseResp.json()}catch{return json({ok:false,error:"INTERNAL_ERROR"},500)}if(!baseResp.ok||!isObj(basePayload)||basePayload.ok!==true)return json(basePayload,baseResp.status);
- const validCount=isObj(basePayload.scope)?n(basePayload.scope.validCount):0,latestRunId=isObj(basePayload.scope)&&typeof basePayload.scope.runId==="string"?basePayload.scope.runId:"";const db=createClient(e.url,e.secret,{auth:{persistSession:false,autoRefreshToken:false}});const{data:compatibleRuns,error:compatibleRunsError}=await db.rpc("get_compatible_audit_runs_v01",{p_org_id:orgId,p_business_id:businessId,p_limit:6});if(compatibleRunsError){console.error(JSON.stringify({function:"visibility-action-recommendations-v2",code:"COMPATIBLE_RUNS_RPC_FAILED",message:compatibleRunsError.message}));return json({ok:false,error:"INTERNAL_ERROR"},500)}const compatibleRunCount=Array.isArray(compatibleRuns)?compatibleRuns.length:0,hasCompatibleRepeat=compatibleRunCount>=2;let recommendations=Array.isArray(basePayload.recommendations)?[...basePayload.recommendations]:[];
+ const db=createClient(e.url,e.secret,{auth:{persistSession:false,autoRefreshToken:false}});const{data:compatibleRuns,error:compatibleRunsError}=await db.rpc("get_compatible_audit_runs_v01",{p_org_id:orgId,p_business_id:businessId,p_limit:6});if(compatibleRunsError){console.error(JSON.stringify({function:"visibility-action-recommendations-v2",code:"COMPATIBLE_RUNS_RPC_FAILED",message:compatibleRunsError.message}));return json({ok:false,error:"INTERNAL_ERROR"},500)}const compatibleRunCount=Array.isArray(compatibleRuns)?compatibleRuns.length:0,hasCompatibleRepeat=compatibleRunCount>=2;let recommendations=Array.isArray(basePayload.recommendations)?[...basePayload.recommendations]:[];
+ let scope=basePayload.scope;
+ if(scope===null&&compatibleRunCount===0){
+   try{scope=await latestCompletedObservationScope(db,orgId,businessId);}
+   catch{console.error(JSON.stringify({function:"visibility-action-recommendations-v2",code:"LATEST_OBSERVATION_SCOPE_FAILED"}));return json({ok:false,error:"INTERNAL_ERROR"},500);}
+ }
+ const recoveredLatestScope=basePayload.scope===null&&isObj(scope);
+ const validCount=isObj(scope)?n(scope.validCount):0,latestRunId=isObj(scope)&&typeof scope.runId==="string"?scope.runId:"";
  if(!hasCompatibleRepeat){recommendations=recommendations.filter(rec=>!(isObj(rec)&&rec.kind==="intent_gap"));if(UUID_RE.test(latestRunId)){
    const{data:contentObservations,error:contentObservationError}=await db.rpc("get_first_run_content_source_observations_v01",{p_org_id:orgId,p_business_id:businessId,p_run_id:latestRunId});if(contentObservationError)console.error(JSON.stringify({function:"visibility-action-recommendations-v2",code:"CONTENT_OBSERVATION_RPC_FAILED",message:contentObservationError.message}));else{const existingIds=new Set(recommendations.filter(isObj).map(rec=>typeof rec.id==="string"?rec.id:""));for(const raw of Array.isArray(contentObservations)?contentObservations:[]){const rec=buildFirstRunContentRecommendation(raw,validCount);if(!rec||existingIds.has(rec.id))continue;recommendations.push(rec);existingIds.add(rec.id);}}
    const{data:profileObservations,error:profileObservationError}=await db.rpc("get_first_run_profile_source_observations_v03",{p_org_id:orgId,p_business_id:businessId,p_run_id:latestRunId});if(profileObservationError)console.error(JSON.stringify({function:"visibility-action-recommendations-v2",code:"PROFILE_OBSERVATION_RPC_FAILED",message:profileObservationError.message}));else{const existingIds=new Set(recommendations.filter(isObj).map(rec=>typeof rec.id==="string"?rec.id:""));const takenPlatformKeys=existingPlatformKeys(recommendations);for(const raw of Array.isArray(profileObservations)?profileObservations:[]){const rec=buildFirstRunProfileRecommendation(raw,validCount);if(!rec||existingIds.has(rec.id))continue;const platformKey=isObj(raw)&&typeof raw.source_key==="string"?raw.source_key.trim():"";if(platformKey&&takenPlatformKeys.has(platformKey))continue;recommendations.push(rec);existingIds.add(rec.id);if(platformKey)takenPlatformKeys.add(platformKey);}}
@@ -61,5 +100,6 @@ Deno.serve(async(req)=>{
  let marketText:string|null=null;if(homepageAllowed&&recommendations.some(hasLegacyHomepageGroup)){const{data:benchmark,error:benchmarkError}=await db.rpc("get_global_high_visibility_source_patterns_v02",{p_requesting_org_id:orgId,p_business_id:businessId});if(benchmarkError)console.error(JSON.stringify({function:"visibility-action-recommendations-v2",code:"BENCHMARK_RPC_FAILED",message:benchmarkError.message}));else marketText=marketSentence(benchmark);}
  recommendations=recommendations.map(rec=>enrichHomepageRecommendation(rec,marketText,compatibleRunCount));recommendations=rerank(recommendations);recommendations=dedupeRankedSourceGroups(recommendations);
  const disclaimer=!hasCompatibleRepeat?"현재는 동일 조건 1회 측정의 1차 관찰입니다. 상위 액션에는 실제 출처 연결 차이가 확인된 항목과 같은 유의미 업체가 2개 이상 답변·2개 이상 검색 상황에서 관찰된 업체 프로필형 출처를 표시합니다. 홈페이지·독립 사이트 단서는 같은 답변 안에서 업체 확정과 검증된 출처 연결이 동시에 확인되고, 최근 90일 동안 다른 확정 업체와 공유되지 않은 경우에만 묶어서 표시합니다. 독립 사이트나 홈페이지 운영 자체가 추천 원인이라는 뜻은 아닙니다. 질문군별 미노출은 추가 관찰 영역으로 분리하며, 동일 질문 세트로 재측정해 반복성을 확인해야 합니다.":basePayload.disclaimer;
- return json({...basePayload,recommendations,disclaimer,recommendationFilterVersion:FILTER_VERSION});
+ const observationDisclaimer=recoveredLatestScope?"최근 완료된 측정 1회에 남아 있는 답변과 출처를 기준으로 표시합니다. 이전 측정과 동일 조건인지 확인할 수 없어 반복 확인으로 해석하지 않습니다. 출처 연결은 추천 원인을 뜻하지 않으며, 실제 공개 정보를 확인할 단서입니다.":scope===null?basePayload.disclaimer:disclaimer;
+ return json({...basePayload,scope,recommendations,disclaimer:observationDisclaimer,recommendationFilterVersion:FILTER_VERSION});
 });
