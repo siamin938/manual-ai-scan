@@ -1,0 +1,21 @@
+{
+  "release": "2026-09-17-persistent-evidence",
+  "reviewed_commit": "7a2a7f37e4394089f97d4b7fe3ad4ac7fd4b6d0f",
+  "merged_commit": "32810d33cc16dff8cf9b83ffebec30046ada7969",
+  "comparison_rpc": "get_compatible_audit_runs_v01",
+  "raw_retention": "indefinite",
+  "functions": [
+    {
+      "name": "visibility-action-recommendations-v2",
+      "version": 35,
+      "verify_jwt": true,
+      "source_sha256": "7883905ce22bcc65c9d570e28c8c348c95ebeb2a7c953ab5e7597f74466f4281"
+    },
+    {
+      "name": "visibility-diagnostic",
+      "version": 17,
+      "verify_jwt": true,
+      "source_sha256": "bd427e804cbcec0731f7eaa9da11d8f35e76457e1e4b3259b9dfb22c7c4d97d6"
+    }
+  ]
+}

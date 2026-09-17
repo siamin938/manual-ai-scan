@@ -1,3 +1,19 @@
+# 2026-09-17 — Persistent evidence and diagnostic repair
+
+- User authorized permanent preservation of measurement evidence and the audited fixes.
+- PR #2 merged into main at `32810d33cc16dff8cf9b83ffebec30046ada7969`; Entity v2 foundation PR #1 remains separate.
+- Production migrations: `20260917133219`, `20260917133440`, `20260917134642`.
+- Raw payload purge cron is inactive; legacy purge returns 0; all 24 surviving payloads have infinite retention enforced by a write trigger. No historical requests were fabricated.
+- Private durable request fingerprints now drive the common audit comparison RPC. Significance also consumes that RPC.
+- Latest profile/content clues survive compatible repeats. Partial RPC failures produce explicit availability information. History remains visible even when comparison cannot be verified.
+- Generic location descriptions are excluded from business counts; corporate notation aliases retain the existing shared-source requirement. Prior derived values are recorded in scoped correction events; raw answers are unchanged.
+- Action Edge v35 (filter 1.5) and diagnostic Edge v17 are deployed, JWT verification remains enabled, and deployed source matches the tested files. See `supabase/DIAGNOSTIC_RUNTIME_CONTRACT.json`.
+- CI run 35229717504: typecheck, 177 application tests, 12 Edge regression tests, PostgreSQL retention/comparison/classifier checks, and production build passed.
+- Deleted historical provider payload recovery is not confirmed. Browser access to backups requires a separate Supabase dashboard sign-in; no project restore was attempted.
+- No paid AI measurement, credit consumption, or Entity v2 cutover/replay was performed.
+
+---
+
 # CHABOIM / 차보임 현재 개발 상태
 
 > 스냅샷 기준: **2026-09-04 23:38 KST**
@@ -671,3 +687,4 @@ DB:
 11. Preview 확인
 12. Production publish는 별도 승인
 13. 비용 발생 측정은 별도 승인
+
