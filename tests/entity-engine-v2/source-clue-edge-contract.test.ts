@@ -22,10 +22,15 @@ describe("source clue Edge integration", () => {
 
   it("allows managed-profile clues with one or more significant competitors across two intents", () => {
     const normalized = compact(source);
-    expect(normalized).toContain(
+    const profileStart = normalized.indexOf("function buildfirstrunprofilerecommendation");
+    const profileEnd = normalized.indexOf("function independentreferencegroup", profileStart);
+    expect(profileStart).toBeGreaterThanOrEqual(0);
+    expect(profileEnd).toBeGreaterThan(profileStart);
+    const profileSource = normalized.slice(profileStart, profileEnd);
+    expect(profileSource).toContain(
       "competitorresponsecount<2||intentcount<2||clientresponsecount>0",
     );
-    expect(normalized).not.toContain("distinctcompetitorcount!==1||clientresponsecount>0");
+    expect(profileSource).not.toContain("distinctcompetitorcount!==1");
   });
 
   it("runs the verified v04 homepage fallback only after legacy shared-domain filtering", () => {
