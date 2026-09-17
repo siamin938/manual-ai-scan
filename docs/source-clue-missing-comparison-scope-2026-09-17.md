@@ -1,6 +1,6 @@
 # Source clues with missing comparison payloads
 
-Status: reviewed deploy candidate, **not deployed**. PR #1 remains Draft; do not merge.
+Status: **deployed with explicit user approval** on 2026-09-17. PR #1 remains Draft; do not merge. Authenticated customer-screen confirmation is pending.
 
 ## Confirmed production trace
 
@@ -34,7 +34,7 @@ Only when the authorized legacy response has null scope **and** the common compa
 
 Database/lookup errors return an error; they are not converted into an empty-evidence success. A business with no completed audit keeps its existing no-measurement response.
 
-The deployed version/hash remain v33 in `EDGE_RUNTIME_CONTRACT.json`; filter 1.4 is explicitly recorded as pending approval.
+The candidate initially retained v33 as the live contract. After explicit user approval, filter 1.4 was deployed as v34 and the live contract was updated to the verified deployed hash.
 
 ## Preserved behavior and remaining boundaries
 
@@ -43,7 +43,7 @@ The deployed version/hash remain v33 in `EDGE_RUNTIME_CONTRACT.json`; filter 1.4
 - Profile eligibility still comes from v03. No new threshold, entity rule or business exception is introduced.
 - Homepage ownership, same-measurement confirmation and exact cross-site measurement union are unchanged; no new RPC or migration is needed.
 - Legacy authentication must succeed before fallback DB reads. Every fallback read is scoped by organization and target run/business.
-- Frontend files, legacy Edge v17, the measurement pipeline, Entity v2, `main`, and production data are unchanged.
+- Frontend files, legacy Edge v17, the measurement pipeline, Entity v2, `main`, and production data are unchanged. Only the v2 action Edge was deployed.
 - The current UI uses "첫 측정" for preliminary evidence rather than lifetime run count. The candidate clarifies the recovered scope in the server disclaimer. A neutral section-title copy change can be handled with the next separately approved frontend publish.
 - Actual compatible-repeat managed-profile support is a separate product change. It is not the cause of this incident, so its gate is not loosened in this patch.
 - Long-term repeat comparison after request payload removal requires durable comparison evidence. This patch restores latest-run clues; it does not recreate missing comparison records.
@@ -54,8 +54,18 @@ The deployed version/hash remain v33 in `EDGE_RUNTIME_CONTRACT.json`; filter 1.4
 - Cases cover missing payloads, latest/org/business/run filtering, no measurements, empty evidence, lookup failures, authorization failures, normal first-run and repeat paths, platform deduplication, and strict multi-owner homepage rejection.
 - The actual read-only aggregate values from the latest production run yield two display cards locally: 마이클 first (4/24, 2 competitors), 티스토리 second (3/24, 1 competitor), preserving the saved links. The 4 and 3 are separate source counts and must not be added as a union.
 - Local execution uses Node's TypeScript stripping with the same assertions; CI runs the committed Vitest/TypeScript implementation using the repository dependencies.
-- No provider call, measurement credit use, historical Entity replay, production deploy, DDL or data modification was performed.
+- Candidate validation used no provider call, measurement credit, historical Entity replay, production deploy, DDL or data modification. The later authorized Edge deployment is recorded below.
 
-## Approval and post-deploy check
+## Authorized deployment and post-deploy check
 
-Deploy only `visibility-action-recommendations-v2/index.ts`, preserving `verify_jwt=true`, after explicit user approval. Do not merge PR #1. Re-read deployed version/hash, update the live contract after successful deployment, then confirm the target customer screen shows the expected latest-run cards. A live UI fix is not claimed before this check.
+The user explicitly approved the Supabase-only deployment after clarification that no Lovable publish or main merge was required.
+
+- Deployed only `visibility-action-recommendations-v2/index.ts` from commit `c7958a2b83741a9c086e0d2cc8f36500e725b9cb`.
+- Production: **v34 / filter 1.4 / ACTIVE / verify_jwt=true**.
+- Deployed at: 2026-09-17T12:55:49.364Z.
+- Bundle SHA-256: `c54e80414fb5f24dea6b2c93cc6ba412469ae9720960b063559493949b400217`.
+- Re-fetched deployed source matches the approved source (ignoring terminal newlines).
+- Fresh read-only DB checks still return latest run `bad9250c-af54-4efc-9b82-c0eb9b551ffc`, 24 valid answers, zero compatible runs, profile 4 responses / 2 competitors, content 3 responses / 1 competitor, no independent sites. Service-role SELECT permissions for both fallback tables are present.
+- Executing the re-fetched deployed source with those fresh DB snapshots locally passes the actual server DTO parser and existing display reducer with both expected cards and saved links.
+- Approved source CI #121 succeeded. No DB writes, paid measurement, Entity historical replay, Lovable publish or main merge were performed.
+- **Remaining verification:** refresh the authenticated customer screen and confirm the two cards. The checks above are deployed-source verification plus local execution with production snapshots, not an authenticated production HTTP/UI observation.
