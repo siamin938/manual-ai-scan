@@ -20,11 +20,12 @@ describe("source clue Edge integration", () => {
     expect(source).not.toContain("get_first_run_profile_source_observations_v02\",{p_org_id");
   });
 
-  it("allows two-response managed-profile clues only for one competitor across two intents", () => {
+  it("allows managed-profile clues with one or more significant competitors across two intents", () => {
     const normalized = compact(source);
     expect(normalized).toContain(
-      "competitorresponsecount<2||intentcount<2||distinctcompetitorcount!==1||clientresponsecount>0",
+      "competitorresponsecount<2||intentcount<2||clientresponsecount>0",
     );
+    expect(normalized).not.toContain("distinctcompetitorcount!==1||clientresponsecount>0");
   });
 
   it("runs the verified v04 homepage fallback only after legacy shared-domain filtering", () => {
@@ -52,6 +53,6 @@ describe("source clue Edge integration", () => {
   });
 
   it("keeps the customer-facing source clue filter version explicit", () => {
-    expect(source).toContain('const FILTER_VERSION = "1.2";');
+    expect(source).toContain('const FILTER_VERSION = "1.3";');
   });
 });
