@@ -37,7 +37,7 @@ function generateInternalSlug(): string {
 function readCreatedOrgId(payload: unknown): string | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   const row = payload as Record<string, unknown>;
-  return row.ok === true && typeof row.orgId === "string" ? row.orgId : null;
+  return row["ok"] === true && typeof row["orgId"] === "string" ? row["orgId"] : null;
 }
 
 export function OrgOnboarding() {

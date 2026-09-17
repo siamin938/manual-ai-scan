@@ -1,0 +1,68 @@
+name: Evidence retention and dashboard regression
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: fixture
+          POSTGRES_DB: evidence_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: fixture
+      PGDATABASE: evidence_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Application tests
+        run: bun run test
+      - name: Edge regression tests
+        run: node --test tests/regression/*.node.mjs
+      - name: Retention and comparison PostgreSQL regression
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/regression/bootstrap-retention.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20260917133219_preserve_measurement_evidence.sql
+          python3 - <<'PY'
+          from pathlib import Path
+          sql=Path('supabase/migrations/20260917133440_use_durable_audit_comparison_contracts.sql').read_text()
+          Path('/tmp/comparison-rpc.sql').write_text(sql.split('CREATE OR REPLACE FUNCTION public.get_competitor_significance_v02')[0])
+          PY
+          psql -v ON_ERROR_STOP=1 -f /tmp/comparison-rpc.sql
+          psql -v ON_ERROR_STOP=1 -f tests/regression/retention-contracts.sql
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import re
+          sql=next(Path('supabase/migrations').glob('*_guard_generic_descriptions_and_corporate_aliases.sql')).read_text()
+          classifiers=re.findall(r'create(?: or replace)? function public\.(?:is_generic_location_business_description|get_auto_business_brand_core_v01)\([\s\S]*?AS \$(?:function)?\$[\s\S]*?\$(?:function)?\$;',sql,re.I)
+          assert len(classifiers)==2
+          Path('/tmp/entity-classifiers.sql').write_text('\n'.join(classifiers))
+          PYCODE
+          psql -v ON_ERROR_STOP=1 -f /tmp/entity-classifiers.sql
+          psql -v ON_ERROR_STOP=1 -f tests/regression/entity-description-contracts.sql
+      - name: Production build
+        run: bun run build
