@@ -75,15 +75,10 @@ function Shell() {
     <div className="min-h-screen bg-background">
       <header className="no-print sticky top-0 z-20 border-b border-border/90 bg-card/95 shadow-[0_1px_0_color-mix(in_oklab,var(--foreground)_3%,transparent)] backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 lg:px-6">
-          <Link to="/dashboard" className="flex min-h-9 items-center gap-3 border-r border-border pr-5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-              차
-            </span>
-            <span className="flex flex-col leading-none">
-              <span className="text-base font-bold">차보임</span>
-              <span className="mt-1 text-[9px] font-semibold tracking-[0.18em] text-muted-foreground">
-                CHABOIM
-              </span>
+          <Link to="/dashboard" className="flex min-h-9 items-baseline gap-2 border-r border-border pr-5">
+            <span className="text-lg font-bold tracking-tight">차보임</span>
+            <span className="text-[10px] font-semibold tracking-[0.22em] text-muted-foreground">
+              CHABOIM
             </span>
           </Link>
 
