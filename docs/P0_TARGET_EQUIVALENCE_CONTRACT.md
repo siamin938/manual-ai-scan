@@ -15,7 +15,7 @@ Target Equivalence only evaluates candidates already classified as `confirmed_bu
 
 - `equivalent`: strong identity evidence proves the observed business is the current target.
 - `distinct`: strong contradictory identity evidence proves it is not the current target.
-- `unresolved`: evidence is insufficient or malformed; fail closed and do not auto-merge.
+- `unresolved`: evidence is insufficient, malformed, or unsupported; fail closed and do not auto-merge.
 
 An `equivalent` result always projects to:
 
@@ -23,22 +23,19 @@ An `equivalent` result always projects to:
 
 A foreign or cross-org business ID is never used as the projected target key.
 
-## Automatic-equivalence evidence
+## Evidence precedence
 
-Only these paths may auto-project to the current target:
+Before trusting an internal row ID, the engine validates stronger public Place identity evidence:
 
-1. Exact current target business ID.
-2. Exact canonical Naver Place ID.
-3. Exact verified **concrete** official URL **plus** an exact, pre-verified opaque branch/business identity key.
-4. Exact normalized full address **plus** exact verified phone.
+1. Unsupported/malformed non-empty Naver Place evidence → `unresolved`
+2. Two valid canonical Naver Place IDs that conflict → `distinct`
+3. Then exact current target business ID may return `equivalent`
+4. Exact canonical Naver Place ID → `equivalent`
+5. Exact verified **concrete** official URL + exact opaque branch/business identity key → `equivalent`
+6. Exact normalized full address + exact verified phone → `equivalent`
+7. Otherwise → `unresolved`
 
-No name or alias surface is standalone Target Equivalence evidence. Exact current names/aliases should normally have been resolved upstream as registered-business identity; this layer does not re-decide that from strings.
-
-## Strong conflicts and malformed identity
-
-- If both sides contain valid canonical Naver Place IDs and they differ, the result is `distinct`.
-- If a non-empty canonical Naver Place field is malformed or uses an unsupported host/shape, the result is `unresolved` before weaker evidence may merge it.
-- A foreign/cross-org business ID alone is neither equivalent nor distinct.
+This order is intentional: a stale or incorrectly attached internal business ID must not override stronger contradictory public identity evidence.
 
 ## Naver Place rule
 
@@ -50,14 +47,37 @@ If a URL is supplied, only these hosts are accepted:
 - `m.place.naver.com`
 - `map.naver.com`
 
-Supported Naver Place page shapes include dedicated Place-host category pages such as `/restaurant/<id>/...` and map entry/place paths. A non-Naver URL containing `/place/<id>` is never accepted as Naver Place evidence.
+Supported URL shapes are intentionally narrow and versioned.
+
+For `place.naver.com` and `m.place.naver.com`, the first path segment must be one of:
+
+- `place`
+- `restaurant`
+- `cafe`
+- `hairshop`
+- `hospital`
+- `accommodation`
+- `attraction`
+
+followed by the numeric Place ID.
+
+For `map.naver.com`, supported paths are:
+
+- `/p/entry/place/<id>`
+- `/entry/place/<id>`
+- `/place/<id>`
+
+Query-only shapes such as `/?placeId=<id>` are not accepted in Phase 2A. Unsupported categories such as `/anything/<id>` fail closed.
+
+A non-Naver URL containing `/place/<id>` is never accepted as Naver Place evidence.
 
 ## URL rule
 
 Only verified concrete official URLs are identity evidence.
 
+- The URL scheme is part of identity. `http://...` and `https://...` are different origins.
+- Non-default ports are part of identity and are preserved.
 - A root page is rejected even if it has non-tracking query parameters such as `?lang=ko`.
-- Non-default ports are part of the origin and must be preserved.
 - Tracking parameters do not create a new identity.
 - Same corporate/root domain alone is never sufficient.
 - A shared concrete URL still requires an exact pre-verified branch/business identity key.
@@ -110,9 +130,10 @@ The engine must not auto-merge from:
 
 - same physical business may project to the current target even if the observed registered row belongs to another org, but only with strong public identity evidence
 - the foreign business ID must never escape as the target projection
-- same building, same brand, same root domain, near-identical names, generic aliases, or query-only root URLs must not overmerge
-- a different valid Naver Place ID must defeat weaker same-name evidence
-- malformed/unsupported Place evidence fails closed
+- same building, same brand, same root domain, near-identical names, generic aliases, query-only root URLs, or unsupported Naver URL shapes must not overmerge
+- a different valid Naver Place ID must override an internal current-business-id match and return `distinct`
+- malformed/unsupported Place evidence must override an internal current-business-id match and fail closed
+- `http` and `https` concrete URLs remain different origins
 - different URL ports remain different origins
 - punctuation-distinct opaque branch keys remain distinct
 - non-confirmed entities fail closed
