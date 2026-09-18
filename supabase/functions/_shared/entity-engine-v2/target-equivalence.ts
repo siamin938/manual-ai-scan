@@ -21,7 +21,7 @@ export interface PublicBusinessIdentityV2 {
   verifiedPhone?: string | null;
   /**
    * URLs must already be verified upstream as official business URLs.
-   * This engine still rejects root-only URLs and preserves origin ports.
+   * This engine still rejects root-only URLs and preserves full origins.
    */
   verifiedConcreteOfficialUrls?: string[];
   /**
@@ -57,6 +57,16 @@ const NAVER_PLACE_HOSTS = new Set([
   "map.naver.com",
 ]);
 
+const NAVER_PLACE_CATEGORY_SEGMENTS = new Set([
+  "place",
+  "restaurant",
+  "cafe",
+  "hairshop",
+  "hospital",
+  "accommodation",
+  "attraction",
+]);
+
 function normalizeText(value: string | null | undefined): string {
   return (value ?? "").normalize("NFKC").replace(/\s+/gu, " ").trim();
 }
@@ -86,24 +96,23 @@ export function normalizeCanonicalNaverPlaceId(
     if (!NAVER_PLACE_HOSTS.has(host)) return null;
 
     if (host === "map.naver.com") {
-      const mapEntry =
-        url.pathname.match(/\/(?:p\/)?entry\/place\/(\d{5,})(?:\/|$)/u)?.[1] ??
-        url.pathname.match(/\/place\/(\d{5,})(?:\/|$)/u)?.[1];
-      if (mapEntry) return mapEntry;
+      return (
+        url.pathname.match(/\/p\/entry\/place\/(\d{5,})(?:\/|$)/u)?.[1] ??
+        url.pathname.match(/\/entry\/place\/(\d{5,})(?:\/|$)/u)?.[1] ??
+        url.pathname.match(/\/place\/(\d{5,})(?:\/|$)/u)?.[1] ??
+        null
+      );
     }
 
     if (host === "place.naver.com" || host === "m.place.naver.com") {
-      const placeEntry =
-        url.pathname.match(
-          /^\/(?:place|[a-z][a-z0-9_-]*)\/(\d{5,})(?:\/|$)/iu,
-        )?.[1] ?? null;
-      if (placeEntry) return placeEntry;
-    }
+      const match = url.pathname.match(
+        /^\/([a-z][a-z0-9_-]*)\/(\d{5,})(?:\/|$)/iu,
+      );
+      if (!match) return null;
 
-    const query =
-      url.searchParams.get("placeId") ??
-      url.searchParams.get("place_id");
-    if (query && /^\d{5,}$/u.test(query)) return query;
+      const category = match[1]!.toLowerCase();
+      return NAVER_PLACE_CATEGORY_SEGMENTS.has(category) ? match[2]! : null;
+    }
   } catch {
     // Fail closed below.
   }
@@ -143,6 +152,7 @@ export function normalizeVerifiedConcreteUrl(
 
     const hostname = url.hostname.toLowerCase().replace(/^www\./u, "");
     const originHost = url.port ? `${hostname}:${url.port}` : hostname;
+    const origin = `${url.protocol}//${originHost}`;
     const path = url.pathname.replace(/\/{2,}/gu, "/").replace(/\/+$/u, "");
 
     // A root page remains a corporate/root URL even when it has language,
@@ -158,7 +168,7 @@ export function normalizeVerifiedConcreteUrl(
       )
       .join("&");
 
-    return `${originHost}${path}${query ? `?${query}` : ""}`;
+    return `${origin}${path}${query ? `?${query}` : ""}`;
   } catch {
     return null;
   }
@@ -284,24 +294,25 @@ export function evaluateTargetEquivalenceV2(
     return unresolved("OBSERVED_ENTITY_NOT_CONFIRMED_BUSINESS");
   }
 
-  if (observed.businessId && observed.businessId === target.businessId) {
-    return equivalent(
-      target,
-      ["exact_current_business_id"],
-      ["CURRENT_BUSINESS_ID_MATCH"],
-    );
-  }
-
   const place = normalizedNaverPlacePair(target, observed);
 
-  // A non-empty but unsupported/malformed canonical Place field is not
-  // silently ignored in favor of weaker evidence.
+  // Public identity conflicts/malformed identity outrank an internal row-id
+  // match. A stale or wrongly attached businessId must never hide stronger
+  // contradictory public evidence.
   if (place.hasInvalidProvidedValue) {
     return unresolved("NAVER_PLACE_ID_INVALID_OR_UNSUPPORTED");
   }
 
   if (place.targetId && place.observedId && place.targetId !== place.observedId) {
     return distinct("CANONICAL_NAVER_PLACE_ID_CONFLICT");
+  }
+
+  if (observed.businessId && observed.businessId === target.businessId) {
+    return equivalent(
+      target,
+      ["exact_current_business_id"],
+      ["CURRENT_BUSINESS_ID_MATCH"],
+    );
   }
 
   if (place.targetId && place.observedId && place.targetId === place.observedId) {
