@@ -71,16 +71,16 @@ export function BusinessSelector({
   isLoading: boolean;
   isError: boolean;
 }) {
-  if (isLoading) return <Skeleton className="h-9 w-56" />;
+  if (isLoading) return <Skeleton className="h-11 w-full sm:w-64" />;
   if (isError)
     return <p className="text-sm text-destructive">대상 업체 목록을 불러오지 못했습니다.</p>;
   if (options.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">대상 업체</span>
+    <div className="flex w-full items-center gap-3 sm:w-auto">
+      <span className="shrink-0 text-sm font-semibold text-foreground">대상 업체</span>
       <Select {...(value ? { value } : {})} onValueChange={onChange}>
-        <SelectTrigger className="w-56">
+        <SelectTrigger className="h-11 min-w-0 flex-1 border-input bg-card px-4 text-base shadow-none sm:w-64 sm:flex-none">
           <SelectValue placeholder="대상 업체 선택" />
         </SelectTrigger>
         <SelectContent>

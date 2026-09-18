@@ -198,22 +198,25 @@ function DashboardPage() {
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">내 AI 노출 진단</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <div className="space-y-8 lg:space-y-10">
+      <div className="border-b border-border pb-6 lg:flex lg:items-end lg:justify-between lg:gap-8">
+        <div className="max-w-3xl">
+          <p className="report-kicker mb-3">AI VISIBILITY REPORT</p>
+          <h1 className="text-3xl font-bold leading-tight sm:text-4xl">내 AI 노출 진단</h1>
+          <p className="mt-3 text-base leading-7 text-muted-foreground">
             고객이 실제로 물을 법한 질문으로 AI 답변을 측정해, 내 업체의 노출과 함께 관찰된 업체·인용
             출처를 확인합니다.
           </p>
         </div>
-        <BusinessSelector
-          options={businesses.options}
-          value={businesses.selectedBusinessId}
-          onChange={businesses.select}
-          isLoading={businesses.isLoading}
-          isError={businesses.isError}
-        />
+        <div className="mt-5 min-w-0 rounded-lg border border-border bg-card p-3 lg:mt-0">
+          <BusinessSelector
+            options={businesses.options}
+            value={businesses.selectedBusinessId}
+            onChange={businesses.select}
+            isLoading={businesses.isLoading}
+            isError={businesses.isError}
+          />
+        </div>
       </div>
 
 
@@ -258,12 +261,13 @@ function DashboardPage() {
 
       {payload && d && (
         <>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">최근 측정 결과</CardTitle>
+          <Card className="report-section border-t-2 border-t-primary">
+            <CardHeader className="border-b bg-muted/25 pb-4">
+              <p className="report-kicker">EXECUTIVE SUMMARY</p>
+              <CardTitle className="text-xl">최근 측정 결과</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1.5 text-sm">
-              <p>
+            <CardContent className="grid gap-3 pt-5 text-base leading-7 lg:grid-cols-2 lg:gap-x-10">
+              <p className="font-medium">
                 내 업체는 AI 답변 {d.overview.validCount}개 중 {d.overview.mentionCount}개에서
                 추천됐습니다({pct(d.overview.visibilityRatePct)}).
               </p>
@@ -282,7 +286,7 @@ function DashboardPage() {
                 </p>
               )}
               {aggregate && aggregate.compatibleRunCount >= 2 && (
-                <div className="border-t pt-3">
+                <div className="border-t pt-4 lg:col-span-2">
                   <p className="font-medium">동일 조건 반복 종합</p>
                   <p className="text-muted-foreground">
                     동일 조건으로 총 {aggregate.compatibleRunCount}회 측정한 {aggregate.validCount}개
@@ -304,7 +308,7 @@ function DashboardPage() {
 
           </Card>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:gap-px">
             <MetricCard
               label="최근 측정 · AI에서 추천된 비율"
               value={pct(d.overview.visibilityRatePct)}
@@ -327,7 +331,7 @@ function DashboardPage() {
             />
           </div>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="border-b border-border pb-5 text-sm text-muted-foreground">
             분석에 사용한 AI 답변 {d.overview.validCount}건 · 최근 측정{" "}
             {formatSeoul(d.scope.measuredAt)}
             {d.overview.invalidCount > 0 ? ` · 제외 ${d.overview.invalidCount}건` : ""}
@@ -341,9 +345,10 @@ function DashboardPage() {
 
           <ActionRecommendationsSection orgId={activeOrgId ?? null} businessId={businessId ?? null} />
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">AI 답변에서 함께 관찰된 업체</CardTitle>
+          <Card className="report-section">
+            <CardHeader className="border-b bg-muted/20">
+              <p className="report-kicker">OBSERVED BUSINESSES</p>
+              <CardTitle className="text-xl">AI 답변에서 함께 관찰된 업체</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-1 text-xs text-muted-foreground">
@@ -425,10 +430,10 @@ function DashboardPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 lg:grid-cols-2 items-start">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">내 업체가 잘 보이지 않는 검색 질문</CardTitle>
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            <Card className="report-section">
+              <CardHeader className="border-b bg-muted/20">
+                <CardTitle className="text-xl">내 업체가 잘 보이지 않는 검색 질문</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
@@ -513,9 +518,9 @@ function DashboardPage() {
 
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">AI 답변에 연결된 주요 출처</CardTitle>
+            <Card className="report-section">
+              <CardHeader className="border-b bg-muted/20">
+                <CardTitle className="text-xl">AI 답변에 연결된 주요 출처</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
@@ -619,9 +624,10 @@ function DashboardPage() {
           </div>
 
           {benchmark && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex flex-wrap items-center gap-2">
+            <Card className="report-section">
+              <CardHeader className="border-b bg-muted/20">
+                <p className="report-kicker">MARKET BENCHMARK</p>
+                <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
                   AI에 자주 추천되는 업체들은 어디에서 많이 보일까요?
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     데이터 축적 중
@@ -718,9 +724,10 @@ function DashboardPage() {
             </Card>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">어떤 검색 상황에서 보였나요?</CardTitle>
+          <Card className="report-section">
+            <CardHeader className="border-b bg-muted/20">
+              <p className="report-kicker">SEARCH CONTEXT</p>
+              <CardTitle className="text-xl">어떤 검색 상황에서 보였나요?</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
@@ -762,7 +769,7 @@ function DashboardPage() {
           </Card>
 
           <Collapsible>
-            <Card>
+            <Card className="report-section">
               <CardHeader className="pb-2">
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="px-0 text-sm font-medium">
@@ -968,13 +975,13 @@ function MetricCard({
   note?: string | null;
 }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+    <Card className="rounded-none border-0 bg-card shadow-none">
+      <CardHeader className="border-t-2 border-t-transparent pb-2 pt-5 transition-colors hover:border-t-primary">
+        <CardTitle className="text-sm font-semibold leading-5 text-muted-foreground">{label}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <p className="text-3xl font-semibold tabular-nums">{value}</p>
-        {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
+      <CardContent className="pb-5">
+        <p className="text-4xl font-bold leading-none tabular-nums text-foreground">{value}</p>
+        {note && <p className="mt-3 text-sm leading-6 text-muted-foreground">{note}</p>}
       </CardContent>
     </Card>
   );
