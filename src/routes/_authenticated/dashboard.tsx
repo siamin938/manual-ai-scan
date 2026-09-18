@@ -774,7 +774,7 @@ function DashboardPage() {
               <CardHeader className="pb-2">
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="px-0 text-sm font-medium">
-                    분석 방법과 신뢰도 자세히 보기
+                    과거 측정 기록·분석 기준 보기
                   </Button>
                 </CollapsibleTrigger>
               </CardHeader>
@@ -832,7 +832,16 @@ function DashboardPage() {
 
 
                   <div className="space-y-3 rounded-md border p-3">
-                    <p className="text-sm font-medium">측정 이력과 AI 노출 변화</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium">측정 이력과 AI 노출 변화</p>
+                      {payload.comparison?.status === "unverified" ? (
+                        <Badge variant="outline">동일 조건 비교 불가</Badge>
+                      ) : payload.comparison?.status === "unavailable" ? (
+                        <Badge variant="outline">비교 정보 조회 실패</Badge>
+                      ) : payload.comparison?.status === "single" ? (
+                        <Badge variant="outline">비교 측정 1회</Badge>
+                      ) : null}
+                    </div>
                     {payload.comparison?.status !== "verified" ? (
                       <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">
