@@ -167,7 +167,17 @@ function LandingPage() {
       <main>
         {/* Hero */}
         <section className="relative overflow-hidden border-b bg-card">
-          <div className="relative mx-auto grid max-w-7xl gap-10 px-4 pb-12 pt-16 md:pb-16 md:pt-24 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:gap-8 lg:px-6">
+          {/* Desktop: immersive full-bleed hero backdrop, fading to white on the left */}
+          <div className="pointer-events-none absolute inset-0 hidden lg:block" aria-hidden="true">
+            <img
+              src={heroGrandTourer}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover object-[72%_center]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-card from-[36%] via-card/90 via-[56%] to-card/0" />
+            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-card/60" />
+          </div>
+          <div className="relative mx-auto grid max-w-7xl gap-10 px-4 pb-12 pt-16 md:pb-16 md:pt-24 lg:min-h-[38rem] lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:gap-8 lg:px-6">
             <div>
               <Badge
                 variant="outline"
@@ -205,14 +215,15 @@ function LandingPage() {
               </div>
             </div>
 
-            <div className="relative -mx-4 overflow-hidden border-y border-border bg-muted/20 sm:mx-0">
+            {/* Mobile/tablet: standalone image below the copy */}
+            <div className="relative -mx-4 overflow-hidden border-y border-border bg-muted/20 sm:mx-0 lg:hidden">
               <img
                 src={heroGrandTourer}
-                alt="그래파이트 세단과 코발트 데이터 분석 흐름"
+                alt="자동차 전문 업체 작업 공간과 코발트 데이터 분석 흐름"
                 width={1536}
                 height={864}
                 fetchPriority="high"
-                className="aspect-[16/10] h-full w-full object-cover object-[68%_center] sm:aspect-video lg:aspect-[5/4] lg:min-h-[34rem] lg:object-[69%_center]"
+                className="aspect-[16/10] h-full w-full object-cover object-[68%_center] sm:aspect-video"
               />
             </div>
           </div>
