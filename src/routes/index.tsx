@@ -137,13 +137,10 @@ function LandingPage() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/90 bg-card/95 backdrop-blur-md">
         <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-4 px-4 lg:px-6">
-          <span className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">차</span>
-            <span className="flex flex-col leading-none">
-              <span className="text-base font-bold sm:text-[17px]">차보임</span>
-              <span className="mt-1 text-[9px] font-semibold tracking-[0.18em] text-muted-foreground">
-                CHABOIM
-              </span>
+          <span className="flex items-baseline gap-2">
+            <span className="text-lg font-bold tracking-tight sm:text-xl">차보임</span>
+            <span className="text-[10px] font-semibold tracking-[0.22em] text-muted-foreground">
+              CHABOIM
             </span>
           </span>
 
