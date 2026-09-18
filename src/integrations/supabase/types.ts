@@ -1738,6 +1738,42 @@ export type Database = {
           },
         ]
       }
+      measurement_request_contracts: {
+        Row: {
+          captured_at: string
+          job_id: string
+          org_id: string
+          request_fingerprint: string
+        }
+        Insert: {
+          captured_at?: string
+          job_id: string
+          org_id: string
+          request_fingerprint: string
+        }
+        Update: {
+          captured_at?: string
+          job_id?: string
+          org_id?: string
+          request_fingerprint?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_request_contracts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "measurement_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_request_contracts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_runs: {
         Row: {
           actual_cost_usd: number
@@ -2373,7 +2409,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          expires_at: string
+          expires_at?: string
           job_id: string
           org_id: string
           request_payload_redacted: Json
@@ -2729,6 +2765,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      visibility_density_shadow_evaluations: {
+        Row: {
+          action_filter_version: string
+          added_ids: Json
+          baseline_count: number
+          baseline_top_ids: Json
+          business_id: string
+          changed: boolean
+          environment: string
+          evaluated_at: string
+          id: string
+          metadata: Json
+          org_id: string
+          route_key: string
+          router_version: string
+          run_id: string
+          shadow_count: number
+          shadow_top_ids: Json
+          suppressed_ids: Json
+        }
+        Insert: {
+          action_filter_version: string
+          added_ids?: Json
+          baseline_count?: number
+          baseline_top_ids?: Json
+          business_id: string
+          changed?: boolean
+          environment: string
+          evaluated_at?: string
+          id?: string
+          metadata?: Json
+          org_id: string
+          route_key: string
+          router_version: string
+          run_id: string
+          shadow_count?: number
+          shadow_top_ids?: Json
+          suppressed_ids?: Json
+        }
+        Update: {
+          action_filter_version?: string
+          added_ids?: Json
+          baseline_count?: number
+          baseline_top_ids?: Json
+          business_id?: string
+          changed?: boolean
+          environment?: string
+          evaluated_at?: string
+          id?: string
+          metadata?: Json
+          org_id?: string
+          route_key?: string
+          router_version?: string
+          run_id?: string
+          shadow_count?: number
+          shadow_top_ids?: Json
+          suppressed_ids?: Json
+        }
+        Relationships: []
       }
       visibility_postprocess_tokens: {
         Row: {
@@ -3152,6 +3248,10 @@ export type Database = {
         Args: { p_name: string; p_slug: string }
         Returns: string
       }
+      create_organization_with_owner_server_v01: {
+        Args: { p_name: string; p_slug: string; p_user_id: string }
+        Returns: string
+      }
       get_auto_business_brand_core_v01: {
         Args: { p_name: string }
         Returns: string
@@ -3218,6 +3318,23 @@ export type Database = {
         }[]
       }
       get_data_asset_admin_overview_v01: { Args: never; Returns: Json }
+      get_density_shadow_sparse_source_candidates_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          candidate_type: string
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
       get_first_run_content_source_observations_v01: {
         Args: { p_business_id: string; p_org_id: string; p_run_id: string }
         Returns: {
@@ -3266,7 +3383,72 @@ export type Database = {
           source_name: string
         }[]
       }
+      get_first_run_independent_site_observations_v03: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
+      get_first_run_independent_site_observations_v04: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          measurement_ids: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
       get_first_run_profile_source_observations_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
+      get_first_run_profile_source_observations_v02: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: {
+          client_response_count: number
+          competitor_response_count: number
+          distinct_competitor_count: number
+          domains: Json
+          intent_count: number
+          linked_competitors: Json
+          question_count: number
+          sample_questions: Json
+          source_group_key: string
+          source_key: string
+          source_name: string
+        }[]
+      }
+      get_first_run_profile_source_observations_v03: {
         Args: { p_business_id: string; p_org_id: string; p_run_id: string }
         Returns: {
           client_response_count: number
@@ -3308,6 +3490,10 @@ export type Database = {
       }
       get_measurement_credit_admin_overview_v02: {
         Args: { p_limit?: number; p_query?: string }
+        Returns: Json
+      }
+      get_measurement_evidence_density_router_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
         Returns: Json
       }
       get_measurement_evidence_density_v01: {
@@ -3368,6 +3554,14 @@ export type Database = {
           source_name: string
         }[]
       }
+      get_visibility_density_shadow_ab_summary_v01: {
+        Args: never
+        Returns: Json
+      }
+      get_visibility_density_shadow_ab_v01: {
+        Args: { p_business_id: string; p_org_id: string; p_run_id: string }
+        Returns: Json
+      }
       get_visibility_domain_sharedness_v01: {
         Args: { p_domains: string[] }
         Returns: {
@@ -3378,6 +3572,8 @@ export type Database = {
         }[]
       }
       get_visibility_release_regression_v01: { Args: never; Returns: Json }
+      get_visibility_release_regression_v02: { Args: never; Returns: Json }
+      get_visibility_release_regression_v03: { Args: never; Returns: Json }
       get_visibility_repeat_aggregate_v01: {
         Args: { p_business_id: string; p_org_id: string }
         Returns: Json
@@ -3400,6 +3596,10 @@ export type Database = {
           allowed_roles: Database["public"]["Enums"]["app_role"][]
           target_org: string
         }
+        Returns: boolean
+      }
+      is_generic_location_business_description: {
+        Args: { p_name: string }
         Returns: boolean
       }
       is_org_member: { Args: { target_org: string }; Returns: boolean }
