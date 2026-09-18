@@ -44,9 +44,9 @@ function evaluate(item: FixtureCase) {
 
 describe("Entity Engine v2 Target Equivalence", () => {
   it("loads the Phase 2A fixture contract", () => {
-    expect(fixture.version).toBe("0.1");
+    expect(fixture.version).toBe("0.2");
     expect(fixture.positives).toHaveLength(5);
-    expect(fixture.negatives).toHaveLength(8);
+    expect(fixture.negatives).toHaveLength(16);
   });
 
   for (const item of fixture.positives) {
@@ -147,4 +147,87 @@ describe("Entity Engine v2 Target Equivalence", () => {
     expect(result.decision).toBe("unresolved");
     expect(result.projectedCanonicalKey).toBeNull();
   });
+
+  it("accepts only supported Naver Place hosts and known place-page URL shapes", () => {
+    const same = evaluateTargetEquivalenceV2({
+      target: fixture.target,
+      observed: {
+        name: "카스페이스 구로 본점",
+        canonicalNaverPlaceId:
+          "https://m.place.naver.com/restaurant/1069740203/home",
+      },
+      observedIdentityDecision: "confirmed_business",
+    });
+    expect(same.decision).toBe("equivalent");
+
+    const spoofed = evaluateTargetEquivalenceV2({
+      target: fixture.target,
+      observed: {
+        name: "카스페이스 구로 본점",
+        canonicalNaverPlaceId:
+          "https://evil.example/place/1069740203",
+      },
+      observedIdentityDecision: "confirmed_business",
+    });
+    expect(spoofed.decision).toBe("unresolved");
+  });
+
+  it("preserves URL ports and rejects root pages even when they have query parameters", () => {
+    const portMismatch = evaluateTargetEquivalenceV2({
+      target: fixture.target,
+      observed: {
+        name: "카스페이스 구로 본점",
+        verifiedConcreteOfficialUrls: [
+          "https://example.com:9443/stores/guro",
+        ],
+        branchIdentityKey: fixture.target.branchIdentityKey,
+      },
+      observedIdentityDecision: "confirmed_business",
+    });
+    expect(portMismatch.decision).toBe("unresolved");
+
+    const rootQuery = evaluateTargetEquivalenceV2({
+      target: {
+        ...fixture.target,
+        verifiedConcreteOfficialUrls: ["https://example.com/?lang=ko"],
+      },
+      observed: {
+        name: "카스페이스 구로 본점",
+        verifiedConcreteOfficialUrls: ["https://example.com/?lang=ko"],
+        branchIdentityKey: fixture.target.branchIdentityKey,
+      },
+      observedIdentityDecision: "confirmed_business",
+    });
+    expect(rootQuery.decision).toBe("unresolved");
+  });
+
+  it("compares branchIdentityKey as an opaque exact key", () => {
+    const result = evaluateTargetEquivalenceV2({
+      target: {
+        ...fixture.target,
+        verifiedConcreteOfficialUrls: ["https://example.com/store/x"],
+        branchIdentityKey: "brand:a-b",
+      },
+      observed: {
+        name: "별도 지점",
+        verifiedConcreteOfficialUrls: ["https://example.com/store/x"],
+        branchIdentityKey: "brand:ab",
+      },
+      observedIdentityDecision: "confirmed_business",
+    });
+
+    expect(result.decision).toBe("unresolved");
+  });
+
+  it("never treats a generic target-owned alias as standalone equivalence evidence", () => {
+    const result = evaluateTargetEquivalenceV2({
+      target: fixture.target,
+      observed: { name: "공식점" },
+      observedIdentityDecision: "confirmed_business",
+    });
+
+    expect(result.decision).toBe("unresolved");
+    expect(result.projectedCanonicalKey).toBeNull();
+  });
+
 });
