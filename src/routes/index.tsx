@@ -172,9 +172,10 @@ function LandingPage() {
             <img
               src={heroGrandTourer}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover object-center"
+              className="absolute inset-0 h-full w-full object-cover object-[46%_center]"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-card from-[20%] via-card/65 via-[31%] to-card/0 to-[44%]" />
+            {/* Local scrim behind the left copy area only (~42-54%), image otherwise untouched */}
+            <div className="absolute inset-y-0 left-0 w-[54%] bg-gradient-to-r from-card/95 from-[78%] via-card/85 via-[86%] to-card/0 to-[100%]" />
             <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-card/60" />
           </div>
           <div className="relative mx-auto grid max-w-7xl gap-10 px-4 pb-12 pt-16 md:pb-16 md:pt-24 lg:min-h-[38rem] lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:gap-8 lg:px-6">
@@ -193,7 +194,7 @@ function LandingPage() {
                   우리 업체는 얼마나 보이고 있을까요?
                 </span>
               </h1>
-              <p className="mt-7 max-w-2xl text-base leading-8 text-muted-foreground sm:text-lg">
+              <p className="mt-7 max-w-2xl text-base font-medium leading-8 text-foreground/80 sm:text-lg">
                 실제 고객이 검색할 만한 질문을 반복 측정해 내 업체의 AI 노출과 경쟁업체를 분석하고,
                 차보임의 분석 로직으로 AI 노출을 위해 무엇부터 확인할지 제안합니다.
               </p>
