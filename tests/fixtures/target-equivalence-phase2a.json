@@ -1,0 +1,153 @@
+{
+  "version": "0.1",
+  "description": "Phase 2A Target Equivalence positive and adversarial fixtures. Test data only; not production rules.",
+  "target": {
+    "businessId": "target-business-001",
+    "name": "카스페이스 구로점",
+    "aliases": [
+      "카스페이스 구로점"
+    ],
+    "canonicalNaverPlaceId": "1069740203",
+    "fullAddress": "서울 구로구 경인로53나길 27 1층",
+    "verifiedPhone": "02-0000-0001",
+    "verifiedConcreteOfficialUrls": [
+      "https://example.com/stores/guro"
+    ],
+    "branchIdentityKey": "carspace:guro"
+  },
+  "positives": [
+    {
+      "id": "P1-current-target-id",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "businessId": "target-business-001",
+        "name": "카스페이스 구로점"
+      },
+      "expectedDecision": "equivalent",
+      "expectedEvidence": "exact_current_business_id"
+    },
+    {
+      "id": "P2-same-place-id-name-variant",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "businessId": "foreign-row-101",
+        "name": "카스페이스 구로 본점",
+        "canonicalNaverPlaceId": "1069740203"
+      },
+      "expectedDecision": "equivalent",
+      "expectedEvidence": "exact_naver_place_id"
+    },
+    {
+      "id": "P3-target-owned-alias",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로점"
+      },
+      "expectedDecision": "equivalent",
+      "expectedEvidence": "explicit_target_owned_alias"
+    },
+    {
+      "id": "P4-full-address-plus-phone",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "fullAddress": "서울 구로구 경인로53나길 27 1층",
+        "verifiedPhone": "02-0000-0001"
+      },
+      "expectedDecision": "equivalent",
+      "expectedEvidence": "exact_full_address_plus_verified_phone"
+    },
+    {
+      "id": "P5-shared-concrete-url-compatible-branch",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로본점",
+        "verifiedConcreteOfficialUrls": [
+          "https://example.com/stores/guro?utm_source=test"
+        ],
+        "branchIdentityKey": "carspace:guro"
+      },
+      "expectedDecision": "equivalent",
+      "expectedEvidence": "exact_verified_concrete_official_url"
+    }
+  ],
+  "negatives": [
+    {
+      "id": "N1-same-building-different-business",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "다른자동차용품점",
+        "fullAddress": "서울 구로구 경인로53나길 27 1층"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N2-same-brand-different-branch-place-conflict",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 강남점",
+        "canonicalNaverPlaceId": "9999999999",
+        "branchIdentityKey": "carspace:gangnam"
+      },
+      "expectedDecision": "distinct"
+    },
+    {
+      "id": "N3-same-address-but-strong-id-conflict",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 별도매장",
+        "canonicalNaverPlaceId": "8888888888",
+        "fullAddress": "서울 구로구 경인로53나길 27 1층",
+        "verifiedPhone": "02-9999-9999",
+        "verifiedConcreteOfficialUrls": [
+          "https://example.com/stores/other"
+        ]
+      },
+      "expectedDecision": "distinct"
+    },
+    {
+      "id": "N4-same-root-domain-different-concrete-branch",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 송파점",
+        "verifiedConcreteOfficialUrls": [
+          "https://example.com/stores/songpa"
+        ],
+        "branchIdentityKey": "carspace:songpa"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N5-same-gu-and-brand-only",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 디지털점"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N6-nearly-identical-name-but-not-owned-alias",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로센터"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N7-brand-mention-only",
+      "observedIdentityDecision": "brand_network",
+      "observed": {
+        "name": "카스페이스"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N8-generic-service-phrase",
+      "observedIdentityDecision": "non_business",
+      "observed": {
+        "name": "구로구 신차패키지 전문점"
+      },
+      "expectedDecision": "unresolved"
+    }
+  ]
+}
