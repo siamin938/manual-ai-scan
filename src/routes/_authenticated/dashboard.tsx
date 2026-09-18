@@ -970,18 +970,38 @@ function MetricCard({
   label,
   value,
   note,
+  highlight = false,
 }: {
   label: string;
   value: string;
   note?: string | null;
+  highlight?: boolean;
 }) {
   return (
-    <Card className="rounded-none border-0 bg-card shadow-none">
-      <CardHeader className="border-t-2 border-t-transparent pb-2 pt-5 transition-colors hover:border-t-primary">
-        <CardTitle className="text-sm font-semibold leading-5 text-muted-foreground">{label}</CardTitle>
+    <Card
+      className={
+        highlight
+          ? "rounded-none border-0 bg-primary/[0.04] shadow-none"
+          : "rounded-none border-0 bg-card shadow-none"
+      }
+    >
+      <CardHeader
+        className={`border-t-2 pb-2 pt-5 ${
+          highlight ? "border-t-primary" : "border-t-transparent transition-colors hover:border-t-primary"
+        }`}
+      >
+        <CardTitle
+          className={`text-sm font-semibold leading-5 ${highlight ? "text-primary" : "text-muted-foreground"}`}
+        >
+          {label}
+        </CardTitle>
       </CardHeader>
       <CardContent className="pb-5">
-        <p className="text-4xl font-bold leading-none tabular-nums text-foreground">{value}</p>
+        <p
+          className={`text-4xl font-bold leading-none tabular-nums ${highlight ? "text-primary" : "text-foreground"}`}
+        >
+          {value}
+        </p>
         {note && <p className="mt-3 text-sm leading-6 text-muted-foreground">{note}</p>}
       </CardContent>
     </Card>
