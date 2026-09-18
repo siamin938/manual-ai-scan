@@ -1,5 +1,5 @@
 {
-  "version": "0.2",
+  "version": "0.3",
   "description": "Phase 2A Target Equivalence positive and adversarial fixtures. Test data only; never production rules.",
   "target": {
     "businessId": "target-business-001",
@@ -233,6 +233,56 @@
         "canonicalNaverPlaceId": "https://not-naver.example/restaurant/1069740203/home",
         "fullAddress": "서울 구로구 경인로53나길 27 1층",
         "verifiedPhone": "02-0000-0001"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N17-current-id-with-conflicting-place-id",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "businessId": "target-business-001",
+        "name": "카스페이스 구로점",
+        "canonicalNaverPlaceId": "9999999999"
+      },
+      "expectedDecision": "distinct"
+    },
+    {
+      "id": "N18-current-id-with-malformed-place-evidence",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "businessId": "target-business-001",
+        "name": "카스페이스 구로점",
+        "canonicalNaverPlaceId": "https://evil.example/place/1069740203"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N19-http-https-scheme-mismatch",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "verifiedConcreteOfficialUrls": [
+          "http://example.com:8443/stores/guro"
+        ],
+        "branchIdentityKey": "carspace:guro-a"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N20-unsupported-naver-category-shape",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "canonicalNaverPlaceId": "https://m.place.naver.com/anything/1069740203/home"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N21-query-only-naver-place-shape",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "canonicalNaverPlaceId": "https://m.place.naver.com/?placeId=1069740203"
       },
       "expectedDecision": "unresolved"
     }
