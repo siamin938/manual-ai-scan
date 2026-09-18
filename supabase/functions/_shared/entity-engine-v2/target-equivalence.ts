@@ -5,24 +5,28 @@ export type TargetEquivalenceDecision = "equivalent" | "distinct" | "unresolved"
 export type TargetEquivalenceEvidenceKind =
   | "exact_current_business_id"
   | "exact_naver_place_id"
-  | "exact_verified_concrete_official_url"
-  | "explicit_target_owned_alias"
-  | "exact_full_address_plus_verified_phone"
-  | "exact_full_address_plus_target_owned_alias"
-  | "exact_full_address_plus_naver_place_id"
-  | "exact_full_address_plus_verified_concrete_official_url";
+  | "exact_verified_concrete_official_url_with_branch_identity"
+  | "exact_full_address_plus_verified_phone";
 
 export interface PublicBusinessIdentityV2 {
   businessId?: string | null;
   name: string;
   aliases?: string[];
+  /**
+   * Canonical numeric Naver Place ID, or a supported Naver Place URL.
+   * Unsupported/malformed non-empty values fail closed.
+   */
   canonicalNaverPlaceId?: string | null;
   fullAddress?: string | null;
   verifiedPhone?: string | null;
+  /**
+   * URLs must already be verified upstream as official business URLs.
+   * This engine still rejects root-only URLs and preserves origin ports.
+   */
   verifiedConcreteOfficialUrls?: string[];
   /**
-   * A pre-verified branch/business identity key supplied by an upstream identity
-   * normalizer. This engine intentionally does not derive it from fuzzy names.
+   * Opaque, pre-verified branch/business identity key.
+   * This engine does not derive or fuzzily normalize this key.
    */
   branchIdentityKey?: string | null;
 }
@@ -47,8 +51,18 @@ export interface TargetEquivalenceResultV2 {
 const TRACKING_PARAM =
   /^(utm_|ref$|referrer$|fbclid$|gclid$|igshid$|mc_cid$|mc_eid$)/i;
 
+const NAVER_PLACE_HOSTS = new Set([
+  "place.naver.com",
+  "m.place.naver.com",
+  "map.naver.com",
+]);
+
 function normalizeText(value: string | null | undefined): string {
   return (value ?? "").normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
+function hasProvidedValue(value: string | null | undefined): boolean {
+  return normalizeText(value).length > 0;
 }
 
 export function normalizeIdentitySurface(value: string | null | undefined): string {
@@ -68,16 +82,30 @@ export function normalizeCanonicalNaverPlaceId(
 
   try {
     const url = new URL(text);
-    const entry = url.pathname.match(/\/place\/(\d{5,})/u)?.[1];
-    if (entry) return entry;
+    const host = url.hostname.toLowerCase().replace(/^www\./u, "");
+    if (!NAVER_PLACE_HOSTS.has(host)) return null;
+
+    if (host === "map.naver.com") {
+      const mapEntry =
+        url.pathname.match(/\/(?:p\/)?entry\/place\/(\d{5,})(?:\/|$)/u)?.[1] ??
+        url.pathname.match(/\/place\/(\d{5,})(?:\/|$)/u)?.[1];
+      if (mapEntry) return mapEntry;
+    }
+
+    if (host === "place.naver.com" || host === "m.place.naver.com") {
+      const placeEntry =
+        url.pathname.match(
+          /^\/(?:place|[a-z][a-z0-9_-]*)\/(\d{5,})(?:\/|$)/iu,
+        )?.[1] ?? null;
+      if (placeEntry) return placeEntry;
+    }
 
     const query =
       url.searchParams.get("placeId") ??
-      url.searchParams.get("place_id") ??
-      url.searchParams.get("id");
+      url.searchParams.get("place_id");
     if (query && /^\d{5,}$/u.test(query)) return query;
   } catch {
-    // Fail closed: a non-canonical, non-numeric value is not a Place identity.
+    // Fail closed below.
   }
 
   return null;
@@ -93,7 +121,6 @@ export function normalizeFullAddress(
     .trim();
   if (!normalized) return null;
 
-  // Preserve unit/building numbers while removing formatting-only separators.
   return normalized.replace(/\s*([/-])\s*/gu, "$1");
 }
 
@@ -114,8 +141,14 @@ export function normalizeVerifiedConcreteUrl(
     const url = new URL(value);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
 
-    const host = url.hostname.toLowerCase().replace(/^www\./u, "");
+    const hostname = url.hostname.toLowerCase().replace(/^www\./u, "");
+    const originHost = url.port ? `${hostname}:${url.port}` : hostname;
     const path = url.pathname.replace(/\/{2,}/gu, "/").replace(/\/+$/u, "");
+
+    // A root page remains a corporate/root URL even when it has language,
+    // campaign, or redirect query parameters. It is never branch-concrete.
+    if (!path) return null;
+
     const query = [...url.searchParams.entries()]
       .filter(([key]) => !TRACKING_PARAM.test(key))
       .sort(([a], [b]) => a.localeCompare(b))
@@ -125,10 +158,7 @@ export function normalizeVerifiedConcreteUrl(
       )
       .join("&");
 
-    // A root domain alone is deliberately not a concrete business/branch URL.
-    if (!path && !query) return null;
-
-    return `${host}${path}${query ? `?${query}` : ""}`;
+    return `${originHost}${path}${query ? `?${query}` : ""}`;
   } catch {
     return null;
   }
@@ -155,38 +185,18 @@ function sharesConcreteOfficialUrl(
   return false;
 }
 
-function normalizedBranchKey(value: string | null | undefined): string | null {
-  const key = normalizeIdentitySurface(value);
-  return key.length >= 2 ? key : null;
+function opaqueBranchKey(value: string | null | undefined): string | null {
+  const key = value?.trim() ?? "";
+  return key.length > 0 ? key : null;
 }
 
 function hasCompatibleBranchIdentity(
   target: TargetBusinessIdentityV2,
   observed: PublicBusinessIdentityV2,
 ): boolean {
-  const targetKey = normalizedBranchKey(target.branchIdentityKey);
-  const observedKey = normalizedBranchKey(observed.branchIdentityKey);
+  const targetKey = opaqueBranchKey(target.branchIdentityKey);
+  const observedKey = opaqueBranchKey(observed.branchIdentityKey);
   return !!targetKey && !!observedKey && targetKey === observedKey;
-}
-
-function targetOwnedSurfaces(target: TargetBusinessIdentityV2): Set<string> {
-  const values = [target.name, ...(target.aliases ?? [])];
-  return new Set(
-    values
-      .map(normalizeIdentitySurface)
-      .filter((value) => value.length >= 2),
-  );
-}
-
-function observedMatchesTargetOwnedAlias(
-  target: TargetBusinessIdentityV2,
-  observed: PublicBusinessIdentityV2,
-): boolean {
-  const observedSurface = normalizeIdentitySurface(observed.name);
-  return (
-    observedSurface.length >= 2 &&
-    targetOwnedSurfaces(target).has(observedSurface)
-  );
 }
 
 function sameNormalizedAddress(
@@ -207,22 +217,27 @@ function sameVerifiedPhone(
   return !!left && !!right && left === right;
 }
 
-function sameNaverPlaceId(
+function normalizedNaverPlacePair(
   target: TargetBusinessIdentityV2,
   observed: PublicBusinessIdentityV2,
-): boolean {
-  const left = normalizeCanonicalNaverPlaceId(target.canonicalNaverPlaceId);
-  const right = normalizeCanonicalNaverPlaceId(observed.canonicalNaverPlaceId);
-  return !!left && !!right && left === right;
-}
+): {
+  targetId: string | null;
+  observedId: string | null;
+  hasInvalidProvidedValue: boolean;
+} {
+  const targetId = normalizeCanonicalNaverPlaceId(target.canonicalNaverPlaceId);
+  const observedId = normalizeCanonicalNaverPlaceId(observed.canonicalNaverPlaceId);
 
-function naverPlaceIdConflict(
-  target: TargetBusinessIdentityV2,
-  observed: PublicBusinessIdentityV2,
-): boolean {
-  const left = normalizeCanonicalNaverPlaceId(target.canonicalNaverPlaceId);
-  const right = normalizeCanonicalNaverPlaceId(observed.canonicalNaverPlaceId);
-  return !!left && !!right && left !== right;
+  const targetInvalid =
+    hasProvidedValue(target.canonicalNaverPlaceId) && targetId === null;
+  const observedInvalid =
+    hasProvidedValue(observed.canonicalNaverPlaceId) && observedId === null;
+
+  return {
+    targetId,
+    observedId,
+    hasInvalidProvidedValue: targetInvalid || observedInvalid,
+  };
 }
 
 function equivalent(
@@ -277,13 +292,19 @@ export function evaluateTargetEquivalenceV2(
     );
   }
 
-  // Conflicting canonical place identities are a strong negative signal and
-  // override weaker name/address evidence.
-  if (naverPlaceIdConflict(target, observed)) {
+  const place = normalizedNaverPlacePair(target, observed);
+
+  // A non-empty but unsupported/malformed canonical Place field is not
+  // silently ignored in favor of weaker evidence.
+  if (place.hasInvalidProvidedValue) {
+    return unresolved("NAVER_PLACE_ID_INVALID_OR_UNSUPPORTED");
+  }
+
+  if (place.targetId && place.observedId && place.targetId !== place.observedId) {
     return distinct("CANONICAL_NAVER_PLACE_ID_CONFLICT");
   }
 
-  if (sameNaverPlaceId(target, observed)) {
+  if (place.targetId && place.observedId && place.targetId === place.observedId) {
     return equivalent(
       target,
       ["exact_naver_place_id"],
@@ -291,7 +312,6 @@ export function evaluateTargetEquivalenceV2(
     );
   }
 
-  const aliasMatch = observedMatchesTargetOwnedAlias(target, observed);
   const sharedConcreteUrl = sharesConcreteOfficialUrl(
     target.verifiedConcreteOfficialUrls,
     observed.verifiedConcreteOfficialUrls,
@@ -300,51 +320,20 @@ export function evaluateTargetEquivalenceV2(
   if (sharedConcreteUrl && hasCompatibleBranchIdentity(target, observed)) {
     return equivalent(
       target,
-      ["exact_verified_concrete_official_url"],
-      ["VERIFIED_CONCRETE_URL_AND_BRANCH_IDENTITY_MATCH"],
+      ["exact_verified_concrete_official_url_with_branch_identity"],
+      ["VERIFIED_CONCRETE_URL_AND_EXACT_BRANCH_IDENTITY_MATCH"],
     );
   }
 
-  if (aliasMatch) {
+  if (
+    sameNormalizedAddress(target, observed) &&
+    sameVerifiedPhone(target, observed)
+  ) {
     return equivalent(
       target,
-      ["explicit_target_owned_alias"],
-      ["TARGET_OWNED_ALIAS_MATCH"],
+      ["exact_full_address_plus_verified_phone"],
+      ["FULL_ADDRESS_AND_VERIFIED_PHONE_MATCH"],
     );
-  }
-
-  if (sameNormalizedAddress(target, observed)) {
-    if (sameVerifiedPhone(target, observed)) {
-      return equivalent(
-        target,
-        ["exact_full_address_plus_verified_phone"],
-        ["FULL_ADDRESS_AND_VERIFIED_PHONE_MATCH"],
-      );
-    }
-
-    if (aliasMatch) {
-      return equivalent(
-        target,
-        ["exact_full_address_plus_target_owned_alias"],
-        ["FULL_ADDRESS_AND_TARGET_OWNED_ALIAS_MATCH"],
-      );
-    }
-
-    if (sameNaverPlaceId(target, observed)) {
-      return equivalent(
-        target,
-        ["exact_full_address_plus_naver_place_id"],
-        ["FULL_ADDRESS_AND_NAVER_PLACE_ID_MATCH"],
-      );
-    }
-
-    if (sharedConcreteUrl) {
-      return equivalent(
-        target,
-        ["exact_full_address_plus_verified_concrete_official_url"],
-        ["FULL_ADDRESS_AND_VERIFIED_CONCRETE_URL_MATCH"],
-      );
-    }
   }
 
   return unresolved("INSUFFICIENT_STRONG_TARGET_EQUIVALENCE_EVIDENCE");
