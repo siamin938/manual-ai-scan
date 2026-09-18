@@ -1,19 +1,20 @@
 {
-  "version": "0.1",
-  "description": "Phase 2A Target Equivalence positive and adversarial fixtures. Test data only; not production rules.",
+  "version": "0.2",
+  "description": "Phase 2A Target Equivalence positive and adversarial fixtures. Test data only; never production rules.",
   "target": {
     "businessId": "target-business-001",
     "name": "카스페이스 구로점",
     "aliases": [
-      "카스페이스 구로점"
+      "카스페이스 구로점",
+      "공식점"
     ],
     "canonicalNaverPlaceId": "1069740203",
     "fullAddress": "서울 구로구 경인로53나길 27 1층",
     "verifiedPhone": "02-0000-0001",
     "verifiedConcreteOfficialUrls": [
-      "https://example.com/stores/guro"
+      "https://example.com:8443/stores/guro"
     ],
-    "branchIdentityKey": "carspace:guro"
+    "branchIdentityKey": "carspace:guro-a"
   },
   "positives": [
     {
@@ -27,7 +28,7 @@
       "expectedEvidence": "exact_current_business_id"
     },
     {
-      "id": "P2-same-place-id-name-variant",
+      "id": "P2-same-numeric-place-id-cross-org",
       "observedIdentityDecision": "confirmed_business",
       "observed": {
         "businessId": "foreign-row-101",
@@ -38,13 +39,14 @@
       "expectedEvidence": "exact_naver_place_id"
     },
     {
-      "id": "P3-target-owned-alias",
+      "id": "P3-same-place-id-supported-naver-restaurant-url",
       "observedIdentityDecision": "confirmed_business",
       "observed": {
-        "name": "카스페이스 구로점"
+        "name": "카스페이스 구로본점",
+        "canonicalNaverPlaceId": "https://m.place.naver.com/restaurant/1069740203/home"
       },
       "expectedDecision": "equivalent",
-      "expectedEvidence": "explicit_target_owned_alias"
+      "expectedEvidence": "exact_naver_place_id"
     },
     {
       "id": "P4-full-address-plus-phone",
@@ -58,17 +60,17 @@
       "expectedEvidence": "exact_full_address_plus_verified_phone"
     },
     {
-      "id": "P5-shared-concrete-url-compatible-branch",
+      "id": "P5-shared-concrete-url-exact-branch-key",
       "observedIdentityDecision": "confirmed_business",
       "observed": {
         "name": "카스페이스 구로본점",
         "verifiedConcreteOfficialUrls": [
-          "https://example.com/stores/guro?utm_source=test"
+          "https://example.com:8443/stores/guro?utm_source=test"
         ],
-        "branchIdentityKey": "carspace:guro"
+        "branchIdentityKey": "carspace:guro-a"
       },
       "expectedDecision": "equivalent",
-      "expectedEvidence": "exact_verified_concrete_official_url"
+      "expectedEvidence": "exact_verified_concrete_official_url_with_branch_identity"
     }
   ],
   "negatives": [
@@ -92,7 +94,7 @@
       "expectedDecision": "distinct"
     },
     {
-      "id": "N3-same-address-but-strong-id-conflict",
+      "id": "N3-same-address-but-place-conflict",
       "observedIdentityDecision": "confirmed_business",
       "observed": {
         "name": "카스페이스 별도매장",
@@ -100,7 +102,7 @@
         "fullAddress": "서울 구로구 경인로53나길 27 1층",
         "verifiedPhone": "02-9999-9999",
         "verifiedConcreteOfficialUrls": [
-          "https://example.com/stores/other"
+          "https://example.com:8443/stores/other"
         ]
       },
       "expectedDecision": "distinct"
@@ -111,7 +113,7 @@
       "observed": {
         "name": "카스페이스 송파점",
         "verifiedConcreteOfficialUrls": [
-          "https://example.com/stores/songpa"
+          "https://example.com:8443/stores/songpa"
         ],
         "branchIdentityKey": "carspace:songpa"
       },
@@ -126,7 +128,7 @@
       "expectedDecision": "unresolved"
     },
     {
-      "id": "N6-nearly-identical-name-but-not-owned-alias",
+      "id": "N6-nearly-identical-name-only",
       "observedIdentityDecision": "confirmed_business",
       "observed": {
         "name": "카스페이스 구로센터"
@@ -146,6 +148,91 @@
       "observedIdentityDecision": "non_business",
       "observed": {
         "name": "구로구 신차패키지 전문점"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N9-non-naver-host-place-id-spoof",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "canonicalNaverPlaceId": "https://evil.example/place/1069740203"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N10-supported-naver-url-different-place-id",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로점",
+        "canonicalNaverPlaceId": "https://m.place.naver.com/restaurant/9999999999/home"
+      },
+      "expectedDecision": "distinct"
+    },
+    {
+      "id": "N11-root-query-url-is-not-concrete",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "verifiedConcreteOfficialUrls": [
+          "https://example.com:8443/?lang=ko"
+        ],
+        "branchIdentityKey": "carspace:guro-a"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N12-different-origin-ports-do-not-match",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "verifiedConcreteOfficialUrls": [
+          "https://example.com:9443/stores/guro"
+        ],
+        "branchIdentityKey": "carspace:guro-a"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N13-opaque-branch-key-punctuation-remains-distinct",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "verifiedConcreteOfficialUrls": [
+          "https://example.com:8443/stores/guro"
+        ],
+        "branchIdentityKey": "carspace:guroa"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N14-generic-target-alias-is-not-equivalence-evidence",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "공식점"
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N15-same-address-plus-root-query-url-still-insufficient",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "다른 업체",
+        "fullAddress": "서울 구로구 경인로53나길 27 1층",
+        "verifiedConcreteOfficialUrls": [
+          "https://example.com:8443/?lang=ko"
+        ]
+      },
+      "expectedDecision": "unresolved"
+    },
+    {
+      "id": "N16-malformed-place-field-blocks-weaker-evidence",
+      "observedIdentityDecision": "confirmed_business",
+      "observed": {
+        "name": "카스페이스 구로 본점",
+        "canonicalNaverPlaceId": "https://not-naver.example/restaurant/1069740203/home",
+        "fullAddress": "서울 구로구 경인로53나길 27 1층",
+        "verifiedPhone": "02-0000-0001"
       },
       "expectedDecision": "unresolved"
     }
