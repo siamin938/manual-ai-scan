@@ -44,9 +44,9 @@ function evaluate(item: FixtureCase) {
 
 describe("Entity Engine v2 Target Equivalence", () => {
   it("loads the Phase 2A fixture contract", () => {
-    expect(fixture.version).toBe("0.2");
+    expect(fixture.version).toBe("0.3");
     expect(fixture.positives).toHaveLength(5);
-    expect(fixture.negatives).toHaveLength(16);
+    expect(fixture.negatives).toHaveLength(21);
   });
 
   for (const item of fixture.positives) {
@@ -100,19 +100,28 @@ describe("Entity Engine v2 Target Equivalence", () => {
     expect(JSON.stringify(input)).toBe(before);
   });
 
-  it("fails closed for non-confirmed identity decisions", () => {
-    const result = evaluateTargetEquivalenceV2({
-      target: fixture.target,
-      observed: {
-        name: fixture.target.name,
-        canonicalNaverPlaceId: fixture.target.canonicalNaverPlaceId,
-      },
-      observedIdentityDecision: "needs_review" as IdentityDecisionV2,
-    });
+  it("fails closed for every non-confirmed identity decision in the real union", () => {
+    const nonConfirmed: IdentityDecisionV2[] = [
+      "brand_network",
+      "platform",
+      "non_business",
+      "unresolved",
+    ];
 
-    expect(result.decision).toBe("unresolved");
-    expect(result.projectedCanonicalKey).toBeNull();
-    expect(result.reasons).toContain("OBSERVED_ENTITY_NOT_CONFIRMED_BUSINESS");
+    for (const observedIdentityDecision of nonConfirmed) {
+      const result = evaluateTargetEquivalenceV2({
+        target: fixture.target,
+        observed: {
+          name: fixture.target.name,
+          canonicalNaverPlaceId: fixture.target.canonicalNaverPlaceId,
+        },
+        observedIdentityDecision,
+      });
+
+      expect(result.decision).toBe("unresolved");
+      expect(result.projectedCanonicalKey).toBeNull();
+      expect(result.reasons).toContain("OBSERVED_ENTITY_NOT_CONFIRMED_BUSINESS");
+    }
   });
 
   it("treats a conflicting canonical Naver Place ID as distinct even when names are similar", () => {
@@ -228,6 +237,72 @@ describe("Entity Engine v2 Target Equivalence", () => {
 
     expect(result.decision).toBe("unresolved");
     expect(result.projectedCanonicalKey).toBeNull();
+  });
+
+  it("lets conflicting or malformed Place evidence outrank an internal current-id match", () => {
+    const conflict = evaluateTargetEquivalenceV2({
+      target: fixture.target,
+      observed: {
+        businessId: fixture.target.businessId,
+        name: fixture.target.name,
+        canonicalNaverPlaceId: "9999999999",
+      },
+      observedIdentityDecision: "confirmed_business",
+    });
+
+    expect(conflict.decision).toBe("distinct");
+    expect(conflict.projectedCanonicalKey).toBeNull();
+
+    const malformed = evaluateTargetEquivalenceV2({
+      target: fixture.target,
+      observed: {
+        businessId: fixture.target.businessId,
+        name: fixture.target.name,
+        canonicalNaverPlaceId: "https://evil.example/place/1069740203",
+      },
+      observedIdentityDecision: "confirmed_business",
+    });
+
+    expect(malformed.decision).toBe("unresolved");
+    expect(malformed.projectedCanonicalKey).toBeNull();
+  });
+
+  it("keeps http and https concrete URLs as different origins", () => {
+    const result = evaluateTargetEquivalenceV2({
+      target: {
+        ...fixture.target,
+        verifiedConcreteOfficialUrls: ["https://example.com/store/x"],
+        branchIdentityKey: "branch-x",
+      },
+      observed: {
+        name: "같은 표면형",
+        verifiedConcreteOfficialUrls: ["http://example.com/store/x"],
+        branchIdentityKey: "branch-x",
+      },
+      observedIdentityDecision: "confirmed_business",
+    });
+
+    expect(result.decision).toBe("unresolved");
+    expect(result.projectedCanonicalKey).toBeNull();
+  });
+
+  it("rejects unsupported and query-only Naver Place URL shapes", () => {
+    for (const canonicalNaverPlaceId of [
+      "https://m.place.naver.com/anything/1069740203/home",
+      "https://m.place.naver.com/?placeId=1069740203",
+    ]) {
+      const result = evaluateTargetEquivalenceV2({
+        target: fixture.target,
+        observed: {
+          name: fixture.target.name,
+          canonicalNaverPlaceId,
+        },
+        observedIdentityDecision: "confirmed_business",
+      });
+
+      expect(result.decision).toBe("unresolved");
+      expect(result.projectedCanonicalKey).toBeNull();
+    }
   });
 
 });
