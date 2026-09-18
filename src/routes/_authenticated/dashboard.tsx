@@ -261,6 +261,30 @@ function DashboardPage() {
 
       {payload && d && (
         <>
+          <div className="grid overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:gap-px">
+            <MetricCard
+              highlight
+              label="최근 측정 · AI에서 추천된 비율"
+              value={pct(d.overview.visibilityRatePct)}
+              note={`AI 답변 ${d.overview.validCount}건 중 ${d.overview.mentionCount}건에서 추천`}
+            />
+            <MetricCard
+              label="최근 측정 · 상위 3곳 안에 추천"
+              value={`${d.overview.top3Count}건`}
+              note={`AI 답변 ${d.overview.validCount}건 중 상위 3곳 안에 추천`}
+            />
+            <MetricCard
+              label="AI 답변에서 함께 관찰된 업체"
+              value={`${d.competitors.length}곳`}
+              note="자주 등장한 곳과 추가 관찰 업체 포함"
+            />
+            <MetricCard
+              label="AI 답변에 연결된 주요 출처"
+              value={`${d.sources.length}곳`}
+              note="직접 연결되거나 여러 답변에서 반복 관찰"
+            />
+          </div>
+
           <Card className="report-section border-t-2 border-t-primary">
             <CardHeader className="border-b bg-muted/25 pb-4">
               <p className="report-kicker">EXECUTIVE SUMMARY</p>
@@ -307,29 +331,6 @@ function DashboardPage() {
             </CardContent>
 
           </Card>
-
-          <div className="grid overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:gap-px">
-            <MetricCard
-              label="최근 측정 · AI에서 추천된 비율"
-              value={pct(d.overview.visibilityRatePct)}
-              note={`AI 답변 ${d.overview.validCount}건 중 ${d.overview.mentionCount}건에서 추천`}
-            />
-            <MetricCard
-              label="최근 측정 · 상위 3곳 안에 추천"
-              value={`${d.overview.top3Count}건`}
-              note={`AI 답변 ${d.overview.validCount}건 중 상위 3곳 안에 추천`}
-            />
-            <MetricCard
-              label="AI 답변에서 함께 관찰된 업체"
-              value={`${d.competitors.length}곳`}
-              note="자주 등장한 곳과 추가 관찰 업체 포함"
-            />
-            <MetricCard
-              label="AI 답변에 연결된 주요 출처"
-              value={`${d.sources.length}곳`}
-              note="직접 연결되거나 여러 답변에서 반복 관찰"
-            />
-          </div>
 
           <p className="border-b border-border pb-5 text-sm text-muted-foreground">
             분석에 사용한 AI 답변 {d.overview.validCount}건 · 최근 측정{" "}
