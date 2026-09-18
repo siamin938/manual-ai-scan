@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import heroGrandTourer from "@/assets/chaboim-hero-grand-tourer.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -166,7 +167,7 @@ function LandingPage() {
       <main>
         {/* Hero */}
         <section className="relative overflow-hidden border-b bg-card">
-          <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 md:py-24 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:px-6">
+          <div className="relative mx-auto grid max-w-7xl gap-10 px-4 pb-12 pt-16 md:pb-16 md:pt-24 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:gap-8 lg:px-6">
             <div>
               <Badge
                 variant="outline"
@@ -204,7 +205,20 @@ function LandingPage() {
               </div>
             </div>
 
-            {/* Research panel */}
+            <div className="relative -mx-4 overflow-hidden border-y border-border bg-muted/20 sm:mx-0">
+              <img
+                src={heroGrandTourer}
+                alt="그래파이트 세단과 코발트 데이터 분석 흐름"
+                width={1536}
+                height={864}
+                fetchPriority="high"
+                className="aspect-[16/10] h-full w-full object-cover object-[68%_center] sm:aspect-video lg:aspect-[5/4] lg:min-h-[34rem] lg:object-[69%_center]"
+              />
+            </div>
+          </div>
+
+          {/* Research panel */}
+          <div className="mx-auto max-w-7xl px-4 pb-16 lg:px-6">
             <div className="relative border-t-2 border-primary pt-1">
               <Card className="relative overflow-hidden rounded-lg border-border shadow-none">
                 <CardHeader className="border-b bg-muted/30 pb-4">
@@ -218,10 +232,10 @@ function LandingPage() {
                     </span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0 pt-5">
-                  <ol className="relative space-y-3 pl-6">
+                <CardContent className="space-y-0 pt-5 lg:grid lg:grid-cols-[1.12fr_0.88fr] lg:gap-8 lg:space-y-0">
+                  <ol className="relative grid gap-3 pl-6 sm:grid-cols-2">
                     <span
-                      className="absolute left-[5px] top-2 bottom-2 w-px bg-border"
+                      className="absolute bottom-2 left-[5px] top-2 w-px bg-border"
                       aria-hidden="true"
                     />
                     {HERO_FLOW.map((row) => (
@@ -240,7 +254,7 @@ function LandingPage() {
                     ))}
                   </ol>
 
-                  <div className="mt-5 border-t bg-muted/30 p-4">
+                  <div className="mt-5 border-t bg-muted/30 p-4 lg:mt-0 lg:border-l lg:border-t-0">
                     <p className="mb-3 text-xs font-semibold text-muted-foreground">
                       측정에 쓰이는 고객 질문 예시
                     </p>
@@ -261,7 +275,7 @@ function LandingPage() {
                     </div>
                   </div>
 
-                  <p className="mt-4 text-center text-xs text-muted-foreground">
+                  <p className="mt-4 text-center text-xs text-muted-foreground lg:col-span-2">
                     고객 질문 → AI 답변 측정 → 경쟁업체 분석 → 우선 확인 항목 제안
                   </p>
                 </CardContent>
