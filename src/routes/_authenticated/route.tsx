@@ -73,32 +73,37 @@ function Shell() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="no-print sticky top-0 z-20 border-b bg-card">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link to="/dashboard" className="flex items-baseline gap-1.5">
-            <span className="text-sm font-semibold tracking-tight">차보임</span>
-            <span className="text-[10px] font-medium tracking-widest text-muted-foreground">
-              CHABOIM
+      <header className="no-print sticky top-0 z-20 border-b border-border/90 bg-card/95 shadow-[0_1px_0_color-mix(in_oklab,var(--foreground)_3%,transparent)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 lg:px-6">
+          <Link to="/dashboard" className="flex min-h-9 items-center gap-3 border-r border-border pr-5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
+              차
+            </span>
+            <span className="flex flex-col leading-none">
+              <span className="text-base font-bold">차보임</span>
+              <span className="mt-1 text-[9px] font-semibold tracking-[0.18em] text-muted-foreground">
+                CHABOIM
+              </span>
             </span>
           </Link>
 
-          <nav className="order-3 flex w-full flex-wrap gap-1 md:order-none md:w-auto">
+          <nav className="order-3 flex w-full gap-1 overflow-x-auto border-t border-border/70 pt-2 md:order-none md:w-auto md:border-0 md:pt-0">
             {navItems.map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
-                className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                activeProps={{ className: "rounded-md px-3 py-1.5 text-sm bg-secondary text-foreground font-medium" }}
+                className="shrink-0 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                activeProps={{ className: "shrink-0 rounded-md px-3 py-2 text-sm bg-primary/8 text-primary font-semibold" }}
               >
                 {n.label}
               </Link>
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex min-w-0 items-center gap-2">
             {memberships.length > 0 && (
               <Select value={activeOrgId ?? ""} onValueChange={setActiveOrgId}>
-                <SelectTrigger className="h-8 w-[180px] text-xs">
+                <SelectTrigger className="h-9 w-[150px] border-border bg-background text-sm shadow-none sm:w-[190px]">
                   <SelectValue placeholder="조직 선택" />
                 </SelectTrigger>
                 <SelectContent>
@@ -110,14 +115,14 @@ function Shell() {
                 </SelectContent>
               </Select>
             )}
-            {role && <Badge variant="secondary">{ROLE_LABELS[role]}</Badge>}
+            {role && <Badge variant="secondary" className="hidden font-medium sm:inline-flex">{ROLE_LABELS[role]}</Badge>}
             <Button variant="outline" size="sm" onClick={signOut}>
               로그아웃
             </Button>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-7 lg:px-6 lg:py-10">
         {loading ? (
           <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>
         ) : memberships.length === 0 ? (

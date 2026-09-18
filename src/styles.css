@@ -19,6 +19,7 @@
  */
 
 @theme inline {
+  --font-sans: "SUIT Variable", "Pretendard Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -62,39 +63,39 @@
 }
 
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.985 0.004 240);
-  --foreground: oklch(0.22 0.03 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.03 250);
+  --radius: 0.625rem;
+  --background: oklch(0.982 0.003 255);
+  --foreground: oklch(0.245 0.022 257);
+  --card: oklch(0.998 0.001 255);
+  --card-foreground: oklch(0.245 0.022 257);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.03 250);
-  --primary: oklch(0.42 0.09 236);
-  --primary-foreground: oklch(0.99 0.005 240);
-  --secondary: oklch(0.955 0.008 240);
-  --secondary-foreground: oklch(0.3 0.04 250);
-  --muted: oklch(0.955 0.008 240);
-  --muted-foreground: oklch(0.52 0.02 250);
-  --accent: oklch(0.93 0.04 200);
-  --accent-foreground: oklch(0.3 0.05 236);
+  --popover-foreground: oklch(0.245 0.022 257);
+  --primary: oklch(0.48 0.17 260);
+  --primary-foreground: oklch(0.99 0.003 255);
+  --secondary: oklch(0.945 0.008 255);
+  --secondary-foreground: oklch(0.32 0.025 257);
+  --muted: oklch(0.958 0.006 255);
+  --muted-foreground: oklch(0.48 0.025 257);
+  --accent: oklch(0.93 0.024 252);
+  --accent-foreground: oklch(0.34 0.11 260);
   --destructive: oklch(0.55 0.2 27);
   --destructive-foreground: oklch(0.99 0.005 240);
-  --border: oklch(0.9 0.01 245);
-  --input: oklch(0.9 0.01 245);
-  --ring: oklch(0.42 0.09 236);
-  --chart-1: oklch(0.48 0.1 236);
-  --chart-2: oklch(0.62 0.11 190);
+  --border: oklch(0.875 0.012 255);
+  --input: oklch(0.855 0.014 255);
+  --ring: oklch(0.48 0.17 260);
+  --chart-1: oklch(0.48 0.17 260);
+  --chart-2: oklch(0.62 0.12 212);
   --chart-3: oklch(0.68 0.12 150);
   --chart-4: oklch(0.72 0.14 80);
   --chart-5: oklch(0.6 0.15 30);
-  --sidebar: oklch(0.99 0.004 240);
-  --sidebar-foreground: oklch(0.22 0.03 250);
-  --sidebar-primary: oklch(0.42 0.09 236);
+  --sidebar: oklch(0.99 0.002 255);
+  --sidebar-foreground: oklch(0.245 0.022 257);
+  --sidebar-primary: oklch(0.48 0.17 260);
   --sidebar-primary-foreground: oklch(0.99 0.005 240);
-  --sidebar-accent: oklch(0.95 0.01 240);
-  --sidebar-accent-foreground: oklch(0.3 0.04 250);
-  --sidebar-border: oklch(0.9 0.01 245);
-  --sidebar-ring: oklch(0.42 0.09 236);
+  --sidebar-accent: oklch(0.945 0.01 255);
+  --sidebar-accent-foreground: oklch(0.32 0.025 257);
+  --sidebar-border: oklch(0.875 0.012 255);
+  --sidebar-ring: oklch(0.48 0.17 260);
 }
 
 
@@ -141,7 +142,45 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.65;
+    letter-spacing: 0;
+    text-rendering: optimizeLegibility;
+    background-image: linear-gradient(to bottom, color-mix(in oklab, var(--color-card) 82%, transparent), transparent 32rem);
   }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-primary) 22%, transparent);
+    color: var(--color-foreground);
+  }
+
+  :focus-visible {
+    outline-color: var(--color-ring);
+  }
+
+  table tbody tr {
+    transition: background-color 150ms ease;
+  }
+
+  table tbody tr:hover {
+    background-color: color-mix(in oklab, var(--color-accent) 52%, transparent);
+  }
+}
+
+@utility report-section {
+  overflow: hidden;
+  border-color: color-mix(in oklab, var(--color-border) 92%, transparent);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--color-foreground) 5%, transparent);
+}
+
+@utility report-kicker {
+  color: var(--color-primary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 @page {

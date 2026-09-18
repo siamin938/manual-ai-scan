@@ -134,19 +134,20 @@ const RESEARCH_STEPS = [
 
 function LandingPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground [--grid-line:color-mix(in_oklab,var(--foreground)_7%,transparent)]">
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-          <span className="flex items-center">
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border/90 bg-card/95 backdrop-blur-md">
+        <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-4 px-4 lg:px-6">
+          <span className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">차</span>
             <span className="flex flex-col leading-none">
-              <span className="text-base font-semibold tracking-tight sm:text-[17px]">차보임</span>
-              <span className="mt-0.5 text-[9px] font-medium tracking-[0.22em] text-muted-foreground">
+              <span className="text-base font-bold sm:text-[17px]">차보임</span>
+              <span className="mt-1 text-[9px] font-semibold tracking-[0.18em] text-muted-foreground">
                 CHABOIM
               </span>
             </span>
           </span>
 
-          <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
+          <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
             <a href="#service" className="transition-colors hover:text-foreground">
               서비스 소개
             </a>
@@ -167,32 +168,24 @@ function LandingPage() {
 
       <main>
         {/* Hero */}
-        <section className="relative overflow-hidden border-b">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-70 [background-image:linear-gradient(to_right,var(--grid-line)_1px,transparent_1px),linear-gradient(to_bottom,var(--grid-line)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_top_left,black,transparent_75%)]"
-            aria-hidden="true"
-          />
-          <div className="relative mx-auto grid max-w-6xl gap-12 px-4 py-20 md:py-28 lg:grid-cols-[1.05fr_1fr] lg:items-center">
+        <section className="relative overflow-hidden border-b bg-card">
+          <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-16 md:py-24 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:px-6">
             <div>
               <Badge
                 variant="outline"
-                className="mb-5 gap-1.5 border-primary/30 bg-primary/5 font-normal text-primary"
+                className="mb-6 gap-1.5 border-primary/25 bg-primary/5 px-3 py-1 font-semibold text-primary"
               >
                 <CircleDot className="h-3 w-3" />
                 자동차 업체를 위한 AI 노출 분석
               </Badge>
-              <h1 className="text-[2rem] font-bold leading-[1.2] tracking-[-0.02em] sm:text-[2.6rem] lg:text-[3.1rem]">
+              <h1 className="max-w-3xl text-[2.25rem] font-bold leading-[1.22] sm:text-[3rem] lg:text-[3.5rem]">
                 고객이 AI에 물어볼 때,
                 <br />
-                <span className="relative inline-block">
+                <span className="inline-block text-primary">
                   우리 업체는 얼마나 보이고 있을까요?
-                  <span
-                    className="absolute -bottom-1 left-0 h-[3px] w-full rounded-full bg-primary/25"
-                    aria-hidden="true"
-                  />
                 </span>
               </h1>
-              <p className="mt-7 max-w-xl text-base leading-[1.75] text-muted-foreground">
+              <p className="mt-7 max-w-2xl text-base leading-8 text-muted-foreground sm:text-lg">
                 실제 고객이 검색할 만한 질문을 반복 측정해 내 업체의 AI 노출과 경쟁업체를 분석하고,
                 차보임의 분석 로직으로 AI 노출을 위해 무엇부터 확인할지 제안합니다.
               </p>
@@ -207,21 +200,17 @@ function LandingPage() {
                   <a href="#method">어떻게 분석하나요?</a>
                 </Button>
               </div>
-              <div className="mt-8 border-l-2 border-border pl-4">
-                <p className="text-xs leading-relaxed text-muted-foreground">
+              <div className="mt-10 border-t border-border pt-4">
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   튜닝 · 썬팅 · 엔진오일 · 타이어/휠 · 디테일링 · PPF · 전장 등 자동차 업체 분석
                 </p>
               </div>
             </div>
 
             {/* Research panel */}
-            <div className="relative">
-              <div
-                className="absolute -inset-3 rounded-2xl border border-border/60 bg-card/40"
-                aria-hidden="true"
-              />
-              <Card className="relative overflow-hidden shadow-sm">
-                <CardHeader className="border-b pb-3">
+            <div className="relative border-t-2 border-primary pt-1">
+              <Card className="relative overflow-hidden rounded-lg border-border shadow-none">
+                <CardHeader className="border-b bg-muted/30 pb-4">
                   <CardTitle className="flex items-center justify-between gap-2 text-sm font-medium">
                     <span className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-primary" />
@@ -244,8 +233,8 @@ function LandingPage() {
                           className="absolute -left-6 top-3 h-2.5 w-2.5 rounded-full border-2 border-primary/60 bg-background"
                           aria-hidden="true"
                         />
-                        <div className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2">
-                          <span className="text-sm font-medium">{row.label}</span>
+                        <div className="flex items-center justify-between gap-2 border-b border-border/80 bg-card px-3 py-3">
+                          <span className="text-base font-semibold">{row.label}</span>
                           <Badge variant="secondary" className="font-normal">
                             {row.state}
                           </Badge>
@@ -254,8 +243,8 @@ function LandingPage() {
                     ))}
                   </ol>
 
-                  <div className="mt-5 rounded-md border border-dashed bg-muted/40 p-3">
-                    <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
+                  <div className="mt-5 border-t bg-muted/30 p-4">
+                    <p className="mb-3 text-xs font-semibold text-muted-foreground">
                       측정에 쓰이는 고객 질문 예시
                     </p>
                     <div className="grid gap-1.5">
@@ -266,7 +255,7 @@ function LandingPage() {
                       ].map((q) => (
                         <div
                           key={q}
-                          className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground"
+                          className="flex items-center gap-2 border-b border-border/80 px-1 py-2.5 text-sm text-muted-foreground"
                         >
                           <Search className="h-3.5 w-3.5 shrink-0 text-primary/70" />
                           <span className="truncate">{q}</span>
@@ -286,7 +275,7 @@ function LandingPage() {
 
         {/* Service */}
         <section id="service" className="scroll-mt-20 border-b">
-          <div className="mx-auto max-w-6xl px-4 py-20 md:py-24">
+          <div className="mx-auto max-w-7xl px-4 py-20 md:py-24 lg:px-6">
             <div className="max-w-3xl">
               <p className="mb-3 text-[11px] font-semibold tracking-[0.2em] text-primary">
                 SERVICE
@@ -299,11 +288,11 @@ function LandingPage() {
                 아니라, 고객이 실제로 쓸 법한 여러 질문을 반복해서 확인합니다.
               </p>
             </div>
-            <div className="mt-10 grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4">
               {VALUE_CARDS.map((c, i) => (
                 <div
                   key={c.title}
-                  className="group bg-card p-6 transition-colors hover:bg-muted/40"
+                  className="group border-t-2 border-t-primary/0 bg-card p-7 transition-colors hover:border-t-primary hover:bg-muted/30"
                 >
                   <div className="flex items-center justify-between">
                     <c.icon className="h-5 w-5 text-primary" />
@@ -311,8 +300,8 @@ function LandingPage() {
                       {String(i + 1).padStart(2, "0")} · {c.micro}
                     </span>
                   </div>
-                  <h3 className="mt-5 text-base font-semibold tracking-tight">{c.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.body}</p>
+                  <h3 className="mt-5 text-lg font-semibold">{c.title}</h3>
+                  <p className="mt-2 text-[15px] leading-7 text-muted-foreground">{c.body}</p>
                 </div>
               ))}
             </div>
@@ -321,7 +310,7 @@ function LandingPage() {
 
         {/* Method */}
         <section id="method" className="scroll-mt-20 border-b bg-muted/30">
-          <div className="mx-auto max-w-6xl px-4 py-20 md:py-24">
+          <div className="mx-auto max-w-7xl px-4 py-20 md:py-24 lg:px-6">
             <p className="mb-3 text-[11px] font-semibold tracking-[0.2em] text-primary">METHOD</p>
             <h2 className="text-2xl font-bold tracking-tight sm:text-[1.85rem]">
               차보임은 이렇게 분석합니다.
@@ -341,16 +330,16 @@ function LandingPage() {
                       </span>
                       <span className="hidden h-px flex-1 bg-border lg:block" aria-hidden="true" />
                     </div>
-                    <div className="rounded-lg border bg-background p-5">
-                      <h3 className="text-base font-semibold tracking-tight">{s.title}</h3>
-                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+                    <div className="border-t border-border bg-background py-5 pr-4">
+                      <h3 className="text-base font-semibold">{s.title}</h3>
+                      <p className="mt-2 text-[15px] leading-7 text-muted-foreground">{s.body}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="mt-10 rounded-xl border border-primary/20 bg-background p-7">
+            <div className="mt-12 border-y border-primary/25 bg-background px-1 py-7">
               <div className="flex items-start gap-4">
                 <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10">
                   <Repeat className="h-4 w-4 text-primary" />
