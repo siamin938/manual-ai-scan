@@ -174,7 +174,7 @@ function LandingPage() {
               alt=""
               className="absolute inset-0 h-full w-full object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-card from-[26%] via-card/65 via-[38%] to-card/0 to-[52%]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-card from-[22%] via-card/70 via-[34%] to-card/0 to-[48%]" />
             <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-card/60" />
           </div>
           <div className="relative mx-auto grid max-w-7xl gap-10 px-4 pb-12 pt-16 md:pb-16 md:pt-24 lg:min-h-[38rem] lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:gap-8 lg:px-6">
