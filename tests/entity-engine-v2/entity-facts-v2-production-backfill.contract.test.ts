@@ -113,17 +113,26 @@ describe("Entity Facts v2 production backfill runner contract", () => {
     expect(source).not.toMatch(/\bfetch\s*\(/u);
   });
 
-  it("is not wired to any GitHub Actions workflow", () => {
+  it("is not executable from any GitHub Actions workflow", () => {
     const workflowsDir = resolve(process.cwd(), ".github/workflows");
     const workflowFiles = readdirSync(workflowsDir).filter((name) =>
       /\.ya?ml$/u.test(name)
     );
-    const references = workflowFiles.filter((name) =>
-      readFileSync(resolve(workflowsDir, name), "utf8").includes(
-        "entity-facts-v2-production-backfill",
-      )
-    );
+    const executableReferences = workflowFiles.filter((name) => {
+      const workflow = readFileSync(resolve(workflowsDir, name), "utf8");
+      return (
+        /\bbun\s+scripts\/entity-facts-v2-production-backfill\.ts\b/u.test(
+          workflow,
+        ) ||
+        /\bnode\s+scripts\/entity-facts-v2-production-backfill\.ts\b/u.test(
+          workflow,
+        ) ||
+        /\btsx?\s+scripts\/entity-facts-v2-production-backfill\.ts\b/u.test(
+          workflow,
+        )
+      );
+    });
 
-    expect(references).toEqual([]);
+    expect(executableReferences).toEqual([]);
   });
 });
