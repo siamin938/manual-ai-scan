@@ -144,6 +144,29 @@ describe("Entity Engine v2 candidate extractor", () => {
     );
   });
 
+  it("splits spaced slash-separated unregistered business siblings", () => {
+    const nodes = parseResponseStructure(
+      "- **후보:** 천현카센타 / 타이어타운 법원점",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, []);
+    const identities = candidates.map((candidate) => candidate.identitySurface);
+
+    expect(identities).toContain("천현카센타");
+    expect(identities).toContain("타이어타운 법원점");
+    expect(identities).not.toContain("천현카센타 / 타이어타운 법원점");
+  });
+
+  it("does not split an unspaced slash inside one surface", () => {
+    const nodes = parseResponseStructure(
+      "- **후보:** AB모터스/미스터카",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, []);
+
+    expect(candidates.map((candidate) => candidate.identitySurface)).toContain(
+      "AB모터스/미스터카",
+    );
+  });
+
   it("keeps unregistered siblings when one business in the same criterion is registered", () => {
     const nodes = parseResponseStructure(
       "- **조리·봉일천 쪽:** 타이어프로 봉일천점, 더타이어샵 봉일천점",
