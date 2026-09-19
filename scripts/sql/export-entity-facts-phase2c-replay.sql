@@ -122,15 +122,30 @@ with eligible_runs as (
           'canonicalKey', cs.canonical_key,
           'name', cs.name
         )
-        order by cs.significance_score desc, cs.name, cs.canonical_key
+        order by cs.name, cs.canonical_key
       ) filter (where cs.canonical_key is not null),
       '[]'::jsonb
     ) as competitors
   from run_context rc
-  left join lateral public.get_competitor_significance_v02(
-    rc.org_id,
-    rc.business_id,
-    rc.run_id
+  left join lateral (
+    select
+      c.canonical_key,
+      max(c.canonical_display_name)::text as name
+    from public.measurements m
+    join public.measurement_entity_canonicalizations c
+      on c.org_id=rc.org_id
+     and c.business_id=rc.business_id
+     and c.source_run_id=rc.run_id
+     and c.measurement_id=m.id
+    join public.measurement_mentions mm
+      on mm.id=c.measurement_mention_id
+     and mm.org_id=rc.org_id
+     and mm.count_as_confirmed_business=true
+    where m.org_id=rc.org_id
+      and m.run_id=rc.run_id
+      and m.valid=true
+      and c.canonical_key<>'business:'||rc.business_id::text
+    group by c.canonical_key
   ) cs on true
   group by rc.run_id
 ), current_target_source_context as (
