@@ -176,6 +176,7 @@ export async function runEntityFactsV2ProductionPreflight(
   invariant(token.length > 0, "PREFLIGHT_MANAGEMENT_TOKEN_REQUIRED");
 
   let loginRole: LoginRoleResponse | null = null;
+  let temporaryRoleCreated = false;
   let deleteSucceeded = false;
   let db: ReturnType<typeof postgres> | null = null;
   let pendingError: unknown = null;
@@ -183,8 +184,9 @@ export async function runEntityFactsV2ProductionPreflight(
     null;
 
   try {
-    loginRole = await createTemporaryLoginRole(token);
     const pooler = await getPrimaryPoolerConnectionString(token);
+    loginRole = await createTemporaryLoginRole(token);
+    temporaryRoleCreated = true;
     const databaseUrl = buildSessionPoolerUrl(pooler, loginRole);
 
     db = postgres(databaseUrl, {
@@ -409,7 +411,7 @@ export async function runEntityFactsV2ProductionPreflight(
     if (db) {
       await db.end({ timeout: 5 }).catch(() => undefined);
     }
-    if (loginRole) {
+    if (temporaryRoleCreated) {
       try {
         await deleteTemporaryLoginRoles(token);
         deleteSucceeded = true;
