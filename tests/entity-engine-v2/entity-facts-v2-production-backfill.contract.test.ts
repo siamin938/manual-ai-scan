@@ -51,7 +51,13 @@ describe("Entity Facts v2 production backfill runner contract", () => {
     expect(roleDowngrade).toBeGreaterThan(isolation);
     expect(roleCheck).toBeGreaterThan(roleDowngrade);
     expect(preflight).toBeGreaterThan(roleCheck);
-    expect(source).toContain('String(roleCheck[0]?.current_user) === "service_role"');
+    expect(source).toContain(
+      '/^cli_login_postgres(?:_|$)/u.test(sessionUser)',
+    );
+    expect(source).toContain(
+      '"BACKFILL_TEMP_CLI_SESSION_REQUIRED"',
+    );
+    expect(source).toContain('currentUser === "service_role"');
     expect(source).not.toMatch(/\bdb\.unsafe\s*\([^)]*insert/iu);
     expect(source).not.toMatch(/\bcommit\b/iu);
     expect(source).not.toMatch(/\brollback\b/iu);
