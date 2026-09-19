@@ -93,7 +93,11 @@ For valid measurements:
 
 `visibility upper bound = (confirmed mentions + unresolved target measurements) / valid measurements`
 
-Top3 uses the same rule, with unresolved measurements contributing only to the upper bound.
+Top3 preserves two forms of uncertainty in the upper bound:
+- unresolved target truth (`targetSeen=null`)
+- confirmed target presence with no authoritative position (`targetSeen=true` and `targetBestPosition=null`)
+
+A confirmed target with missing authoritative position contributes to visibility as confirmed, but contributes only to the Top3 upper bound until rank is known.
 
 An unresolved measurement is never silently counted as a confident negative.
 
