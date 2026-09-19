@@ -242,6 +242,112 @@ describe("Historical Measurement Replay Adapter v0.1", () => {
     );
   });
 
+  it("recovers a registered target subspan from a mixed table primary cell", () => {
+    const tireTargetId = "483022a4-30c9-4f6d-9cf4-19a30c2f58d2";
+    const result = replayHistoricalMeasurementV2(
+      baseInput({
+        responseText:
+          "| **타이어프로 봉일천점 / 더타이어샵 봉일천점** | 파주시 조리읍 송비말길 122 | 타이어 판매·장착 |",
+        rawParser: {
+          wasClientMentioned: true,
+          clientPosition: null,
+        },
+        target: {
+          id: tireTargetId,
+          name: "타이어프로 봉일천점",
+          aliases: ["타이어프로봉일천점"],
+        },
+        registeredBusinesses: [
+          {
+            id: tireTargetId,
+            name: "타이어프로 봉일천점",
+            aliases: ["타이어프로봉일천점"],
+          },
+        ],
+        storedMentions: [],
+      }),
+    );
+
+    expect(result.facts.targetSeen).toBe(true);
+    expect(result.facts.targetBestPosition).toBeNull();
+    expect(result.facts.dataQualityFlags).toContain("target_position_missing");
+    expect(
+      result.identityDecisions.some(
+        (decision) =>
+          decision.decision === "confirmed_business" &&
+          decision.canonicalBusinessId === tireTargetId,
+      ),
+    ).toBe(true);
+  });
+
+  it("recovers a registered target subspan when several businesses share one list item", () => {
+    const tireTargetId = "483022a4-30c9-4f6d-9cf4-19a30c2f58d2";
+    const result = replayHistoricalMeasurementV2(
+      baseInput({
+        responseText:
+          "- **금호타이어 운정신도시점·타이어프로 운정점·타이어프로 LG점·타이어프로 봉일천점**은 파주 매장으로 확인됩니다.",
+        rawParser: {
+          wasClientMentioned: true,
+          clientPosition: null,
+        },
+        target: {
+          id: tireTargetId,
+          name: "타이어프로 봉일천점",
+          aliases: ["타이어프로봉일천점"],
+        },
+        registeredBusinesses: [
+          {
+            id: tireTargetId,
+            name: "타이어프로 봉일천점",
+            aliases: ["타이어프로봉일천점"],
+          },
+        ],
+        storedMentions: [],
+      }),
+    );
+
+    expect(result.facts.targetSeen).toBe(true);
+    expect(
+      result.observations.some(
+        (observation) =>
+          observation.identityDecision === "confirmed_business" &&
+          observation.equivalenceDecision === "equivalent",
+      ),
+    ).toBe(true);
+  });
+
+  it("recovers a registered target from a standalone table row without raw rank fallback", () => {
+    const tireTargetId = "483022a4-30c9-4f6d-9cf4-19a30c2f58d2";
+    const result = replayHistoricalMeasurementV2(
+      baseInput({
+        responseText:
+          "| **타이어프로 봉일천점** | 파주시 조리읍 송비말길 122 | 브랜드 타이어 교체·점검 |",
+        rawParser: {
+          wasClientMentioned: true,
+          clientPosition: null,
+        },
+        target: {
+          id: tireTargetId,
+          name: "타이어프로 봉일천점",
+          aliases: ["타이어프로봉일천점"],
+        },
+        registeredBusinesses: [
+          {
+            id: tireTargetId,
+            name: "타이어프로 봉일천점",
+            aliases: ["타이어프로봉일천점"],
+          },
+        ],
+        storedMentions: [],
+      }),
+    );
+
+    expect(result.facts.targetSeen).toBe(true);
+    expect(result.facts.targetBestPosition).toBeNull();
+    expect(result.facts.dataQualityFlags).toContain("target_position_missing");
+    expect(result.facts.dataQualityFlags).not.toContain("parser_false_positive");
+  });
+
   it("marks source replay as explicitly not evaluated at this stage", () => {
     const result = replayHistoricalMeasurementV2(baseInput());
     expect(result.sourceReplayStatus).toBe("not_evaluated");
