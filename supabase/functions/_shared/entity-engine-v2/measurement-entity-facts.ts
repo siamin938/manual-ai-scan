@@ -165,6 +165,16 @@ function validBusinessId(value: string): string | null {
   return UUID_RE.test(normalized) ? normalized : null;
 }
 
+function normalizeCanonicalBusinessKey(
+  value: string | null | undefined,
+): string {
+  const key = clean(value);
+  if (!key.startsWith("business:")) return key;
+
+  const businessId = validBusinessId(key.slice("business:".length));
+  return businessId ? `business:${businessId}` : key;
+}
+
 function normalizeDomain(value: string): string {
   return value.trim().toLowerCase().replace(/^www\./u, "");
 }
@@ -236,8 +246,8 @@ function entitySemanticSignature(
     equivalenceReasons: stableStrings(entity.equivalenceReasons),
     equivalenceEvidenceKinds: stableStrings(entity.equivalenceEvidenceKinds),
     targetCandidate: candidate,
-    canonicalKey: clean(entity.canonicalKey),
-    projectedCanonicalKey: clean(entity.projectedCanonicalKey),
+    canonicalKey: normalizeCanonicalBusinessKey(entity.canonicalKey),
+    projectedCanonicalKey: normalizeCanonicalBusinessKey(entity.projectedCanonicalKey),
     position: validPosition(entity.position),
   });
 }
@@ -421,7 +431,7 @@ export function buildMeasurementEntityFactsV2(
     }
 
     if (entity.equivalenceDecision === "equivalent") {
-      if (clean(entity.projectedCanonicalKey) !== targetKey) {
+      if (normalizeCanonicalBusinessKey(entity.projectedCanonicalKey) !== targetKey) {
         flags.push("equivalent_projection_mismatch");
         hasIdentityContractConflict = true;
         relations.push(
@@ -464,7 +474,7 @@ export function buildMeasurementEntityFactsV2(
       continue;
     }
 
-    const key = clean(entity.canonicalKey);
+    const key = normalizeCanonicalBusinessKey(entity.canonicalKey);
     if (!key) {
       flags.push("distinct_entity_missing_canonical_key");
       relations.push(
