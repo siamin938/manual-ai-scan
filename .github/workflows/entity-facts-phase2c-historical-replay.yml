@@ -20,6 +20,9 @@ jobs:
     timeout-minutes: 15
     env:
       ENTITY_V2_REPLAY_DATABASE_URL: ${{ secrets.ENTITY_V2_REPLAY_DATABASE_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
       ENTITY_FACTS_PHASE2C_REPLAY_OUTPUT: /tmp/entity-facts-phase2c-historical-replay.json
 
     steps:
@@ -33,6 +36,18 @@ jobs:
 
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
+
+      - name: Report available credential paths without exposing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ENTITY_V2_REPLAY_DATABASE_URL SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD DATABASE_URL; do
+            if [ -n "${!name:-}" ]; then
+              echo "${name}=PRESENT"
+            else
+              echo "${name}=ABSENT"
+            fi
+          done
 
       - name: Require dedicated read-only replay credential
         shell: bash
