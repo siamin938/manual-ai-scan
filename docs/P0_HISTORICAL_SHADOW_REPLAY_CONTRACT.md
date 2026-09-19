@@ -4,7 +4,7 @@ Status: pure replay/aggregation contract only. No Production DB mutation, migrat
 
 ## Entry gate
 
-Phase 2C starts only after Phase 2B Measurement Entity Facts v0.2 has:
+Phase 2C starts only after Phase 2B Measurement Entity Facts v0.3 has:
 - BLOCKER 0
 - HIGH 0
 - green Entity Engine v2 CI
@@ -25,7 +25,7 @@ Stored completed standalone audit
 → replay-safe stored response/public identity evidence
 → Identity Gate
 → Target Equivalence
-→ Measurement Entity Facts v0.2
+→ Measurement Entity Facts v0.3
 → Run Entity Facts Aggregate v0.1
 → current-vs-proposed diff
 → release gate
@@ -131,6 +131,10 @@ Question status:
 Current competitor baseline is read from the existing Production `get_competitor_significance_v02` RPC for the same run.
 
 Proposed competitors are derived only from `confirmedOtherEntities`.
+
+Under Measurement Entity Facts v0.3, a confirmed business whose Phase 2A equivalence remains `unresolved` may still project to relation `side=other` when its versioned target-candidate assessment is trusted `not_candidate` and it has a non-target canonical key. The Phase 2A `equivalenceDecision` itself remains `unresolved`; Phase 2C must not rewrite it to `distinct`.
+
+This preserves competitors such as clearly unrelated confirmed businesses while keeping same-brand/same-address target candidates unresolved.
 
 The replay report preserves added/removed competitor canonical keys. Any competitor-set change is release-blocking by default until reviewed.
 
