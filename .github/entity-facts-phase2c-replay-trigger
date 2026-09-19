@@ -10,3 +10,4 @@ run=v03-competitor-replay-2026-09-19
 run=paragraph-exact-replay-2026-09-19
 run=after-supabase-token-2026-09-19T21:37+09:00
 run=competitor-delta-evidence-2026-09-19T21:45+09:00
+run=multiline-list-evidence-fix-2026-09-19T21:50+09:00
