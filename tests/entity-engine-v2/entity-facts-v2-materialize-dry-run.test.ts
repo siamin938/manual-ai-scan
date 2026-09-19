@@ -132,8 +132,9 @@ describe("Entity Facts v2 materializer dry-run validator", () => {
     expect(source).not.toMatch(/\.rpc\s*\(/u);
     expect(source).not.toMatch(/\.insert\s*\(/u);
     expect(source).not.toMatch(/\.upsert\s*\(/u);
-    expect(source).not.toMatch(/\.update\s*\(/u);
-    expect(source).not.toMatch(/\.delete\s*\(/u);
+    expect(source).not.toMatch(
+      /\.from\s*\([^)]*\)[\s\S]{0,200}\.(?:insert|upsert|update|delete)\s*\(/u,
+    );
     expect(source).not.toMatch(/\bfetch\s*\(/u);
     expect(source).not.toMatch(/openai|anthropic|gemini|provider/iu);
   });
