@@ -299,8 +299,22 @@ export async function executeProductionEntityFactsV2Backfill(
   try {
     return await db.begin(async (tx) => {
       await tx.unsafe("set transaction isolation level serializable");
+      await tx.unsafe("set local role service_role");
       await tx.unsafe("set local statement_timeout = '180s'");
       await tx.unsafe("set local lock_timeout = '5s'");
+
+      const roleCheck = (await tx.unsafe(
+        `
+          select
+            current_user::text as current_user,
+            session_user::text as session_user
+        `,
+      )) as SqlRows;
+      invariant(
+        roleCheck.length === 1 &&
+          String(roleCheck[0]?.current_user) === "service_role",
+        "BACKFILL_SERVICE_ROLE_DOWNGRADE_FAILED",
+      );
 
       const preflight = (await tx.unsafe(
         `
