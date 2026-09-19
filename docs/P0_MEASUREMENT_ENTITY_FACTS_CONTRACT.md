@@ -1,4 +1,4 @@
-# P0 Measurement Entity Facts Contract — Phase 2B v0.2
+# P0 Measurement Entity Facts Contract — Phase 2B v0.3
 
 Status: pure-engine contract only. No Production DB schema, migration, Edge, UI, consumer cutover, or new measurement is part of this phase.
 
@@ -65,11 +65,13 @@ type TargetCandidateAssessment = {
 ```
 
 For an unresolved confirmed business:
-- trusted `candidate` → target presence remains unresolved
-- trusted `not_candidate` → does not by itself block a confident negative
+- trusted `candidate` → target presence remains unresolved and relation side stays `unresolved`
+- trusted `not_candidate` + non-empty canonical key different from the current target → relation side may be `other` while `equivalenceDecision` remains `unresolved`
+- trusted `not_candidate` + missing canonical key → target absence may remain confident, but the entity is excluded from competitor output and emits `other_entity_missing_canonical_key`
+- trusted `not_candidate` + canonical key equal to the current target → contract conflict, `self_key_leakage_blocked`, and `targetSeen=null`
 - `unknown`, incomplete input, missing version, or missing reason → fail closed and emit `target_candidate_provenance_incomplete`
 
-The candidate assessment may prevent a false negative. It never proves target equivalence.
+The candidate assessment never proves target equivalence and never rewrites Phase 2A's `equivalenceDecision`. A trusted `not_candidate` only establishes that a confirmed business is on the non-target side for measurement projection.
 
 ## Duplicate entityRef contract
 
@@ -168,10 +170,17 @@ If raw parser says target was present and its valid position differs from author
 
 Only relations with:
 - `side=other`
+- confirmed business identity
 - non-empty canonical key
 - canonical key different from current target
 
 enter `confirmedOtherEntityKeys` / `confirmedOtherEntities`.
+
+A relation may reach `side=other` through either:
+- Phase 2A `equivalenceDecision=distinct`, or
+- Phase 2A `equivalenceDecision=unresolved` plus a trusted versioned `targetCandidate=not_candidate`.
+
+In the second case, the stored `equivalenceDecision` MUST remain `unresolved`; Phase 2B is only projecting the measurement-relative side and is not claiming stronger Phase 2A evidence.
 
 The facts builder deduplicates identical canonical keys and preserves minimum valid position.
 
