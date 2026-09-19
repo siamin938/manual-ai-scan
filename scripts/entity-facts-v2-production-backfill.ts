@@ -310,9 +310,15 @@ export async function executeProductionEntityFactsV2Backfill(
             session_user::text as session_user
         `,
       )) as SqlRows;
+      const currentUser = String(roleCheck[0]?.current_user ?? "");
+      const sessionUser = String(roleCheck[0]?.session_user ?? "");
       invariant(
         roleCheck.length === 1 &&
-          String(roleCheck[0]?.current_user) === "service_role",
+          /^cli_login_postgres(?:_|$)/u.test(sessionUser),
+        "BACKFILL_TEMP_CLI_SESSION_REQUIRED",
+      );
+      invariant(
+        currentUser === "service_role",
         "BACKFILL_SERVICE_ROLE_DOWNGRADE_FAILED",
       );
 
