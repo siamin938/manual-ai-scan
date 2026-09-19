@@ -76,6 +76,7 @@ if (!databaseUrl) {
     datasetVersion: report.datasetVersion,
     summary: report.summary,
     runs: report.runs,
+    releaseGate: report.releaseGate,
   };
 
   await writeFile(
@@ -89,6 +90,7 @@ if (!databaseUrl) {
 
   const logSummary = {
     ...report.summary,
+    releaseGate: report.releaseGate,
     runs: report.runs.map((run) => ({
       runId: run.runId,
       businessId: run.businessId,
@@ -125,9 +127,9 @@ if (!databaseUrl) {
     `ENTITY_FACTS_PHASE2C_HISTORICAL_REPLAY_SUMMARY=${JSON.stringify(logSummary)}`,
   );
 
-  if (report.summary.contractIssueRunCount > 0) {
+  if (!report.releaseGate.ok) {
     console.error(
-      `ENTITY_FACTS_PHASE2C_CONTRACT_BLOCK=${report.summary.contractIssueRunCount}`,
+      `ENTITY_FACTS_PHASE2C_RELEASE_BLOCK=${report.releaseGate.blockingIssueCount}`,
     );
     process.exitCode = 1;
   }
