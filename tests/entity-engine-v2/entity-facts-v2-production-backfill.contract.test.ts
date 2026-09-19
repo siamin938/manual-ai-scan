@@ -88,7 +88,7 @@ describe("Entity Facts v2 production backfill runner contract", () => {
     const factHash = source.indexOf("BACKFILL_FACT_HASH_MISMATCH");
     const aggregateHash = source.indexOf("BACKFILL_AGGREGATE_HASH_MISMATCH");
     const regression = source.indexOf("BACKFILL_REGRESSION_DB_BOUNDS_MISMATCH");
-    const returnSummary = source.indexOf("committedMeasurementRows: 428");
+    const returnSummary = source.lastIndexOf("committedMeasurementRows: 428");
 
     expect(postMeasurement).toBeGreaterThan(aggregateInsert);
     expect(postAggregate).toBeGreaterThan(postMeasurement);
