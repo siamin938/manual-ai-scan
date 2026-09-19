@@ -69,6 +69,37 @@ describe("Historical Measurement Replay Adapter v0.1", () => {
     ).toBe(true);
   });
 
+  it("treats unsupported naver.me storage URLs as unavailable canonical evidence", () => {
+    const shortUrl = "https://naver.me/xSBsENP8";
+    const result = replayHistoricalMeasurementV2(
+      baseInput({
+        target: {
+          ...baseInput().target,
+          canonicalNaverPlaceId: shortUrl,
+        },
+        registeredBusinesses: [
+          {
+            ...baseInput().registeredBusinesses[0]!,
+            canonicalNaverPlaceId: shortUrl,
+          },
+        ],
+      }),
+    );
+
+    expect(result.facts.targetSeen).toBe(true);
+    expect(result.facts.dataQualityFlags).not.toContain(
+      "equivalent_projection_mismatch",
+    );
+    const target = result.observations.find(
+      (observation) =>
+        observation.identityDecision === "confirmed_business" &&
+        observation.equivalenceDecision === "equivalent",
+    );
+    expect(target?.equivalenceReasons).toContain(
+      "CURRENT_BUSINESS_ID_MATCH",
+    );
+  });
+
   it("keeps the Carspace old public identity unresolved when strong evidence is incomplete", () => {
     const result = replayHistoricalMeasurementV2(
       baseInput({
