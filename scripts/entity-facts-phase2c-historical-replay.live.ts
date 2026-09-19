@@ -104,6 +104,13 @@ if (!databaseUrl) {
       confirmedMentionCount: run.proposed.confirmedMentionCount,
       unresolvedTargetCount: run.proposed.unresolvedTargetCount,
       competitorCount: run.proposed.competitorCount,
+      sourceReplayStatus: run.proposed.sourceReplayStatus,
+      sourceDomainCount: run.proposed.sourceDomainCount,
+      sourcePartialMeasurementCount:
+        run.proposed.sourcePartialMeasurementCount,
+      acceptedAttributionCount:
+        run.proposed.acceptedAttributionCount,
+      sourceDiagnosticCount: run.proposed.sourceDiagnosticCount,
       visibilityInsideBounds:
         run.currentVisibilityInsideProposedBounds,
       top3InsideBounds: run.currentTop3InsideProposedBounds,
