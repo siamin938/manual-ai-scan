@@ -241,5 +241,5 @@ select jsonb_build_object(
     jsonb_agg(row_json order by run_id, measurement_id),
     '[]'::jsonb
   )
-)::text
+)::text as dataset_json
 from replay_rows;
