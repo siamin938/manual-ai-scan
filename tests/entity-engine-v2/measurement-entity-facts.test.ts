@@ -168,6 +168,9 @@ describe("Measurement Entity Facts v0.1", () => {
     });
 
     expect(result.confirmedOtherEntityKeys).toEqual(["auto:other"]);
+    expect(result.confirmedOtherEntities).toEqual([
+      { canonicalKey: "auto:other", bestPosition: 2 },
+    ]);
     expect(result.targetCitationDomains).toEqual(["example.com"]);
   });
 
