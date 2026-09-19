@@ -255,6 +255,7 @@ export function assessTargetCandidateV2(
 
   const targetPrimarySurface = normalizeIdentitySurface(input.target.name);
   if (
+    relation.related &&
     explicitBranchConflict(targetPrimarySurface, observedSurface)
   ) {
     return result(
