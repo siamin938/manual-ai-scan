@@ -128,7 +128,11 @@ Question status:
 
 ## Competitor consistency
 
-Competitors are derived only from `confirmedOtherEntities`.
+Current competitor baseline is read from the existing Production `get_competitor_significance_v02` RPC for the same run.
+
+Proposed competitors are derived only from `confirmedOtherEntities`.
+
+The replay report preserves added/removed competitor canonical keys. Any competitor-set change is release-blocking by default until reviewed.
 
 The current target canonical key is a contract violation if it appears in competitor input.
 
@@ -141,7 +145,11 @@ Significance/ranking remains downstream and must not reclassify target/self iden
 
 ## Source consistency
 
-Target sources are derived from Phase 2B target source facts.
+Current target-source baseline is read from `measurement_citation_attributions_actionable_v2` rows whose canonical key is the current target business key.
+
+Proposed target sources are derived from Phase 2B target source facts.
+
+The replay report preserves added/removed target source domains. Current target-source disappearance is release-blocking by default until reviewed.
 
 Phase 2C historical replay evaluates source attribution at run scope using only persisted `measurement_citation_attributions` rows from attribution contract version `0.1.0`.
 
