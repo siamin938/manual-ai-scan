@@ -57,13 +57,22 @@ function sharedSurface(
   observedSurface: string | null | undefined,
 ): { exact: boolean; related: boolean; aliasOverlap: boolean } {
   const targetSurfaces = surfaces(target);
-  const observedSurfaces = stable([
-    ...surfaces(observed),
+  const observedPrimarySurfaces = stable([
+    normalizeIdentitySurface(observed.name),
     normalizeIdentitySurface(observedSurface),
   ]);
+  const observedAliases = stable(
+    (observed.aliases ?? []).map((value) => normalizeIdentitySurface(value)),
+  );
+  const observedSurfaces = stable([
+    ...observedPrimarySurfaces,
+    ...observedAliases,
+  ]);
 
-  const exact = observedSurfaces.some((value) => targetSurfaces.includes(value));
-  const aliasOverlap = surfaces(observed).some((value) =>
+  const exact = observedPrimarySurfaces.some((value) =>
+    targetSurfaces.includes(value),
+  );
+  const aliasOverlap = observedAliases.some((value) =>
     targetSurfaces.includes(value),
   );
   const related = observedSurfaces.some((observedValue) =>
