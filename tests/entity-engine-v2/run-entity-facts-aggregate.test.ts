@@ -79,11 +79,29 @@ describe("Phase 2C Run Entity Facts Aggregate v0.1", () => {
     expect(result.overview.visibilityLowerBoundPct).toBe(4.17);
     expect(result.overview.visibilityUpperBoundPct).toBe(25);
     expect(result.overview.confirmedTop3Count).toBe(1);
+    expect(result.overview.top3UncertainCount).toBe(5);
     expect(result.overview.top3LowerBoundPct).toBe(4.17);
     expect(result.overview.top3UpperBoundPct).toBe(25);
     expect(result.qualityFlagCounts).toEqual({
       target_identity_unresolved: 5,
     });
+  });
+
+  it("keeps confirmed target with unknown authoritative position inside the Top3 upper bound", () => {
+    const result = aggregateRunEntityFactsV2(TARGET, [
+      record(1, {
+        targetSeen: true,
+        targetBestPosition: null,
+        dataQualityFlags: ["target_position_missing"],
+      }),
+    ]);
+
+    expect(result.overview.confirmedMentionCount).toBe(1);
+    expect(result.overview.unresolvedTargetCount).toBe(0);
+    expect(result.overview.confirmedTop3Count).toBe(0);
+    expect(result.overview.top3UncertainCount).toBe(1);
+    expect(result.overview.top3LowerBoundPct).toBe(0);
+    expect(result.overview.top3UpperBoundPct).toBe(100);
   });
 
   it("keeps question-group truth aligned with the same measurement facts", () => {
