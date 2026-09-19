@@ -59,6 +59,7 @@ export interface Phase2CRunDiff {
     visibilityLowerBoundPct: number | null;
     visibilityUpperBoundPct: number | null;
     confirmedTop3Count: number;
+    top3UncertainCount: number;
     top3LowerBoundPct: number | null;
     top3UpperBoundPct: number | null;
     competitorCount: number;
@@ -227,6 +228,7 @@ export function replayPhase2CDataset(
       visibilityLowerBoundPct: aggregate.overview.visibilityLowerBoundPct,
       visibilityUpperBoundPct: aggregate.overview.visibilityUpperBoundPct,
       confirmedTop3Count: aggregate.overview.confirmedTop3Count,
+      top3UncertainCount: aggregate.overview.top3UncertainCount,
       top3LowerBoundPct: aggregate.overview.top3LowerBoundPct,
       top3UpperBoundPct: aggregate.overview.top3UpperBoundPct,
       competitorCount: aggregate.competitors.length,
