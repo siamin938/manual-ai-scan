@@ -50,7 +50,7 @@ jobs:
 
           umask 077
           curl --fail-with-body --silent --show-error \
-            -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
+            -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query/read-only" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
             --data "$payload" \
