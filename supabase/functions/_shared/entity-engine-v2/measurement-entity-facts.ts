@@ -12,6 +12,7 @@ export type MeasurementEntityFactQualityFlag =
   | "target_identity_unresolved"
   | "target_candidate_provenance_incomplete"
   | "target_position_missing"
+  | "equivalence_provenance_incomplete"
   | "equivalent_projection_mismatch"
   | "distinct_entity_missing_canonical_key"
   | "self_key_leakage_blocked"
@@ -102,7 +103,11 @@ export interface MeasurementEntityRelationV2 {
   bestPosition: number | null;
   identityDecision: IdentityDecisionV2 | null;
   equivalenceDecision: TargetEquivalenceDecision | null;
+  equivalenceVersion: string | null;
+  equivalenceEvidenceKinds: string[];
   targetCandidateDecision: TargetCandidateDecisionV2 | null;
+  targetCandidateVersion: string | null;
+  targetCandidateReasonCodes: string[];
   relationReasonCodes: string[];
 }
 
@@ -130,6 +135,7 @@ const FLAG_ORDER: MeasurementEntityFactQualityFlag[] = [
   "invalid_measurement",
   "invalid_target_business_id",
   "entity_ref_conflict",
+  "equivalence_provenance_incomplete",
   "equivalent_projection_mismatch",
   "self_key_leakage_blocked",
   "distinct_entity_missing_canonical_key",
@@ -207,6 +213,15 @@ function candidateAssessmentTrusted(
   );
 }
 
+function equivalenceProvenanceTrusted(
+  entity: MeasurementEntityObservationV2,
+): boolean {
+  return (
+    clean(entity.equivalenceVersion).length > 0 &&
+    stableStrings(entity.equivalenceReasons).length > 0
+  );
+}
+
 function entitySemanticSignature(
   entity: MeasurementEntityObservationV2,
 ): string {
@@ -252,7 +267,11 @@ function relationFromEntity(
     bestPosition: validPosition(entity.position),
     identityDecision: entity.identityDecision,
     equivalenceDecision: entity.equivalenceDecision,
+    equivalenceVersion: clean(entity.equivalenceVersion) || null,
+    equivalenceEvidenceKinds: stableStrings(entity.equivalenceEvidenceKinds),
     targetCandidateDecision: entity.targetCandidate.decision,
+    targetCandidateVersion: clean(entity.targetCandidate.version) || null,
+    targetCandidateReasonCodes: stableStrings(entity.targetCandidate.reasonCodes),
     relationReasonCodes: relationReason(...reasonCodes),
   };
 }
@@ -268,7 +287,11 @@ function conflictRelation(
     bestPosition: null,
     identityDecision: null,
     equivalenceDecision: null,
+    equivalenceVersion: null,
+    equivalenceEvidenceKinds: [],
     targetCandidateDecision: null,
+    targetCandidateVersion: null,
+    targetCandidateReasonCodes: [],
     relationReasonCodes: [reason],
   };
 }
@@ -353,7 +376,6 @@ export function buildMeasurementEntityFactsV2(
   }
 
   const relations: MeasurementEntityRelationV2[] = [];
-  const entityByRef = new Map<string, MeasurementEntityObservationV2>();
   let unresolvedIdentityCount = 0;
   let unresolvedTargetCandidateCount = 0;
   let hasIdentityContractConflict = flags.includes("entity_ref_conflict");
@@ -372,12 +394,22 @@ export function buildMeasurementEntityFactsV2(
     }
 
     const entity = rows[0]!;
-    entityByRef.set(entityRef, entity);
 
     if (entity.identityDecision !== "confirmed_business") {
       relations.push(
         relationFromEntity(entity, "excluded", null, [
           "NOT_CONFIRMED_BUSINESS",
+        ]),
+      );
+      continue;
+    }
+
+    if (!equivalenceProvenanceTrusted(entity)) {
+      flags.push("equivalence_provenance_incomplete");
+      hasIdentityContractConflict = true;
+      relations.push(
+        relationFromEntity(entity, "conflict", null, [
+          "EQUIVALENCE_PROVENANCE_INCOMPLETE",
         ]),
       );
       continue;
@@ -580,9 +612,12 @@ export function buildMeasurementEntityFactsV2(
   const finalFlags = uniqueFlags(flags);
   const sourcePartialFlags = new Set<MeasurementEntityFactQualityFlag>([
     "entity_ref_conflict",
+    "equivalence_provenance_incomplete",
     "equivalent_projection_mismatch",
     "self_key_leakage_blocked",
     "target_candidate_provenance_incomplete",
+    "target_identity_unresolved",
+    "distinct_entity_missing_canonical_key",
     "attribution_id_conflict",
     "attribution_identity_conflict",
     "attribution_identity_unresolved",
