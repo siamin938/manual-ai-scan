@@ -55,10 +55,15 @@ describe("Phase 2C replay export contract", () => {
     );
   });
 
-  it("uses current Production competitor/source readers as replay baselines", () => {
-    expect(executableSql).toContain(
+  it("reconstructs current Production competitor/source baselines through read-only relations", () => {
+    expect(executableSql).not.toContain(
       "public.get_competitor_significance_v02",
     );
+    expect(executableSql).toContain(
+      "public.measurement_entity_canonicalizations",
+    );
+    expect(executableSql).toContain("public.measurement_mentions");
+    expect(executableSql).toContain("mm.count_as_confirmed_business=true");
     expect(executableSql).toContain(
       "public.measurement_citation_attributions_actionable_v2",
     );
