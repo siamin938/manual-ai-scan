@@ -172,6 +172,49 @@ export interface Phase2CReplayReport {
   releaseGate: Phase2CReplayReleaseGate;
 }
 
+function competitorDeltaIsEvidenceBacked(
+  delta: Phase2CCompetitorDeltaEvidenceV2,
+): boolean {
+  if (delta.support.length === 0) return false;
+
+  if (delta.direction === "added") {
+    return delta.support.every((item) =>
+      Boolean(item.entityRef) &&
+      item.identityDecision === "confirmed_business" &&
+      item.relationSide === "other" &&
+      item.relationCanonicalKey === delta.canonicalKey &&
+      item.relationReasonCodes.includes(
+        "AUTHORITATIVE_OTHER_BY_TARGET_CANDIDATE",
+      )
+    );
+  }
+
+  return delta.support.every((item) => {
+    if (!item.entityRef) return false;
+    if (!item.storedCanonicalKeys.includes(delta.canonicalKey)) return false;
+
+    if (
+      item.identityDecision === "non_business" ||
+      item.identityDecision === "platform" ||
+      item.identityDecision === "brand_network" ||
+      item.identityDecision === "unresolved"
+    ) {
+      return item.relationSide === "excluded";
+    }
+
+    if (
+      item.identityDecision === "confirmed_business" &&
+      item.relationSide === "unresolved"
+    ) {
+      return item.relationReasonCodes.includes(
+        "TARGET_CANDIDATE_CANDIDATE",
+      );
+    }
+
+    return false;
+  });
+}
+
 function buildReleaseGate(
   runs: Phase2CRunDiff[],
 ): Phase2CReplayReleaseGate {
@@ -202,12 +245,21 @@ function buildReleaseGate(
           `Current Top3 ${run.current.top3RatePct} is outside proposed bounds ${run.proposed.top3LowerBoundPct}-${run.proposed.top3UpperBoundPct}.`,
       });
     }
-    if (run.competitorAdded.length > 0 || run.competitorRemoved.length > 0) {
+    const unsafeCompetitorDeltas = run.competitorDeltaEvidence.filter(
+      (delta) => !competitorDeltaIsEvidenceBacked(delta),
+    );
+    if (unsafeCompetitorDeltas.length > 0) {
+      const unsafeAdded = unsafeCompetitorDeltas
+        .filter((delta) => delta.direction === "added")
+        .map((delta) => delta.canonicalKey);
+      const unsafeRemoved = unsafeCompetitorDeltas
+        .filter((delta) => delta.direction === "removed")
+        .map((delta) => delta.canonicalKey);
       issues.push({
         code: "CURRENT_COMPETITOR_SET_CHANGED",
         runId: run.runId,
         detail:
-          `Competitor set changed. Added=${run.competitorAdded.join("|")}; Removed=${run.competitorRemoved.join("|")}.`,
+          `Unreviewed competitor change. Added=${unsafeAdded.join("|")}; Removed=${unsafeRemoved.join("|")}.`,
       });
     }
     if (run.targetSourceRemoved.length > 0) {
