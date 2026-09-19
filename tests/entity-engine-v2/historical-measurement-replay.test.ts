@@ -139,7 +139,7 @@ describe("Historical Measurement Replay Adapter v0.1", () => {
     expect(unresolved?.targetCandidate.decision).toBe("candidate");
   });
 
-  it("allows a clearly unrelated confirmed branch to support confident target absence without calling it a competitor", () => {
+  it("projects a clearly unrelated confirmed branch to the other side without rewriting Phase 2A equivalence", () => {
     const result = replayHistoricalMeasurementV2(
       baseInput({
         responseText: "- 레이노 개봉점",
@@ -156,7 +156,17 @@ describe("Historical Measurement Replay Adapter v0.1", () => {
     );
 
     expect(result.facts.targetSeen).toBe(false);
-    expect(result.facts.confirmedOtherEntityKeys).toEqual([]);
+    expect(result.facts.confirmedOtherEntityKeys).toEqual([
+      "auto:레이노개봉점",
+    ]);
+    expect(result.facts.entityRelations).toEqual([
+      expect.objectContaining({
+        side: "other",
+        canonicalKey: "auto:레이노개봉점",
+        equivalenceDecision: "unresolved",
+        targetCandidateDecision: "not_candidate",
+      }),
+    ]);
     const observed = result.observations.find(
       (observation) => observation.identityDecision === "confirmed_business",
     );
