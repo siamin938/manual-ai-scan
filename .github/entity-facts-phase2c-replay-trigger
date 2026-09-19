@@ -5,3 +5,4 @@ probe=ephemeral-readonly-bootstrap-2026-09-19
 probe=ephemeral-readonly-yaml-fixed-2026-09-19
 run=after-supabase-token-2026-09-19T21:37+09:00
 probe=management-readonly-query-2026-09-19
+run=full-management-replay-2026-09-19
