@@ -38,6 +38,43 @@ function commonPrefixLength(left: string, right: string): number {
   return count;
 }
 
+function explicitBranchCore(value: string): string | null {
+  const normalized = value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z가-힣\s]/giu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  if (!normalized) return null;
+
+  const tokens = normalized.split(" ").filter(Boolean);
+  const last = tokens.at(-1) ?? "";
+
+  const compactBranch = last.match(
+    /^([0-9a-z가-힣]{2,}?)(?:본점|직영점|지점|분점|대리점|전문점|점)$/u,
+  );
+  if (compactBranch?.[1]) return compactBranch[1];
+
+  if (
+    /^(?:본점|직영점|지점|분점|대리점|전문점)$/u.test(last) &&
+    tokens.length >= 2
+  ) {
+    return tokens[tokens.length - 2] ?? null;
+  }
+
+  return null;
+}
+
+function explicitBranchConflict(left: string, right: string): boolean {
+  const leftBranch = explicitBranchCore(left);
+  const rightBranch = explicitBranchCore(right);
+  return Boolean(
+    leftBranch &&
+      rightBranch &&
+      leftBranch !== rightBranch,
+  );
+}
+
 function surfaceRelated(left: string, right: string): boolean {
   if (!left || !right) return false;
   if (left === right) return true;
@@ -212,6 +249,18 @@ export function assessTargetCandidateV2(
       "candidate",
       ["TARGET_CANDIDATE_CONCRETE_URL_RECALL_MATCH"],
       ["exact_concrete_official_url_recall"],
+      true,
+    );
+  }
+
+  const targetPrimarySurface = normalizeIdentitySurface(input.target.name);
+  if (
+    explicitBranchConflict(targetPrimarySurface, observedSurface)
+  ) {
+    return result(
+      "not_candidate",
+      ["TARGET_CANDIDATE_EXPLICIT_BRANCH_CONFLICT"],
+      ["explicit_branch_conflict"],
       true,
     );
   }
