@@ -1,0 +1,403 @@
+{
+  "version": "0.1",
+  "description": "Phase 2B pure Measurement Entity Facts fixtures. No DB/Edge/UI contract.",
+  "cases": [
+    {
+      "id": "F1-parser-false-negative-recovered",
+      "input": {
+        "measurementId": "m1",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e1",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "isTargetCandidate": true,
+            "projectedCanonicalKey": "business:target-1",
+            "position": 1
+          }
+        ],
+        "attributions": [
+          {
+            "attributionId": "a1",
+            "entityRef": "e1",
+            "domain": "www.example.com",
+            "url": "https://example.com/store/target"
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": true,
+        "targetBestPosition": 1,
+        "otherKeys": [],
+        "domains": [
+          "example.com"
+        ],
+        "flags": [
+          "parser_false_negative"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0
+      }
+    },
+    {
+      "id": "F2-parser-false-positive-blocked",
+      "input": {
+        "measurementId": "m2",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": true,
+          "clientPosition": 1
+        },
+        "entities": [
+          {
+            "entityRef": "e2",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "distinct",
+            "isTargetCandidate": false,
+            "canonicalKey": "auto:other-shop",
+            "position": 1
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": false,
+        "targetBestPosition": null,
+        "otherKeys": [
+          "auto:other-shop"
+        ],
+        "domains": [],
+        "flags": [
+          "parser_false_positive"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0
+      }
+    },
+    {
+      "id": "F3-unresolved-target-candidate-fails-closed",
+      "input": {
+        "measurementId": "m3",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e3",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "unresolved",
+            "isTargetCandidate": true,
+            "canonicalKey": "auto:maybe-target",
+            "position": 2
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": null,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "target_identity_unresolved"
+        ],
+        "unresolvedIdentityCount": 1,
+        "unresolvedTargetCandidateCount": 1
+      }
+    },
+    {
+      "id": "F4-unresolved-unrelated-does-not-block-negative",
+      "input": {
+        "measurementId": "m4",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e4",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "unresolved",
+            "isTargetCandidate": false,
+            "canonicalKey": "auto:unknown-other",
+            "position": 3
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": false,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [],
+        "unresolvedIdentityCount": 1,
+        "unresolvedTargetCandidateCount": 0
+      }
+    },
+    {
+      "id": "F5-multiple-target-mentions-use-best-position",
+      "input": {
+        "measurementId": "m5",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": true,
+          "clientPosition": 4
+        },
+        "entities": [
+          {
+            "entityRef": "e5a",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "isTargetCandidate": true,
+            "projectedCanonicalKey": "business:target-1",
+            "position": 4
+          },
+          {
+            "entityRef": "e5b",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "isTargetCandidate": true,
+            "projectedCanonicalKey": "business:target-1",
+            "position": 2
+          },
+          {
+            "entityRef": "e5c",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "distinct",
+            "isTargetCandidate": false,
+            "canonicalKey": "auto:competitor",
+            "position": 1
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": true,
+        "targetBestPosition": 2,
+        "otherKeys": [
+          "auto:competitor"
+        ],
+        "domains": [],
+        "flags": [],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0
+      }
+    },
+    {
+      "id": "F6-self-key-leakage-blocked",
+      "input": {
+        "measurementId": "m6",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e6",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "distinct",
+            "isTargetCandidate": false,
+            "canonicalKey": "business:target-1",
+            "position": 1
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": false,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "self_key_leakage_blocked"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0
+      }
+    },
+    {
+      "id": "F7-equivalent-projection-mismatch-fails-closed",
+      "input": {
+        "measurementId": "m7",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e7",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "isTargetCandidate": true,
+            "projectedCanonicalKey": "business:foreign",
+            "position": 1
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": null,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "equivalent_projection_mismatch"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0
+      }
+    },
+    {
+      "id": "F8-target-position-missing-is-quality-flag",
+      "input": {
+        "measurementId": "m8",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": true,
+          "clientPosition": 1
+        },
+        "entities": [
+          {
+            "entityRef": "e8",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "isTargetCandidate": true,
+            "projectedCanonicalKey": "business:target-1",
+            "position": null
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": true,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "target_position_missing"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0
+      }
+    },
+    {
+      "id": "F9-attribution-follows-authoritative-entity-side",
+      "input": {
+        "measurementId": "m9",
+        "targetBusinessId": "target-1",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e9t",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "isTargetCandidate": true,
+            "projectedCanonicalKey": "business:target-1",
+            "position": 2
+          },
+          {
+            "entityRef": "e9o",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "distinct",
+            "isTargetCandidate": false,
+            "canonicalKey": "auto:other",
+            "position": 1
+          },
+          {
+            "entityRef": "e9u",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "unresolved",
+            "isTargetCandidate": true,
+            "canonicalKey": "auto:maybe",
+            "position": 3
+          }
+        ],
+        "attributions": [
+          {
+            "attributionId": "a9t",
+            "entityRef": "e9t",
+            "domain": "WWW.Target.EXAMPLE",
+            "url": "https://target.example/page"
+          },
+          {
+            "attributionId": "a9o",
+            "entityRef": "e9o",
+            "domain": "other.example",
+            "url": "https://other.example/page"
+          },
+          {
+            "attributionId": "a9u",
+            "entityRef": "e9u",
+            "domain": "maybe.example",
+            "url": "https://maybe.example/page"
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": true,
+        "targetBestPosition": 2,
+        "otherKeys": [
+          "auto:other"
+        ],
+        "domains": [
+          "target.example"
+        ],
+        "flags": [
+          "parser_false_negative",
+          "attribution_identity_unresolved"
+        ],
+        "unresolvedIdentityCount": 1,
+        "unresolvedTargetCandidateCount": 1
+      }
+    },
+    {
+      "id": "F10-invalid-measurement-never-contributes",
+      "input": {
+        "measurementId": "m10",
+        "targetBusinessId": "target-1",
+        "valid": false,
+        "rawParser": {
+          "wasClientMentioned": true,
+          "clientPosition": 1
+        },
+        "entities": [
+          {
+            "entityRef": "e10",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "isTargetCandidate": true,
+            "projectedCanonicalKey": "business:target-1",
+            "position": 1
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": null,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "invalid_measurement"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0
+      }
+    }
+  ]
+}
