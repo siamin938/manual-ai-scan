@@ -237,10 +237,11 @@ describe("Entity Facts v2 pure materializer", () => {
       "utf8",
     );
     expect(source).not.toContain("@supabase/supabase-js");
+    expect(source).not.toMatch(/createClient\s*\(/u);
+    expect(source).not.toMatch(/\.from\s*\(/u);
+    expect(source).not.toMatch(/\.rpc\s*\(/u);
     expect(source).not.toMatch(/\.insert\s*\(/u);
     expect(source).not.toMatch(/\.upsert\s*\(/u);
-    expect(source).not.toMatch(/\.update\s*\(/u);
-    expect(source).not.toMatch(/\.delete\s*\(/u);
   });
 
   it("requires the historical export to carry explicit orgId", () => {
