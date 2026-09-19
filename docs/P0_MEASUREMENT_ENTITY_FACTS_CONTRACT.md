@@ -38,7 +38,7 @@ Every confirmed-business observation carries:
 - `equivalenceEvidenceKinds`
 - versioned target-candidate assessment
 
-A confirmed-business row without equivalence version/reason provenance is an identity contract conflict and cannot become customer truth.
+A confirmed-business row without a non-empty equivalence version and reason provenance is an identity contract conflict. It emits `equivalence_provenance_incomplete`, receives relation side `conflict`, and cannot become customer truth.
 
 ## Target-candidate assessment
 
@@ -91,6 +91,7 @@ entityRelations: Array<{
   targetCandidateDecision: TargetCandidateDecisionV2 | null;
   targetCandidateVersion: string | null;
   targetCandidateReasonCodes: string[];
+  targetCandidateEvidenceKinds: string[];
   relationReasonCodes: string[];
 }>
 ```
@@ -176,6 +177,7 @@ Attribution IDs must also be unique.
 - Conflicting rows sharing an attribution ID are rejected as a group.
 - No first-row-wins behavior is permitted.
 - Conflict emits `attribution_id_conflict`.
+- An attribution whose `entityRef` has no authoritative relation is rejected and emits `attribution_entity_ref_missing`.
 - Entity attribution uses `entityRelations`, not fresh identity classification.
 
 Target attribution is accepted only when:
