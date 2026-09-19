@@ -114,6 +114,10 @@ if (!databaseUrl) {
       acceptedAttributionCount:
         run.proposed.acceptedAttributionCount,
       sourceDiagnosticCount: run.proposed.sourceDiagnosticCount,
+      competitorAdded: run.competitorAdded,
+      competitorRemoved: run.competitorRemoved,
+      targetSourceAdded: run.targetSourceAdded,
+      targetSourceRemoved: run.targetSourceRemoved,
       visibilityInsideBounds:
         run.currentVisibilityInsideProposedBounds,
       top3InsideBounds: run.currentTop3InsideProposedBounds,
