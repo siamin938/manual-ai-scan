@@ -31,6 +31,8 @@ describe("Phase 2C replay export contract", () => {
     expect(executableSql).toContain("'registeredBusinesses'");
     expect(executableSql).toContain("'storedMentions'");
     expect(executableSql).toContain("'attributions'");
+    expect(executableSql).toContain("'currentCompetitors'");
+    expect(executableSql).toContain("'currentTargetSources'");
     expect(executableSql).toContain("'attributionId'");
     expect(executableSql).toContain("'measurementMentionId'");
     expect(executableSql).toContain("'citationStartIndex'");
@@ -50,6 +52,18 @@ describe("Phase 2C replay export contract", () => {
     expect(executableSql).toContain("'verifiedPhone', null");
     expect(executableSql).toContain(
       "'verifiedConcreteOfficialUrls', '[]'::jsonb",
+    );
+  });
+
+  it("uses current Production competitor/source readers as replay baselines", () => {
+    expect(executableSql).toContain(
+      "public.get_competitor_significance_v02",
+    );
+    expect(executableSql).toContain(
+      "public.measurement_citation_attributions_actionable_v2",
+    );
+    expect(executableSql).toContain(
+      "a.canonical_key='business:'||rc.business_id::text",
     );
   });
 
