@@ -415,6 +415,59 @@ describe("Historical Measurement Replay Adapter v0.1", () => {
     expect(result.facts.dataQualityFlags).not.toContain("parser_false_positive");
   });
 
+  it("reconnects a persisted auto canonical subspan inside a composite business surface", () => {
+    const result = replayHistoricalMeasurementV2(
+      baseInput({
+        responseText:
+          "| **카프랜드 / 성동썬팅멀티샵** | 서울 성동구 용답동 249-1 | 02-2214-4662 |",
+        storedMentions: [
+          {
+            mentionId: "legacy-carpland",
+            displayName: "카프랜드",
+            position: 2,
+            canonicalKey: "auto:카프랜드",
+            canonicalDisplayName: "카프랜드",
+          },
+        ],
+        publicIdentities: [],
+      }),
+    );
+
+    const linked = result.entityMentionLinks.find((item) =>
+      item.mentionIds.includes("legacy-carpland"),
+    );
+    expect(linked).toBeDefined();
+
+    const observation = result.observations.find(
+      (item) => item.entityRef === linked?.entityRef,
+    );
+    expect(observation?.canonicalKey).toBe("auto:카프랜드");
+  });
+
+  it("does not use arbitrary stored display-name containment as canonical replay evidence", () => {
+    const result = replayHistoricalMeasurementV2(
+      baseInput({
+        responseText:
+          "| **카프랜드 / 성동썬팅멀티샵** | 서울 성동구 용답동 249-1 | 02-2214-4662 |",
+        storedMentions: [
+          {
+            mentionId: "legacy-arbitrary",
+            displayName: "카프랜드",
+            position: 2,
+            canonicalKey: null,
+          },
+        ],
+        publicIdentities: [],
+      }),
+    );
+
+    expect(
+      result.entityMentionLinks.some((item) =>
+        item.mentionIds.includes("legacy-arbitrary"),
+      ),
+    ).toBe(false);
+  });
+
   it("marks source replay as explicitly not evaluated at this stage", () => {
     const result = replayHistoricalMeasurementV2(baseInput());
     expect(result.sourceReplayStatus).toBe("not_evaluated");
