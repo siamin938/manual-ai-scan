@@ -260,8 +260,10 @@ describe("Phase 2C Run Source Replay v0.1", () => {
       {
         ...measurement("m1", [targetObservation()], [
           rawAttribution({
-            entityEndIndex: 5,
-            citationStartIndex: 15,
+            // "업체A" occupies indices [0, 3); comparative wording begins
+            // immediately after that end-exclusive entity boundary.
+            entityEndIndex: 3,
+            citationStartIndex: 14,
           }),
         ]),
         responseText: "업체A 보다 업체B가 낫다",
