@@ -55,6 +55,8 @@ Current persisted business fields include:
 
 Phone and an explicit branchIdentityKey are not currently persisted on `businesses`.
 
+The persisted `naver_place_url` field is not automatically canonical evidence. Phase 2C may pass it into Phase 2A only when the approved `normalizeCanonicalNaverPlaceId` parser can extract a supported canonical Place ID. Unsupported short URLs such as `naver.me/*` are treated as unavailable evidence, not as malformed canonical identity evidence.
+
 Therefore Phase 2A evidence paths that require missing evidence MUST remain unresolved. Historical replay must not manufacture phone, branch identity, Place ID, or official URLs.
 
 Cross-org business rows may be used only as internal public-identity evidence candidates and MUST NOT become the target projection merely because the row exists.
