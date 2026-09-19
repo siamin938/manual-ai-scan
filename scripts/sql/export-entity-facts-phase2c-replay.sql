@@ -208,6 +208,7 @@ with eligible_runs as (
     jsonb_build_object(
       'measurementId', rm.measurement_id,
       'runId', rm.run_id,
+      'orgId', rm.org_id,
       'businessId', rm.business_id,
       'questionId', rm.question_id,
       'questionText', coalesce(rm.prompt_text,''),
