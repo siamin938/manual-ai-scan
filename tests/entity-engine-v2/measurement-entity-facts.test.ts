@@ -598,4 +598,75 @@ describe("Measurement Entity Facts v0.2", () => {
     expect(top3).toHaveLength(6);
     expect(selfCompetitorCount).toBe(0);
   });
+
+  it("fails closed when confirmed entity equivalence provenance is incomplete", () => {
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        entities: [
+          entity({
+            entityRef: "missing-provenance",
+            equivalenceDecision: "equivalent",
+            equivalenceVersion: "",
+            equivalenceReasons: [],
+            projectedCanonicalKey: TARGET_KEY,
+            targetCandidate: candidateAssessment("candidate"),
+            position: 1,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.targetSeen).toBeNull();
+    expect(result.dataQualityFlags).toContain("equivalence_provenance_incomplete");
+    expect(result.entityRelations[0]?.side).toBe("conflict");
+  });
+
+  it("flags attribution rows whose entityRef has no authoritative relation", () => {
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        attributions: [
+          {
+            attributionId: "orphan-attribution",
+            entityRef: "missing-entity",
+            domain: "example.com",
+            url: "https://example.com/page",
+            urlValidation: "validated_http_https",
+          },
+        ],
+      }),
+    );
+
+    expect(result.targetAttributionLinks).toEqual([]);
+    expect(result.sourceFactsStatus).toBe("partial");
+    expect(result.dataQualityFlags).toContain("attribution_entity_ref_missing");
+  });
+
+  it("keeps quality flag serialization stable regardless of entity order", () => {
+    const projectionMismatch = entity({
+      entityRef: "bad-projection",
+      equivalenceDecision: "equivalent",
+      projectedCanonicalKey:
+        "business:22222222-2222-4222-8222-222222222222",
+      targetCandidate: candidateAssessment("candidate"),
+      position: 1,
+    });
+    const missingCanonical = entity({
+      entityRef: "missing-canonical",
+      equivalenceDecision: "distinct",
+      canonicalKey: null,
+      targetCandidate: candidateAssessment("not_candidate"),
+      position: 2,
+    });
+
+    const first = buildMeasurementEntityFactsV2(
+      baseInput({ entities: [projectionMismatch, missingCanonical] }),
+    );
+    const second = buildMeasurementEntityFactsV2(
+      baseInput({ entities: [missingCanonical, projectionMismatch] }),
+    );
+
+    expect(first.dataQualityFlags).toEqual(second.dataQualityFlags);
+    expect(first).toEqual(second);
+  });
+
 });
