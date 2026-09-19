@@ -99,6 +99,7 @@ if (!databaseUrl) {
       proposedVisibilityUpperPct:
         run.proposed.visibilityUpperBoundPct,
       currentTop3Pct: run.current.top3RatePct,
+      proposedTop3UncertainCount: run.proposed.top3UncertainCount,
       proposedTop3LowerPct: run.proposed.top3LowerBoundPct,
       proposedTop3UpperPct: run.proposed.top3UpperBoundPct,
       confirmedMentionCount: run.proposed.confirmedMentionCount,
