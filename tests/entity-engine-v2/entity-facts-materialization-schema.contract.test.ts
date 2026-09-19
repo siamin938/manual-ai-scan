@@ -100,6 +100,18 @@ describe("Entity Facts v2 materialization schema contract", () => {
     expect(sql).toContain("ENTITY_FACT_MEASUREMENT_SCOPE_MISMATCH");
   });
 
+  it("allows only contract-clean run aggregates to become commit markers", () => {
+    expect(sql).toContain(
+      "contract_ok boolean NOT NULL CHECK (contract_ok = true)",
+    );
+    expect(sql).toContain(
+      "jsonb_typeof(aggregate->'contractIssues') = 'array'",
+    );
+    expect(sql).toContain(
+      "jsonb_array_length(aggregate->'contractIssues') = 0",
+    );
+  });
+
   it("uses the aggregate row as a complete materialization commit marker", () => {
     expect(sql).toContain(
       "CREATE OR REPLACE FUNCTION public.validate_run_entity_fact_aggregate_v2_materialization()",
