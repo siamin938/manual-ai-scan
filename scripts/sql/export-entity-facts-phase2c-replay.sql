@@ -110,6 +110,55 @@ with eligible_runs as (
     limit 1
   ) cc on true
   group by rm.measurement_id
+), run_context as (
+  select distinct run_id, org_id, business_id
+  from replay_measurements
+), current_competitor_context as (
+  select
+    rc.run_id,
+    coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'canonicalKey', cs.canonical_key,
+          'name', cs.name
+        )
+        order by cs.significance_score desc, cs.name, cs.canonical_key
+      ) filter (where cs.canonical_key is not null),
+      '[]'::jsonb
+    ) as competitors
+  from run_context rc
+  left join lateral public.get_competitor_significance_v02(
+    rc.org_id,
+    rc.business_id,
+    rc.run_id
+  ) cs on true
+  group by rc.run_id
+), current_target_source_context as (
+  select
+    rc.run_id,
+    coalesce(
+      jsonb_agg(
+        jsonb_build_object(
+          'domain', src.domain,
+          'responseCount', src.response_count
+        )
+        order by src.domain
+      ) filter (where src.domain is not null),
+      '[]'::jsonb
+    ) as sources
+  from run_context rc
+  left join lateral (
+    select
+      lower(regexp_replace(a.domain,'^www\\.','')) as domain,
+      count(distinct a.measurement_id)::integer as response_count
+    from public.measurement_citation_attributions_actionable_v2 a
+    where a.org_id=rc.org_id
+      and a.business_id=rc.business_id
+      and a.source_run_id=rc.run_id
+      and a.canonical_key='business:'||rc.business_id::text
+    group by lower(regexp_replace(a.domain,'^www\\.',''))
+  ) src on true
+  group by rc.run_id
 ), attribution_context as (
   select
     rm.measurement_id,
@@ -172,13 +221,17 @@ with eligible_runs as (
       'target', tc.target,
       'registeredBusinesses', coalesce(rc.businesses,'[]'::jsonb),
       'storedMentions', coalesce(mc.mentions,'[]'::jsonb),
-      'attributions', coalesce(ac.attributions,'[]'::jsonb)
+      'attributions', coalesce(ac.attributions,'[]'::jsonb),
+      'currentCompetitors', coalesce(ccur.competitors,'[]'::jsonb),
+      'currentTargetSources', coalesce(scur.sources,'[]'::jsonb)
     ) as row_json
   from replay_measurements rm
   join target_context tc on tc.measurement_id=rm.measurement_id
   left join registered_context rc on rc.measurement_id=rm.measurement_id
   left join mention_context mc on mc.measurement_id=rm.measurement_id
   left join attribution_context ac on ac.measurement_id=rm.measurement_id
+  left join current_competitor_context ccur on ccur.run_id=rm.run_id
+  left join current_target_source_context scur on scur.run_id=rm.run_id
 )
 select jsonb_build_object(
   'version', 'entity-facts-phase2c-export-v0.1',
