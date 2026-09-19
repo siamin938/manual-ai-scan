@@ -20,6 +20,7 @@ export type MeasurementEntityFactQualityFlag =
   | "attribution_identity_unresolved"
   | "attribution_identity_conflict"
   | "attribution_id_conflict"
+  | "attribution_entity_ref_missing"
   | "attribution_url_unvalidated"
   | "attribution_url_invalid"
   | "attribution_domain_mismatch";
@@ -108,6 +109,7 @@ export interface MeasurementEntityRelationV2 {
   targetCandidateDecision: TargetCandidateDecisionV2 | null;
   targetCandidateVersion: string | null;
   targetCandidateReasonCodes: string[];
+  targetCandidateEvidenceKinds: string[];
   relationReasonCodes: string[];
 }
 
@@ -146,6 +148,7 @@ const FLAG_ORDER: MeasurementEntityFactQualityFlag[] = [
   "parser_false_positive",
   "parser_position_mismatch",
   "attribution_id_conflict",
+  "attribution_entity_ref_missing",
   "attribution_identity_conflict",
   "attribution_identity_unresolved",
   "attribution_url_unvalidated",
@@ -272,6 +275,7 @@ function relationFromEntity(
     targetCandidateDecision: entity.targetCandidate.decision,
     targetCandidateVersion: clean(entity.targetCandidate.version) || null,
     targetCandidateReasonCodes: stableStrings(entity.targetCandidate.reasonCodes),
+    targetCandidateEvidenceKinds: stableStrings(entity.targetCandidate.evidenceKinds),
     relationReasonCodes: relationReason(...reasonCodes),
   };
 }
@@ -292,6 +296,7 @@ function conflictRelation(
     targetCandidateDecision: null,
     targetCandidateVersion: null,
     targetCandidateReasonCodes: [],
+    targetCandidateEvidenceKinds: [],
     relationReasonCodes: [reason],
   };
 }
@@ -576,7 +581,10 @@ export function buildMeasurementEntityFactsV2(
 
     const attribution = rows[0]!;
     const relation = relationByRef.get(clean(attribution.entityRef));
-    if (!relation) continue;
+    if (!relation) {
+      flags.push("attribution_entity_ref_missing");
+      continue;
+    }
 
     if (relation.side === "conflict") {
       flags.push("attribution_identity_conflict");
@@ -619,6 +627,7 @@ export function buildMeasurementEntityFactsV2(
     "target_identity_unresolved",
     "distinct_entity_missing_canonical_key",
     "attribution_id_conflict",
+    "attribution_entity_ref_missing",
     "attribution_identity_conflict",
     "attribution_identity_unresolved",
     "attribution_url_unvalidated",
