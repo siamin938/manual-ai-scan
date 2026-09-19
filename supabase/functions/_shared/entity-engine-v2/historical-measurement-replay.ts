@@ -17,6 +17,7 @@ import {
 import { parseResponseStructure } from "./response-structure.ts";
 import {
   evaluateTargetEquivalenceV2,
+  normalizeCanonicalNaverPlaceId,
   normalizeIdentitySurface,
   type PublicBusinessIdentityV2,
   type TargetBusinessIdentityV2,
@@ -105,6 +106,12 @@ function validPosition(value: number | null | undefined): number | null {
     : null;
 }
 
+function canonicalPlaceEvidence(
+  value: string | null | undefined,
+): string | null {
+  return normalizeCanonicalNaverPlaceId(value);
+}
+
 function asTargetIdentity(
   target: ReplayBusinessIdentityV2,
 ): TargetBusinessIdentityV2 {
@@ -112,7 +119,7 @@ function asTargetIdentity(
     businessId: target.id,
     name: target.name,
     aliases: [...(target.aliases ?? [])],
-    canonicalNaverPlaceId: target.canonicalNaverPlaceId ?? null,
+    canonicalNaverPlaceId: canonicalPlaceEvidence(target.canonicalNaverPlaceId),
     fullAddress: target.fullAddress ?? null,
     verifiedPhone: target.verifiedPhone ?? null,
     verifiedConcreteOfficialUrls: [
@@ -129,7 +136,7 @@ function asPublicIdentity(
     businessId: business.id,
     name: business.name,
     aliases: [...(business.aliases ?? [])],
-    canonicalNaverPlaceId: business.canonicalNaverPlaceId ?? null,
+    canonicalNaverPlaceId: canonicalPlaceEvidence(business.canonicalNaverPlaceId),
     fullAddress: business.fullAddress ?? null,
     verifiedPhone: business.verifiedPhone ?? null,
     verifiedConcreteOfficialUrls: [
@@ -144,7 +151,8 @@ function publicIdentitySignature(identity: ReplayPublicIdentityV2): string {
     name: compact(identity.name),
     aliases: [...new Set((identity.aliases ?? []).map(compact).filter(Boolean))].sort(),
     fullAddress: (identity.fullAddress ?? "").trim(),
-    canonicalNaverPlaceId: (identity.canonicalNaverPlaceId ?? "").trim(),
+    canonicalNaverPlaceId:
+      canonicalPlaceEvidence(identity.canonicalNaverPlaceId) ?? "",
     verifiedPhone: (identity.verifiedPhone ?? "").trim(),
     verifiedConcreteOfficialUrls: [
       ...new Set((identity.verifiedConcreteOfficialUrls ?? []).map((value) => value.trim()).filter(Boolean)),
@@ -190,7 +198,8 @@ function findPublicIdentity(
     identity: {
       name: match.name,
       aliases: [...(match.aliases ?? [])],
-      canonicalNaverPlaceId: match.canonicalNaverPlaceId ?? null,
+      canonicalNaverPlaceId:
+        canonicalPlaceEvidence(match.canonicalNaverPlaceId),
       fullAddress: match.fullAddress ?? null,
       verifiedPhone: match.verifiedPhone ?? null,
       verifiedConcreteOfficialUrls: [
