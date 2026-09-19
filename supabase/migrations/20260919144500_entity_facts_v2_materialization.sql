@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS public.run_entity_fact_aggregates_v2 (
       valid_measurement_count >= 0
       AND valid_measurement_count <= measurement_count
     ),
-  contract_ok boolean NOT NULL,
+  contract_ok boolean NOT NULL CHECK (contract_ok = true),
   aggregate jsonb NOT NULL
     CHECK (jsonb_typeof(aggregate) = 'object'),
   aggregate_hash text NOT NULL
@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS public.run_entity_fact_aggregates_v2 (
     AND aggregate ? 'contractOk'
     AND jsonb_typeof(aggregate->'contractOk') = 'boolean'
     AND (aggregate->>'contractOk')::boolean = contract_ok
+    AND jsonb_typeof(aggregate->'contractIssues') = 'array'
+    AND jsonb_array_length(aggregate->'contractIssues') = 0
     AND jsonb_typeof(aggregate->'overview') = 'object'
     AND (aggregate->'overview') ? 'measurementCount'
     AND (aggregate #>> '{overview,measurementCount}')::integer = measurement_count
