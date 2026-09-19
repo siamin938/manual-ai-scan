@@ -110,6 +110,30 @@ with eligible_runs as (
     limit 1
   ) cc on true
   group by rm.measurement_id
+), attribution_context as (
+  select
+    rm.measurement_id,
+    jsonb_agg(
+      jsonb_build_object(
+        'attributionId', a.id,
+        'measurementMentionId', a.measurement_mention_id,
+        'canonicalKey', a.canonical_key,
+        'domain', a.domain,
+        'url', a.citation_url,
+        'attributionLevel', a.attribution_level,
+        'evidence', a.evidence,
+        'citationStartIndex', a.citation_start_index,
+        'entityEndIndex', a.entity_end_index
+      )
+      order by a.id
+    ) as attributions
+  from replay_measurements rm
+  join public.measurement_citation_attributions a
+    on a.measurement_id=rm.measurement_id
+   and a.org_id=rm.org_id
+   and a.business_id=rm.business_id
+   and a.attribution_version='0.1.0'
+  group by rm.measurement_id
 ), public_identity_directory as (
   select coalesce(
     jsonb_agg(
@@ -147,12 +171,14 @@ with eligible_runs as (
       ),
       'target', tc.target,
       'registeredBusinesses', coalesce(rc.businesses,'[]'::jsonb),
-      'storedMentions', coalesce(mc.mentions,'[]'::jsonb)
+      'storedMentions', coalesce(mc.mentions,'[]'::jsonb),
+      'attributions', coalesce(ac.attributions,'[]'::jsonb)
     ) as row_json
   from replay_measurements rm
   join target_context tc on tc.measurement_id=rm.measurement_id
   left join registered_context rc on rc.measurement_id=rm.measurement_id
   left join mention_context mc on mc.measurement_id=rm.measurement_id
+  left join attribution_context ac on ac.measurement_id=rm.measurement_id
 )
 select jsonb_build_object(
   'version', 'entity-facts-phase2c-export-v0.1',
