@@ -1,6 +1,6 @@
 {
-  "version": "0.2",
-  "description": "Phase 2B Measurement Entity Facts v0.2 fixtures. Pure engine only; no DB/Edge/UI contract.",
+  "version": "0.3",
+  "description": "Phase 2B Measurement Entity Facts v0.3 fixtures. Pure engine only; no DB/Edge/UI contract.",
   "cases": [
     {
       "id": "F1-parser-false-negative-recovered",
@@ -193,7 +193,9 @@
       "expected": {
         "targetSeen": false,
         "targetBestPosition": null,
-        "otherKeys": [],
+        "otherKeys": [
+          "auto:unknown-other"
+        ],
         "domains": [],
         "flags": [],
         "unresolvedIdentityCount": 1,
