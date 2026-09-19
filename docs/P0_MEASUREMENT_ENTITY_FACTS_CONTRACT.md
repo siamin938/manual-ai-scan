@@ -34,6 +34,7 @@ The pure builder emits:
 - `targetSeen: true | false | null`
 - `targetBestPosition`
 - `confirmedOtherEntityKeys`
+- `confirmedOtherEntities[{ canonicalKey, bestPosition }]`
 - `targetCitationDomains`
 - `targetAttributionLinks`
 - unresolved identity counts
@@ -99,12 +100,15 @@ Only confirmed businesses with:
 - a non-empty canonical key
 - canonical key different from the current target key
 
-enter `confirmedOtherEntityKeys`.
+enter the authoritative other-entity facts.
+
+For each distinct canonical key, Phase 2B preserves the minimum valid 1-based mention position as `bestPosition`. This prevents later competitor significance/Top3 consumers from having to re-read raw `measurement_mentions` and recreate identity side independently.
 
 Rules:
 
 - equivalent entities never enter other-entity keys
 - unresolved entities never enter other-entity keys
+- duplicate mentions of the same distinct canonical entity collapse to one measurement-level entity fact with the best authoritative position
 - if a distinct entity somehow carries the current target key, it is blocked and flagged `self_key_leakage_blocked`
 - distinct entities without a canonical key are excluded and flagged
 
@@ -148,7 +152,7 @@ They do not contribute to customer-facing rate denominators in later aggregation
    Toggling raw parser mention state does not change authoritative targetSeen for identical authoritative entities.
 
 2. SELF_NOT_COMPETITOR  
-   Equivalent/self keys cannot enter `confirmedOtherEntityKeys`.
+   Equivalent/self keys cannot enter `confirmedOtherEntityKeys` or `confirmedOtherEntities`.
 
 3. BEST_POSITION  
    Multiple target-equivalent mentions collapse to one measurement fact with the minimum authoritative position.
