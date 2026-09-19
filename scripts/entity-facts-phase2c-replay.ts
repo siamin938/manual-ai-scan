@@ -21,6 +21,16 @@ import {
   type ReplayRawAttributionV2,
 } from "../supabase/functions/_shared/entity-engine-v2/run-source-replay";
 
+export interface Phase2CCurrentCompetitorBaseline {
+  canonicalKey: string;
+  name: string;
+}
+
+export interface Phase2CCurrentTargetSourceBaseline {
+  domain: string;
+  responseCount: number;
+}
+
 export interface Phase2CReplayDatasetRow {
   measurementId: string;
   runId: string;
@@ -35,6 +45,8 @@ export interface Phase2CReplayDatasetRow {
   registeredBusinesses: ReplayBusinessIdentityV2[];
   storedMentions: ReplayStoredMentionV2[];
   attributions: ReplayRawAttributionV2[];
+  currentCompetitors: Phase2CCurrentCompetitorBaseline[];
+  currentTargetSources: Phase2CCurrentTargetSourceBaseline[];
 }
 
 export interface Phase2CReplayDataset {
@@ -50,6 +62,8 @@ export interface CurrentRunMetricsV2 {
   top3Count: number;
   visibilityRatePct: number | null;
   top3RatePct: number | null;
+  competitorKeys: string[];
+  targetSourceDomains: string[];
 }
 
 export interface Phase2CRunDiff {
@@ -79,6 +93,10 @@ export interface Phase2CRunDiff {
   };
   currentVisibilityInsideProposedBounds: boolean | null;
   currentTop3InsideProposedBounds: boolean | null;
+  competitorAdded: string[];
+  competitorRemoved: string[];
+  targetSourceAdded: string[];
+  targetSourceRemoved: string[];
   contractOk: boolean;
   contractIssues: ReturnType<typeof aggregateRunEntityFactsV2>["contractIssues"];
   qualityFlagCounts: Record<string, number>;
@@ -88,7 +106,9 @@ export interface Phase2CRunDiff {
 export type Phase2CReplayGateIssueCode =
   | "RUN_CONTRACT_ISSUE"
   | "CURRENT_VISIBILITY_OUTSIDE_PROPOSED_BOUNDS"
-  | "CURRENT_TOP3_OUTSIDE_PROPOSED_BOUNDS";
+  | "CURRENT_TOP3_OUTSIDE_PROPOSED_BOUNDS"
+  | "CURRENT_COMPETITOR_SET_CHANGED"
+  | "CURRENT_TARGET_SOURCE_REMOVED";
 
 export interface Phase2CReplayGateIssue {
   code: Phase2CReplayGateIssueCode;
@@ -105,6 +125,8 @@ export interface Phase2CReplayReleaseGate {
     contractIssueRuns: number;
     visibilityOutsideBoundsRuns: number;
     top3OutsideBoundsRuns: number;
+    competitorChangedRuns: number;
+    targetSourceRemovalRuns: number;
   };
 }
 
@@ -160,6 +182,22 @@ function buildReleaseGate(
           `Current Top3 ${run.current.top3RatePct} is outside proposed bounds ${run.proposed.top3LowerBoundPct}-${run.proposed.top3UpperBoundPct}.`,
       });
     }
+    if (run.competitorAdded.length > 0 || run.competitorRemoved.length > 0) {
+      issues.push({
+        code: "CURRENT_COMPETITOR_SET_CHANGED",
+        runId: run.runId,
+        detail:
+          `Competitor set changed. Added=${run.competitorAdded.join("|")}; Removed=${run.competitorRemoved.join("|")}.`,
+      });
+    }
+    if (run.targetSourceRemoved.length > 0) {
+      issues.push({
+        code: "CURRENT_TARGET_SOURCE_REMOVED",
+        runId: run.runId,
+        detail:
+          `Current target source domains disappeared: ${run.targetSourceRemoved.join("|")}.`,
+      });
+    }
   }
 
   issues.sort(
@@ -184,6 +222,8 @@ function buildReleaseGate(
       top3OutsideBoundsRuns: count(
         "CURRENT_TOP3_OUTSIDE_PROPOSED_BOUNDS",
       ),
+      competitorChangedRuns: count("CURRENT_COMPETITOR_SET_CHANGED"),
+      targetSourceRemovalRuns: count("CURRENT_TARGET_SOURCE_REMOVED"),
     },
   };
 }
@@ -212,6 +252,8 @@ function currentMetrics(rows: Phase2CReplayDatasetRow[]): CurrentRunMetricsV2 {
     top3Count,
     visibilityRatePct: pct(mentionCount, valid.length),
     top3RatePct: pct(top3Count, valid.length),
+    competitorKeys: [],
+    targetSourceDomains: [],
   };
 }
 
@@ -312,6 +354,20 @@ export function replayPhase2CDataset(
       factsRecords,
     );
     const current = currentMetrics(rows);
+    current.competitorKeys = [
+      ...new Set(
+        (first.currentCompetitors ?? [])
+          .map((item) => item.canonicalKey.trim())
+          .filter(Boolean),
+      ),
+    ].sort((a, b) => a.localeCompare(b, "en"));
+    current.targetSourceDomains = [
+      ...new Set(
+        (first.currentTargetSources ?? [])
+          .map((item) => item.domain.trim().toLowerCase().replace(/^www\./u, ""))
+          .filter(Boolean),
+      ),
+    ].sort((a, b) => a.localeCompare(b, "en"));
     const proposed = {
       confirmedMentionCount: aggregate.overview.confirmedMentionCount,
       unresolvedTargetCount: aggregate.overview.unresolvedTargetCount,
@@ -334,6 +390,17 @@ export function replayPhase2CDataset(
       sourceDiagnosticCount: sourceReplay.diagnostics.length,
     };
 
+    const proposedCompetitorKeys = aggregate.competitors
+      .map((item) => item.canonicalKey)
+      .sort((a, b) => a.localeCompare(b, "en"));
+    const proposedTargetSourceDomains = aggregate.targetSources
+      .map((item) => item.domain)
+      .sort((a, b) => a.localeCompare(b, "en"));
+    const currentCompetitorSet = new Set(current.competitorKeys);
+    const proposedCompetitorSet = new Set(proposedCompetitorKeys);
+    const currentSourceSet = new Set(current.targetSourceDomains);
+    const proposedSourceSet = new Set(proposedTargetSourceDomains);
+
     runs.push({
       runId,
       businessId: first.businessId,
@@ -349,6 +416,18 @@ export function replayPhase2CDataset(
         current.top3RatePct,
         proposed.top3LowerBoundPct,
         proposed.top3UpperBoundPct,
+      ),
+      competitorAdded: proposedCompetitorKeys.filter(
+        (key) => !currentCompetitorSet.has(key),
+      ),
+      competitorRemoved: current.competitorKeys.filter(
+        (key) => !proposedCompetitorSet.has(key),
+      ),
+      targetSourceAdded: proposedTargetSourceDomains.filter(
+        (domain) => !currentSourceSet.has(domain),
+      ),
+      targetSourceRemoved: current.targetSourceDomains.filter(
+        (domain) => !proposedSourceSet.has(domain),
       ),
       contractOk: aggregate.contractOk,
       contractIssues: aggregate.contractIssues,
