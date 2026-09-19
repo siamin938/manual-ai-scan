@@ -22,6 +22,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: qoirkwmnyolquvsgbian
       ENTITY_FACTS_PHASE2C_REPLAY_OUTPUT: /tmp/entity-facts-phase2c-historical-replay.json
+      ENTITY_FACTS_V2_DRY_RUN_SUMMARY: /tmp/entity-facts-v2-materializer-dry-run-summary.json
 
     steps:
       - name: Checkout Phase 2C branch
@@ -114,12 +115,44 @@ jobs:
           echo "Replay summary:"
           cat /tmp/entity-facts-phase2c-log-summary.json
 
+      - name: Validate Entity Facts v2 materializer dry-run
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          bun scripts/entity-facts-v2-materialize-dry-run.ts \
+            /tmp/entity-facts-phase2c-dataset.json \
+            --expected-runs=23 \
+            --expected-measurements=428 \
+            > "${ENTITY_FACTS_V2_DRY_RUN_SUMMARY}"
+
+          jq -e '
+            .runCount == 23 and
+            .measurementCount == 428 and
+            .measurementRowCount == 428 and
+            .aggregateRowCount == 23 and
+            .factVersion == "0.3" and
+            .aggregateVersion == "0.1" and
+            .contractOk == true and
+            .semanticMatch == true and
+            .hashChecksOk == true and
+            .scopeChecksOk == true and
+            .duplicateMeasurementIds == 0
+          ' "${ENTITY_FACTS_V2_DRY_RUN_SUMMARY}" >/dev/null
+
+          echo "Materializer dry-run summary:"
+          cat "${ENTITY_FACTS_V2_DRY_RUN_SUMMARY}"
+          echo "Entity Facts v2 materializer dry-run passed." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload review-only replay report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: entity-facts-phase2c-historical-replay-review
-          path: /tmp/entity-facts-phase2c-historical-replay.json
+          path: |
+            /tmp/entity-facts-phase2c-historical-replay.json
+            /tmp/entity-facts-v2-materializer-dry-run-summary.json
           if-no-files-found: warn
           retention-days: 1
 
@@ -142,4 +175,5 @@ jobs:
             /tmp/entity-facts-phase2c-export-response.json \
             /tmp/entity-facts-phase2c-dataset.json \
             /tmp/entity-facts-phase2c-log-summary.json \
-            /tmp/entity-facts-phase2c-historical-replay.json
+            /tmp/entity-facts-phase2c-historical-replay.json \
+            /tmp/entity-facts-v2-materializer-dry-run-summary.json
