@@ -12,6 +12,10 @@ import {
   type ReplayStoredMentionV2,
 } from "../supabase/functions/_shared/entity-engine-v2/historical-measurement-replay";
 import type { RawParserTargetSignalV2 } from "../supabase/functions/_shared/entity-engine-v2/measurement-entity-facts";
+import {
+  replayRunSourcesV2,
+  type ReplayRawAttributionV2,
+} from "../supabase/functions/_shared/entity-engine-v2/run-source-replay";
 
 export interface Phase2CReplayDatasetRow {
   measurementId: string;
@@ -26,6 +30,7 @@ export interface Phase2CReplayDatasetRow {
   target: ReplayBusinessIdentityV2;
   registeredBusinesses: ReplayBusinessIdentityV2[];
   storedMentions: ReplayStoredMentionV2[];
+  attributions: ReplayRawAttributionV2[];
 }
 
 export interface Phase2CReplayDataset {
@@ -57,7 +62,11 @@ export interface Phase2CRunDiff {
     top3LowerBoundPct: number | null;
     top3UpperBoundPct: number | null;
     competitorCount: number;
-    sourceReplayStatus: "not_evaluated";
+    sourceReplayStatus: "evaluated";
+    sourceDomainCount: number;
+    sourcePartialMeasurementCount: number;
+    acceptedAttributionCount: number;
+    sourceDiagnosticCount: number;
   };
   currentVisibilityInsideProposedBounds: boolean | null;
   currentTop3InsideProposedBounds: boolean | null;
@@ -80,7 +89,10 @@ export interface Phase2CReplayReport {
     visibilityOutsideBoundsRunCount: number;
     top3OutsideBoundsRunCount: number;
     unresolvedRunCount: number;
-    sourceReplayStatus: "not_evaluated";
+    sourceReplayStatus: "evaluated";
+    sourcePartialRunCount: number;
+    acceptedAttributionCount: number;
+    sourceDiagnosticCount: number;
   };
   runs: Phase2CRunDiff[];
 }
@@ -147,10 +159,9 @@ export function replayPhase2CDataset(
     a.localeCompare(b, "en"),
   )) {
     const first = rows[0]!;
-    const factsRecords: RunMeasurementFactRecordV2[] = [];
     const diagnosticCodes: string[] = [];
 
-    for (const row of rows) {
+    const preliminary = rows.map((row) => {
       const replay = replayHistoricalMeasurementV2({
         measurementId: row.measurementId,
         valid: row.valid,
@@ -162,14 +173,48 @@ export function replayPhase2CDataset(
         storedMentions: row.storedMentions,
       });
 
-      diagnosticCodes.push(...replay.diagnostics.map((item) => item.code));
-      factsRecords.push({
-        fact: replay.facts,
+      diagnosticCodes.push(
+        ...replay.diagnostics
+          .map((item) => item.code)
+          .filter((code) => code !== "SOURCE_REPLAY_NOT_EVALUATED"),
+      );
+
+      return { row, replay };
+    });
+
+    const sourceReplay = replayRunSourcesV2(
+      preliminary.map(({ row, replay }) => ({
+        measurementId: row.measurementId,
+        responseText: row.responseText,
+        targetBusinessId: row.businessId,
+        valid: row.valid,
+        rawParser: row.rawParser,
+        observations: replay.observations,
+        preliminaryFacts: replay.facts,
+        entityMentionLinks: replay.entityMentionLinks,
+        attributions: row.attributions ?? [],
+      })),
+    );
+
+    diagnosticCodes.push(
+      ...sourceReplay.diagnostics.map((item) => item.code),
+    );
+
+    const sourceFactsByMeasurement = new Map(
+      sourceReplay.factsByMeasurement.map((item) => [
+        item.measurementId,
+        item.facts,
+      ]),
+    );
+
+    const factsRecords: RunMeasurementFactRecordV2[] = preliminary.map(
+      ({ row, replay }) => ({
+        fact: sourceFactsByMeasurement.get(row.measurementId) ?? replay.facts,
         questionId: row.questionId,
         questionText: row.questionText,
         intentType: row.intentType,
-      });
-    }
+      }),
+    );
 
     const aggregate = aggregateRunEntityFactsV2(
       first.businessId,
@@ -185,7 +230,12 @@ export function replayPhase2CDataset(
       top3LowerBoundPct: aggregate.overview.top3LowerBoundPct,
       top3UpperBoundPct: aggregate.overview.top3UpperBoundPct,
       competitorCount: aggregate.competitors.length,
-      sourceReplayStatus: "not_evaluated" as const,
+      sourceReplayStatus: "evaluated" as const,
+      sourceDomainCount: aggregate.targetSources.length,
+      sourcePartialMeasurementCount:
+        aggregate.overview.sourcePartialMeasurementCount,
+      acceptedAttributionCount: sourceReplay.acceptedAttributions.length,
+      sourceDiagnosticCount: sourceReplay.diagnostics.length,
     };
 
     runs.push({
@@ -230,7 +280,18 @@ export function replayPhase2CDataset(
       unresolvedRunCount: runs.filter(
         (run) => run.proposed.unresolvedTargetCount > 0,
       ).length,
-      sourceReplayStatus: "not_evaluated",
+      sourceReplayStatus: "evaluated",
+      sourcePartialRunCount: runs.filter(
+        (run) => run.proposed.sourcePartialMeasurementCount > 0,
+      ).length,
+      acceptedAttributionCount: runs.reduce(
+        (sum, run) => sum + run.proposed.acceptedAttributionCount,
+        0,
+      ),
+      sourceDiagnosticCount: runs.reduce(
+        (sum, run) => sum + run.proposed.sourceDiagnosticCount,
+        0,
+      ),
     },
     runs,
   };
