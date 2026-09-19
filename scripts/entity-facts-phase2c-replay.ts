@@ -3,7 +3,11 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   aggregateRunEntityFactsV2,
+  type RunCompetitorFactV2,
   type RunMeasurementFactRecordV2,
+  type RunQuestionAreaV2,
+  type RunQuestionGroupV2,
+  type RunTargetSourceFactV2,
 } from "../supabase/functions/_shared/entity-engine-v2/run-entity-facts-aggregate";
 import {
   replayHistoricalMeasurementV2,
@@ -63,6 +67,10 @@ export interface Phase2CRunDiff {
     top3LowerBoundPct: number | null;
     top3UpperBoundPct: number | null;
     competitorCount: number;
+    questionGroups: RunQuestionGroupV2[];
+    questionAreas: RunQuestionAreaV2[];
+    competitors: RunCompetitorFactV2[];
+    targetSources: RunTargetSourceFactV2[];
     sourceReplayStatus: "evaluated";
     sourceDomainCount: number;
     sourcePartialMeasurementCount: number;
@@ -314,6 +322,10 @@ export function replayPhase2CDataset(
       top3LowerBoundPct: aggregate.overview.top3LowerBoundPct,
       top3UpperBoundPct: aggregate.overview.top3UpperBoundPct,
       competitorCount: aggregate.competitors.length,
+      questionGroups: aggregate.questionGroups,
+      questionAreas: aggregate.questionAreas,
+      competitors: aggregate.competitors,
+      targetSources: aggregate.targetSources,
       sourceReplayStatus: "evaluated" as const,
       sourceDomainCount: aggregate.targetSources.length,
       sourcePartialMeasurementCount:
