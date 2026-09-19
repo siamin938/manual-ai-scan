@@ -66,6 +66,25 @@ export interface CurrentRunMetricsV2 {
   targetSourceDomains: string[];
 }
 
+export interface Phase2CCompetitorDeltaSupportV2 {
+  measurementId: string;
+  entityRef: string | null;
+  identitySurface: string | null;
+  identityDecision: string | null;
+  relationSide: string | null;
+  relationCanonicalKey: string | null;
+  relationReasonCodes: string[];
+  storedMentionIds: string[];
+  storedDisplayNames: string[];
+  storedCanonicalKeys: string[];
+}
+
+export interface Phase2CCompetitorDeltaEvidenceV2 {
+  direction: "added" | "removed";
+  canonicalKey: string;
+  support: Phase2CCompetitorDeltaSupportV2[];
+}
+
 export interface Phase2CRunDiff {
   runId: string;
   businessId: string;
@@ -95,6 +114,7 @@ export interface Phase2CRunDiff {
   currentTop3InsideProposedBounds: boolean | null;
   competitorAdded: string[];
   competitorRemoved: string[];
+  competitorDeltaEvidence: Phase2CCompetitorDeltaEvidenceV2[];
   targetSourceAdded: string[];
   targetSourceRemoved: string[];
   contractOk: boolean;
@@ -276,6 +296,129 @@ function countDiagnostics(
   );
 }
 
+function competitorDeltaEvidence(
+  direction: "added" | "removed",
+  canonicalKeys: string[],
+  preliminary: Array<{
+    row: Phase2CReplayDatasetRow;
+    replay: ReturnType<typeof replayHistoricalMeasurementV2>;
+  }>,
+): Phase2CCompetitorDeltaEvidenceV2[] {
+  return canonicalKeys.map((canonicalKey) => {
+    const support: Phase2CCompetitorDeltaSupportV2[] = [];
+
+    for (const { row, replay } of preliminary) {
+      const relationByRef = new Map(
+        replay.facts.entityRelations.map((relation) => [
+          relation.entityRef,
+          relation,
+        ]),
+      );
+      const decisionByRef = new Map(
+        replay.identityDecisions.map((decision) => [
+          decision.candidateId,
+          decision,
+        ]),
+      );
+      const linkByRef = new Map(
+        replay.entityMentionLinks.map((link) => [link.entityRef, link]),
+      );
+      const storedById = new Map(
+        row.storedMentions.map((mention) => [mention.mentionId, mention]),
+      );
+
+      const refs = new Set<string>();
+
+      if (direction === "added") {
+        for (const relation of replay.facts.entityRelations) {
+          if (
+            relation.side === "other" &&
+            relation.canonicalKey === canonicalKey
+          ) {
+            refs.add(relation.entityRef);
+          }
+        }
+      } else {
+        const mentionIds = row.storedMentions
+          .filter((mention) => mention.canonicalKey === canonicalKey)
+          .map((mention) => mention.mentionId);
+
+        for (const link of replay.entityMentionLinks) {
+          if (link.mentionIds.some((id) => mentionIds.includes(id))) {
+            refs.add(link.entityRef);
+          }
+        }
+
+        if (mentionIds.length > 0 && refs.size === 0) {
+          support.push({
+            measurementId: row.measurementId,
+            entityRef: null,
+            identitySurface: null,
+            identityDecision: null,
+            relationSide: null,
+            relationCanonicalKey: null,
+            relationReasonCodes: ["STORED_COMPETITOR_MENTION_NOT_LINKED_TO_REPLAY_ENTITY"],
+            storedMentionIds: [...mentionIds].sort((a, b) =>
+              a.localeCompare(b, "en")
+            ),
+            storedDisplayNames: row.storedMentions
+              .filter((mention) => mentionIds.includes(mention.mentionId))
+              .map((mention) => mention.displayName)
+              .sort((a, b) => a.localeCompare(b, "ko")),
+            storedCanonicalKeys: [canonicalKey],
+          });
+        }
+      }
+
+      for (const entityRef of [...refs].sort((a, b) =>
+        a.localeCompare(b, "en")
+      )) {
+        const relation = relationByRef.get(entityRef);
+        const decision = decisionByRef.get(entityRef);
+        const linkedIds = linkByRef.get(entityRef)?.mentionIds ?? [];
+        const linkedMentions = linkedIds
+          .map((id) => storedById.get(id))
+          .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+        support.push({
+          measurementId: row.measurementId,
+          entityRef,
+          identitySurface: decision?.identitySurface ?? null,
+          identityDecision: decision?.decision ?? null,
+          relationSide: relation?.side ?? null,
+          relationCanonicalKey: relation?.canonicalKey ?? null,
+          relationReasonCodes: [...(relation?.relationReasonCodes ?? [])],
+          storedMentionIds: linkedMentions
+            .map((mention) => mention.mentionId)
+            .sort((a, b) => a.localeCompare(b, "en")),
+          storedDisplayNames: linkedMentions
+            .map((mention) => mention.displayName)
+            .sort((a, b) => a.localeCompare(b, "ko")),
+          storedCanonicalKeys: [
+            ...new Set(
+              linkedMentions
+                .map((mention) => mention.canonicalKey ?? "")
+                .filter(Boolean),
+            ),
+          ].sort((a, b) => a.localeCompare(b, "en")),
+        });
+      }
+    }
+
+    support.sort(
+      (a, b) =>
+        a.measurementId.localeCompare(b.measurementId, "en") ||
+        (a.entityRef ?? "").localeCompare(b.entityRef ?? "", "en"),
+    );
+
+    return {
+      direction,
+      canonicalKey,
+      support,
+    };
+  });
+}
+
 export function replayPhase2CDataset(
   dataset: Phase2CReplayDataset,
 ): Phase2CReplayReport {
@@ -401,6 +544,21 @@ export function replayPhase2CDataset(
     const currentSourceSet = new Set(current.targetSourceDomains);
     const proposedSourceSet = new Set(proposedTargetSourceDomains);
 
+    const competitorAdded = proposedCompetitorKeys.filter(
+      (key) => !currentCompetitorSet.has(key),
+    );
+    const competitorRemoved = current.competitorKeys.filter(
+      (key) => !proposedCompetitorSet.has(key),
+    );
+    const competitorDeltaReview = [
+      ...competitorDeltaEvidence("added", competitorAdded, preliminary),
+      ...competitorDeltaEvidence("removed", competitorRemoved, preliminary),
+    ].sort(
+      (a, b) =>
+        a.direction.localeCompare(b.direction, "en") ||
+        a.canonicalKey.localeCompare(b.canonicalKey, "en"),
+    );
+
     runs.push({
       runId,
       businessId: first.businessId,
@@ -417,12 +575,9 @@ export function replayPhase2CDataset(
         proposed.top3LowerBoundPct,
         proposed.top3UpperBoundPct,
       ),
-      competitorAdded: proposedCompetitorKeys.filter(
-        (key) => !currentCompetitorSet.has(key),
-      ),
-      competitorRemoved: current.competitorKeys.filter(
-        (key) => !proposedCompetitorSet.has(key),
-      ),
+      competitorAdded,
+      competitorRemoved,
+      competitorDeltaEvidence: competitorDeltaReview,
       targetSourceAdded: proposedTargetSourceDomains.filter(
         (domain) => !currentSourceSet.has(domain),
       ),
