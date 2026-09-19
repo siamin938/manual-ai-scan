@@ -1,0 +1,62 @@
+name: Entity Facts Phase 2C Historical Replay
+
+on:
+  push:
+    branches:
+      - codex/p0-entity-truth-phase2c-replay-v2
+    paths:
+      - ".github/entity-facts-phase2c-replay-trigger"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: entity-facts-phase2c-historical-replay
+  cancel-in-progress: false
+
+jobs:
+  historical-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ENTITY_V2_REPLAY_DATABASE_URL: ${{ secrets.ENTITY_V2_REPLAY_DATABASE_URL }}
+      ENTITY_FACTS_PHASE2C_REPLAY_OUTPUT: /tmp/entity-facts-phase2c-historical-replay.json
+
+    steps:
+      - name: Checkout Phase 2C branch
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Require dedicated read-only replay credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${ENTITY_V2_REPLAY_DATABASE_URL:-}" ]; then
+            echo "Historical replay aborted: ENTITY_V2_REPLAY_DATABASE_URL is absent." >&2
+            exit 2
+          fi
+          echo "Read-only historical replay credential is configured." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run Phase 2C historical replay
+        run: bun scripts/entity-facts-phase2c-historical-replay.live.ts
+
+      - name: Upload review-only summary artifact
+        if: always() && env.ENTITY_V2_REPLAY_DATABASE_URL != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: entity-facts-phase2c-historical-replay-review
+          path: /tmp/entity-facts-phase2c-historical-replay.json
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Remove ephemeral replay output
+        if: always()
+        shell: bash
+        run: rm -f /tmp/entity-facts-phase2c-historical-replay.json
