@@ -93,6 +93,12 @@ describe("Phase 2C historical dataset replay v0.1", () => {
               canonicalKey: `business:${TARGET_ID}`,
             },
           ],
+          currentCompetitors: [
+            {
+              canonicalKey: "auto:레이노개봉점",
+              name: "레이노 개봉점",
+            },
+          ],
         });
       }
       if (index >= 1 && index <= 5) {
@@ -122,7 +128,15 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     expect(run.proposed.top3UncertainCount).toBe(5);
     expect(run.proposed.questionGroups).toHaveLength(1);
     expect(run.proposed.questionAreas).toHaveLength(24);
-    expect(run.proposed.competitors).toEqual([]);
+    expect(run.proposed.competitors).toEqual([
+      {
+        canonicalKey: "auto:레이노개봉점",
+        responseCount: 18,
+        questionCount: 18,
+        intentCount: 1,
+        top3ResponseCount: 18,
+      },
+    ]);
     expect(run.currentVisibilityInsideProposedBounds).toBe(true);
     expect(report.releaseGate.ok).toBe(true);
     expect(report.releaseGate.blockingIssueCount).toBe(0);
@@ -243,6 +257,8 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     const report = replayPhase2CDataset(
       dataset([
         row(1, {
+          responseText: "- 일반 정비 정보",
+          storedMentions: [],
           currentCompetitors: [
             { canonicalKey: "auto:legacy-self", name: "Legacy self" },
           ],
