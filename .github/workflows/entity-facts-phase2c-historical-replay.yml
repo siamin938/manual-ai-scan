@@ -49,12 +49,24 @@ jobs:
           payload="$(jq -nc --arg q "$export_sql" '{query:$q}')"
 
           umask 077
-          curl --fail-with-body --silent --show-error \
+          http_code="$(curl --silent --show-error \
             -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query/read-only" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
             --data "$payload" \
-            > /tmp/entity-facts-phase2c-export-response.json
+            --output /tmp/entity-facts-phase2c-export-response.json \
+            --write-out '%{http_code}')"
+
+          if [ "$http_code" != "201" ]; then
+            echo "Read-only historical export failed with HTTP ${http_code}." >&2
+            jq -c '{
+              code: (.code // null),
+              message: (.message // .error // null),
+              hint: (.hint // null),
+              details: (.details // null)
+            }' /tmp/entity-facts-phase2c-export-response.json >&2 || true
+            exit 22
+          fi
 
           jq -e '
             type == "array" and
