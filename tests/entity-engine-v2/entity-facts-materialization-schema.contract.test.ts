@@ -7,6 +7,13 @@ const migrationPath = resolve(
   "supabase/migrations/20260919144500_entity_facts_v2_materialization.sql",
 );
 const sql = readFileSync(migrationPath, "utf8");
+const servicePrivilegeCorrection = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260919145500_entity_facts_v2_restrict_service_mutation.sql",
+  ),
+  "utf8",
+);
 
 describe("Entity Facts v2 materialization schema contract", () => {
   it("creates separate measurement authority and run aggregate cache tables", () => {
@@ -49,6 +56,12 @@ describe("Entity Facts v2 materialization schema contract", () => {
     );
     expect(sql).not.toMatch(
       /GRANT[^;]*(UPDATE|DELETE)[^;]*run_entity_fact_aggregates_v2/iu,
+    );
+    expect(servicePrivilegeCorrection).toContain(
+      "REVOKE UPDATE, DELETE ON TABLE public.measurement_entity_facts_v2 FROM service_role",
+    );
+    expect(servicePrivilegeCorrection).toContain(
+      "REVOKE UPDATE, DELETE ON TABLE public.run_entity_fact_aggregates_v2 FROM service_role",
     );
   });
 
