@@ -170,7 +170,14 @@ Mixing v1/v2 or multiple Measurement Entity Facts versions in one aggregate is a
 
 ## Phase 2C release-block conditions
 
-Historical replay must block progression toward cutover if it finds any of the following without an explicit, reviewed explanation:
+The executable Phase 2C replay gate blocks by default when:
+- a run aggregate contract fails
+- current visibility falls outside the proposed uncertainty bounds
+- current Top3 falls outside the proposed uncertainty bounds
+
+Those metric differences require explicit review before they can be treated as intentional parser/entity corrections.
+
+Historical replay must also block progression toward cutover if it finds any of the following without an explicit, reviewed explanation:
 
 - target self in competitor set
 - unsafe overmerge
