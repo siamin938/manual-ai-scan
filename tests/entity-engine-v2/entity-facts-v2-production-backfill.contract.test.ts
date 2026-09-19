@@ -34,11 +34,24 @@ describe("Entity Facts v2 production backfill runner contract", () => {
     );
   });
 
-  it("uses one explicit database transaction for all production writes", () => {
+  it("uses one explicit transaction and downgrades to service_role before data access", () => {
     expect(source.match(/\bdb\.begin\s*\(/gu)).toHaveLength(1);
-    expect(source).toContain(
+    const isolation = source.indexOf(
       'await tx.unsafe("set transaction isolation level serializable")',
     );
+    const roleDowngrade = source.indexOf(
+      'await tx.unsafe("set local role service_role")',
+    );
+    const roleCheck = source.indexOf(
+      "BACKFILL_SERVICE_ROLE_DOWNGRADE_FAILED",
+    );
+    const preflight = source.indexOf("BACKFILL_PREFLIGHT_TABLES_NOT_EMPTY");
+
+    expect(isolation).toBeGreaterThan(0);
+    expect(roleDowngrade).toBeGreaterThan(isolation);
+    expect(roleCheck).toBeGreaterThan(roleDowngrade);
+    expect(preflight).toBeGreaterThan(roleCheck);
+    expect(source).toContain('String(roleCheck[0]?.current_user) === "service_role"');
     expect(source).not.toMatch(/\bdb\.unsafe\s*\([^)]*insert/iu);
     expect(source).not.toMatch(/\bcommit\b/iu);
     expect(source).not.toMatch(/\brollback\b/iu);
