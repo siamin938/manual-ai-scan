@@ -117,6 +117,7 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     expect(run.proposed.unresolvedTargetCount).toBe(5);
     expect(run.proposed.visibilityLowerBoundPct).toBe(4.17);
     expect(run.proposed.visibilityUpperBoundPct).toBe(25);
+    expect(run.proposed.top3UncertainCount).toBe(5);
     expect(run.currentVisibilityInsideProposedBounds).toBe(true);
   });
 
