@@ -52,6 +52,7 @@ function row(
         canonicalKey: "auto:레이노개봉점",
       },
     ],
+    attributions: [],
     ...overrides,
   };
 }
@@ -168,10 +169,51 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     ]);
   });
 
-  it("marks source replay as not evaluated instead of silently claiming empty sources", () => {
+  it("evaluates source replay and keeps zero sources explicit when no attribution exists", () => {
     const report = replayPhase2CDataset(dataset([row(1)]));
-    expect(report.summary.sourceReplayStatus).toBe("not_evaluated");
-    expect(report.runs[0]?.proposed.sourceReplayStatus).toBe("not_evaluated");
+    expect(report.summary.sourceReplayStatus).toBe("evaluated");
+    expect(report.runs[0]?.proposed.sourceReplayStatus).toBe("evaluated");
+    expect(report.runs[0]?.proposed.sourceDomainCount).toBe(0);
+    expect(report.runs[0]?.proposed.acceptedAttributionCount).toBe(0);
+  });
+
+  it("feeds stored target attribution through source replay into run source facts", () => {
+    const report = replayPhase2CDataset(
+      dataset([
+        row(1, {
+          responseText: "- 카스페이스 구로점",
+          storedMentions: [
+            {
+              mentionId: "target-mention",
+              displayName: "카스페이스 구로점",
+              matchedBusinessId: TARGET_ID,
+              matchedAlias: "카스페이스구로점",
+              position: 1,
+              canonicalKey: `business:${TARGET_ID}`,
+            },
+          ],
+          attributions: [
+            {
+              attributionId: "source-1",
+              measurementMentionId: "target-mention",
+              canonicalKey: `business:${TARGET_ID}`,
+              domain: "example.com",
+              url: "https://example.com/page",
+              attributionLevel: "direct",
+              evidence: {},
+              citationStartIndex: 20,
+              entityEndIndex: 12,
+            },
+          ],
+        }),
+      ]),
+    );
+
+    expect(report.summary.sourceReplayStatus).toBe("evaluated");
+    expect(report.summary.acceptedAttributionCount).toBe(1);
+    expect(report.runs[0]?.proposed.sourceDomainCount).toBe(1);
+    expect(report.runs[0]?.proposed.acceptedAttributionCount).toBe(1);
+    expect(report.runs[0]?.proposed.sourcePartialMeasurementCount).toBe(0);
   });
 
   it("preserves invalid measurements in total count but excludes them from current denominator", () => {
