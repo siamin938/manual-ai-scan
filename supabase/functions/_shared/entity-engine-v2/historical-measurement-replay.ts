@@ -211,6 +211,15 @@ function findPublicIdentity(
   };
 }
 
+function storedAutoCanonicalSurface(
+  canonicalKey: string | null | undefined,
+): string | null {
+  const key = (canonicalKey ?? "").trim();
+  if (!key.startsWith("auto:")) return null;
+  const surface = compact(key.slice("auto:".length));
+  return surface.length >= 4 ? surface : null;
+}
+
 function matchingMentions(
   candidate: EntityCandidateV2,
   result: IdentityGateResultV2,
@@ -234,7 +243,7 @@ function matchingMentions(
       .filter(Boolean),
   );
 
-  return mentions.filter((mention) =>
+  const exact = mentions.filter((mention) =>
     [
       mention.displayName,
       mention.matchedAlias ?? "",
@@ -243,6 +252,32 @@ function matchingMentions(
       .map(compact)
       .some((value) => Boolean(value && surfaces.has(value))),
   );
+  if (exact.length > 0) return exact;
+
+  // Historical-only bridge: v1 may have stored a canonical auto:<business>
+  // key for one business inside a composite surface such as
+  // "A / B" or "A·B". Reuse that persisted canonical surface only when it
+  // is an exact normalized subspan of the replay candidate. This does not
+  // create a new identity rule and never guesses from an arbitrary name.
+  const candidateSurfaces = [
+    candidate.identitySurface,
+    result.identitySurface,
+    result.canonicalDisplayName ?? "",
+  ]
+    .map(compact)
+    .filter(Boolean);
+
+  return mentions.filter((mention) => {
+    const canonicalSurface = storedAutoCanonicalSurface(
+      mention.canonicalKey,
+    );
+    if (!canonicalSurface) return false;
+    return candidateSurfaces.some(
+      (surface) =>
+        surface === canonicalSurface ||
+        surface.includes(canonicalSurface),
+    );
+  });
 }
 
 function bestStoredPosition(mentions: ReplayStoredMentionV2[]): number | null {
