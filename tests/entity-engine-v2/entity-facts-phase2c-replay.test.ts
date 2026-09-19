@@ -118,6 +118,9 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     expect(run.proposed.visibilityLowerBoundPct).toBe(4.17);
     expect(run.proposed.visibilityUpperBoundPct).toBe(25);
     expect(run.proposed.top3UncertainCount).toBe(5);
+    expect(run.proposed.questionGroups).toHaveLength(1);
+    expect(run.proposed.questionAreas).toHaveLength(24);
+    expect(run.proposed.competitors).toEqual([]);
     expect(run.currentVisibilityInsideProposedBounds).toBe(true);
     expect(report.releaseGate.ok).toBe(true);
     expect(report.releaseGate.blockingIssueCount).toBe(0);
@@ -224,6 +227,14 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     expect(report.runs[0]?.proposed.sourceDomainCount).toBe(1);
     expect(report.runs[0]?.proposed.acceptedAttributionCount).toBe(1);
     expect(report.runs[0]?.proposed.sourcePartialMeasurementCount).toBe(0);
+    expect(report.runs[0]?.proposed.targetSources).toEqual([
+      {
+        domain: "example.com",
+        responseCount: 1,
+        completeResponseCount: 1,
+        partialResponseCount: 0,
+      },
+    ]);
   });
 
   it("preserves invalid measurements in total count but excludes them from current denominator", () => {
