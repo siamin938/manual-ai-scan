@@ -91,9 +91,9 @@ function baseInput(
   };
 }
 
-describe("Measurement Entity Facts v0.2", () => {
+describe("Measurement Entity Facts v0.3", () => {
   it("loads the Phase 2B fixture contract", () => {
-    expect(fixture.version).toBe("0.2");
+    expect(fixture.version).toBe("0.3");
     expect(fixture.cases.length).toBeGreaterThanOrEqual(14);
   });
 
@@ -285,12 +285,67 @@ describe("Measurement Entity Facts v0.2", () => {
             entityRef: "known-other",
             equivalenceDecision: "unresolved",
             targetCandidate: candidateAssessment("not_candidate"),
+            canonicalKey: "auto:known-other",
+            position: 2,
           }),
         ],
       }),
     );
 
     expect(trustedOther.targetSeen).toBe(false);
+    expect(trustedOther.confirmedOtherEntityKeys).toEqual(["auto:known-other"]);
+    expect(trustedOther.entityRelations[0]).toEqual(
+      expect.objectContaining({
+        entityRef: "known-other",
+        side: "other",
+        canonicalKey: "auto:known-other",
+        equivalenceDecision: "unresolved",
+        targetCandidateDecision: "not_candidate",
+      }),
+    );
+  });
+
+  it("keeps trusted non-candidate target-key contradictions fail-closed", () => {
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        entities: [
+          entity({
+            entityRef: "contradictory-other",
+            equivalenceDecision: "unresolved",
+            targetCandidate: candidateAssessment("not_candidate"),
+            canonicalKey: TARGET_KEY,
+            position: 1,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.targetSeen).toBeNull();
+    expect(result.confirmedOtherEntityKeys).toEqual([]);
+    expect(result.dataQualityFlags).toContain("self_key_leakage_blocked");
+    expect(result.entityRelations[0]?.side).toBe("conflict");
+  });
+
+  it("keeps target absence confident but flags a trusted non-candidate missing canonical key", () => {
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        entities: [
+          entity({
+            entityRef: "other-without-key",
+            equivalenceDecision: "unresolved",
+            targetCandidate: candidateAssessment("not_candidate"),
+            canonicalKey: null,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.targetSeen).toBe(false);
+    expect(result.confirmedOtherEntityKeys).toEqual([]);
+    expect(result.dataQualityFlags).toContain(
+      "other_entity_missing_canonical_key",
+    );
+    expect(result.entityRelations[0]?.side).toBe("excluded");
   });
 
   it("returns an authoritative entityRef-to-side projection for downstream consumers", () => {
