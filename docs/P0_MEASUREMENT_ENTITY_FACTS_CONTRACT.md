@@ -1,4 +1,4 @@
-# P0 Measurement Entity Facts Contract — Phase 2B
+# P0 Measurement Entity Facts Contract — Phase 2B v0.2
 
 Status: pure-engine contract only. No Production DB schema, migration, Edge, UI, consumer cutover, or new measurement is part of this phase.
 
@@ -6,176 +6,255 @@ Status: pure-engine contract only. No Production DB schema, migration, Edge, UI,
 
 Phase 2A decides whether a confirmed business is equivalent to the current target.
 
-Phase 2B converts already-decided identity observations into one measurement-level customer-facing fact contract.
-
-The goal is to stop visibility, Top3, question groups, competitor self-exclusion and target source linkage from independently reinterpreting raw parser fields or canonical keys.
+Phase 2B converts already-decided identity observations into one measurement-level authoritative fact contract so visibility, Top3, competitor self-exclusion, and source linkage do not independently reinterpret raw parser flags or canonical keys.
 
 ## Authority rule
 
 `measurements.was_client_mentioned` and `client_position` remain raw parser audit signals only.
 
 They MUST NOT force:
-
 - `targetSeen=true`
 - `targetBestPosition`
 - competitor inclusion/exclusion
 - target source attribution
 
-Authoritative customer-facing target presence comes only from:
+Customer-facing entity truth is built only from versioned authoritative identity/equivalence observations.
 
-1. `identityDecision = confirmed_business`
-2. `equivalenceDecision = equivalent`
-3. projected key exactly equals `business:<CURRENT TARGET BUSINESS ID>`
+## Required target context
 
-## Measurement fact output
+`targetBusinessId` must be a UUID-shaped business identifier.
 
-The pure builder emits:
+Missing, whitespace-only, or non-UUID target IDs fail closed:
+- `targetSeen=null`
+- no entity/source facts
+- `invalid_target_business_id`
 
-- `targetSeen: true | false | null`
-- `targetBestPosition`
-- `confirmedOtherEntityKeys`
-- `confirmedOtherEntities[{ canonicalKey, bestPosition }]`
-- `targetCitationDomains`
-- `targetAttributionLinks`
-- unresolved identity counts
-- versioned data-quality flags
+## Entity observation provenance
 
-No raw provider response or persisted v1 field is mutated.
+Every confirmed-business observation carries:
+- `equivalenceDecision`
+- `equivalenceVersion`
+- `equivalenceReasons`
+- `equivalenceEvidenceKinds`
+- versioned target-candidate assessment
+
+A confirmed-business row without equivalence version/reason provenance is an identity contract conflict and cannot become customer truth.
+
+## Target-candidate assessment
+
+The old recall-only boolean is not sufficient.
+
+The contract is:
+
+```ts
+type TargetCandidateAssessment = {
+  decision: "candidate" | "not_candidate" | "unknown";
+  version: string;
+  reasonCodes: string[];
+  evidenceKinds?: string[];
+  inputComplete: boolean;
+};
+```
+
+For an unresolved confirmed business:
+- trusted `candidate` → target presence remains unresolved
+- trusted `not_candidate` → does not by itself block a confident negative
+- `unknown`, incomplete input, missing version, or missing reason → fail closed and emit `target_candidate_provenance_incomplete`
+
+The candidate assessment may prevent a false negative. It never proves target equivalence.
+
+## Duplicate entityRef contract
+
+`entityRef` is a unique identity observation reference.
+
+- Semantically identical duplicate rows may be deduplicated.
+- Conflicting rows sharing the same `entityRef` are a data-integrity conflict.
+- Conflicting duplicates MUST NOT use first-row-wins or last-row-wins.
+- They emit a `conflict` relation, flag `entity_ref_conflict`, and force `targetSeen=null`.
+
+Results must be invariant to input array permutation.
+
+## Measurement-level entity projection
+
+The facts output includes a versioned relation for every unique `entityRef`:
+
+```ts
+entityRelations: Array<{
+  entityRef: string;
+  side: "target" | "other" | "unresolved" | "excluded" | "conflict";
+  canonicalKey: string | null;
+  bestPosition: number | null;
+  identityDecision: IdentityDecisionV2 | null;
+  equivalenceDecision: TargetEquivalenceDecision | null;
+  equivalenceVersion: string | null;
+  equivalenceEvidenceKinds: string[];
+  targetCandidateDecision: TargetCandidateDecisionV2 | null;
+  targetCandidateVersion: string | null;
+  targetCandidateReasonCodes: string[];
+  relationReasonCodes: string[];
+}>
+```
+
+This mapping is the intended future join authority for competitor/source/action consumers. Those consumers must not re-run target/self classification.
 
 ## targetSeen semantics
 
 ### true
 
-At least one confirmed entity has:
-
-- Target Equivalence = `equivalent`
-- projected canonical key = current target key
-
-Multiple aliases/surfaces in one answer still count as one measurement-level target presence.
+At least one conflict-free authoritative relation has:
+- confirmed business identity
+- `equivalenceDecision=equivalent`
+- projected key exactly equal to `business:<CURRENT TARGET BUSINESS ID>`
 
 ### false
 
-No authoritative target-equivalent entity exists, and no unresolved target candidate can change that conclusion.
-
-A raw parser positive alone does not change false to true.
+No target relation exists, no identity contract conflict exists, and no unresolved target candidate or incomplete target-candidate provenance could change the conclusion.
 
 ### null
 
-The measurement is not valid, or authoritative identity is incomplete in a way that could change target presence.
+Any of the following:
+- invalid measurement
+- invalid target business context
+- conflicting duplicate `entityRef`
+- equivalent projection mismatch
+- distinct entity carrying the current target canonical key
+- unresolved target candidate
+- incomplete/unknown target-candidate provenance
 
-Examples:
+A null measurement is not silently counted as a negative.
 
-- unresolved broad-recall target candidate
-- an `equivalent` decision whose projected key violates the current-target contract
+## Projection conflicts
 
-A null fact is not silently counted as a negative.
+These combinations are contract violations and fail closed:
+
+- `equivalent` with a projected key other than current target
+- `distinct` with canonical key equal to current target
+- conflicting duplicate `entityRef`
+
+Even if another normal target relation exists in the same measurement, an identity contract conflict makes the measurement target truth `null` until the bad input is resolved.
 
 ## Position semantics
 
-`targetBestPosition` is the minimum valid 1-based position among authoritative target-equivalent observations.
+`targetBestPosition` is the minimum valid 1-based integer position among authoritative target relations.
 
-Raw `client_position` is not used as a fallback.
+Raw `client_position` is never a fallback.
 
-If target is authoritatively present but no authoritative position exists:
-
+If target is authoritative but all authoritative positions are missing/invalid:
 - `targetSeen=true`
 - `targetBestPosition=null`
-- quality flag `target_position_missing`
+- `target_position_missing`
+
+If raw parser says target was present and its valid position differs from authoritative best position:
+- customer fact remains authoritative
+- quality flag `parser_position_mismatch` is emitted
 
 ## Parser quality comparison
 
-Parser output is compared only after authoritative facts exist.
-
 - raw false + authoritative true → `parser_false_negative`
 - raw true + authoritative false → `parser_false_positive`
-- authoritative null → no false-positive/false-negative label is forced
-
-This preserves parser diagnostics without letting parser state control customer metrics.
+- authoritative null → no forced false-positive/false-negative label
+- raw and authoritative valid positions differ → `parser_position_mismatch`
 
 ## Competitor/self rule
 
-Only confirmed businesses with:
+Only relations with:
+- `side=other`
+- non-empty canonical key
+- canonical key different from current target
 
-- Target Equivalence = `distinct`
-- a non-empty canonical key
-- canonical key different from the current target key
+enter `confirmedOtherEntityKeys` / `confirmedOtherEntities`.
 
-enter the authoritative other-entity facts.
+The facts builder deduplicates identical canonical keys and preserves minimum valid position.
 
-For each distinct canonical key, Phase 2B preserves the minimum valid 1-based mention position as `bestPosition`. This prevents later competitor significance/Top3 consumers from having to re-read raw `measurement_mentions` and recreate identity side independently.
+Significance/ranking belongs downstream; entity side does not.
 
-Rules:
+## Attribution contract
 
-- equivalent entities never enter other-entity keys
-- unresolved entities never enter other-entity keys
-- duplicate mentions of the same distinct canonical entity collapse to one measurement-level entity fact with the best authoritative position
-- if a distinct entity somehow carries the current target key, it is blocked and flagged `self_key_leakage_blocked`
-- distinct entities without a canonical key are excluded and flagged
+Attribution IDs must also be unique.
 
-Significance/ranking belongs downstream. This facts layer decides entity side only.
+- Semantically identical duplicate attribution rows may dedupe.
+- Conflicting rows sharing an attribution ID are rejected as a group.
+- No first-row-wins behavior is permitted.
+- Conflict emits `attribution_id_conflict`.
+- Entity attribution uses `entityRelations`, not fresh identity classification.
 
-## Attribution rule
+Target attribution is accepted only when:
+- relation side is `target`
+- input URL provenance says `validated_http_https`
+- stored URL parses as HTTP/HTTPS
+- supplied domain exactly matches URL hostname after `www.` normalization
 
-Target attribution is accepted only when its linked entity is:
+The original stored URL string is preserved exactly. The facts layer does not invent or reconstruct URLs.
 
-- confirmed business
-- Target Equivalence = equivalent
-- projected to current target key
+Rejected/unverifiable source evidence makes `sourceFactsStatus=partial`.
 
-The stored URL is carried through as supplied. The facts engine does not invent URLs from domains or business names.
+## Source facts status
 
-If attribution is linked to an unresolved target candidate, the target attribution is not accepted and a quality flag is emitted.
+`sourceFactsStatus` is:
+- `complete` when no source/identity quality issue affects source-side confidence
+- `partial` when identity/source conflicts or validation failures exist
 
-## Broad target-candidate signal
-
-`isTargetCandidate` is recall-only metadata supplied upstream.
-
-It may cause fail-closed `targetSeen=null` when equivalence remains unresolved.
-
-It MUST NOT prove equivalence or target presence.
-
-Its upstream generation contract must be separately reviewed before runtime cutover.
+Downstream source/action consumers must not interpret partial as “no source”.
 
 ## Invalid measurements
 
 Invalid measurements produce:
-
 - `targetSeen=null`
-- no competitor/source facts
+- no competitor/source/entity-relation facts
 - `invalid_measurement`
+- `sourceFactsStatus=partial`
 
-They do not contribute to customer-facing rate denominators in later aggregation.
+They do not contribute to later customer-facing denominators.
 
-## Invariants
+## Determinism
 
-1. RAW_PARSER_NOT_AUTHORITY  
-   Toggling raw parser mention state does not change authoritative targetSeen for identical authoritative entities.
+The pure builder must be:
+- side-effect free
+- input immutable
+- repeat deterministic
+- permutation-stable for semantically identical input sets
+- deterministic on conflict: conflicts produce the same fail-closed result regardless of row ordering
+- stable in quality-flag ordering for reproducible replay hashes
 
-2. SELF_NOT_COMPETITOR  
-   Equivalent/self keys cannot enter `confirmedOtherEntityKeys` or `confirmedOtherEntities`.
+## Required invariants
 
-3. BEST_POSITION  
-   Multiple target-equivalent mentions collapse to one measurement fact with the minimum authoritative position.
+1. RAW_PARSER_NOT_AUTHORITY
+2. SELF_NOT_COMPETITOR
+3. BEST_POSITION
+4. FAIL_CLOSED_ON_IDENTITY_CONFLICT
+5. TARGET_CANDIDATE_PROVENANCE_REQUIRED
+6. ENTITY_RELATION_SINGLE_TRUTH
+7. SOURCE_TARGET_CONSISTENCY
+8. DUPLICATE_ENTITY_REF_ORDER_INDEPENDENT
+9. DUPLICATE_ATTRIBUTION_ID_ORDER_INDEPENDENT
+10. VALID_TARGET_CONTEXT_REQUIRED
+11. RAW_PRESERVATION
+12. STABLE_SERIALIZATION
 
-4. FAIL_CLOSED  
-   Unresolved target candidates and projection contract violations never become confident false.
+## Synthetic run contract
 
-5. SOURCE_TARGET_CONSISTENCY  
-   Only authoritative target-equivalent entity links enter target attribution/source facts.
+A pure 24-measurement fixture with:
+- 24 valid measurements
+- 6 authoritative target-equivalent measurements
+- raw parser positive on only 1 of those 6
+- all 6 authoritative target positions <=3
 
-6. RAW_PRESERVATION  
-   Builder is deterministic, side-effect-free, and input-immutable.
+must aggregate to:
+- denominator 24
+- authoritative target seen 6
+- visibility 25%
+- Top3 6
+- current target key appearing as competitor 0
+
+This is a contract fixture, not a claim about any Production business.
 
 ## Deferred to later phases
 
 Not part of Phase 2B pure-engine work:
-
 - DB schema/materialization
-- migrations
-- RLS
-- diagnostic consumer changes
-- significance changes
-- source/action/benchmark changes
+- migrations/RLS
+- diagnostic consumer cutover
+- significance/source/action/benchmark cutover
 - historical replay against Production
 - runtime feature flag
 - customer UI
