@@ -186,6 +186,60 @@ describe("Entity Engine v2 single-authority identity gate", () => {
     expect(twin?.decision).toBe("confirmed_business");
   });
 
+  it("keeps a descriptorless list business unresolved even with directly indented address and phone evidence", () => {
+    const text = [
+      "- **루미나**",
+      "  서울 성동구 자동차로 123, ☎ 02-1234-5678",
+    ].join("\n");
+
+    const { results } = evaluate(text);
+    const result = results.find((item) => item.identitySurface === "루미나");
+
+    expect(result?.decision).toBe("unresolved");
+    expect(
+      result?.evidence.some(
+        (item) =>
+          item.provenance === "list_detail_child" &&
+          (item.type === "address" || item.type === "phone"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not let sibling descriptorless businesses share one list item's address and phone as confirmation", () => {
+    const text = [
+      "- **루미나 / 아르코**",
+      "  서울 성동구 자동차로 123, ☎ 02-1234-5678",
+    ].join("\n");
+
+    const { candidates, results } = evaluate(text);
+    const siblingSurfaces = candidates
+      .filter((item) => item.nodeId === candidates[0]?.nodeId)
+      .map((item) => item.identitySurface)
+      .sort();
+
+    expect(siblingSurfaces).toEqual(["루미나", "아르코"]);
+
+    const lumina = results.find((item) => item.identitySurface === "루미나");
+    const arco = results.find((item) => item.identitySurface === "아르코");
+
+    expect(lumina?.decision).toBe("unresolved");
+    expect(arco?.decision).toBe("unresolved");
+    expect(
+      lumina?.evidence.some(
+        (item) =>
+          item.provenance === "list_detail_child" &&
+          (item.type === "address" || item.type === "phone"),
+      ),
+    ).toBe(true);
+    expect(
+      arco?.evidence.some(
+        (item) =>
+          item.provenance === "list_detail_child" &&
+          (item.type === "address" || item.type === "phone"),
+      ),
+    ).toBe(true);
+  });
+
   it("does not leak an unindented paragraph into the previous list-item identity", () => {
     const text = [
       "- **판교메젠모터스**",
