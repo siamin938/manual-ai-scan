@@ -140,11 +140,13 @@ export function buildMeasurementEntityFactsV2(
   const otherKeys: string[] = [];
   let unresolvedIdentityCount = 0;
   let unresolvedTargetCandidateCount = 0;
+  let equivalentProjectionMismatchCount = 0;
 
   for (const entity of confirmed) {
     if (entity.equivalenceDecision === "equivalent") {
       if (clean(entity.projectedCanonicalKey) !== targetKey) {
         flags.push("equivalent_projection_mismatch");
+        equivalentProjectionMismatchCount += 1;
         continue;
       }
       equivalent.push(entity);
@@ -172,9 +174,14 @@ export function buildMeasurementEntityFactsV2(
   let targetSeen: boolean | null;
   if (equivalent.length > 0) {
     targetSeen = true;
-  } else if (unresolvedTargetCandidateCount > 0) {
+  } else if (
+    equivalentProjectionMismatchCount > 0 ||
+    unresolvedTargetCandidateCount > 0
+  ) {
     targetSeen = null;
-    flags.push("target_identity_unresolved");
+    if (unresolvedTargetCandidateCount > 0) {
+      flags.push("target_identity_unresolved");
+    }
   } else {
     targetSeen = false;
   }
