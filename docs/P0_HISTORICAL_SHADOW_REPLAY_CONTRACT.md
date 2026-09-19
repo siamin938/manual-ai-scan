@@ -137,14 +137,24 @@ Significance/ranking remains downstream and must not reclassify target/self iden
 
 Target sources are derived from Phase 2B target source facts.
 
+Phase 2C historical replay evaluates source attribution at run scope using only persisted `measurement_citation_attributions` rows from attribution contract version `0.1.0`.
+
+Source replay MUST:
+- map attribution to the already-produced `entityRelations`
+- never re-decide target/self identity
+- use only the stored citation URL/domain
+- reject non-HTTP(S), infrastructure hosts, comparative-target context, and unsupported weak section evidence according to the versioned source replay contract
+- keep unresolved/conflicting entity mappings partial rather than treating them as zero source
+
 `sourceFactsStatus=partial` does not mean no source.
 
 Run aggregation preserves:
 - total responses containing a target source domain
 - complete source-fact response count
 - partial source-fact response count
+- accepted attribution count and replay diagnostics for review
 
-Future source/action replay must not treat partial evidence as fully complete or as empty.
+Action replay remains deferred.
 
 ## Fact version consistency
 
