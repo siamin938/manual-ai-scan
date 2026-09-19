@@ -69,6 +69,32 @@ describe("Historical Measurement Replay Adapter v0.1", () => {
     ).toBe(true);
   });
 
+  it("recovers an exact registered target mention from prose without raw parser authority", () => {
+    const result = replayHistoricalMeasurementV2(
+      baseInput({
+        responseText:
+          "자동차 썬팅 범위 상담이라면 **카스페이스 구로점**부터 문의해보시는 게 괜찮습니다. ([hunnytip.kr](https://www.hunnytip.kr/example))",
+        rawParser: {
+          wasClientMentioned: false,
+          clientPosition: null,
+        },
+        storedMentions: [],
+      }),
+    );
+
+    expect(result.facts.targetSeen).toBe(true);
+    expect(result.facts.targetBestPosition).toBeNull();
+    expect(result.facts.dataQualityFlags).toContain("parser_false_negative");
+    expect(result.facts.dataQualityFlags).toContain("target_position_missing");
+    expect(
+      result.identityDecisions.some(
+        (decision) =>
+          decision.decision === "confirmed_business" &&
+          decision.canonicalBusinessId === TARGET_ID,
+      ),
+    ).toBe(true);
+  });
+
   it("treats unsupported naver.me storage URLs as unavailable canonical evidence", () => {
     const shortUrl = "https://naver.me/xSBsENP8";
     const result = replayHistoricalMeasurementV2(
