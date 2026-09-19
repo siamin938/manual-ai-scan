@@ -80,12 +80,18 @@ export interface HistoricalMeasurementReplayDiagnosticV2 {
   detail: string;
 }
 
+export interface ReplayEntityMentionLinkV2 {
+  entityRef: string;
+  mentionIds: string[];
+}
+
 export interface HistoricalMeasurementReplayResultV2 {
   version: typeof HISTORICAL_MEASUREMENT_REPLAY_VERSION;
   sourceReplayStatus: "not_evaluated";
   facts: MeasurementEntityFactsV2;
   observations: MeasurementEntityObservationV2[];
   identityDecisions: IdentityGateResultV2[];
+  entityMentionLinks: ReplayEntityMentionLinkV2[];
   diagnostics: HistoricalMeasurementReplayDiagnosticV2[];
 }
 
@@ -393,6 +399,24 @@ export function replayHistoricalMeasurementV2(
     return result ? [observationFor(candidate, result, input, diagnostics)] : [];
   });
 
+  const entityMentionLinks = candidates.flatMap((candidate) => {
+    const result = byCandidateId.get(candidate.id);
+    if (!result) return [];
+    return [
+      {
+        entityRef: candidate.id,
+        mentionIds: matchingMentions(
+          candidate,
+          result,
+          input.storedMentions ?? [],
+        )
+          .map((mention) => mention.mentionId)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, "en")),
+      },
+    ];
+  });
+
   const facts = buildMeasurementEntityFactsV2({
     measurementId: input.measurementId,
     targetBusinessId: input.target.id,
@@ -408,6 +432,7 @@ export function replayHistoricalMeasurementV2(
     facts,
     observations,
     identityDecisions: decisions,
+    entityMentionLinks,
     diagnostics,
   };
 }
