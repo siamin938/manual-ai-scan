@@ -77,6 +77,29 @@ export interface Phase2CRunDiff {
   replayDiagnostics: Record<string, number>;
 }
 
+export type Phase2CReplayGateIssueCode =
+  | "RUN_CONTRACT_ISSUE"
+  | "CURRENT_VISIBILITY_OUTSIDE_PROPOSED_BOUNDS"
+  | "CURRENT_TOP3_OUTSIDE_PROPOSED_BOUNDS";
+
+export interface Phase2CReplayGateIssue {
+  code: Phase2CReplayGateIssueCode;
+  runId: string;
+  detail: string;
+}
+
+export interface Phase2CReplayReleaseGate {
+  version: "0.1";
+  ok: boolean;
+  blockingIssueCount: number;
+  issues: Phase2CReplayGateIssue[];
+  checks: {
+    contractIssueRuns: number;
+    visibilityOutsideBoundsRuns: number;
+    top3OutsideBoundsRuns: number;
+  };
+}
+
 export interface Phase2CReplayReport {
   version: "0.1";
   datasetVersion: string;
@@ -96,6 +119,65 @@ export interface Phase2CReplayReport {
     sourceDiagnosticCount: number;
   };
   runs: Phase2CRunDiff[];
+  releaseGate: Phase2CReplayReleaseGate;
+}
+
+function buildReleaseGate(
+  runs: Phase2CRunDiff[],
+): Phase2CReplayReleaseGate {
+  const issues: Phase2CReplayGateIssue[] = [];
+
+  for (const run of runs) {
+    if (!run.contractOk) {
+      issues.push({
+        code: "RUN_CONTRACT_ISSUE",
+        runId: run.runId,
+        detail: run.contractIssues.map((item) => item.code).join(",") ||
+          "Run aggregate contract failed.",
+      });
+    }
+    if (run.currentVisibilityInsideProposedBounds === false) {
+      issues.push({
+        code: "CURRENT_VISIBILITY_OUTSIDE_PROPOSED_BOUNDS",
+        runId: run.runId,
+        detail:
+          `Current visibility ${run.current.visibilityRatePct} is outside proposed bounds ${run.proposed.visibilityLowerBoundPct}-${run.proposed.visibilityUpperBoundPct}.`,
+      });
+    }
+    if (run.currentTop3InsideProposedBounds === false) {
+      issues.push({
+        code: "CURRENT_TOP3_OUTSIDE_PROPOSED_BOUNDS",
+        runId: run.runId,
+        detail:
+          `Current Top3 ${run.current.top3RatePct} is outside proposed bounds ${run.proposed.top3LowerBoundPct}-${run.proposed.top3UpperBoundPct}.`,
+      });
+    }
+  }
+
+  issues.sort(
+    (a, b) =>
+      a.runId.localeCompare(b.runId, "en") ||
+      a.code.localeCompare(b.code, "en"),
+  );
+
+  const count = (code: Phase2CReplayGateIssueCode) =>
+    issues.filter((issue) => issue.code === code).length;
+
+  return {
+    version: "0.1",
+    ok: issues.length === 0,
+    blockingIssueCount: issues.length,
+    issues,
+    checks: {
+      contractIssueRuns: count("RUN_CONTRACT_ISSUE"),
+      visibilityOutsideBoundsRuns: count(
+        "CURRENT_VISIBILITY_OUTSIDE_PROPOSED_BOUNDS",
+      ),
+      top3OutsideBoundsRuns: count(
+        "CURRENT_TOP3_OUTSIDE_PROPOSED_BOUNDS",
+      ),
+    },
+  };
 }
 
 function pct(numerator: number, denominator: number): number | null {
@@ -263,6 +345,8 @@ export function replayPhase2CDataset(
     });
   }
 
+  const releaseGate = buildReleaseGate(runs);
+
   return {
     version: "0.1",
     datasetVersion: dataset.version,
@@ -296,6 +380,7 @@ export function replayPhase2CDataset(
       ),
     },
     runs,
+    releaseGate,
   };
 }
 
