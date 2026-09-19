@@ -284,7 +284,9 @@
           "auto:competitor"
         ],
         "domains": [],
-        "flags": [],
+        "flags": [
+          "parser_position_mismatch"
+        ],
         "unresolvedIdentityCount": 0,
         "unresolvedTargetCandidateCount": 0,
         "sourceStatus": "complete"
@@ -325,7 +327,7 @@
         ]
       },
       "expected": {
-        "targetSeen": false,
+        "targetSeen": null,
         "targetBestPosition": null,
         "otherKeys": [],
         "domains": [],
