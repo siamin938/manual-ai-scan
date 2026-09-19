@@ -35,7 +35,7 @@ jobs:
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
 
-      - name: Probe Supabase Management API read-only query
+      - name: Export Phase 2C replay dataset via Supabase Management API
         shell: bash
         run: |
           set -euo pipefail
@@ -44,22 +44,102 @@ jobs:
             exit 2
           fi
 
-          payload="$(jq -nc --arg q 'select 1 as ok' '{query:$q}')"
-          response="$(curl --fail-with-body --silent --show-error \
+          export_sql="$(cat scripts/sql/export-entity-facts-phase2c-replay.sql)"
+          payload="$(jq -nc --arg q "$export_sql" '{query:$q}')"
+
+          umask 077
+          curl --fail-with-body --silent --show-error \
             -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
-            --data "$payload")"
+            --data "$payload" \
+            > /tmp/entity-facts-phase2c-export-response.json
 
-          echo "Management API read-only query succeeded."
-          echo "$response" | jq -c 'if type=="array" then {type:"array",length:length,first:(.[0] // null)} else {type:type,keys:(keys // [])} end'
+          jq -e '
+            type == "array" and
+            length == 1 and
+            (.[0].dataset_json | type) == "string"
+          ' /tmp/entity-facts-phase2c-export-response.json >/dev/null
 
-      - name: Historical replay execution
+          jq -r '.[0].dataset_json' \
+            /tmp/entity-facts-phase2c-export-response.json \
+            > /tmp/entity-facts-phase2c-dataset.json
+
+          jq -e '
+            .version == "entity-facts-phase2c-export-v0.1" and
+            (.rows | type) == "array" and
+            (.rows | length) > 0
+          ' /tmp/entity-facts-phase2c-dataset.json >/dev/null
+
+          row_count="$(jq '.rows | length' /tmp/entity-facts-phase2c-dataset.json)"
+          echo "Phase 2C historical export completed: ${row_count} measurements." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run Phase 2C historical replay
         shell: bash
         run: |
-          echo "Management API probe only; full replay will run after response contract is confirmed."
+          set -euo pipefail
+          umask 077
 
-      - name: Remove ephemeral replay output
+          bun scripts/entity-facts-phase2c-replay.ts \
+            /tmp/entity-facts-phase2c-dataset.json \
+            > "${ENTITY_FACTS_PHASE2C_REPLAY_OUTPUT}"
+
+          jq -c '{
+            summary: .summary,
+            releaseGate: .releaseGate,
+            runs: [.runs[] | {
+              runId,
+              businessId,
+              businessName,
+              currentVisibilityPct: .current.visibilityRatePct,
+              proposedVisibilityLowerPct: .proposed.visibilityLowerBoundPct,
+              proposedVisibilityUpperPct: .proposed.visibilityUpperBoundPct,
+              currentTop3Pct: .current.top3RatePct,
+              proposedTop3LowerPct: .proposed.top3LowerBoundPct,
+              proposedTop3UpperPct: .proposed.top3UpperBoundPct,
+              confirmedMentionCount: .proposed.confirmedMentionCount,
+              unresolvedTargetCount: .proposed.unresolvedTargetCount,
+              competitorCount: .proposed.competitorCount,
+              sourceDomainCount: .proposed.sourceDomainCount,
+              sourcePartialMeasurementCount: .proposed.sourcePartialMeasurementCount,
+              competitorAdded,
+              competitorRemoved,
+              targetSourceAdded,
+              targetSourceRemoved,
+              contractOk
+            }]
+          }' "${ENTITY_FACTS_PHASE2C_REPLAY_OUTPUT}" \
+            > /tmp/entity-facts-phase2c-log-summary.json
+
+          echo "Replay summary:"
+          cat /tmp/entity-facts-phase2c-log-summary.json
+
+      - name: Upload review-only replay report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: entity-facts-phase2c-historical-replay-review
+          path: /tmp/entity-facts-phase2c-historical-replay.json
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Enforce Phase 2C release gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.releaseGate.ok == true' \
+            "${ENTITY_FACTS_PHASE2C_REPLAY_OUTPUT}" >/dev/null || {
+              echo "Phase 2C release gate is BLOCKED." >&2
+              jq -c '.releaseGate' "${ENTITY_FACTS_PHASE2C_REPLAY_OUTPUT}" >&2
+              exit 1
+            }
+
+      - name: Remove ephemeral replay data
         if: always()
         shell: bash
-        run: rm -f /tmp/entity-facts-phase2c-historical-replay.json
+        run: |
+          rm -f \
+            /tmp/entity-facts-phase2c-export-response.json \
+            /tmp/entity-facts-phase2c-dataset.json \
+            /tmp/entity-facts-phase2c-log-summary.json \
+            /tmp/entity-facts-phase2c-historical-replay.json
