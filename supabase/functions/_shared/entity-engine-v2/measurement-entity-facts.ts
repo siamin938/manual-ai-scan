@@ -1,7 +1,7 @@
 import type { IdentityDecisionV2 } from "./identity-gate.ts";
 import type { TargetEquivalenceDecision } from "./target-equivalence.ts";
 
-export const MEASUREMENT_ENTITY_FACTS_VERSION = "0.2" as const;
+export const MEASUREMENT_ENTITY_FACTS_VERSION = "0.3" as const;
 
 export type MeasurementEntityFactQualityFlag =
   | "invalid_measurement"
@@ -15,6 +15,7 @@ export type MeasurementEntityFactQualityFlag =
   | "equivalence_provenance_incomplete"
   | "equivalent_projection_mismatch"
   | "distinct_entity_missing_canonical_key"
+  | "other_entity_missing_canonical_key"
   | "self_key_leakage_blocked"
   | "entity_ref_conflict"
   | "attribution_identity_unresolved"
@@ -141,6 +142,7 @@ const FLAG_ORDER: MeasurementEntityFactQualityFlag[] = [
   "equivalent_projection_mismatch",
   "self_key_leakage_blocked",
   "distinct_entity_missing_canonical_key",
+  "other_entity_missing_canonical_key",
   "target_candidate_provenance_incomplete",
   "target_identity_unresolved",
   "target_position_missing",
@@ -459,16 +461,57 @@ export function buildMeasurementEntityFactsV2(
       if (!trusted) {
         flags.push("target_candidate_provenance_incomplete");
         unresolvedTargetCandidateCount += 1;
-      } else if (candidate.decision === "candidate") {
+        relations.push(
+          relationFromEntity(entity, "unresolved", null, [
+            ...entity.equivalenceReasons,
+            "TARGET_CANDIDATE_PROVENANCE_INCOMPLETE",
+          ]),
+        );
+        continue;
+      }
+
+      if (candidate.decision === "candidate") {
         unresolvedTargetCandidateCount += 1;
+        relations.push(
+          relationFromEntity(entity, "unresolved", null, [
+            ...entity.equivalenceReasons,
+            "TARGET_CANDIDATE_CANDIDATE",
+          ]),
+        );
+        continue;
+      }
+
+      const key = normalizeCanonicalBusinessKey(entity.canonicalKey);
+      if (!key) {
+        flags.push("other_entity_missing_canonical_key");
+        relations.push(
+          relationFromEntity(entity, "excluded", null, [
+            ...entity.equivalenceReasons,
+            "TARGET_CANDIDATE_NOT_CANDIDATE",
+            "OTHER_ENTITY_MISSING_CANONICAL_KEY",
+          ]),
+        );
+        continue;
+      }
+
+      if (key === targetKey) {
+        flags.push("self_key_leakage_blocked");
+        hasIdentityContractConflict = true;
+        relations.push(
+          relationFromEntity(entity, "conflict", null, [
+            ...entity.equivalenceReasons,
+            "TARGET_CANDIDATE_NOT_CANDIDATE",
+            "UNRESOLVED_NON_CANDIDATE_HAS_CURRENT_TARGET_KEY",
+          ]),
+        );
+        continue;
       }
 
       relations.push(
-        relationFromEntity(entity, "unresolved", null, [
+        relationFromEntity(entity, "other", key, [
           ...entity.equivalenceReasons,
-          trusted
-            ? `TARGET_CANDIDATE_${candidate.decision.toUpperCase()}`
-            : "TARGET_CANDIDATE_PROVENANCE_INCOMPLETE",
+          "TARGET_CANDIDATE_NOT_CANDIDATE",
+          "AUTHORITATIVE_OTHER_BY_TARGET_CANDIDATE",
         ]),
       );
       continue;
