@@ -29,6 +29,14 @@ Missing, whitespace-only, or non-UUID target IDs fail closed:
 - no entity/source facts
 - `invalid_target_business_id`
 
+## Canonical business UUID representation
+
+Within Phase 2B, a valid canonical key of the form `business:<UUID>` uses one semantic UUID representation: the UUID payload is normalized to lowercase before identity equality, self-exclusion, deduplication, and relation projection.
+
+UUID letter casing alone MUST NOT create a separate entity. The current target UUID MUST NOT enter competitor output only because another observation uses uppercase or mixed-case hexadecimal letters.
+
+This normalization is intentionally narrow. It applies only to valid `business:<UUID>` keys. Other canonical-key namespaces and malformed `business:*` values are not broadly lowercased or fuzzily normalized.
+
 ## Entity observation provenance
 
 Every confirmed-business observation carries:
