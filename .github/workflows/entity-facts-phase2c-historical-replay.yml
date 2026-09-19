@@ -80,43 +80,43 @@ jobs:
           export PROJECT_REF="$SUPABASE_PROJECT_REF"
 
           replay_url="$(python3 - <<'PY'
-import json
-import os
-from urllib.parse import quote
-
-items = json.loads(os.environ["POOLER_JSON"])
-if not isinstance(items, list) or not items:
-    raise SystemExit("No Supavisor pooler config returned")
-
-primary = next((x for x in items if x.get("database_type") == "PRIMARY"), items[0])
-host = primary.get("db_host")
-port = primary.get("db_port")
-dbname = primary.get("db_name") or "postgres"
-base_user = primary.get("db_user") or ""
-role = os.environ["TEMP_ROLE"]
-project_ref = os.environ["PROJECT_REF"]
-
-if not host or not port:
-    raise SystemExit("Pooler host/port missing")
-
-suffix = "." + project_ref
-user = role + suffix if base_user.endswith(suffix) else role
-password = os.environ["TEMP_PASSWORD"]
-
-print(
-    "postgresql://"
-    + quote(user, safe="")
-    + ":"
-    + quote(password, safe="")
-    + "@"
-    + host
-    + ":"
-    + str(port)
-    + "/"
-    + quote(dbname, safe="")
-)
-PY
-)"
+          import json
+          import os
+          from urllib.parse import quote
+          
+          items = json.loads(os.environ["POOLER_JSON"])
+          if not isinstance(items, list) or not items:
+              raise SystemExit("No Supavisor pooler config returned")
+          
+          primary = next((x for x in items if x.get("database_type") == "PRIMARY"), items[0])
+          host = primary.get("db_host")
+          port = primary.get("db_port")
+          dbname = primary.get("db_name") or "postgres"
+          base_user = primary.get("db_user") or ""
+          role = os.environ["TEMP_ROLE"]
+          project_ref = os.environ["PROJECT_REF"]
+          
+          if not host or not port:
+              raise SystemExit("Pooler host/port missing")
+          
+          suffix = "." + project_ref
+          user = role + suffix if base_user.endswith(suffix) else role
+          password = os.environ["TEMP_PASSWORD"]
+          
+          print(
+              "postgresql://"
+              + quote(user, safe="")
+              + ":"
+              + quote(password, safe="")
+              + "@"
+              + host
+              + ":"
+              + str(port)
+              + "/"
+              + quote(dbname, safe="")
+          )
+          PY
+          )"
 
           echo "::add-mask::$replay_url"
           echo "ENTITY_V2_REPLAY_DATABASE_URL=$replay_url" >> "$GITHUB_ENV"
