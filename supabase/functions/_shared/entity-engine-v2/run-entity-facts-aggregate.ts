@@ -24,6 +24,7 @@ export interface VisibilityBoundsV2 {
   visibilityLowerBoundPct: number | null;
   visibilityUpperBoundPct: number | null;
   confirmedTop3Count: number;
+  top3UncertainCount: number;
   top3LowerBoundPct: number | null;
   top3UpperBoundPct: number | null;
 }
@@ -134,6 +135,13 @@ function buildBounds(
       record.fact.targetBestPosition !== null &&
       record.fact.targetBestPosition <= 3,
   ).length;
+  const confirmedPositionUnknownCount = valid.filter(
+    (record) =>
+      record.fact.targetSeen === true &&
+      record.fact.targetBestPosition === null,
+  ).length;
+  const top3UncertainCount =
+    unresolvedTargetCount + confirmedPositionUnknownCount;
 
   return {
     validCount: valid.length,
@@ -145,9 +153,10 @@ function buildBounds(
       valid.length,
     ),
     confirmedTop3Count,
+    top3UncertainCount,
     top3LowerBoundPct: pct(confirmedTop3Count, valid.length),
     top3UpperBoundPct: pct(
-      confirmedTop3Count + unresolvedTargetCount,
+      confirmedTop3Count + top3UncertainCount,
       valid.length,
     ),
   };
