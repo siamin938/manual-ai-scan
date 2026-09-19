@@ -16,3 +16,4 @@ run=post-slash-fix-2026-09-19T22:40+09:00
 run=post-branch-conflict-fix-2026-09-19T23:00+09:00
 run=final-evidence-backed-gate-2026-09-19T23:10+09:00
 run=materializer-real-dry-run-2026-09-20
+run=materializer-dry-run-safe-error-probe-2026-09-20
