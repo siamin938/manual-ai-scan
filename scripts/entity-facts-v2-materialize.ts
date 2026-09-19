@@ -192,6 +192,11 @@ export function buildEntityFactsV2Materialization(
     if (!UUID_RE.test(runId)) {
       throw new Error(`MATERIALIZATION_RUN_ID_INVALID:${row.runId}`);
     }
+    if (!UUID_RE.test(row.measurementId.trim())) {
+      throw new Error(
+        `MATERIALIZATION_MEASUREMENT_ID_INVALID:${row.measurementId}`,
+      );
+    }
     const current = byRun.get(runId.toLowerCase()) ?? [];
     current.push(row);
     byRun.set(runId.toLowerCase(), current);
