@@ -11,7 +11,11 @@ on:
       - "tests/fixtures/entity-golden-corpus*.json"
       - "tests/fixtures/entity-v2-shadow-*.json"
       - "scripts/entity-v2-shadow-replay.ts"
+      - "scripts/entity-facts-phase2c-replay.ts"
+      - "scripts/entity-facts-v2-materialize.ts"
+      - "scripts/entity-facts-v2-materialize-dry-run.ts"
       - "scripts/sql/export-entity-v2-replay.sql"
+      - "scripts/sql/export-entity-facts-phase2c-replay.sql"
       - ".github/workflows/entity-engine-v2.yml"
   workflow_dispatch:
 
