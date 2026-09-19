@@ -125,6 +125,9 @@ jobs:
             /tmp/entity-facts-phase2c-dataset.json \
             --expected-runs=23 \
             --expected-measurements=428 \
+            --regression-run=28a793c9-c24d-41ff-9037-f08abc21b3ca \
+            --expected-lower=4.17 \
+            --expected-upper=29.17 \
             > "${ENTITY_FACTS_V2_DRY_RUN_SUMMARY}"
 
           jq -e '
@@ -138,7 +141,12 @@ jobs:
             .semanticMatch == true and
             .hashChecksOk == true and
             .scopeChecksOk == true and
-            .duplicateMeasurementIds == 0
+            .duplicateMeasurementIds == 0 and
+            .unresolvedRunCount == 2 and
+            .sourcePartialRunCount == 16 and
+            .regressionRun.matched == true and
+            .regressionRun.visibilityLowerBoundPct == 4.17 and
+            .regressionRun.visibilityUpperBoundPct == 29.17
           ' "${ENTITY_FACTS_V2_DRY_RUN_SUMMARY}" >/dev/null
 
           echo "Materializer dry-run summary:"
