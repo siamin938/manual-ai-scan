@@ -352,6 +352,158 @@ describe("Measurement Entity Facts v0.2", () => {
     }
   });
 
+  it("canonicalizes uppercase target business UUID projection without mismatch", () => {
+    const upperTarget = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        targetBusinessId: upperTarget,
+        entities: [
+          entity({
+            entityRef: "upper-target",
+            equivalenceDecision: "equivalent",
+            projectedCanonicalKey: `business:${upperTarget}`,
+            targetCandidate: candidateAssessment("candidate"),
+            position: 1,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.targetSeen).toBe(true);
+    expect(result.entityRelations[0]?.canonicalKey).toBe(
+      "business:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    );
+    expect(result.dataQualityFlags).not.toContain(
+      "equivalent_projection_mismatch",
+    );
+  });
+
+  it("accepts mixed-case equivalent projection for the lowercase current target", () => {
+    const target = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        targetBusinessId: target,
+        entities: [
+          entity({
+            entityRef: "mixed-target",
+            equivalenceDecision: "equivalent",
+            projectedCanonicalKey:
+              "business:AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+            targetCandidate: candidateAssessment("candidate"),
+            position: 2,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.targetSeen).toBe(true);
+    expect(result.targetBestPosition).toBe(2);
+    expect(result.dataQualityFlags).not.toContain(
+      "equivalent_projection_mismatch",
+    );
+  });
+
+  it("blocks mixed-case current target business UUID from competitor output", () => {
+    const target = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        targetBusinessId: target,
+        entities: [
+          entity({
+            entityRef: "mixed-self",
+            equivalenceDecision: "distinct",
+            canonicalKey:
+              "business:AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+            targetCandidate: candidateAssessment("not_candidate"),
+            position: 1,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.targetSeen).toBeNull();
+    expect(result.confirmedOtherEntityKeys).toEqual([]);
+    expect(result.confirmedOtherEntities).toEqual([]);
+    expect(result.dataQualityFlags).toContain("self_key_leakage_blocked");
+    expect(result.entityRelations[0]?.side).toBe("conflict");
+  });
+
+  it("deduplicates other business UUID canonical keys across casing", () => {
+    const foreignLower =
+      "business:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const foreignUpper =
+      "business:BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB";
+
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        entities: [
+          entity({
+            entityRef: "foreign-a",
+            equivalenceDecision: "distinct",
+            canonicalKey: foreignUpper,
+            position: 5,
+          }),
+          entity({
+            entityRef: "foreign-b",
+            equivalenceDecision: "distinct",
+            canonicalKey: foreignLower,
+            position: 2,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.confirmedOtherEntityKeys).toEqual([foreignLower]);
+    expect(result.confirmedOtherEntities).toEqual([
+      { canonicalKey: foreignLower, bestPosition: 2 },
+    ]);
+  });
+
+  it("treats duplicate entityRef business UUID keys differing only by case as identical", () => {
+    const lower =
+      "business:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const upper =
+      "business:BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB";
+
+    const first = entity({
+      entityRef: "same-business-ref",
+      equivalenceDecision: "distinct",
+      canonicalKey: lower,
+      position: 2,
+    });
+    const second = {
+      ...structuredClone(first),
+      canonicalKey: upper,
+    };
+
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({ entities: [first, second] }),
+    );
+
+    expect(result.targetSeen).toBe(false);
+    expect(result.confirmedOtherEntityKeys).toEqual([lower]);
+    expect(result.dataQualityFlags).not.toContain("entity_ref_conflict");
+  });
+
+  it("does not canonicalize malformed business keys into the current target", () => {
+    const result = buildMeasurementEntityFactsV2(
+      baseInput({
+        entities: [
+          entity({
+            entityRef: "malformed-business-key",
+            equivalenceDecision: "equivalent",
+            projectedCanonicalKey: "business:not-a-uuid",
+            targetCandidate: candidateAssessment("candidate"),
+            position: 1,
+          }),
+        ],
+      }),
+    );
+
+    expect(result.targetSeen).toBeNull();
+    expect(result.dataQualityFlags).toContain("equivalent_projection_mismatch");
+  });
+
   it("fails closed and order-independently on conflicting duplicate attributionId", () => {
     const target = entity({
       entityRef: "target",
