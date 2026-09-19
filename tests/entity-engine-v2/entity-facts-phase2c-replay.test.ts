@@ -53,6 +53,8 @@ function row(
       },
     ],
     attributions: [],
+    currentCompetitors: [],
+    currentTargetSources: [],
     ...overrides,
   };
 }
@@ -235,6 +237,34 @@ describe("Phase 2C historical dataset replay v0.1", () => {
         partialResponseCount: 0,
       },
     ]);
+  });
+
+  it("compares current competitor and target-source baselines with proposed facts", () => {
+    const report = replayPhase2CDataset(
+      dataset([
+        row(1, {
+          currentCompetitors: [
+            { canonicalKey: "auto:legacy-self", name: "Legacy self" },
+          ],
+          currentTargetSources: [
+            { domain: "old.example", responseCount: 1 },
+          ],
+        }),
+      ]),
+    );
+
+    const run = report.runs[0]!;
+    expect(run.competitorAdded).toEqual([]);
+    expect(run.competitorRemoved).toEqual(["auto:legacy-self"]);
+    expect(run.targetSourceAdded).toEqual([]);
+    expect(run.targetSourceRemoved).toEqual(["old.example"]);
+    expect(report.releaseGate.ok).toBe(false);
+    expect(report.releaseGate.issues.map((item) => item.code)).toEqual(
+      expect.arrayContaining([
+        "CURRENT_COMPETITOR_SET_CHANGED",
+        "CURRENT_TARGET_SOURCE_REMOVED",
+      ]),
+    );
   });
 
   it("preserves invalid measurements in total count but excludes them from current denominator", () => {
