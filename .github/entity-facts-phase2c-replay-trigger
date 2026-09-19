@@ -2,3 +2,4 @@ phase2c-replay-v0.1
 run=2026-09-19T20:37+09:00
 probe=credential-paths-2026-09-19
 probe=ephemeral-readonly-bootstrap-2026-09-19
+probe=ephemeral-readonly-yaml-fixed-2026-09-19
