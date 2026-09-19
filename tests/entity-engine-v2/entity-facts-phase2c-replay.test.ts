@@ -253,6 +253,70 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     ]);
   });
 
+  it("allows an evidence-backed newly confirmed competitor", () => {
+    const report = replayPhase2CDataset(dataset([row(1)]));
+    const run = report.runs[0]!;
+
+    expect(run.competitorAdded).toEqual(["auto:레이노개봉점"]);
+    expect(run.competitorDeltaEvidence[0]?.support).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          identityDecision: "confirmed_business",
+          relationSide: "other",
+          relationCanonicalKey: "auto:레이노개봉점",
+        }),
+      ]),
+    );
+    expect(
+      report.releaseGate.issues.some(
+        (item) => item.code === "CURRENT_COMPETITOR_SET_CHANGED",
+      ),
+    ).toBe(false);
+    expect(report.releaseGate.ok).toBe(true);
+  });
+
+  it("allows an evidence-backed competitor removal when the new identity gate is unresolved", () => {
+    const report = replayPhase2CDataset(
+      dataset([
+        row(1, {
+          responseText: "- **루미나**",
+          storedMentions: [
+            {
+              mentionId: "legacy-lumina",
+              displayName: "루미나",
+              position: 1,
+              canonicalKey: "auto:루미나",
+            },
+          ],
+          currentCompetitors: [
+            {
+              canonicalKey: "auto:루미나",
+              name: "루미나",
+            },
+          ],
+        }),
+      ]),
+    );
+
+    const run = report.runs[0]!;
+    expect(run.competitorRemoved).toEqual(["auto:루미나"]);
+    expect(run.competitorDeltaEvidence[0]?.support).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          identityDecision: "unresolved",
+          relationSide: "excluded",
+          storedCanonicalKeys: ["auto:루미나"],
+        }),
+      ]),
+    );
+    expect(
+      report.releaseGate.issues.some(
+        (item) => item.code === "CURRENT_COMPETITOR_SET_CHANGED",
+      ),
+    ).toBe(false);
+    expect(report.releaseGate.ok).toBe(true);
+  });
+
   it("compares current competitor and target-source baselines with proposed facts", () => {
     const report = replayPhase2CDataset(
       dataset([
