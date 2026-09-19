@@ -155,6 +155,9 @@ Source replay MUST:
 `sourceFactsStatus=partial` does not mean no source.
 
 Run aggregation preserves:
+- question-group and question-area details
+- full proposed competitor facts, not only competitor count
+- full proposed target-source domain facts, not only source count
 - total responses containing a target source domain
 - complete source-fact response count
 - partial source-fact response count
