@@ -119,6 +119,8 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     expect(run.proposed.visibilityUpperBoundPct).toBe(25);
     expect(run.proposed.top3UncertainCount).toBe(5);
     expect(run.currentVisibilityInsideProposedBounds).toBe(true);
+    expect(report.releaseGate.ok).toBe(true);
+    expect(report.releaseGate.blockingIssueCount).toBe(0);
   });
 
   it("flags a raw parser metric that falls outside authoritative proposed bounds", () => {
@@ -138,6 +140,13 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     expect(report.runs[0]?.proposed.visibilityUpperBoundPct).toBe(0);
     expect(report.runs[0]?.currentVisibilityInsideProposedBounds).toBe(false);
     expect(report.summary.visibilityOutsideBoundsRunCount).toBe(1);
+    expect(report.releaseGate.ok).toBe(false);
+    expect(report.releaseGate.issues.map((item) => item.code)).toEqual(
+      expect.arrayContaining([
+        "CURRENT_VISIBILITY_OUTSIDE_PROPOSED_BOUNDS",
+        "CURRENT_TOP3_OUTSIDE_PROPOSED_BOUNDS",
+      ]),
+    );
   });
 
   it("groups multiple runs independently", () => {
