@@ -64,13 +64,51 @@ describe("Target Candidate Assessment v0.1", () => {
     ).toBe(true);
   });
 
-  it("keeps a same-brand different-branch surface in candidate recall instead of false", () => {
+  it("rejects an explicit same-brand different-branch surface as not_candidate", () => {
     const result = assessTargetCandidateV2({
       target: TARGET,
       observed: {
         name: "카스페이스 강남점",
       },
       observedSurface: "카스페이스 강남점",
+      inputComplete: true,
+    });
+
+    expect(result.decision).toBe("not_candidate");
+    expect(result.evidenceKinds).toContain("explicit_branch_conflict");
+  });
+
+  it("rejects Tirepro Bongilcheon vs Unjeong as an explicit branch conflict", () => {
+    const result = assessTargetCandidateV2({
+      target: {
+        ...TARGET,
+        name: "타이어프로 봉일천점",
+        aliases: [],
+      },
+      observed: {
+        name: "타이어프로 운정점",
+      },
+      observedSurface: "타이어프로 운정점",
+      inputComplete: true,
+    });
+
+    expect(result.decision).toBe("not_candidate");
+    expect(result.reasonCodes).toContain(
+      "TARGET_CANDIDATE_EXPLICIT_BRANCH_CONFLICT",
+    );
+  });
+
+  it("keeps same location branch variants in candidate recall", () => {
+    const result = assessTargetCandidateV2({
+      target: {
+        ...TARGET,
+        aliases: [],
+        fullAddress: null,
+      },
+      observed: {
+        name: "카스페이스 구로 본점",
+      },
+      observedSurface: "카스페이스 구로 본점",
       inputComplete: true,
     });
 
