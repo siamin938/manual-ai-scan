@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      ENTITY_V2_REPLAY_DATABASE_URL: ${{ secrets.ENTITY_V2_REPLAY_DATABASE_URL }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: qoirkwmnyolquvsgbian
       ENTITY_FACTS_PHASE2C_REPLAY_OUTPUT: /tmp/entity-facts-phase2c-historical-replay.json
@@ -36,115 +35,29 @@ jobs:
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
 
-      - name: Bootstrap temporary read-only replay credential
-        id: replay-credential
+      - name: Probe Supabase Management API read-only query
         shell: bash
         run: |
           set -euo pipefail
-
-          if [ -n "${ENTITY_V2_REPLAY_DATABASE_URL:-}" ]; then
-            echo "credential_source=dedicated_database_url" >> "$GITHUB_OUTPUT"
-            echo "Dedicated read-only replay credential is configured." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
           if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
-            echo "Historical replay aborted: neither ENTITY_V2_REPLAY_DATABASE_URL nor SUPABASE_ACCESS_TOKEN is configured." >&2
+            echo "Historical replay aborted: SUPABASE_ACCESS_TOKEN is not configured." >&2
             exit 2
           fi
 
-          login_json="$(curl --fail-with-body --silent --show-error \
-            -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/cli/login-role" \
+          payload="$(jq -nc --arg q 'select 1 as ok' '{query:$q}')"
+          response="$(curl --fail-with-body --silent --show-error \
+            -X POST "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
             -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{"read_only":true}')"
+            --data "$payload")"
 
-          temp_role="$(jq -r '.role // empty' <<<"$login_json")"
-          temp_password="$(jq -r '.password // empty' <<<"$login_json")"
-          ttl_seconds="$(jq -r '.ttl_seconds // 0' <<<"$login_json")"
+          echo "Management API read-only query succeeded."
+          echo "$response" | jq -c 'if type=="array" then {type:"array",length:length,first:(.[0] // null)} else {type:type,keys:(keys // [])} end'
 
-          if [ -z "$temp_role" ] || [ -z "$temp_password" ]; then
-            echo "Supabase did not return a temporary read-only login role." >&2
-            exit 3
-          fi
-
-          echo "::add-mask::$temp_password"
-
-          pooler_json="$(curl --fail-with-body --silent --show-error \
-            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/config/database/pooler" \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}")"
-
-          export TEMP_ROLE="$temp_role"
-          export TEMP_PASSWORD="$temp_password"
-          export POOLER_JSON="$pooler_json"
-          export PROJECT_REF="$SUPABASE_PROJECT_REF"
-
-          replay_url="$(python3 - <<'PY'
-          import json
-          import os
-          from urllib.parse import quote
-          
-          items = json.loads(os.environ["POOLER_JSON"])
-          if not isinstance(items, list) or not items:
-              raise SystemExit("No Supavisor pooler config returned")
-          
-          primary = next((x for x in items if x.get("database_type") == "PRIMARY"), items[0])
-          host = primary.get("db_host")
-          port = primary.get("db_port")
-          dbname = primary.get("db_name") or "postgres"
-          base_user = primary.get("db_user") or ""
-          role = os.environ["TEMP_ROLE"]
-          project_ref = os.environ["PROJECT_REF"]
-          
-          if not host or not port:
-              raise SystemExit("Pooler host/port missing")
-          
-          suffix = "." + project_ref
-          user = role + suffix if base_user.endswith(suffix) else role
-          password = os.environ["TEMP_PASSWORD"]
-          
-          print(
-              "postgresql://"
-              + quote(user, safe="")
-              + ":"
-              + quote(password, safe="")
-              + "@"
-              + host
-              + ":"
-              + str(port)
-              + "/"
-              + quote(dbname, safe="")
-          )
-          PY
-          )"
-
-          echo "::add-mask::$replay_url"
-          echo "ENTITY_V2_REPLAY_DATABASE_URL=$replay_url" >> "$GITHUB_ENV"
-          echo "credential_source=temporary_read_only_login" >> "$GITHUB_OUTPUT"
-          echo "temporary_role_created=true" >> "$GITHUB_OUTPUT"
-          echo "Temporary read-only Supabase login role created (TTL: ${ttl_seconds}s)." >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Run Phase 2C historical replay
-        run: bun scripts/entity-facts-phase2c-historical-replay.live.ts
-
-      - name: Upload review-only summary artifact
-        if: always() && env.ENTITY_V2_REPLAY_DATABASE_URL != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: entity-facts-phase2c-historical-replay-review
-          path: /tmp/entity-facts-phase2c-historical-replay.json
-          if-no-files-found: warn
-          retention-days: 1
-
-      - name: Delete temporary Supabase login role
-        if: always() && steps.replay-credential.outputs.temporary_role_created == 'true'
+      - name: Historical replay execution
         shell: bash
         run: |
-          set -euo pipefail
-          curl --fail-with-body --silent --show-error \
-            -X DELETE "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/cli/login-role" \
-            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" >/dev/null
-          echo "Temporary Supabase login role deleted." >> "$GITHUB_STEP_SUMMARY"
+          echo "Management API probe only; full replay will run after response contract is confirmed."
 
       - name: Remove ephemeral replay output
         if: always()
