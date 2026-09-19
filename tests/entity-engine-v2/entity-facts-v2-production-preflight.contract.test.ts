@@ -2,6 +2,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+
+const workflow = readFileSync(
+  resolve(
+    process.cwd(),
+    ".github/workflows/entity-facts-v2-production-preflight.yml",
+  ),
+  "utf8",
+);
+
 const source = readFileSync(
   resolve(
     process.cwd(),
@@ -81,5 +90,24 @@ describe("Entity Facts v2 production preflight contract", () => {
     expect(source).not.toMatch(/postgres(?:ql)?:\/\/[^"']+:[^"']+@/u);
     expect(source).not.toMatch(/console\.log\([^)]*(?:token|password)/iu);
     expect(source).not.toMatch(/console\.error\([^)]*(?:token|password)/iu);
+  });
+
+  it("workflow is trigger-file-only and never calls the backfill runner", () => {
+    expect(workflow).toContain(
+      '.github/entity-facts-v2-production-preflight-trigger',
+    );
+    expect(workflow).toContain(
+      'bun scripts/entity-facts-v2-production-preflight.ts',
+    );
+    expect(workflow).not.toContain(
+      'bun scripts/entity-facts-v2-production-backfill.ts',
+    );
+    expect(workflow).not.toMatch(/workflow_dispatch:/u);
+    expect(workflow).not.toMatch(/schedule:/u);
+    expect(workflow).not.toMatch(/pull_request:/u);
+    expect(workflow).toContain('SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}');
+    expect(workflow).toContain('.measurementFactRows == 0');
+    expect(workflow).toContain('.aggregateRows == 0');
+    expect(workflow).toContain('.temporaryLoginRoleDeleted == true');
   });
 });
