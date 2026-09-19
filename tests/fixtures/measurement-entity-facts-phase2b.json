@@ -1,12 +1,12 @@
 {
-  "version": "0.1",
-  "description": "Phase 2B pure Measurement Entity Facts fixtures. No DB/Edge/UI contract.",
+  "version": "0.2",
+  "description": "Phase 2B Measurement Entity Facts v0.2 fixtures. Pure engine only; no DB/Edge/UI contract.",
   "cases": [
     {
       "id": "F1-parser-false-negative-recovered",
       "input": {
         "measurementId": "m1",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": false,
@@ -17,9 +17,22 @@
             "entityRef": "e1",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "equivalent",
-            "isTargetCandidate": true,
-            "projectedCanonicalKey": "business:target-1",
-            "position": 1
+            "projectedCanonicalKey": "business:11111111-1111-4111-8111-111111111111",
+            "position": 1,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_EQUIVALENT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ],
         "attributions": [
@@ -27,7 +40,8 @@
             "attributionId": "a1",
             "entityRef": "e1",
             "domain": "www.example.com",
-            "url": "https://example.com/store/target"
+            "url": "https://example.com/store/target",
+            "urlValidation": "validated_http_https"
           }
         ]
       },
@@ -42,14 +56,15 @@
           "parser_false_negative"
         ],
         "unresolvedIdentityCount": 0,
-        "unresolvedTargetCandidateCount": 0
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "complete"
       }
     },
     {
       "id": "F2-parser-false-positive-blocked",
       "input": {
         "measurementId": "m2",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": true,
@@ -60,9 +75,22 @@
             "entityRef": "e2",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "distinct",
-            "isTargetCandidate": false,
             "canonicalKey": "auto:other-shop",
-            "position": 1
+            "position": 1,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_DISTINCT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "not_candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_NOT_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ]
       },
@@ -77,14 +105,15 @@
           "parser_false_positive"
         ],
         "unresolvedIdentityCount": 0,
-        "unresolvedTargetCandidateCount": 0
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "complete"
       }
     },
     {
       "id": "F3-unresolved-target-candidate-fails-closed",
       "input": {
         "measurementId": "m3",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": false,
@@ -95,9 +124,22 @@
             "entityRef": "e3",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "unresolved",
-            "isTargetCandidate": true,
             "canonicalKey": "auto:maybe-target",
-            "position": 2
+            "position": 2,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_UNRESOLVED"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ]
       },
@@ -110,14 +152,15 @@
           "target_identity_unresolved"
         ],
         "unresolvedIdentityCount": 1,
-        "unresolvedTargetCandidateCount": 1
+        "unresolvedTargetCandidateCount": 1,
+        "sourceStatus": "complete"
       }
     },
     {
       "id": "F4-unresolved-unrelated-does-not-block-negative",
       "input": {
         "measurementId": "m4",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": false,
@@ -128,9 +171,22 @@
             "entityRef": "e4",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "unresolved",
-            "isTargetCandidate": false,
             "canonicalKey": "auto:unknown-other",
-            "position": 3
+            "position": 3,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_UNRESOLVED"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "not_candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_NOT_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ]
       },
@@ -141,14 +197,15 @@
         "domains": [],
         "flags": [],
         "unresolvedIdentityCount": 1,
-        "unresolvedTargetCandidateCount": 0
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "complete"
       }
     },
     {
       "id": "F5-multiple-target-mentions-use-best-position",
       "input": {
         "measurementId": "m5",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": true,
@@ -159,25 +216,64 @@
             "entityRef": "e5a",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "equivalent",
-            "isTargetCandidate": true,
-            "projectedCanonicalKey": "business:target-1",
-            "position": 4
+            "projectedCanonicalKey": "business:11111111-1111-4111-8111-111111111111",
+            "position": 4,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_EQUIVALENT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           },
           {
             "entityRef": "e5b",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "equivalent",
-            "isTargetCandidate": true,
-            "projectedCanonicalKey": "business:target-1",
-            "position": 2
+            "projectedCanonicalKey": "business:11111111-1111-4111-8111-111111111111",
+            "position": 2,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_EQUIVALENT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           },
           {
             "entityRef": "e5c",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "distinct",
-            "isTargetCandidate": false,
             "canonicalKey": "auto:competitor",
-            "position": 1
+            "position": 1,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_DISTINCT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "not_candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_NOT_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ]
       },
@@ -190,14 +286,15 @@
         "domains": [],
         "flags": [],
         "unresolvedIdentityCount": 0,
-        "unresolvedTargetCandidateCount": 0
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "complete"
       }
     },
     {
       "id": "F6-self-key-leakage-blocked",
       "input": {
         "measurementId": "m6",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": false,
@@ -208,9 +305,22 @@
             "entityRef": "e6",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "distinct",
-            "isTargetCandidate": false,
-            "canonicalKey": "business:target-1",
-            "position": 1
+            "canonicalKey": "business:11111111-1111-4111-8111-111111111111",
+            "position": 1,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_DISTINCT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "not_candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_NOT_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ]
       },
@@ -223,14 +333,15 @@
           "self_key_leakage_blocked"
         ],
         "unresolvedIdentityCount": 0,
-        "unresolvedTargetCandidateCount": 0
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "partial"
       }
     },
     {
       "id": "F7-equivalent-projection-mismatch-fails-closed",
       "input": {
         "measurementId": "m7",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": false,
@@ -241,9 +352,22 @@
             "entityRef": "e7",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "equivalent",
-            "isTargetCandidate": true,
             "projectedCanonicalKey": "business:foreign",
-            "position": 1
+            "position": 1,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_EQUIVALENT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ]
       },
@@ -256,14 +380,15 @@
           "equivalent_projection_mismatch"
         ],
         "unresolvedIdentityCount": 0,
-        "unresolvedTargetCandidateCount": 0
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "partial"
       }
     },
     {
       "id": "F8-target-position-missing-is-quality-flag",
       "input": {
         "measurementId": "m8",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": true,
@@ -274,9 +399,22 @@
             "entityRef": "e8",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "equivalent",
-            "isTargetCandidate": true,
-            "projectedCanonicalKey": "business:target-1",
-            "position": null
+            "projectedCanonicalKey": "business:11111111-1111-4111-8111-111111111111",
+            "position": null,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_EQUIVALENT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ]
       },
@@ -289,14 +427,15 @@
           "target_position_missing"
         ],
         "unresolvedIdentityCount": 0,
-        "unresolvedTargetCandidateCount": 0
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "complete"
       }
     },
     {
       "id": "F9-attribution-follows-authoritative-entity-side",
       "input": {
         "measurementId": "m9",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": true,
         "rawParser": {
           "wasClientMentioned": false,
@@ -307,25 +446,64 @@
             "entityRef": "e9t",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "equivalent",
-            "isTargetCandidate": true,
-            "projectedCanonicalKey": "business:target-1",
-            "position": 2
+            "projectedCanonicalKey": "business:11111111-1111-4111-8111-111111111111",
+            "position": 2,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_EQUIVALENT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           },
           {
             "entityRef": "e9o",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "distinct",
-            "isTargetCandidate": false,
             "canonicalKey": "auto:other",
-            "position": 1
+            "position": 1,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_DISTINCT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "not_candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_NOT_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           },
           {
             "entityRef": "e9u",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "unresolved",
-            "isTargetCandidate": true,
             "canonicalKey": "auto:maybe",
-            "position": 3
+            "position": 3,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_UNRESOLVED"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ],
         "attributions": [
@@ -333,19 +511,22 @@
             "attributionId": "a9t",
             "entityRef": "e9t",
             "domain": "WWW.Target.EXAMPLE",
-            "url": "https://target.example/page"
+            "url": "https://target.example/page",
+            "urlValidation": "validated_http_https"
           },
           {
             "attributionId": "a9o",
             "entityRef": "e9o",
             "domain": "other.example",
-            "url": "https://other.example/page"
+            "url": "https://other.example/page",
+            "urlValidation": "validated_http_https"
           },
           {
             "attributionId": "a9u",
             "entityRef": "e9u",
             "domain": "maybe.example",
-            "url": "https://maybe.example/page"
+            "url": "https://maybe.example/page",
+            "urlValidation": "validated_http_https"
           }
         ]
       },
@@ -363,14 +544,15 @@
           "attribution_identity_unresolved"
         ],
         "unresolvedIdentityCount": 1,
-        "unresolvedTargetCandidateCount": 1
+        "unresolvedTargetCandidateCount": 1,
+        "sourceStatus": "partial"
       }
     },
     {
       "id": "F10-invalid-measurement-never-contributes",
       "input": {
         "measurementId": "m10",
-        "targetBusinessId": "target-1",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
         "valid": false,
         "rawParser": {
           "wasClientMentioned": true,
@@ -381,9 +563,22 @@
             "entityRef": "e10",
             "identityDecision": "confirmed_business",
             "equivalenceDecision": "equivalent",
-            "isTargetCandidate": true,
-            "projectedCanonicalKey": "business:target-1",
-            "position": 1
+            "projectedCanonicalKey": "business:11111111-1111-4111-8111-111111111111",
+            "position": 1,
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_EQUIVALENT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            }
           }
         ]
       },
@@ -396,7 +591,215 @@
           "invalid_measurement"
         ],
         "unresolvedIdentityCount": 0,
-        "unresolvedTargetCandidateCount": 0
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "complete"
+      }
+    },
+    {
+      "id": "F11-distinct-current-target-key-fails-closed",
+      "input": {
+        "measurementId": "m11",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e11",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "distinct",
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE_DISTINCT"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "not_candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_NOT_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            },
+            "position": 1,
+            "canonicalKey": "business:11111111-1111-4111-8111-111111111111"
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": null,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "self_key_leakage_blocked"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "partial"
+      }
+    },
+    {
+      "id": "F12-candidate-provenance-unknown-fails-closed",
+      "input": {
+        "measurementId": "m12",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e12",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "unresolved",
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "unknown",
+              "version": "",
+              "reasonCodes": [],
+              "evidenceKinds": [],
+              "inputComplete": false
+            },
+            "position": null
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": null,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "target_candidate_provenance_incomplete",
+          "target_identity_unresolved"
+        ],
+        "unresolvedIdentityCount": 1,
+        "unresolvedTargetCandidateCount": 1,
+        "sourceStatus": "partial"
+      }
+    },
+    {
+      "id": "F13-invalid-target-business-id-fails-closed",
+      "input": {
+        "measurementId": "m13",
+        "targetBusinessId": "   ",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": true,
+          "clientPosition": 1
+        },
+        "entities": [
+          {
+            "entityRef": "e13",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            },
+            "position": 1,
+            "projectedCanonicalKey": "business:11111111-1111-4111-8111-111111111111"
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": null,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "invalid_target_business_id"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "partial"
+      }
+    },
+    {
+      "id": "F14-normal-target-plus-projection-mismatch-is-conflict",
+      "input": {
+        "measurementId": "m14",
+        "targetBusinessId": "11111111-1111-4111-8111-111111111111",
+        "valid": true,
+        "rawParser": {
+          "wasClientMentioned": false,
+          "clientPosition": null
+        },
+        "entities": [
+          {
+            "entityRef": "e14-good",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            },
+            "position": 2,
+            "projectedCanonicalKey": "business:11111111-1111-4111-8111-111111111111"
+          },
+          {
+            "entityRef": "e14-bad",
+            "identityDecision": "confirmed_business",
+            "equivalenceDecision": "equivalent",
+            "equivalenceVersion": "0.3",
+            "equivalenceReasons": [
+              "FIXTURE"
+            ],
+            "equivalenceEvidenceKinds": [],
+            "targetCandidate": {
+              "decision": "candidate",
+              "version": "fixture-candidate-v1",
+              "reasonCodes": [
+                "FIXTURE_CANDIDATE"
+              ],
+              "evidenceKinds": [],
+              "inputComplete": true
+            },
+            "position": 1,
+            "projectedCanonicalKey": "business:22222222-2222-4222-8222-222222222222"
+          }
+        ]
+      },
+      "expected": {
+        "targetSeen": null,
+        "targetBestPosition": null,
+        "otherKeys": [],
+        "domains": [],
+        "flags": [
+          "equivalent_projection_mismatch"
+        ],
+        "unresolvedIdentityCount": 0,
+        "unresolvedTargetCandidateCount": 0,
+        "sourceStatus": "partial"
       }
     }
   ]
