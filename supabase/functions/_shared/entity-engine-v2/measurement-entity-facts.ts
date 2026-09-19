@@ -64,6 +64,11 @@ export interface TargetAttributionLinkV2 {
   url: string;
 }
 
+export interface ConfirmedOtherEntityFactV2 {
+  canonicalKey: string;
+  bestPosition: number | null;
+}
+
 export interface MeasurementEntityFactsV2 {
   version: typeof MEASUREMENT_ENTITY_FACTS_VERSION;
   measurementId: string;
@@ -71,6 +76,7 @@ export interface MeasurementEntityFactsV2 {
   targetSeen: boolean | null;
   targetBestPosition: number | null;
   confirmedOtherEntityKeys: string[];
+  confirmedOtherEntities: ConfirmedOtherEntityFactV2[];
   targetCitationDomains: string[];
   targetAttributionLinks: TargetAttributionLinkV2[];
   unresolvedIdentityCount: number;
@@ -118,6 +124,7 @@ export function buildMeasurementEntityFactsV2(
       targetSeen: null,
       targetBestPosition: null,
       confirmedOtherEntityKeys: [],
+      confirmedOtherEntities: [],
       targetCitationDomains: [],
       targetAttributionLinks: [],
       unresolvedIdentityCount: 0,
@@ -137,7 +144,7 @@ export function buildMeasurementEntityFactsV2(
   );
 
   const equivalent: MeasurementEntityObservationV2[] = [];
-  const otherKeys: string[] = [];
+  const otherPositions = new Map<string, number | null>();
   let unresolvedIdentityCount = 0;
   let unresolvedTargetCandidateCount = 0;
   let equivalentProjectionMismatchCount = 0;
@@ -168,7 +175,13 @@ export function buildMeasurementEntityFactsV2(
       flags.push("self_key_leakage_blocked");
       continue;
     }
-    otherKeys.push(key);
+    const position = validPosition(entity.position);
+    const existing = otherPositions.get(key);
+    if (existing === undefined) {
+      otherPositions.set(key, position);
+    } else if (position !== null && (existing === null || position < existing)) {
+      otherPositions.set(key, position);
+    }
   }
 
   let targetSeen: boolean | null;
@@ -237,13 +250,18 @@ export function buildMeasurementEntityFactsV2(
     a.attributionId.localeCompare(b.attributionId, "en"),
   );
 
+  const confirmedOtherEntities = [...otherPositions.entries()]
+    .map(([canonicalKey, bestPosition]) => ({ canonicalKey, bestPosition }))
+    .sort((a, b) => a.canonicalKey.localeCompare(b.canonicalKey, "en"));
+
   return {
     version: MEASUREMENT_ENTITY_FACTS_VERSION,
     measurementId: input.measurementId,
     valid: true,
     targetSeen,
     targetBestPosition,
-    confirmedOtherEntityKeys: uniqueSorted(otherKeys),
+    confirmedOtherEntityKeys: confirmedOtherEntities.map((entity) => entity.canonicalKey),
+    confirmedOtherEntities,
     targetCitationDomains: uniqueSorted(
       targetAttributionLinks
         .map((link) => link.domain)
