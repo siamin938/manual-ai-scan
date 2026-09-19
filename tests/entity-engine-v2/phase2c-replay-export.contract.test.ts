@@ -30,6 +30,11 @@ describe("Phase 2C replay export contract", () => {
     expect(executableSql).toContain("'publicIdentities'");
     expect(executableSql).toContain("'registeredBusinesses'");
     expect(executableSql).toContain("'storedMentions'");
+    expect(executableSql).toContain("'attributions'");
+    expect(executableSql).toContain("'attributionId'");
+    expect(executableSql).toContain("'measurementMentionId'");
+    expect(executableSql).toContain("'citationStartIndex'");
+    expect(executableSql).toContain("'entityEndIndex'");
     expect(executableSql).toContain("'rawParser'");
     expect(executableSql).toContain("'target'");
   });
@@ -46,6 +51,18 @@ describe("Phase 2C replay export contract", () => {
     expect(executableSql).toContain(
       "'verifiedConcreteOfficialUrls', '[]'::jsonb",
     );
+  });
+
+  it("uses only stored versioned citation attribution rows", () => {
+    expect(executableSql).toContain(
+      "public.measurement_citation_attributions",
+    );
+    expect(executableSql).toContain(
+      "a.attribution_version='0.1.0'",
+    );
+    expect(executableSql).toContain("'url', a.citation_url");
+    expect(executableSql).toContain("'domain', a.domain");
+    expect(executableSql).toContain("'evidence', a.evidence");
   });
 
   it("exports all completed standalone measurement rows including invalid rows", () => {
