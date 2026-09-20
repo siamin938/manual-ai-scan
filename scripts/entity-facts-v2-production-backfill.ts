@@ -197,7 +197,7 @@ async function insertMeasurementRows(
         row.fact_version,
         row.engine_version,
         row.input_fingerprint,
-        JSON.stringify(row.facts),
+        row.facts,
         row.facts_hash,
       ],
     );
@@ -253,7 +253,7 @@ async function insertAggregateRows(
         row.measurement_count,
         row.valid_measurement_count,
         row.contract_ok,
-        JSON.stringify(row.aggregate),
+        row.aggregate,
         row.aggregate_hash,
       ],
     );
