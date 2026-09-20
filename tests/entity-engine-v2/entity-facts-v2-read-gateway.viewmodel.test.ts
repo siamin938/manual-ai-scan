@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { EntityFactsV2ReadGatewayDTO } from "../../src/lib/entity-facts-v2-read-gateway.types";
 import {
@@ -68,16 +68,6 @@ function dto(overrides?: {
     competitors: [],
     targetSources: [],
   };
-}
-
-function listFiles(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listFiles(path));
-    else out.push(path);
-  }
-  return out;
 }
 
 describe("Entity Facts v2 customer View Model", () => {
@@ -209,18 +199,18 @@ describe("Entity Facts v2 customer View Model", () => {
     });
   });
 
-  it("builds only a display model and remains disconnected from customer routes", () => {
+  it("keeps the display model compatible with the live v2 dashboard cutover", () => {
     const vm = buildEntityFactsV2ReadGatewayViewModel(dto());
     expect(vm.businessName).toBe("테스트 업체");
     expect(vm.overview.visibility.valueText).toBe("4.17% ~ 29.17%");
 
-    const routeReferences = listFiles(resolve(process.cwd(), "src/routes"))
-      .filter((path) => /\.(?:ts|tsx)$/u.test(path))
-      .filter((path) =>
-        readFileSync(path, "utf8").includes(
-          "buildEntityFactsV2ReadGatewayViewModel",
-        ),
-      );
-    expect(routeReferences).toEqual([]);
+    const dashboardSource = readFileSync(
+      resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
+      "utf8",
+    );
+    expect(dashboardSource).toContain(
+      "buildEntityFactsV2DashboardCutoverModel",
+    );
+    expect(dashboardSource).toContain("getEntityFactsV2ReadGateway");
   });
 });
