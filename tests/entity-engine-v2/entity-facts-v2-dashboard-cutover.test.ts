@@ -1,0 +1,301 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP,
+  buildEntityFactsV2DashboardCutoverModel,
+} from "../../src/lib/entity-facts-v2-read-gateway.dashboard-cutover";
+import type { EntityFactsV2ReadGatewayDTO } from "../../src/lib/entity-facts-v2-read-gateway.types";
+
+function fixture(): EntityFactsV2ReadGatewayDTO {
+  const baseBounds = {
+    validCount: 24,
+    confirmedMentionCount: 1,
+    unresolvedTargetCount: 6,
+    visibilityLowerBoundPct: 4.17,
+    visibilityUpperBoundPct: 29.17,
+    confirmedTop3Count: 1,
+    top3UncertainCount: 6,
+    top3LowerBoundPct: 4.17,
+    top3UpperBoundPct: 29.17,
+  };
+
+  return {
+    gatewayVersion: "0.1",
+    generatedAt: "2026-09-20T00:00:00.000Z",
+    business: {
+      id: "c9cb39d5-9f04-46ec-8018-14156670446d",
+      name: "카스페이스 구로점",
+      category: "썬팅/신차패키지",
+      region: "서울특별시",
+      city: "구로구",
+    },
+    scope: {
+      runId: "28a793c9-c24d-41ff-9037-f08abc21b3ca",
+      runName: "카스페이스 구로점 측정 2026-09-18",
+      measuredAt: "2026-09-18T12:59:10.936577+00:00",
+      providers: ["openai"],
+      repetitions: 1,
+      totalJobs: 24,
+      completedJobs: 24,
+      failedJobs: 0,
+    },
+    overview: {
+      ...baseBounds,
+      measurementCount: 24,
+      invalidCount: 0,
+      questionCount: 24,
+      coveredQuestionCount: 1,
+      unresolvedQuestionCount: 6,
+      missingQuestionCount: 17,
+      sourcePartialMeasurementCount: 6,
+    },
+    questionGroups: [
+      {
+        intentType: "comparison",
+        questionCount: 3,
+        validCount: 3,
+        confirmedMentionCount: 1,
+        unresolvedTargetCount: 1,
+        visibilityLowerBoundPct: 33.33,
+        visibilityUpperBoundPct: 66.67,
+        confirmedTop3Count: 1,
+        top3UncertainCount: 1,
+        top3LowerBoundPct: 33.33,
+        top3UpperBoundPct: 66.67,
+      },
+    ],
+    questionAreas: [
+      {
+        questionId: "11111111-1111-4111-8111-111111111111",
+        questionText: "구로구 신차패키지 업체 어디야?",
+        intentType: "local",
+        status: "unresolved",
+        validCount: 1,
+        confirmedMentionCount: 0,
+        unresolvedTargetCount: 1,
+        visibilityLowerBoundPct: 0,
+        visibilityUpperBoundPct: 100,
+        confirmedTop3Count: 0,
+        top3UncertainCount: 1,
+        top3LowerBoundPct: 0,
+        top3UpperBoundPct: 100,
+      },
+      {
+        questionId: "22222222-2222-4222-8222-222222222222",
+        questionText: "서울 썬팅 업체 어디 있어?",
+        intentType: "local",
+        status: "missing",
+        validCount: 1,
+        confirmedMentionCount: 0,
+        unresolvedTargetCount: 0,
+        visibilityLowerBoundPct: 0,
+        visibilityUpperBoundPct: 0,
+        confirmedTop3Count: 0,
+        top3UncertainCount: 0,
+        top3LowerBoundPct: 0,
+        top3UpperBoundPct: 0,
+      },
+      {
+        questionId: "33333333-3333-4333-8333-333333333333",
+        questionText: "구로구 썬팅 비교",
+        intentType: "comparison",
+        status: "partial",
+        validCount: 2,
+        confirmedMentionCount: 1,
+        unresolvedTargetCount: 0,
+        visibilityLowerBoundPct: 50,
+        visibilityUpperBoundPct: 50,
+        confirmedTop3Count: 1,
+        top3UncertainCount: 0,
+        top3LowerBoundPct: 50,
+        top3UpperBoundPct: 50,
+      },
+      {
+        questionId: "44444444-4444-4444-8444-444444444444",
+        questionText: "구로구 후기 좋은 썬팅",
+        intentType: "review_quality",
+        status: "covered",
+        validCount: 1,
+        confirmedMentionCount: 1,
+        unresolvedTargetCount: 0,
+        visibilityLowerBoundPct: 100,
+        visibilityUpperBoundPct: 100,
+        confirmedTop3Count: 1,
+        top3UncertainCount: 0,
+        top3LowerBoundPct: 100,
+        top3UpperBoundPct: 100,
+      },
+    ],
+    competitors: [
+      {
+        name: "레이노 개봉점",
+        responseCount: 2,
+        questionCount: 2,
+        intentCount: 2,
+        top3ResponseCount: 2,
+      },
+      {
+        name: "모터큐브",
+        responseCount: 1,
+        questionCount: 1,
+        intentCount: 1,
+        top3ResponseCount: 1,
+      },
+    ],
+    targetSources: [
+      {
+        domain: "example.com",
+        responseCount: 3,
+        completeResponseCount: 2,
+        partialResponseCount: 1,
+      },
+    ],
+  };
+}
+
+describe("Entity Facts v2 dashboard cutover mapping", () => {
+  it("classifies dashboard areas into direct, separate and deferred paths", () => {
+    const bySection = new Map(
+      ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.map((rule) => [
+        rule.section,
+        rule.mode,
+      ]),
+    );
+
+    expect(bySection.get("recent_summary")).toBe("direct_v2");
+    expect(bySection.get("visibility_metric")).toBe("direct_v2");
+    expect(bySection.get("competitor_list")).toBe("direct_v2");
+    expect(bySection.get("weak_questions")).toBe("direct_v2");
+    expect(bySection.get("source_list")).toBe("direct_v2");
+    expect(bySection.get("question_groups")).toBe("direct_v2");
+
+    expect(bySection.get("business_selector")).toBe("separate_existing");
+    expect(bySection.get("action_recommendations")).toBe("separate_existing");
+    expect(bySection.get("benchmark")).toBe("separate_existing");
+
+    expect(bySection.get("repeat_aggregate")).toBe("defer");
+    expect(bySection.get("repeat_context")).toBe("defer");
+    expect(bySection.get("trend")).toBe("defer");
+    expect(bySection.get("competitor_detail")).toBe("defer");
+    expect(bySection.get("reference_sources")).toBe("defer");
+
+    expect(new Set(ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.map((r) => r.section)).size)
+      .toBe(ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.length);
+  });
+
+  it("preserves the 4.17% to 29.17% current-run range in dashboard metrics", () => {
+    const model = buildEntityFactsV2DashboardCutoverModel(fixture());
+
+    expect(model.recentSummary.visibility.kind).toBe("range");
+    expect(model.recentSummary.visibility.valueText).toBe("4.17% ~ 29.17%");
+    expect(model.metricCards.visibility.valueText).toBe("4.17% ~ 29.17%");
+    expect(model.recentSummary.visibility.valueText).not.toContain("25%");
+    expect(model.recentSummary.uncertaintyNotice).not.toBeNull();
+  });
+
+  it("maps v2 competitors without fabricating legacy tier or newness", () => {
+    const model = buildEntityFactsV2DashboardCutoverModel(fixture());
+
+    expect(model.competitors.rows).toEqual([
+      {
+        name: "레이노 개봉점",
+        responseCount: 2,
+        questionCount: 2,
+        top3ResponseCount: 2,
+        label: "함께 관찰",
+      },
+      {
+        name: "모터큐브",
+        responseCount: 1,
+        questionCount: 1,
+        top3ResponseCount: 1,
+        label: "함께 관찰",
+      },
+    ]);
+    expect(model.competitors.legacyBadgesAvailable).toBe(false);
+
+    const serialized = JSON.stringify(model.competitors);
+    expect(serialized).not.toContain('"tier"');
+    expect(serialized).not.toContain('"isNew"');
+    expect(serialized).not.toContain('"priorRunPresenceCount"');
+    expect(serialized).not.toContain('"responseRatePct"');
+  });
+
+  it("uses target-linked v2 sources without legacy reference-source claims", () => {
+    const model = buildEntityFactsV2DashboardCutoverModel(fixture());
+
+    expect(model.sources.heading).toBe("내 업체에 연결된 출처");
+    expect(model.sources.referenceSourcesAvailable).toBe(false);
+    expect(model.sources.rows).toEqual([
+      {
+        domain: "example.com",
+        responseCount: 3,
+        completeResponseCount: 2,
+        partialResponseCount: 1,
+      },
+    ]);
+
+    const serialized = JSON.stringify(model.sources);
+    expect(serialized).not.toContain("sampleTitle");
+    expect(serialized).not.toContain("citationCount");
+  });
+
+  it("keeps weak-question uncertainty distinct from confirmed missing", () => {
+    const model = buildEntityFactsV2DashboardCutoverModel(fixture());
+
+    expect(model.weakQuestions.rows.map((row) => row.status)).toEqual([
+      "unresolved",
+      "missing",
+      "partial",
+    ]);
+    expect(model.weakQuestions.rows[0]).toMatchObject({
+      status: "unresolved",
+      statusLabel: "추가 확인 필요",
+      confirmedMentionCount: 0,
+      unresolvedTargetCount: 1,
+      visibilityLowerBoundPct: 0,
+      visibilityUpperBoundPct: 100,
+    });
+    expect(
+      model.weakQuestions.rows.some((row) => row.status === "covered"),
+    ).toBe(false);
+  });
+
+  it("keeps question-group lower and upper bounds instead of one legacy rate", () => {
+    const model = buildEntityFactsV2DashboardCutoverModel(fixture());
+
+    expect(model.questionGroups).toEqual([
+      {
+        intentType: "comparison",
+        questionCount: 3,
+        validCount: 3,
+        confirmedMentionCount: 1,
+        unresolvedTargetCount: 1,
+        visibilityLowerBoundPct: 33.33,
+        visibilityUpperBoundPct: 66.67,
+        top3LowerBoundPct: 33.33,
+        top3UpperBoundPct: 66.67,
+      },
+    ]);
+
+    const serialized = JSON.stringify(model.questionGroups);
+    expect(serialized).not.toContain("visibilityRatePct");
+    expect(serialized).not.toContain("mentionCount");
+  });
+
+  it("does not wire the cutover model into the live dashboard yet", () => {
+    const dashboardSource = readFileSync(
+      resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
+      "utf8",
+    );
+
+    expect(dashboardSource).not.toContain(
+      "entity-facts-v2-read-gateway.dashboard-cutover",
+    );
+    expect(dashboardSource).not.toContain("getEntityFactsV2ReadGateway");
+    expect(dashboardSource).not.toContain(
+      "buildEntityFactsV2DashboardCutoverModel",
+    );
+  });
+});
