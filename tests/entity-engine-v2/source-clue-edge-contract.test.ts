@@ -58,6 +58,6 @@ describe("source clue Edge integration", () => {
   });
 
   it("keeps the customer-facing source clue filter version explicit", () => {
-    expect(source).toContain('const FILTER_VERSION = "1.4";');
+    expect(source).toContain('const FILTER_VERSION = "1.5";');
   });
 });
