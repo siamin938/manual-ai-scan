@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, Json } from "@/integrations/supabase/types";
+import { buildEntityFactsV2ReadGatewayFromSnapshot } from "./entity-facts-v2-read-gateway.build";
 import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
@@ -161,18 +162,10 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   }
 
   const storage = aggregateRows[0]!;
-  const aggregate = parseEntityFactsV2AggregateForReadGateway(storage.aggregate);
+  const aggregateForResolution =
+    parseEntityFactsV2AggregateForReadGateway(storage.aggregate);
 
-  if (
-    storage.source_run_id !== run.id ||
-    storage.fact_version !== ENTITY_FACTS_V2_READ_FACT_VERSION ||
-    storage.aggregate_version !== ENTITY_FACTS_V2_READ_AGGREGATE_VERSION ||
-    storage.engine_version !== ENTITY_FACTS_V2_READ_ENGINE_VERSION ||
-    storage.contract_ok !== true ||
-    !aggregate ||
-    aggregate.overview.measurementCount !== storage.measurement_count ||
-    aggregate.overview.validCount !== storage.valid_measurement_count
-  ) {
+  if (!aggregateForResolution) {
     return {
       ok: false,
       error: "INVALID_V2_DATA",
@@ -183,7 +176,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
   const competitorBusinessIds = [
     ...new Set(
-      aggregate.competitors
+      aggregateForResolution.competitors
         .map((item) => businessIdFromCanonicalKey(item.canonicalKey))
         .filter(
           (id): id is string => id !== null && id !== businessId,
@@ -191,7 +184,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     ),
   ];
 
-  const competitorNameById = new Map<string, string>();
+  const registeredCompetitorNames: Record<string, string> = {};
   if (competitorBusinessIds.length > 0) {
     const { data: competitorBusinesses, error: competitorError } =
       await supabaseAdmin
@@ -211,23 +204,23 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
     for (const item of competitorBusinesses ?? []) {
       if (item.id !== businessId && item.name?.trim()) {
-        competitorNameById.set(item.id, item.name.trim());
+        registeredCompetitorNames[item.id] = item.name.trim();
       }
     }
   }
 
   const autoCanonicalKeys = [
     ...new Set(
-      aggregate.competitors
+      aggregateForResolution.competitors
         .map((item) => item.canonicalKey.trim())
         .filter((key) => key.startsWith("auto:")),
     ),
   ];
 
-  const autoEvidenceByKey = new Map<
+  const autoCompetitorEvidence: Record<
     string,
     EntityFactsV2CompetitorDisplayEvidence[]
-  >();
+  > = {};
 
   if (autoCanonicalKeys.length > 0) {
     const { data: canonicalizations, error: canonicalizationError } =
@@ -290,7 +283,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     for (const row of canonicalizations ?? []) {
       const key = row.canonical_key?.trim();
       if (!key || !autoCanonicalKeys.includes(key)) continue;
-      const evidence = autoEvidenceByKey.get(key) ?? [];
+      const evidence = autoCompetitorEvidence[key] ?? [];
       evidence.push({
         label: row.canonical_display_name,
         priority: 1,
@@ -307,62 +300,36 @@ export async function fetchEntityFactsV2ReadGateway(args: {
           priority: 3,
         });
       }
-      autoEvidenceByKey.set(key, evidence);
+      autoCompetitorEvidence[key] = evidence;
     }
   }
 
-  const autoCompetitorNameByKey = new Map<string, string>();
-  for (const key of autoCanonicalKeys) {
-    const name = pickEntityFactsV2AutoCompetitorDisplayName(
-      key,
-      autoEvidenceByKey.get(key) ?? [],
-    );
-    if (name) autoCompetitorNameByKey.set(key, name);
-  }
-
-  const competitors: EntityFactsV2ReadCompetitorDTO[] = [];
-  for (const item of aggregate.competitors) {
-    const competitorBusinessId = businessIdFromCanonicalKey(item.canonicalKey);
-    const name = competitorBusinessId
-      ? competitorBusinessId === businessId
-        ? null
-        : competitorNameById.get(competitorBusinessId) ?? null
-      : autoCompetitorNameByKey.get(item.canonicalKey.trim()) ?? null;
-
-    if (!name) continue;
-
-    competitors.push({
-      name,
-      responseCount: item.responseCount,
-      questionCount: item.questionCount,
-      intentCount: item.intentCount,
-      top3ResponseCount: item.top3ResponseCount,
-    });
-  }
-
-  return {
-    ok: true,
-    data: {
-      gatewayVersion: ENTITY_FACTS_V2_READ_GATEWAY_VERSION,
-      generatedAt: new Date().toISOString(),
-      business: businessDTO,
-      scope: {
-        runId: run.id,
-        runName: run.name,
-        measuredAt: run.completed_at ?? run.created_at,
-        providers: Array.isArray(run.selected_providers)
-          ? run.selected_providers.map(String)
-          : [],
-        repetitions: run.repetitions,
-        totalJobs: run.total_jobs,
-        completedJobs: run.completed_jobs,
-        failedJobs: run.failed_jobs,
-      },
-      overview: aggregate.overview,
-      questionGroups: aggregate.questionGroups,
-      questionAreas: aggregate.questionAreas,
-      competitors,
-      targetSources: aggregate.targetSources,
+  return buildEntityFactsV2ReadGatewayFromSnapshot({
+    generatedAt: new Date().toISOString(),
+    business: businessDTO,
+    scope: {
+      runId: run.id,
+      runName: run.name,
+      measuredAt: run.completed_at ?? run.created_at,
+      providers: Array.isArray(run.selected_providers)
+        ? run.selected_providers.map(String)
+        : [],
+      repetitions: run.repetitions,
+      totalJobs: run.total_jobs,
+      completedJobs: run.completed_jobs,
+      failedJobs: run.failed_jobs,
     },
-  };
+    storage: {
+      sourceRunId: storage.source_run_id,
+      factVersion: storage.fact_version,
+      aggregateVersion: storage.aggregate_version,
+      engineVersion: storage.engine_version,
+      measurementCount: storage.measurement_count,
+      validMeasurementCount: storage.valid_measurement_count,
+      contractOk: storage.contract_ok,
+      aggregate: storage.aggregate,
+    },
+    registeredCompetitorNames,
+    autoCompetitorEvidence,
+  });
 }
