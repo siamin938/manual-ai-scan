@@ -174,8 +174,14 @@ describe("Entity Facts v2 Read Gateway", () => {
     ).toBeNull();
 
     expect(
-      pickEntityFactsV2AutoCompetitorDisplayName("auto:abc", [
-        { label: "abc", priority: 1 },
+      pickEntityFactsV2AutoCompetitorDisplayName("auto:올포랩", [
+        { label: "올포랩", priority: 1 },
+      ]),
+    ).toBe("올포랩");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName("auto:", [
+        { label: "무효", priority: 1 },
       ]),
     ).toBeNull();
   });
