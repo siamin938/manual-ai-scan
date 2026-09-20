@@ -94,8 +94,8 @@ export const ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP: readonly EntityFactsV2Dashbo
     },
     {
       section: "action_recommendations",
-      mode: "separate_existing",
-      note: "Keep the existing recommendation engine isolated from this Entity Facts cutover.",
+      mode: "defer",
+      note: "Hide the legacy recommendation surface until its displayed counts use the same v2 truth contract.",
     },
     {
       section: "benchmark",
@@ -155,6 +155,7 @@ export type EntityFactsV2DashboardQuestionAreaRow = {
   unresolvedTargetCount: number;
   visibilityLowerBoundPct: number | null;
   visibilityUpperBoundPct: number | null;
+  visibilityDisplayText: string | null;
 };
 
 export type EntityFactsV2DashboardQuestionGroupRow = {
@@ -205,6 +206,35 @@ export type EntityFactsV2DashboardCutoverModel = {
   };
   questionGroups: EntityFactsV2DashboardQuestionGroupRow[];
 };
+
+function formatQuestionPct(value: number): string {
+  return `${Math.round(value * 100) / 100}%`;
+}
+
+function weakQuestionVisibilityDisplayText(
+  item: EntityFactsV2ReadQuestionAreaDTO,
+): string | null {
+  const lower = item.visibilityLowerBoundPct;
+  const upper = item.visibilityUpperBoundPct;
+
+  // A single fully unresolved response gives the mathematically valid 0–100%
+  // interval, but that number is not useful to a customer. Keep the
+  // uncertainty explicit through the status/counts instead of showing it.
+  if (
+    item.status === "unresolved" &&
+    item.confirmedMentionCount === 0 &&
+    item.unresolvedTargetCount > 0 &&
+    lower === 0 &&
+    upper === 100
+  ) {
+    return null;
+  }
+
+  if (lower === null || upper === null) return null;
+  return lower === upper
+    ? formatQuestionPct(lower)
+    : `${formatQuestionPct(lower)} ~ ${formatQuestionPct(upper)}`;
+}
 
 function weakQuestionRank(
   status: EntityFactsV2ReadQuestionAreaDTO["status"],
@@ -266,6 +296,7 @@ export function buildEntityFactsV2DashboardCutoverModel(
           unresolvedTargetCount: item.unresolvedTargetCount,
           visibilityLowerBoundPct: item.visibilityLowerBoundPct,
           visibilityUpperBoundPct: item.visibilityUpperBoundPct,
+          visibilityDisplayText: weakQuestionVisibilityDisplayText(item),
         };
       });
 
