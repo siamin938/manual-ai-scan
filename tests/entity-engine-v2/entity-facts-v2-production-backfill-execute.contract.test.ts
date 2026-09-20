@@ -10,6 +10,14 @@ const source = readFileSync(
   "utf8",
 );
 
+const workflow = readFileSync(
+  resolve(
+    process.cwd(),
+    ".github/workflows/entity-facts-v2-production-backfill.yml",
+  ),
+  "utf8",
+);
+
 describe("Entity Facts v2 approved Production backfill executor contract", () => {
   it("requires the reviewed confirmation and project ref", () => {
     expect(source).toContain("ENTITY_FACTS_V2_BACKFILL_CONFIRMATION");
@@ -54,5 +62,48 @@ describe("Entity Facts v2 approved Production backfill executor contract", () =>
     expect(source).not.toMatch(/postgres(?:ql)?:\/\/[^"']+:[^"']+@/u);
     expect(source).not.toMatch(/console\.log\([^)]*(?:token|password)/iu);
     expect(source).not.toMatch(/console\.error\([^)]*(?:token|password)/iu);
+  });
+
+  it("workflow is explicit-trigger-only and preserves the reviewed write order", () => {
+    expect(workflow).toContain(
+      '.github/entity-facts-v2-production-backfill-trigger',
+    );
+    expect(workflow).not.toMatch(/workflow_dispatch:/u);
+    expect(workflow).not.toMatch(/schedule:/u);
+    expect(workflow).not.toMatch(/pull_request:/u);
+
+    const exportIndex = workflow.indexOf(
+      "Export exact Production replay dataset read-only",
+    );
+    const dryRunIndex = workflow.indexOf(
+      "Re-run full materializer dry-run immediately before write",
+    );
+    const emptyIndex = workflow.indexOf(
+      "Verify v2 tables are empty before write",
+    );
+    const executeIndex = workflow.indexOf(
+      "Execute approved single-transaction Production backfill",
+    );
+    const verifyIndex = workflow.indexOf(
+      "Verify committed Production materialization read-only",
+    );
+
+    expect(exportIndex).toBeGreaterThan(0);
+    expect(dryRunIndex).toBeGreaterThan(exportIndex);
+    expect(emptyIndex).toBeGreaterThan(dryRunIndex);
+    expect(executeIndex).toBeGreaterThan(emptyIndex);
+    expect(verifyIndex).toBeGreaterThan(executeIndex);
+
+    expect(workflow).toContain("--expected-runs=23");
+    expect(workflow).toContain("--expected-measurements=428");
+    expect(workflow).toContain("--expected-lower=4.17");
+    expect(workflow).toContain("--expected-upper=29.17");
+    expect(workflow).toContain(
+      "bun scripts/entity-facts-v2-production-backfill-execute.ts",
+    );
+    expect(workflow).toContain(".committedMeasurementRows == 428");
+    expect(workflow).toContain(".committedAggregateRows == 23");
+    expect(workflow).toContain("(.[0].measurement_fact_rows | tonumber) == 428");
+    expect(workflow).toContain("(.[0].aggregate_rows | tonumber) == 23");
   });
 });
