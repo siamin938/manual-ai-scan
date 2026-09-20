@@ -118,7 +118,7 @@ function autoCanonicalSurface(value: string): string | null {
   const key = value.trim();
   if (!key.startsWith("auto:")) return null;
   const suffix = key.slice("auto:".length);
-  return suffix.length >= 4 ? suffix : null;
+  return suffix.length > 0 ? suffix : null;
 }
 
 /**
