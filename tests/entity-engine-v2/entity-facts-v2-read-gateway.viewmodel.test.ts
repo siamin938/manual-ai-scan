@@ -87,6 +87,9 @@ describe("Entity Facts v2 customer View Model", () => {
     expect(vm.uncertaintyNotice).toContain(
       "하나의 노출률 대신 확인 가능한 범위로 표시",
     );
+    expect(vm.sourceQualityNotice).toBe(
+      "출처 연결 판정이 일부 미완료인 응답이 6건 있습니다.",
+    );
     expect(vm.visibility.valueText).not.toContain("25%");
   });
 
