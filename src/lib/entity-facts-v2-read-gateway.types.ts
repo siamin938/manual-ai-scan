@@ -102,6 +102,65 @@ export type EntityFactsV2ReadGatewayResponse =
 
 type Obj = Record<string, unknown>;
 
+export type EntityFactsV2CompetitorDisplayEvidence = {
+  label: string | null | undefined;
+  priority: number;
+};
+
+function normalizeCompetitorDisplaySurface(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z가-힣]/giu, "");
+}
+
+function autoCanonicalSurface(value: string): string | null {
+  const key = value.trim();
+  if (!key.startsWith("auto:")) return null;
+  const suffix = key.slice("auto:".length);
+  return suffix.length >= 4 ? suffix : null;
+}
+
+/**
+ * Resolve an auto:<normalized-surface> key only from persisted display evidence
+ * whose normalized surface exactly matches the key. The key suffix itself is
+ * never used as a customer-visible fallback.
+ */
+export function pickEntityFactsV2AutoCompetitorDisplayName(
+  canonicalKey: string,
+  evidence: readonly EntityFactsV2CompetitorDisplayEvidence[],
+): string | null {
+  const expectedSurface = autoCanonicalSurface(canonicalKey);
+  if (!expectedSurface) return null;
+
+  const counts = new Map<string, { label: string; priority: number; count: number }>();
+  for (const item of evidence) {
+    const label = typeof item.label === "string" ? item.label.trim() : "";
+    if (
+      !label ||
+      !Number.isInteger(item.priority) ||
+      item.priority < 1 ||
+      normalizeCompetitorDisplaySurface(label) !== expectedSurface
+    ) {
+      continue;
+    }
+
+    const key = `${item.priority}\u0000${label}`;
+    const current = counts.get(key);
+    if (current) current.count += 1;
+    else counts.set(key, { label, priority: item.priority, count: 1 });
+  }
+
+  const candidates = [...counts.values()].sort(
+    (a, b) =>
+      a.priority - b.priority ||
+      b.count - a.count ||
+      a.label.localeCompare(b.label, "ko"),
+  );
+
+  return candidates[0]?.label ?? null;
+}
+
 export type ParsedEntityFactsV2Competitor = {
   canonicalKey: string;
   responseCount: number;
