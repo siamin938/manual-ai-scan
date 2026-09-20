@@ -43,6 +43,31 @@ describe("Entity Engine v2 candidate extractor", () => {
     ).toBe(false);
   });
 
+  it("extracts a registered business exact subspan from prose without creating unregistered paragraph guesses", () => {
+    const nodes = parseResponseStructure(
+      "자동차 썬팅 범위 상담이라면 **카스페이스 구로 본점**부터 문의해보시는 게 괜찮습니다. ([hunnytip.kr](https://www.hunnytip.kr/example))",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, businesses);
+
+    expect(candidates).toEqual([
+      expect.objectContaining({
+        nodeKind: "paragraph",
+        role: "registered_subspan",
+        identitySurface: "카스페이스 구로 본점",
+        matchedBusinessIds: ["8fa9168b-4dc2-4417-b2ef-bbdafd842c38"],
+      }),
+    ]);
+  });
+
+  it("does not emit arbitrary unregistered paragraph text as an entity candidate", () => {
+    const nodes = parseResponseStructure(
+      "구로구에서 상담받기 좋은 업체를 찾아보세요.",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, businesses);
+
+    expect(candidates).toEqual([]);
+  });
+
   it("extracts the registered business from a purpose criterion body", () => {
     const nodes = parseResponseStructure(
       [
@@ -116,6 +141,29 @@ describe("Entity Engine v2 candidate extractor", () => {
     expect(identities).toContain("금호타이어 운정신도시점");
     expect(identities).not.toContain(
       "티스테이션 파주교하점, 금호타이어 운정신도시점",
+    );
+  });
+
+  it("splits spaced slash-separated unregistered business siblings", () => {
+    const nodes = parseResponseStructure(
+      "- **후보:** 천현카센타 / 타이어타운 법원점",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, []);
+    const identities = candidates.map((candidate) => candidate.identitySurface);
+
+    expect(identities).toContain("천현카센타");
+    expect(identities).toContain("타이어타운 법원점");
+    expect(identities).not.toContain("천현카센타 / 타이어타운 법원점");
+  });
+
+  it("does not split an unspaced slash inside one surface", () => {
+    const nodes = parseResponseStructure(
+      "- **후보:** AB모터스/미스터카",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, []);
+
+    expect(candidates.map((candidate) => candidate.identitySurface)).toContain(
+      "AB모터스/미스터카",
     );
   });
 

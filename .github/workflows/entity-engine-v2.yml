@@ -7,11 +7,24 @@ on:
       - "supabase/functions/process-measurement-job/**"
       - "supabase/functions/reparse-measurements/**"
       - "supabase/EDGE_RUNTIME_CONTRACT.json"
+      - "supabase/migrations/*entity_facts_v2*.sql"
       - "tests/entity-engine-v2/**"
+      - "src/lib/entity-facts-v2-read-gateway.*"
+      - "src/routes/_authenticated/dashboard.tsx"
       - "tests/fixtures/entity-golden-corpus*.json"
       - "tests/fixtures/entity-v2-shadow-*.json"
       - "scripts/entity-v2-shadow-replay.ts"
+      - "scripts/entity-facts-phase2c-replay.ts"
+      - "scripts/entity-facts-v2-materialize.ts"
+      - "scripts/entity-facts-v2-materialize-dry-run.ts"
+      - "scripts/entity-facts-v2-production-backfill.ts"
+      - ".github/workflows/entity-facts-v2-production-backfill.yml"
+      - "scripts/entity-facts-v2-production-backfill-execute.ts"
+      - "scripts/entity-facts-v2-production-preflight.ts"
+      - "scripts/entity-facts-v2-read-gateway-smoke.ts"
+      - ".github/workflows/entity-facts-v2-production-preflight.yml"
       - "scripts/sql/export-entity-v2-replay.sql"
+      - "scripts/sql/export-entity-facts-phase2c-replay.sql"
       - ".github/workflows/entity-engine-v2.yml"
   workflow_dispatch:
 
@@ -36,3 +49,6 @@ jobs:
 
       - name: Run Entity Engine v2 tests
         run: bun run test -- tests/entity-engine-v2
+
+      - name: Build dashboard cutover
+        run: bun run build
