@@ -1176,6 +1176,80 @@ export type Database = {
           },
         ]
       }
+      measurement_entity_facts_v2: {
+        Row: {
+          business_id: string
+          created_at: string
+          engine_version: string
+          fact_version: string
+          facts: Json
+          facts_hash: string
+          id: string
+          input_fingerprint: string
+          materialization_id: string
+          measurement_id: string
+          org_id: string
+          source_run_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          engine_version: string
+          fact_version: string
+          facts: Json
+          facts_hash: string
+          id?: string
+          input_fingerprint: string
+          materialization_id: string
+          measurement_id: string
+          org_id: string
+          source_run_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          engine_version?: string
+          fact_version?: string
+          facts?: Json
+          facts_hash?: string
+          id?: string
+          input_fingerprint?: string
+          materialization_id?: string
+          measurement_id?: string
+          org_id?: string
+          source_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "measurement_entity_facts_v2_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_facts_v2_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_facts_v2_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "measurement_entity_facts_v2_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_entity_verifications: {
         Row: {
           business_id: string
@@ -2711,6 +2785,82 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      run_entity_fact_aggregates_v2: {
+        Row: {
+          aggregate: Json
+          aggregate_hash: string
+          aggregate_version: string
+          business_id: string
+          contract_ok: boolean
+          created_at: string
+          engine_version: string
+          fact_version: string
+          id: string
+          input_fingerprint: string
+          materialization_id: string
+          measurement_count: number
+          org_id: string
+          source_run_id: string
+          valid_measurement_count: number
+        }
+        Insert: {
+          aggregate: Json
+          aggregate_hash: string
+          aggregate_version: string
+          business_id: string
+          contract_ok: boolean
+          created_at?: string
+          engine_version: string
+          fact_version: string
+          id?: string
+          input_fingerprint: string
+          materialization_id: string
+          measurement_count: number
+          org_id: string
+          source_run_id: string
+          valid_measurement_count: number
+        }
+        Update: {
+          aggregate?: Json
+          aggregate_hash?: string
+          aggregate_version?: string
+          business_id?: string
+          contract_ok?: boolean
+          created_at?: string
+          engine_version?: string
+          fact_version?: string
+          id?: string
+          input_fingerprint?: string
+          materialization_id?: string
+          measurement_count?: number
+          org_id?: string
+          source_run_id?: string
+          valid_measurement_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_entity_fact_aggregates_v2_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_entity_fact_aggregates_v2_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_entity_fact_aggregates_v2_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
             referencedColumns: ["id"]
           },
         ]
