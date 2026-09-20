@@ -20,6 +20,7 @@ on:
       - ".github/workflows/entity-facts-v2-production-backfill.yml"
       - "scripts/entity-facts-v2-production-backfill-execute.ts"
       - "scripts/entity-facts-v2-production-preflight.ts"
+      - "scripts/entity-facts-v2-read-gateway-smoke.ts"
       - ".github/workflows/entity-facts-v2-production-preflight.yml"
       - "scripts/sql/export-entity-v2-replay.sql"
       - "scripts/sql/export-entity-facts-phase2c-replay.sql"
