@@ -144,7 +144,7 @@ export function buildEntityFactsV2OverviewViewModel(
 
   const sourceQualityNotice =
     overview.sourcePartialMeasurementCount > 0
-      ? `출처 정보가 일부만 확인된 응답이 ${overview.sourcePartialMeasurementCount}건 있습니다.`
+      ? `출처 연결 판정이 일부 미완료인 응답이 ${overview.sourcePartialMeasurementCount}건 있습니다.`
       : null;
 
   return {
