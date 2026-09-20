@@ -149,7 +149,8 @@ function buildSessionPoolerUrl(
       url.hostname.endsWith(EXPECTED_POOLER_SUFFIX),
     "PREFLIGHT_POOLER_URL_INVALID",
   );
-  url.username = loginRole.role;
+  url.username =
+    `${loginRole.role}.${ENTITY_FACTS_V2_BACKFILL_PROJECT_REF}`;
   url.password = loginRole.password;
   url.port = "5432";
   if (!url.pathname || url.pathname === "/") {
