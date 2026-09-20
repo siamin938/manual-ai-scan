@@ -9,6 +9,7 @@ on:
       - "supabase/EDGE_RUNTIME_CONTRACT.json"
       - "supabase/migrations/*entity_facts_v2*.sql"
       - "tests/entity-engine-v2/**"
+      - "src/lib/entity-facts-v2-read-gateway.*"
       - "tests/fixtures/entity-golden-corpus*.json"
       - "tests/fixtures/entity-v2-shadow-*.json"
       - "scripts/entity-v2-shadow-replay.ts"
