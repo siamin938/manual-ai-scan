@@ -1,0 +1,66 @@
+name: Entity v2 Historical Replay
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - chore/entity-engine-v2-foundation
+    paths:
+      - ".github/entity-v2-historical-replay-trigger"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: entity-v2-historical-replay-foundation
+  cancel-in-progress: false
+
+jobs:
+  historical-replay:
+    if: github.ref == 'refs/heads/chore/entity-engine-v2-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ENTITY_V2_REPLAY_DATABASE_URL: ${{ secrets.ENTITY_V2_REPLAY_DATABASE_URL }}
+      ENTITY_V2_REPLAY_REVIEW_OUTPUT: /tmp/entity-v2-historical-replay-review.json
+    steps:
+      - name: Checkout foundation branch
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Report replay credential presence without exposing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${ENTITY_V2_REPLAY_DATABASE_URL:-}" ]; then
+            echo "ENTITY_V2_REPLAY_DATABASE_URL=PRESENT"
+            echo "Historical replay credential is configured. The harness will use a read-only transaction." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ENTITY_V2_REPLAY_DATABASE_URL=ABSENT"
+            echo "Historical replay NOT EXECUTED: the dedicated temporary read-only credential is not configured." >> "$GITHUB_STEP_SUMMARY"
+            echo "The harness will still be transformed by Vitest, but the production replay test is skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Run isolated Entity v2 historical replay harness
+        run: bunx vitest run --config vitest.entity-v2-historical.config.ts
+
+      - name: Upload review-only release artifact
+        if: always() && env.ENTITY_V2_REPLAY_DATABASE_URL != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: entity-v2-historical-replay-review
+          path: /tmp/entity-v2-historical-replay-review.json
+          if-no-files-found: warn
+          retention-days: 1
+
+      - name: Remove ephemeral replay output
+        if: always()
+        shell: bash
+        run: rm -f /tmp/entity-v2-historical-replay-review.json

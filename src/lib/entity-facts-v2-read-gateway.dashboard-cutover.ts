@@ -1,0 +1,332 @@
+import type {
+  EntityFactsV2ReadGatewayDTO,
+  EntityFactsV2ReadQuestionAreaDTO,
+} from "./entity-facts-v2-read-gateway.types";
+import {
+  buildEntityFactsV2OverviewViewModel,
+  entityFactsV2QuestionStatusViewModel,
+  type EntityFactsV2MetricViewModel,
+} from "./entity-facts-v2-read-gateway.viewmodel";
+
+export const ENTITY_FACTS_V2_DASHBOARD_CUTOVER_VERSION = "0.1" as const;
+
+export type EntityFactsV2DashboardCutoverMode =
+  | "direct_v2"
+  | "separate_existing"
+  | "defer";
+
+export type EntityFactsV2DashboardCutoverSection =
+  | "recent_summary"
+  | "visibility_metric"
+  | "top3_metric"
+  | "competitor_count"
+  | "source_count"
+  | "competitor_list"
+  | "weak_questions"
+  | "source_list"
+  | "question_groups"
+  | "business_selector"
+  | "action_recommendations"
+  | "benchmark"
+  | "repeat_aggregate"
+  | "repeat_context"
+  | "trend"
+  | "competitor_detail"
+  | "reference_sources";
+
+export type EntityFactsV2DashboardCutoverRule = {
+  section: EntityFactsV2DashboardCutoverSection;
+  mode: EntityFactsV2DashboardCutoverMode;
+  note: string;
+};
+
+export const ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP: readonly EntityFactsV2DashboardCutoverRule[] =
+  [
+    {
+      section: "recent_summary",
+      mode: "direct_v2",
+      note: "Use v2 overview bounds and explicit uncertainty copy.",
+    },
+    {
+      section: "visibility_metric",
+      mode: "direct_v2",
+      note: "Use the v2 View Model exact/range/unavailable state. Never collapse a range.",
+    },
+    {
+      section: "top3_metric",
+      mode: "direct_v2",
+      note: "Use v2 Top3 lower/upper bounds with the same uncertainty semantics.",
+    },
+    {
+      section: "competitor_count",
+      mode: "direct_v2",
+      note: "Use the customer-safe v2 competitor list length.",
+    },
+    {
+      section: "source_count",
+      mode: "direct_v2",
+      note: "Use v2 targetSources count and relabel the section as target-linked sources.",
+    },
+    {
+      section: "competitor_list",
+      mode: "direct_v2",
+      note: "Use v2 names/counts only. Do not synthesize legacy tier, repeat, newness or response-rate fields.",
+    },
+    {
+      section: "weak_questions",
+      mode: "direct_v2",
+      note: "Use v2 questionAreas with partial/unresolved/missing states; exclude covered rows.",
+    },
+    {
+      section: "source_list",
+      mode: "direct_v2",
+      note: "Use v2 targetSources only. Do not claim source trust, recommendation reason or sample title.",
+    },
+    {
+      section: "question_groups",
+      mode: "direct_v2",
+      note: "Use v2 lower/upper bounds per intent; do not replace them with one legacy mention rate.",
+    },
+    {
+      section: "business_selector",
+      mode: "separate_existing",
+      note: "Navigation/scope selection is independent of Entity Facts truth.",
+    },
+    {
+      section: "action_recommendations",
+      mode: "separate_existing",
+      note: "Keep the existing recommendation engine isolated from this Entity Facts cutover.",
+    },
+    {
+      section: "benchmark",
+      mode: "separate_existing",
+      note: "Keep benchmark as a separately sourced product surface; do not present it as v2 current-run truth.",
+    },
+    {
+      section: "repeat_aggregate",
+      mode: "defer",
+      note: "Current repeat aggregate exposes one legacy mention rate; wait for v2 historical bounds.",
+    },
+    {
+      section: "repeat_context",
+      mode: "defer",
+      note: "Current repeat context reads legacy measurements.was_client_mentioned and competitor significance.",
+    },
+    {
+      section: "trend",
+      mode: "defer",
+      note: "Current trend uses legacy single-rate run metrics; wait for v2 lower/upper history.",
+    },
+    {
+      section: "competitor_detail",
+      mode: "defer",
+      note: "Current detail/resolve functions use the legacy competitor contract; do not attach them to v2 rows yet.",
+    },
+    {
+      section: "reference_sources",
+      mode: "defer",
+      note: "v2 targetSources does not provide the legacy referenceSources/sample-title contract.",
+    },
+  ] as const;
+
+export type EntityFactsV2DashboardCompetitorRow = {
+  name: string;
+  responseCount: number;
+  questionCount: number;
+  top3ResponseCount: number;
+  label: "함께 관찰";
+};
+
+export type EntityFactsV2DashboardSourceRow = {
+  domain: string;
+  responseCount: number;
+  completeResponseCount: number;
+  partialResponseCount: number;
+};
+
+export type EntityFactsV2DashboardQuestionAreaRow = {
+  questionId: string;
+  questionText: string;
+  intentType: string;
+  status: EntityFactsV2ReadQuestionAreaDTO["status"];
+  statusLabel: string;
+  statusTone: "positive" | "neutral" | "attention";
+  confirmedMentionCount: number;
+  unresolvedTargetCount: number;
+  visibilityLowerBoundPct: number | null;
+  visibilityUpperBoundPct: number | null;
+};
+
+export type EntityFactsV2DashboardQuestionGroupRow = {
+  intentType: string;
+  questionCount: number;
+  validCount: number;
+  confirmedMentionCount: number;
+  unresolvedTargetCount: number;
+  visibilityLowerBoundPct: number | null;
+  visibilityUpperBoundPct: number | null;
+  top3LowerBoundPct: number | null;
+  top3UpperBoundPct: number | null;
+};
+
+export type EntityFactsV2DashboardCutoverModel = {
+  version: typeof ENTITY_FACTS_V2_DASHBOARD_CUTOVER_VERSION;
+  businessName: string;
+  measuredAt: string;
+  recentSummary: {
+    visibility: EntityFactsV2MetricViewModel;
+    top3: EntityFactsV2MetricViewModel;
+    validCount: number;
+    invalidCount: number;
+    questionSummaryText: string;
+    uncertaintyNotice: string | null;
+    sourceQualityNotice: string | null;
+    topCompetitor: { name: string; responseCount: number } | null;
+  };
+  metricCards: {
+    visibility: EntityFactsV2MetricViewModel;
+    top3: EntityFactsV2MetricViewModel;
+    competitorCount: number;
+    targetSourceCount: number;
+  };
+  competitors: {
+    heading: "AI 답변에서 함께 관찰된 업체";
+    rows: EntityFactsV2DashboardCompetitorRow[];
+    legacyBadgesAvailable: false;
+  };
+  weakQuestions: {
+    heading: "내 업체가 잘 보이지 않거나 추가 확인이 필요한 검색 질문";
+    rows: EntityFactsV2DashboardQuestionAreaRow[];
+  };
+  sources: {
+    heading: "내 업체에 연결된 출처";
+    rows: EntityFactsV2DashboardSourceRow[];
+    referenceSourcesAvailable: false;
+  };
+  questionGroups: EntityFactsV2DashboardQuestionGroupRow[];
+};
+
+function weakQuestionRank(
+  status: EntityFactsV2ReadQuestionAreaDTO["status"],
+): number {
+  switch (status) {
+    case "unresolved":
+      return 0;
+    case "missing":
+      return 1;
+    case "partial":
+      return 2;
+    case "covered":
+      return 3;
+  }
+}
+
+export function buildEntityFactsV2DashboardCutoverModel(
+  dto: EntityFactsV2ReadGatewayDTO,
+): EntityFactsV2DashboardCutoverModel {
+  const overviewVm = buildEntityFactsV2OverviewViewModel(dto);
+
+  const topCompetitor =
+    dto.competitors.length === 0
+      ? null
+      : dto.competitors.reduce((best, current) =>
+          current.responseCount > best.responseCount ? current : best,
+        );
+
+  const competitors: EntityFactsV2DashboardCompetitorRow[] =
+    dto.competitors.map((item) => ({
+      name: item.name,
+      responseCount: item.responseCount,
+      questionCount: item.questionCount,
+      top3ResponseCount: item.top3ResponseCount,
+      label: "함께 관찰",
+    }));
+
+  const weakQuestions: EntityFactsV2DashboardQuestionAreaRow[] =
+    dto.questionAreas
+      .filter((item) => item.status !== "covered")
+      .slice()
+      .sort(
+        (a, b) =>
+          weakQuestionRank(a.status) - weakQuestionRank(b.status) ||
+          (a.visibilityLowerBoundPct ?? 0) -
+            (b.visibilityLowerBoundPct ?? 0) ||
+          a.questionText.localeCompare(b.questionText, "ko"),
+      )
+      .map((item) => {
+        const statusVm = entityFactsV2QuestionStatusViewModel(item.status);
+        return {
+          questionId: item.questionId,
+          questionText: item.questionText,
+          intentType: item.intentType,
+          status: item.status,
+          statusLabel: statusVm.label,
+          statusTone: statusVm.tone,
+          confirmedMentionCount: item.confirmedMentionCount,
+          unresolvedTargetCount: item.unresolvedTargetCount,
+          visibilityLowerBoundPct: item.visibilityLowerBoundPct,
+          visibilityUpperBoundPct: item.visibilityUpperBoundPct,
+        };
+      });
+
+  const sources: EntityFactsV2DashboardSourceRow[] = dto.targetSources.map(
+    (item) => ({
+      domain: item.domain,
+      responseCount: item.responseCount,
+      completeResponseCount: item.completeResponseCount,
+      partialResponseCount: item.partialResponseCount,
+    }),
+  );
+
+  const questionGroups: EntityFactsV2DashboardQuestionGroupRow[] =
+    dto.questionGroups.map((item) => ({
+      intentType: item.intentType,
+      questionCount: item.questionCount,
+      validCount: item.validCount,
+      confirmedMentionCount: item.confirmedMentionCount,
+      unresolvedTargetCount: item.unresolvedTargetCount,
+      visibilityLowerBoundPct: item.visibilityLowerBoundPct,
+      visibilityUpperBoundPct: item.visibilityUpperBoundPct,
+      top3LowerBoundPct: item.top3LowerBoundPct,
+      top3UpperBoundPct: item.top3UpperBoundPct,
+    }));
+
+  return {
+    version: ENTITY_FACTS_V2_DASHBOARD_CUTOVER_VERSION,
+    businessName: dto.business.name,
+    measuredAt: dto.scope.measuredAt,
+    recentSummary: {
+      visibility: overviewVm.visibility,
+      top3: overviewVm.top3,
+      validCount: dto.overview.validCount,
+      invalidCount: dto.overview.invalidCount,
+      questionSummaryText: overviewVm.questionSummaryText,
+      uncertaintyNotice: overviewVm.uncertaintyNotice,
+      sourceQualityNotice: overviewVm.sourceQualityNotice,
+      topCompetitor: topCompetitor
+        ? { name: topCompetitor.name, responseCount: topCompetitor.responseCount }
+        : null,
+    },
+    metricCards: {
+      visibility: overviewVm.visibility,
+      top3: overviewVm.top3,
+      competitorCount: dto.competitors.length,
+      targetSourceCount: dto.targetSources.length,
+    },
+    competitors: {
+      heading: "AI 답변에서 함께 관찰된 업체",
+      rows: competitors,
+      legacyBadgesAvailable: false,
+    },
+    weakQuestions: {
+      heading: "내 업체가 잘 보이지 않거나 추가 확인이 필요한 검색 질문",
+      rows: weakQuestions,
+    },
+    sources: {
+      heading: "내 업체에 연결된 출처",
+      rows: sources,
+      referenceSourcesAvailable: false,
+    },
+    questionGroups,
+  };
+}

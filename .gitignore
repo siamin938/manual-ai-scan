@@ -16,6 +16,11 @@ dist-ssr
 .nitro
 *.local
 
+# Entity Engine v2 replay exports contain stored production AI answers.
+.tmp/entity-v2-replay*.json
+.tmp/entity-v2-replay*.ndjson
+.tmp/entity-v2-replay/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

@@ -1,0 +1,142 @@
+{
+  "version": "0.1",
+  "source": "Real stored CHABOIM measurement responses, reduced to the minimum excerpt that preserves the observed structure.",
+  "contract": {
+    "decisions": ["confirmed_business", "non_business", "unresolved", "platform", "brand_network"],
+    "principles": [
+      "A candidate may only borrow evidence from its own structural scope.",
+      "Section headings and recommendation criteria are not business identities by themselves.",
+      "Registered business text embedded inside a larger heading or criterion must be normalized to the registered business identity, not the whole phrase.",
+      "Evidence from a following table row or sibling section must not confirm the parent heading.",
+      "When unique business identity is not established, fail closed to unresolved/non_business rather than inventing a canonical business."
+    ]
+  },
+  "cases": [
+    {
+      "id": "heading-fragment-ranked-section",
+      "sourceMeasurementId": "889f16ae-e0f1-470f-b720-2538eb281a73",
+      "sourceRunId": "cebdcc9c-e6f1-4976-8adb-41117da6bfda",
+      "prompt": "고양에서 PPF 맡길 곳 좀 넓게 찾아줘",
+      "fixtureText": "## 1순위로 문의해볼 곳\n\n| 업체 | 위치 | 특징 / 연락처 |\n|---|---|---|\n| **XPEL Pro 일산백석점** | 일산동구 장항로 70 나동 | XPEL 공식 PRO 인증점. **010-3125-0509** |\n| **XPEL Pro 일산로점** | 일산동구 일산로 418 | XPEL 공식 PRO 인증점. **010-3780-4549** |",
+      "forbiddenConfirmedSurfaces": ["로 문의해볼 곳", "1순위로 문의해볼 곳"],
+      "requiredEntities": [
+        {"surface": "XPEL Pro 일산백석점", "decision": "confirmed_business", "evidenceScope": "same_table_row"},
+        {"surface": "XPEL Pro 일산로점", "decision": "confirmed_business", "evidenceScope": "same_table_row"}
+      ],
+      "regressionReason": "Current v1 parser stripped the rank prefix from a section heading, then borrowed address/phone/URL evidence from child rows and confirmed a fake business."
+    },
+    {
+      "id": "generic-chain-section-heading",
+      "sourceMeasurementId": "ba7a1249-de97-46bf-b6ae-6fd70e5ee55c",
+      "sourceRunId": "015cce8c-d5e6-4260-8a2d-acafb58e5d16",
+      "prompt": "성남 엔진오일 교환할 곳 선택지 넓게 알려줘",
+      "fixtureText": "## 1. 가장 무난한 체인점\n\n### 오토오아시스\n- **오토오아시스 세이브존성남점**\n  - 수정구 산성대로 337\n- **오토오아시스 하대원점**\n  - 중원구 둔촌대로 202",
+      "forbiddenConfirmedSurfaces": ["가장 무난한 체인점"],
+      "requiredEntities": [
+        {"surface": "오토오아시스", "decision": "brand_network", "evidenceScope": "heading"},
+        {"surface": "오토오아시스 세이브존성남점", "decision": "confirmed_business", "evidenceScope": "same_list_item"},
+        {"surface": "오토오아시스 하대원점", "decision": "confirmed_business", "evidenceScope": "same_list_item"}
+      ],
+      "regressionReason": "A category heading was confirmed because branch/address evidence from descendants was treated as evidence for the heading itself."
+    },
+    {
+      "id": "generic-comparison-heading",
+      "sourceMeasurementId": "782900f1-ca21-484e-a918-5e14f3f2a2a1",
+      "sourceRunId": "d987eeb2-9b25-4db5-a81a-3e5760d2783a",
+      "prompt": "성남 엔진오일 교환 후기 좋은 정비소 비교해줘",
+      "fixtureText": "## 성남 엔진오일 정비소 비교\n\n| 정비소 | 위치 | 장점 |\n|---|---|---|\n| **판교메젠모터스** | 분당구 금곡동 | 종합정비업 |\n| **트윈모터스** | 분당구 백현동 | 독일차 전문 |",
+      "forbiddenConfirmedSurfaces": ["성남 엔진오일 정비소 비교"],
+      "requiredEntities": [
+        {"surface": "판교메젠모터스", "decision": "confirmed_business", "evidenceScope": "same_table_row"},
+        {"surface": "트윈모터스", "decision": "confirmed_business", "evidenceScope": "same_table_row"}
+      ],
+      "regressionReason": "A descriptive comparison title inherited structured evidence from its table and was promoted to a business."
+    },
+    {
+      "id": "official-installer-without-unique-identity",
+      "sourceMeasurementId": "91523e67-108b-4f15-824d-1a1bd6143423",
+      "sourceRunId": "1f53c94a-2906-4fcc-abf1-e38edc71d6d4",
+      "prompt": "처음 신차 썬팅과 신차패키지를 알아보는 사람에게 고양시 쪽에서 추천할 만한 곳 몇 군데만 알려줘.",
+      "fixtureText": "### 2. 3M 공식 썬팅 시공점 — 일산동구 풍동\n- 3M 크리스탈라인, 블랙박스, PPF를 함께 시공한다고 안내합니다.\n- 실제 신차패키지 구성은 매장에 문의하는 것이 좋습니다.",
+      "forbiddenConfirmedSurfaces": ["3M 공식 썬팅 시공점"],
+      "requiredEntities": [
+        {"surface": "3M 공식 썬팅 시공점", "decision": "unresolved", "evidenceScope": "same_section"}
+      ],
+      "regressionReason": "Brand + generic installer wording has a branch-like suffix but does not uniquely identify a real business."
+    },
+    {
+      "id": "strong-structured-real-business",
+      "sourceMeasurementId": "ed80ac51-547b-491d-9753-8a43fb7fda7f",
+      "sourceRunId": "bad9250c-af54-4efc-9b82-c0eb9b551ffc",
+      "prompt": "분당구 프리미엄 오일 하는 업체들 알려줘",
+      "fixtureText": "### 3. 그린카서비스\n- **주소:** 경기도 성남시 분당구 정자동 242-1\n- **전화:** 031-712-6522\n- **특징:** 수입차 정비 전문점으로 등록되어 있으며 엔진오일 등을 취급합니다.",
+      "forbiddenConfirmedSurfaces": [],
+      "requiredEntities": [
+        {"surface": "그린카서비스", "decision": "confirmed_business", "evidenceScope": "same_section"}
+      ],
+      "regressionReason": "Positive-control case: v2 must keep real businesses with tightly scoped address/phone evidence."
+    },
+    {
+      "id": "registered-business-inside-section-title",
+      "sourceMeasurementId": "426285de-bc2d-41a6-b660-39ff63819a74",
+      "sourceRunId": "99cc1d74-3ae1-419c-826c-8d411ee03a44",
+      "prompt": "구로구 신차패키지 업체별 구성 비교해줘",
+      "fixtureText": "## 2. 카스페이스 구로본점 패키지 구성\n\n| 패키지 | 공개 구성 | 가격 |\n|---|---|---:|\n| **스페셜** | 신차검수 + 썬팅 + PPF 3종 | 45만 원~ |",
+      "forbiddenConfirmedSurfaces": ["카스페이스 구로본점 패키지 구성"],
+      "requiredEntities": [
+        {"surface": "카스페이스 구로본점", "decision": "confirmed_business", "evidenceScope": "registered_exact_subspan"}
+      ],
+      "regressionReason": "The whole descriptive heading must not become a separate canonical entity; the embedded registered business may still count as a mention."
+    },
+    {
+      "id": "region-label-plus-registered-business",
+      "sourceMeasurementId": "1fe8132b-ea46-4a75-994f-9ffc6746ff8f",
+      "sourceRunId": "4e788705-8740-4119-bfef-2b5bec04c7d2",
+      "prompt": "멀리 이동하기 부담스러운데 파주시와 주변 지역에서 갈 만한 타이어·휠 매장 어디가 있어?",
+      "fixtureText": "### 목적별로 고르면\n- **운정·교하에서 최대한 가까운 곳:** 티스테이션 파주교하점, 금호타이어 운정신도시점\n- **금촌·조리 쪽:** 타이어프로 봉일천점\n- **문산 쪽에서 내려오는 경우:** 타이어프로 엘지로점",
+      "forbiddenConfirmedSurfaces": ["금촌·조리 쪽:** 타이어프로 봉일천점"],
+      "requiredEntities": [
+        {"surface": "타이어프로 봉일천점", "decision": "confirmed_business", "evidenceScope": "same_list_item_subspan"},
+        {"surface": "타이어프로 엘지로점", "decision": "confirmed_business", "evidenceScope": "same_list_item_subspan"}
+      ],
+      "regressionReason": "A registered alias embedded in a criterion line should be extracted as the business subspan; the whole criterion must not become the canonical display name."
+    },
+    {
+      "id": "purpose-label-plus-registered-business",
+      "sourceMeasurementId": "9a7e2295-be5b-4fc6-8004-fd5f024e7f5b",
+      "sourceRunId": "015cce8c-d5e6-4260-8a2d-acafb58e5d16",
+      "prompt": "분당구 프리미엄 엔진오일 업체별 작업 범위 비교해줘",
+      "fixtureText": "## 목적별 추천\n- **가성비와 투명한 공임:** 공임나라 분당금곡점\n- **빠른 국산차 오일 교환:** 현대엑스티어 판교\n- **BMW·벤츠·아우디 일반 관리:** 씨엘모터스 또는 트윈모터스",
+      "forbiddenConfirmedSurfaces": ["빠른 국산차 오일 교환:** 현대엑스티어 판교"],
+      "requiredEntities": [
+        {"surface": "현대엑스티어 판교", "decision": "confirmed_business", "evidenceScope": "registered_exact_subspan"},
+        {"surface": "공임나라 분당금곡점", "decision": "confirmed_business", "evidenceScope": "same_list_item_subspan"}
+      ],
+      "regressionReason": "The existing alias matcher can confirm an entire recommendation criterion because the registered name is only a substring."
+    },
+    {
+      "id": "specific-network-branch-positive-control",
+      "sourceMeasurementId": "5cf8221d-d885-4329-85e5-783c9a8a69a2",
+      "sourceRunId": "bad9250c-af54-4efc-9b82-c0eb9b551ffc",
+      "prompt": "성남에서 엔진오일 꼼꼼하게 하는 곳 추천해줘",
+      "fixtureText": "### 1순위: 공임나라 분당수내점\n- **추천 이유:** 불필요한 정비를 권하지 않고 기본 점검을 꼼꼼히 해준다는 소개가 확인됩니다.",
+      "forbiddenConfirmedSurfaces": [],
+      "requiredEntities": [
+        {"surface": "공임나라 분당수내점", "decision": "confirmed_business", "evidenceScope": "heading_branch_identity"}
+      ],
+      "regressionReason": "Positive-control case: generic network names must remain non-specific, but an actual named branch must remain confirmable."
+    },
+    {
+      "id": "platform-affiliated-shops",
+      "sourceMeasurementId": "9fd0beec-96b8-428e-9c9d-e4cf5194c93e",
+      "sourceRunId": "d987eeb2-9b25-4db5-a81a-3e5760d2783a",
+      "prompt": "분당구 엔진오일 교환 가성비 좋은 정비소",
+      "fixtureText": "### 3순위: 마이클 앱 제휴 정비소\n- 앱에서 차량번호를 입력하면 차종별 엔진오일 교환 총액과 후기를 비교할 수 있습니다.\n- 일부 국산차 상품 가격을 미리 확인할 수 있습니다.",
+      "forbiddenConfirmedSurfaces": ["마이클 앱 제휴 정비소"],
+      "requiredEntities": [
+        {"surface": "마이클 앱 제휴 정비소", "decision": "platform", "evidenceScope": "same_section"}
+      ],
+      "regressionReason": "A platform/marketplace description must never become a local competitor entity."
+    }
+  ]
+}

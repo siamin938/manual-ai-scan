@@ -1,0 +1,68 @@
+{
+  "version": "sample-v0.1",
+  "source": "Reduced historical CHABOIM structures used only to test the replay diff contract. Full production exports must stay uncommitted.",
+  "rows": [
+    {
+      "measurementId": "889f16ae-e0f1-470f-b720-2538eb281a73",
+      "runId": "cebdcc9c-e6f1-4976-8adb-41117da6bfda",
+      "clientBusinessId": "fe215735-bc9f-420c-b445-6d0818edde99",
+      "responseText": "## 1순위로 문의해볼 곳\n\n| 업체 | 위치 | 특징 / 연락처 |\n|---|---|---|\n| **XPEL Pro 일산백석점** | 일산동구 장항로 70 나동 | **010-3125-0509** |\n| **XPEL Pro 일산로점** | 일산동구 일산로 418 | **010-3780-4549** |",
+      "businesses": [],
+      "v1Entities": [
+        {"displayName": "로 문의해볼 곳", "verificationStatus": "confirmed_business", "verifiedEntityKind": "specific_business", "canonicalKey": "auto:로문의해볼곳"},
+        {"displayName": "XPEL Pro 일산백석점", "verificationStatus": "confirmed_business", "verifiedEntityKind": "specific_business"},
+        {"displayName": "XPEL Pro 일산로점", "verificationStatus": "confirmed_business", "verifiedEntityKind": "specific_business"}
+      ]
+    },
+    {
+      "measurementId": "426285de-bc2d-41a6-b660-39ff63819a74",
+      "runId": "99cc1d74-3ae1-419c-826c-8d411ee03a44",
+      "clientBusinessId": "8fa9168b-4dc2-4417-b2ef-bbdafd842c38",
+      "responseText": "## 2. 카스페이스 구로본점 패키지 구성\n\n| 패키지 | 공개 구성 | 가격 |\n|---|---|---:|\n| **스페셜** | 신차검수 + 썬팅 + PPF 3종 | 45만 원~ |",
+      "businesses": [
+        {"id": "8fa9168b-4dc2-4417-b2ef-bbdafd842c38", "name": "카스페이스 구로 본점", "aliases": ["카스페이스 구로본점"]}
+      ],
+      "v1Entities": [
+        {"displayName": "카스페이스 구로본점 패키지 구성", "verificationStatus": "confirmed_business", "verifiedEntityKind": "specific_business", "matchedBusinessId": "8fa9168b-4dc2-4417-b2ef-bbdafd842c38", "canonicalKey": "business:8fa9168b-4dc2-4417-b2ef-bbdafd842c38", "canonicalDisplayName": "카스페이스 구로 본점"}
+      ]
+    },
+    {
+      "measurementId": "replay-positive-control-green-car-service",
+      "runId": "shadow-fixture",
+      "responseText": "### 3. 그린카서비스\n- **주소:** 경기도 성남시 분당구 정자동 242-1\n- **전화:** 031-712-6522\n- **특징:** 수입차 정비 전문점",
+      "businesses": [],
+      "v1Entities": [
+        {"displayName": "그린카서비스", "verificationStatus": "confirmed_business", "verifiedEntityKind": "specific_business"}
+      ]
+    },
+    {
+      "measurementId": "544f3240-91dc-4eeb-a189-592a983d43cd",
+      "runId": "2eea63b3-5b37-4299-80d9-a5c69085aa0a",
+      "responseText": "### 티스테이션 파주출판단지점\n- **주소:** 경기도 파주시 산남로 98\n- 타이어 교체와 기본 점검 상담이 가능한 매장으로 안내됩니다.",
+      "businesses": [],
+      "v1Entities": [
+        {"displayName": "티스테이션 파주출판단지점", "verificationStatus": "needs_review", "verifiedEntityKind": "specific_business"}
+      ]
+    },
+    {
+      "measurementId": "8e866de0-a6d3-4072-9ee1-0ae1bb4ff0cd",
+      "runId": "015cce8c-d5e6-4260-8a2d-acafb58e5d16",
+      "responseText": "### 공임나라 성남권 지점\n- 성남권 여러 지점 중 가까운 곳의 예약 가능 여부를 확인하세요.",
+      "businesses": [],
+      "v1Entities": [
+        {"displayName": "공임나라 성남권 지점", "verificationStatus": "needs_review", "verifiedEntityKind": "specific_business"}
+      ]
+    },
+    {
+      "measurementId": "62c9fe7e-5c73-410e-98f0-492a21cb23e2",
+      "runId": "4e788705-8740-4119-bfef-2b5bec04c7d2",
+      "responseText": "### 목적별로 고르면\n- **조리·봉일천 쪽:** 타이어프로 봉일천점, 더타이어샵 봉일천점",
+      "businesses": [
+        {"id": "483022a4-30c9-4f6d-9cf4-19a30c2f58d2", "name": "타이어프로 봉일천점", "aliases": []}
+      ],
+      "v1Entities": [
+        {"displayName": "조리·봉일천 쪽:** 타이어프로 봉일천점, 더타이어샵 봉일천점", "verificationStatus": "confirmed_business", "verifiedEntityKind": "specific_business", "matchedBusinessId": "483022a4-30c9-4f6d-9cf4-19a30c2f58d2", "canonicalKey": "business:483022a4-30c9-4f6d-9cf4-19a30c2f58d2", "canonicalDisplayName": "타이어프로 봉일천점"}
+      ]
+    }
+  ]
+}
