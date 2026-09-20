@@ -64,13 +64,18 @@ describe("Entity Facts v2 approved Production backfill executor contract", () =>
     expect(source).not.toMatch(/console\.error\([^)]*(?:token|password)/iu);
   });
 
-  it("workflow is explicit-trigger-only and preserves the reviewed write order", () => {
+  it("keeps the completed Production backfill workflow inert after success", () => {
     expect(workflow).toContain(
-      '.github/entity-facts-v2-production-backfill-trigger',
+      "Entity Facts v2 Production Backfill (DISABLED AFTER SUCCESS)",
     );
-    expect(workflow).not.toMatch(/workflow_dispatch:/u);
+    expect(workflow).toMatch(/workflow_dispatch:/u);
+    expect(workflow).toContain("if: ${{ false }}");
+    expect(workflow).not.toMatch(/\bpush:/u);
     expect(workflow).not.toMatch(/schedule:/u);
     expect(workflow).not.toMatch(/pull_request:/u);
+    expect(workflow).not.toContain(
+      ".github/entity-facts-v2-production-backfill-trigger",
+    );
 
     const exportIndex = workflow.indexOf(
       "Export exact Production replay dataset read-only",
@@ -93,17 +98,5 @@ describe("Entity Facts v2 approved Production backfill executor contract", () =>
     expect(emptyIndex).toBeGreaterThan(dryRunIndex);
     expect(executeIndex).toBeGreaterThan(emptyIndex);
     expect(verifyIndex).toBeGreaterThan(executeIndex);
-
-    expect(workflow).toContain("--expected-runs=23");
-    expect(workflow).toContain("--expected-measurements=428");
-    expect(workflow).toContain("--expected-lower=4.17");
-    expect(workflow).toContain("--expected-upper=29.17");
-    expect(workflow).toContain(
-      "bun scripts/entity-facts-v2-production-backfill-execute.ts",
-    );
-    expect(workflow).toContain(".committedMeasurementRows == 428");
-    expect(workflow).toContain(".committedAggregateRows == 23");
-    expect(workflow).toContain("(.[0].measurement_fact_rows | tonumber) == 428");
-    expect(workflow).toContain("(.[0].aggregate_rows | tonumber) == 23");
   });
 });
