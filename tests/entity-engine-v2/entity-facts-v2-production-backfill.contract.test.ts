@@ -95,6 +95,15 @@ describe("Entity Facts v2 production backfill runner contract", () => {
     expect(source).not.toMatch(/\bcreate\s+(?:table|function|trigger|index)/iu);
   });
 
+  it("passes JSON objects directly to postgres jsonb parameters", () => {
+    expect(source).toContain("$9::jsonb");
+    expect(source).toContain("$12::jsonb");
+    expect(source).toContain("        row.facts,");
+    expect(source).toContain("        row.aggregate,");
+    expect(source).not.toContain("JSON.stringify(row.facts)");
+    expect(source).not.toContain("JSON.stringify(row.aggregate)");
+  });
+
   it("verifies counts, versions, hashes and the KASPACe regression before returning", () => {
     const measurementInsert = source.indexOf("await insertMeasurementRows");
     const aggregateInsert = source.indexOf("await insertAggregateRows");
