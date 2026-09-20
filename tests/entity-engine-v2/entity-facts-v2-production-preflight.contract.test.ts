@@ -29,6 +29,9 @@ describe("Entity Facts v2 production preflight contract", () => {
     expect(source).toContain(
       "/^cli_login_postgres(?:_|$)/u.test(body.role)",
     );
+    expect(source).toContain(
+      "${loginRole.role}.${ENTITY_FACTS_V2_BACKFILL_PROJECT_REF}",
+    );
   });
 
   it("contains no business-data mutation SQL", () => {
