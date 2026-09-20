@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildEntityFactsV2ReadGatewayFromSnapshot } from "../../src/lib/entity-facts-v2-read-gateway.build";
 import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
@@ -198,6 +199,74 @@ describe("Entity Facts v2 Read Gateway", () => {
     badBounds.overview.visibilityLowerBoundPct = 90;
     badBounds.overview.visibilityUpperBoundPct = 10;
     expect(parseEntityFactsV2AggregateForReadGateway(badBounds)).toBeNull();
+  });
+
+  it("uses the same pure assembler for server output and smoke validation", () => {
+    const result = buildEntityFactsV2ReadGatewayFromSnapshot({
+      generatedAt: "2026-09-20T00:00:00.000Z",
+      business: {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "테스트 업체",
+        category: null,
+        region: null,
+        city: null,
+      },
+      scope: {
+        runId: "33333333-3333-4333-8333-333333333333",
+        runName: "최근 측정",
+        measuredAt: "2026-09-19T00:00:00.000Z",
+        providers: ["openai"],
+        repetitions: 1,
+        totalJobs: 24,
+        completedJobs: 24,
+        failedJobs: 0,
+      },
+      storage: {
+        sourceRunId: "33333333-3333-4333-8333-333333333333",
+        factVersion: "0.3",
+        aggregateVersion: "0.1",
+        engineVersion:
+          "entity-facts-v2:mef0.3:hist0.1:te0.3:src0.1:agg0.1:mat0.1",
+        measurementCount: 24,
+        validMeasurementCount: 24,
+        contractOk: true,
+        aggregate: {
+          ...validAggregate(),
+          competitors: [
+            {
+              canonicalKey: "auto:카메오랩분당센터",
+              responseCount: 8,
+              questionCount: 7,
+              intentCount: 3,
+              top3ResponseCount: 4,
+            },
+          ],
+        },
+      },
+      registeredCompetitorNames: {},
+      autoCompetitorEvidence: {
+        "auto:카메오랩분당센터": [
+          { label: "카메오랩 분당센터", priority: 1 },
+        ],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.overview.visibilityLowerBoundPct).toBe(4.17);
+    expect(result.data.overview.visibilityUpperBoundPct).toBe(29.17);
+    expect(result.data.competitors).toEqual([
+      {
+        name: "카메오랩 분당센터",
+        responseCount: 8,
+        questionCount: 7,
+        intentCount: 3,
+        top3ResponseCount: 4,
+      },
+    ]);
+    expect(serverSource).toContain(
+      "return buildEntityFactsV2ReadGatewayFromSnapshot({",
+    );
   });
 
   it("reads only the exact latest standalone audit run aggregate", () => {
