@@ -7,7 +7,6 @@ import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
 import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-read-gateway.dashboard-cutover";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
-import { ActionRecommendationsSection } from "@/components/action-recommendations-section";
 import {
   BusinessSelector,
   useClientBusinessSelection,
@@ -242,11 +241,6 @@ function DashboardPage() {
               : ""}
           </p>
 
-          <ActionRecommendationsSection
-            orgId={activeOrgId ?? null}
-            businessId={businessId ?? null}
-          />
-
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">OBSERVED BUSINESSES</p>
@@ -315,11 +309,10 @@ function DashboardPage() {
                         </Badge>
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        {intentLabel(q.intentType)} · 노출 범위{" "}
-                        {pctRange(
-                          q.visibilityLowerBoundPct,
-                          q.visibilityUpperBoundPct,
-                        )}
+                        {intentLabel(q.intentType)}
+                        {q.visibilityDisplayText
+                          ? ` · 노출 범위 ${q.visibilityDisplayText}`
+                          : ""}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         확정 노출 {q.confirmedMentionCount}건 · 추가 확인 필요{" "}
