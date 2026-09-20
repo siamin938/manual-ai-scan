@@ -171,7 +171,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(bySection.get("question_groups")).toBe("direct_v2");
 
     expect(bySection.get("business_selector")).toBe("separate_existing");
-    expect(bySection.get("action_recommendations")).toBe("separate_existing");
+    expect(bySection.get("action_recommendations")).toBe("defer");
     expect(bySection.get("benchmark")).toBe("separate_existing");
 
     expect(bySection.get("repeat_aggregate")).toBe("defer");
@@ -256,6 +256,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       unresolvedTargetCount: 1,
       visibilityLowerBoundPct: 0,
       visibilityUpperBoundPct: 100,
+      visibilityDisplayText: null,
     });
     expect(
       model.weakQuestions.rows.some((row) => row.status === "covered"),
@@ -298,7 +299,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       "buildEntityFactsV2DashboardCutoverModel",
     );
 
-    expect(dashboardSource).toContain("ActionRecommendationsSection");
+    expect(dashboardSource).not.toContain("ActionRecommendationsSection");
     expect(dashboardSource).toContain("getVisibilityBenchmark");
 
     expect(dashboardSource).not.toContain("getVisibilityDiagnostic");
