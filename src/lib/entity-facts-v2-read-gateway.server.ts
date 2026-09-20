@@ -7,6 +7,8 @@ import {
   ENTITY_FACTS_V2_READ_FACT_VERSION,
   ENTITY_FACTS_V2_READ_GATEWAY_VERSION,
   parseEntityFactsV2AggregateForReadGateway,
+  pickEntityFactsV2AutoCompetitorDisplayName,
+  type EntityFactsV2CompetitorDisplayEvidence,
   type EntityFactsV2ReadBusinessDTO,
   type EntityFactsV2ReadCompetitorDTO,
   type EntityFactsV2ReadGatewayResponse,
@@ -214,12 +216,121 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     }
   }
 
+  const autoCanonicalKeys = [
+    ...new Set(
+      aggregate.competitors
+        .map((item) => item.canonicalKey.trim())
+        .filter((key) => key.startsWith("auto:")),
+    ),
+  ];
+
+  const autoEvidenceByKey = new Map<
+    string,
+    EntityFactsV2CompetitorDisplayEvidence[]
+  >();
+
+  if (autoCanonicalKeys.length > 0) {
+    const { data: canonicalizations, error: canonicalizationError } =
+      await supabaseAdmin
+        .from("measurement_entity_canonicalizations")
+        .select(
+          "canonical_key, canonical_display_name, measurement_mention_id",
+        )
+        .eq("org_id", orgId)
+        .eq("business_id", businessId)
+        .eq("source_run_id", run.id)
+        .in("canonical_key", autoCanonicalKeys);
+
+    if (canonicalizationError) {
+      return {
+        ok: false,
+        error: "INTERNAL_ERROR",
+        business: businessDTO,
+        runId: run.id,
+      };
+    }
+
+    const mentionIds = [
+      ...new Set(
+        (canonicalizations ?? [])
+          .map((row) => row.measurement_mention_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    ];
+
+    const mentionById = new Map<
+      string,
+      { display_name: string; matched_alias: string | null }
+    >();
+
+    if (mentionIds.length > 0) {
+      const { data: mentions, error: mentionError } = await supabaseAdmin
+        .from("measurement_mentions")
+        .select("id, display_name, matched_alias")
+        .eq("org_id", orgId)
+        .in("id", mentionIds);
+
+      if (mentionError) {
+        return {
+          ok: false,
+          error: "INTERNAL_ERROR",
+          business: businessDTO,
+          runId: run.id,
+        };
+      }
+
+      for (const mention of mentions ?? []) {
+        mentionById.set(mention.id, {
+          display_name: mention.display_name,
+          matched_alias: mention.matched_alias,
+        });
+      }
+    }
+
+    for (const row of canonicalizations ?? []) {
+      const key = row.canonical_key?.trim();
+      if (!key || !autoCanonicalKeys.includes(key)) continue;
+      const evidence = autoEvidenceByKey.get(key) ?? [];
+      evidence.push({
+        label: row.canonical_display_name,
+        priority: 1,
+      });
+
+      const mention = mentionById.get(row.measurement_mention_id);
+      if (mention) {
+        evidence.push({
+          label: mention.matched_alias,
+          priority: 2,
+        });
+        evidence.push({
+          label: mention.display_name,
+          priority: 3,
+        });
+      }
+      autoEvidenceByKey.set(key, evidence);
+    }
+  }
+
+  const autoCompetitorNameByKey = new Map<string, string>();
+  for (const key of autoCanonicalKeys) {
+    const name = pickEntityFactsV2AutoCompetitorDisplayName(
+      key,
+      autoEvidenceByKey.get(key) ?? [],
+    );
+    if (name) autoCompetitorNameByKey.set(key, name);
+  }
+
   const competitors: EntityFactsV2ReadCompetitorDTO[] = [];
   for (const item of aggregate.competitors) {
     const competitorBusinessId = businessIdFromCanonicalKey(item.canonicalKey);
-    if (!competitorBusinessId || competitorBusinessId === businessId) continue;
-    const name = competitorNameById.get(competitorBusinessId);
+    const name = competitorBusinessId
+      ? competitorBusinessId === businessId
+        ? null
+        : competitorNameById.get(competitorBusinessId) ?? null
+      : autoCompetitorNameByKey.get(item.canonicalKey.trim()) ?? null;
+
     if (!name) continue;
+
     competitors.push({
       name,
       responseCount: item.responseCount,
