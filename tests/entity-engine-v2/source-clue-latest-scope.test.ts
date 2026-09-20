@@ -10,7 +10,19 @@ const source = readFileSync(edgePath, "utf8").replace(/^import .*createClient.*;
 const edgeCode = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
-const dtoSource = readFileSync(resolve("src/lib/visibility-actions.server.ts"), "utf8");
+const comparisonSource = readFileSync(
+  resolve("src/lib/visibility-comparison.server.ts"),
+  "utf8",
+)
+  .replace(/^import .*$/gm, "")
+  .replace(/^export /gm, "");
+const dtoSource =
+  comparisonSource +
+  "\n" +
+  readFileSync(resolve("src/lib/visibility-actions.server.ts"), "utf8").replace(
+    /^import \{ parseVisibilityComparison \}.*\n/m,
+    "",
+  );
 const dtoCode = ts.transpileModule(dtoSource, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
@@ -220,19 +232,46 @@ describe("latest observation survives missing comparison payloads", () => {
     });
   }
 
-  it("keeps a valid existing single-run scope and never queries a replacement", async () => {
-    const { payload, calls } = await execute({ base: baseWithScope(1), compatible: [{ run_id: RUN }] });
+  it("refreshes a legacy single-run scope from the latest completed observation", async () => {
+    const { payload, calls } = await execute({
+      base: baseWithScope(1),
+      compatible: [{ run_id: RUN }],
+    });
     assert.deepEqual(payload.scope, legacyScope(1));
-    assert.ok(!calls.some(c => c.name === "measurement_runs"));
-    assert.ok(payload.recommendations.some((r: any) => r.id === "observation:profile:mycle"));
+    assert.ok(calls.some((c) => c.name === "measurement_runs"));
+    assert.ok(
+      payload.recommendations.some(
+        (r: any) => r.id === "observation:profile:mycle",
+      ),
+    );
+    assert.equal(payload.comparison.status, "single");
   });
 
-  it("preserves the compatible-repeat path without relabeling latest-only evidence as repeated", async () => {
-    const { payload, calls } = await execute({ base: baseWithScope(2), compatible: [{ run_id: RUN }, { run_id: olderRun }] });
-    assert.deepEqual(payload.scope, legacyScope(2));
-    assert.equal(payload.disclaimer, "Existing disclaimer");
-    assert.ok(calls.some(c => c.name === "get_repeat_independent_site_observations_v02"));
-    assert.ok(!calls.some(c => c.name === "measurement_runs" || c.name === "get_first_run_profile_source_observations_v03"));
+  it("keeps latest-run clues distinct while comparison is verified", async () => {
+    const { payload, parsed, display, calls } = await execute({
+      base: baseWithScope(2),
+      compatible: [{ run_id: RUN }, { run_id: olderRun }],
+    });
+    assert.equal(payload.comparison.status, "verified");
+    assert.equal(payload.scope.runId, RUN);
+    assert.equal(payload.scope.validCount, 24);
+    assert.equal(parsed.ok, true);
+    assert.ok(
+      calls.some(
+        (c) => c.name === "get_first_run_profile_source_observations_v03",
+      ),
+    );
+    assert.ok(
+      calls.some(
+        (c) => c.name === "get_repeat_independent_site_observations_v02",
+      ),
+    );
+    assert.ok(calls.some((c) => c.name === "measurement_runs"));
+    assert.ok(
+      display.every(
+        (r: any) => r.evidenceLabel === "최근 측정 관찰",
+      ),
+    );
   });
 
   it("retains platform deduplication for an existing customer-facing source card", async () => {
