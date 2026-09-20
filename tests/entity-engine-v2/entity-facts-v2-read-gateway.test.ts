@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildEntityFactsV2ReadGatewayFromSnapshot } from "../../src/lib/entity-facts-v2-read-gateway.build";
 import {
@@ -105,16 +105,6 @@ function validAggregate() {
       target_identity_unresolved: 6,
     },
   };
-}
-
-function listFiles(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listFiles(path));
-    else out.push(path);
-  }
-  return out;
 }
 
 describe("Entity Facts v2 Read Gateway", () => {
@@ -348,13 +338,21 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).not.toContain("count_as_confirmed_business");
   });
 
-  it("is prepared but not wired into any customer route yet", () => {
-    const routesDir = resolve(process.cwd(), "src/routes");
-    const references = listFiles(routesDir)
-      .filter((path) => /\.(?:ts|tsx)$/u.test(path))
-      .filter((path) =>
-        readFileSync(path, "utf8").includes("getEntityFactsV2ReadGateway"),
-      );
-    expect(references).toEqual([]);
+  it("is the live dashboard read path without legacy current-run truth", () => {
+    const dashboardSource = readFileSync(
+      resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
+      "utf8",
+    );
+
+    expect(dashboardSource).toContain("getEntityFactsV2ReadGateway");
+    expect(dashboardSource).toContain(
+      "buildEntityFactsV2DashboardCutoverModel",
+    );
+    expect(dashboardSource).not.toContain("getVisibilityDiagnostic");
+    expect(dashboardSource).not.toContain("getVisibilityRepeatAggregate");
+    expect(dashboardSource).not.toContain("getVisibilityRepeatContext");
+    expect(dashboardSource).not.toContain("CompetitorDetailDialog");
+    expect(dashboardSource).not.toContain("was_client_mentioned");
+    expect(dashboardSource).not.toContain("visibilityRatePct");
   });
 });
