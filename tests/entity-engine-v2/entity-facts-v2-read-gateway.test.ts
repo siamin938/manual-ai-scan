@@ -329,8 +329,11 @@ describe("Entity Facts v2 Read Gateway", () => {
     const dtoBlock = typesSource.slice(publicDtoStart, publicDtoEnd);
     expect(dtoBlock).toContain("name: string");
     expect(dtoBlock).not.toContain("canonicalKey");
-    expect(serverSource).toContain("competitorNameById");
-    expect(serverSource).toContain("autoCompetitorNameByKey");
+    expect(serverSource).toContain("registeredCompetitorNames");
+    expect(serverSource).toContain("autoCompetitorEvidence");
+    expect(serverSource).toContain(
+      "return buildEntityFactsV2ReadGatewayFromSnapshot({",
+    );
     expect(serverSource).toContain(
       '.from("measurement_entity_canonicalizations")',
     );
