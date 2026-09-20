@@ -284,18 +284,30 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(serialized).not.toContain("mentionCount");
   });
 
-  it("does not wire the cutover model into the live dashboard yet", () => {
+  it("wires only approved v2/separate sections into the live dashboard", () => {
     const dashboardSource = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
       "utf8",
     );
 
-    expect(dashboardSource).not.toContain(
+    expect(dashboardSource).toContain(
       "entity-facts-v2-read-gateway.dashboard-cutover",
     );
-    expect(dashboardSource).not.toContain("getEntityFactsV2ReadGateway");
-    expect(dashboardSource).not.toContain(
+    expect(dashboardSource).toContain("getEntityFactsV2ReadGateway");
+    expect(dashboardSource).toContain(
       "buildEntityFactsV2DashboardCutoverModel",
     );
+
+    expect(dashboardSource).toContain("ActionRecommendationsSection");
+    expect(dashboardSource).toContain("getVisibilityBenchmark");
+
+    expect(dashboardSource).not.toContain("getVisibilityDiagnostic");
+    expect(dashboardSource).not.toContain("getVisibilityRepeatAggregate");
+    expect(dashboardSource).not.toContain("getVisibilityRepeatContext");
+    expect(dashboardSource).not.toContain("CompetitorDetailDialog");
+    expect(dashboardSource).not.toContain("LineChart");
+    expect(dashboardSource).not.toContain("responseRatePct");
+    expect(dashboardSource).not.toContain("priorRunPresenceCount");
+    expect(dashboardSource).not.toContain("isNew");
   });
 });
