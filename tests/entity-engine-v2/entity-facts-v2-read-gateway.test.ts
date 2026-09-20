@@ -7,6 +7,7 @@ import {
   ENTITY_FACTS_V2_READ_FACT_VERSION,
   ENTITY_FACTS_V2_READ_GATEWAY_VERSION,
   parseEntityFactsV2AggregateForReadGateway,
+  pickEntityFactsV2AutoCompetitorDisplayName,
 } from "../../src/lib/entity-facts-v2-read-gateway.types";
 
 const serverPath = resolve(
@@ -136,6 +137,48 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(parsed?.overview.top3UpperBoundPct).toBe(29.17);
   });
 
+  it("resolves auto competitors only from exact persisted display evidence", () => {
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:카메오랩분당센터",
+        [
+          { label: "카메오랩 분당센터", priority: 1 },
+          { label: "카메오랩분당센터", priority: 3 },
+          { label: "카메오랩 서울센터", priority: 1 },
+        ],
+      ),
+    ).toBe("카메오랩 분당센터");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:솔라가드프리미엄thelx일산동구점",
+        [{ label: "솔라가드 프리미엄 THE LX 일산동구점", priority: 3 }],
+      ),
+    ).toBe("솔라가드 프리미엄 THE LX 일산동구점");
+  });
+
+  it("never uses the auto key suffix itself as a customer-visible fallback", () => {
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:타이어프로파주갈현점",
+        [],
+      ),
+    ).toBeNull();
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:타이어프로파주갈현점",
+        [{ label: "타이어프로 파주 다른점", priority: 1 }],
+      ),
+    ).toBeNull();
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName("auto:abc", [
+        { label: "abc", priority: 1 },
+      ]),
+    ).toBeNull();
+  });
+
   it("fails closed on version, contract or bounds corruption", () => {
     expect(
       parseEntityFactsV2AggregateForReadGateway({
@@ -218,6 +261,13 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(dtoBlock).toContain("name: string");
     expect(dtoBlock).not.toContain("canonicalKey");
     expect(serverSource).toContain("competitorNameById");
+    expect(serverSource).toContain("autoCompetitorNameByKey");
+    expect(serverSource).toContain(
+      '.from("measurement_entity_canonicalizations")',
+    );
+    expect(serverSource).toContain('.from("measurement_mentions")');
+    expect(serverSource).toContain('.eq("source_run_id", run.id)');
+    expect(serverSource).not.toContain("count_as_confirmed_business");
   });
 
   it("is prepared but not wired into any customer route yet", () => {
