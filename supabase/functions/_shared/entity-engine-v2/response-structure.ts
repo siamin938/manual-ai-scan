@@ -234,6 +234,13 @@ export function parseResponseStructure(text: string): ResponseNode[] {
       continue;
     }
 
+    const paragraphIndent = leadingSpaces(raw);
+    const continuationParent =
+      listStack.length > 0 &&
+      paragraphIndent > listStack[listStack.length - 1]!.indent
+        ? listStack[listStack.length - 1]!.id
+        : null;
+
     nodes.push({
       id: `paragraph:${lineNo}`,
       kind: "paragraph",
@@ -242,10 +249,13 @@ export function parseResponseStructure(text: string): ResponseNode[] {
       raw,
       text: stripOuterInlineMarkdown(trimmed),
       scopeText: raw,
-      parentId: nearestHeading(),
+      parentId: continuationParent ?? nearestHeading(),
+      indent: paragraphIndent,
     });
 
-    listStack.length = 0;
+    if (!continuationParent) {
+      listStack.length = 0;
+    }
   }
 
   return nodes;

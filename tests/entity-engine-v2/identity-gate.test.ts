@@ -158,6 +158,97 @@ describe("Entity Engine v2 single-authority identity gate", () => {
     ).toBe(true);
   });
 
+  it("confirms a named list business from a directly indented address/phone continuation", () => {
+    const text = [
+      "### 분당구",
+      "- **판교메젠모터스**",
+      "  분당구 대왕판교로 178, ☎ 031-717-1579",
+      "- **트윈모터스**",
+      "  분당구 백현동 123, ☎ 031-111-2222",
+    ].join("\n");
+
+    const { results } = evaluate(text);
+    const pangyo = results.find(
+      (item) => item.identitySurface === "판교메젠모터스",
+    );
+    const twin = results.find(
+      (item) => item.identitySurface === "트윈모터스",
+    );
+
+    expect(pangyo?.decision).toBe("confirmed_business");
+    expect(
+      pangyo?.evidence.some(
+        (item) =>
+          item.provenance === "list_detail_child" &&
+          (item.type === "address" || item.type === "phone"),
+      ),
+    ).toBe(true);
+    expect(twin?.decision).toBe("confirmed_business");
+  });
+
+  it("keeps a descriptorless list business unresolved even with directly indented address and phone evidence", () => {
+    const text = [
+      "- **루미나**",
+      "  서울 성동구 자동차로 123, ☎ 02-1234-5678",
+    ].join("\n");
+
+    const { results } = evaluate(text);
+    const result = results.find((item) => item.identitySurface === "루미나");
+
+    expect(result?.decision).toBe("unresolved");
+    expect(
+      result?.evidence.some(
+        (item) =>
+          item.provenance === "list_detail_child" &&
+          (item.type === "address" || item.type === "phone"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not let sibling descriptorless businesses share one list item's address and phone as confirmation", () => {
+    const text = [
+      "- **루미나 / 아르코**",
+      "  서울 성동구 자동차로 123, ☎ 02-1234-5678",
+    ].join("\n");
+
+    const { candidates, results } = evaluate(text);
+    const siblingSurfaces = candidates
+      .filter((item) => item.nodeId === candidates[0]?.nodeId)
+      .map((item) => item.identitySurface)
+      .sort();
+
+    expect(siblingSurfaces).toEqual(["루미나", "아르코"]);
+
+    const lumina = results.find((item) => item.identitySurface === "루미나");
+    const arco = results.find((item) => item.identitySurface === "아르코");
+
+    expect(lumina?.decision).toBe("unresolved");
+    expect(arco?.decision).toBe("unresolved");
+    expect(
+      lumina?.evidence.some(
+        (item) =>
+          item.provenance === "list_detail_child" &&
+          (item.type === "address" || item.type === "phone"),
+      ),
+    ).toBe(true);
+    expect(
+      arco?.evidence.some(
+        (item) =>
+          item.provenance === "list_detail_child" &&
+          (item.type === "address" || item.type === "phone"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not leak an unindented paragraph into the previous list-item identity", () => {
+    const text = [
+      "- **판교메젠모터스**",
+      "분당구 대왕판교로 178, ☎ 031-717-1579",
+    ].join("\n");
+
+    expect(decisionFor(text, "판교메젠모터스")).toBe("unresolved");
+  });
+
   it("normalizes a registered business embedded in a descriptive section title", () => {
     const businesses: CandidateBusinessRef[] = [
       {
