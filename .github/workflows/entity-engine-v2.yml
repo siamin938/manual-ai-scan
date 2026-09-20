@@ -10,6 +10,7 @@ on:
       - "supabase/migrations/*entity_facts_v2*.sql"
       - "tests/entity-engine-v2/**"
       - "src/lib/entity-facts-v2-read-gateway.*"
+      - "src/routes/_authenticated/dashboard.tsx"
       - "tests/fixtures/entity-golden-corpus*.json"
       - "tests/fixtures/entity-v2-shadow-*.json"
       - "scripts/entity-v2-shadow-replay.ts"
@@ -48,3 +49,6 @@ jobs:
 
       - name: Run Entity Engine v2 tests
         run: bun run test -- tests/entity-engine-v2
+
+      - name: Build dashboard cutover
+        run: bun run build
