@@ -1,11 +1,7 @@
-name: Entity Facts v2 Production Backfill (APPROVED 428+23)
+name: Entity Facts v2 Production Backfill (DISABLED AFTER SUCCESS)
 
 on:
-  push:
-    branches:
-      - codex/p0-entity-truth-phase2c-replay-v2
-    paths:
-      - ".github/entity-facts-v2-production-backfill-trigger"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,6 +12,7 @@ concurrency:
 
 jobs:
   production-backfill:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
