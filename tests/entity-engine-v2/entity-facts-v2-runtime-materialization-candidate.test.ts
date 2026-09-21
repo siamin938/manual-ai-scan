@@ -89,23 +89,23 @@ function baseRow(
 
 function dataset(): Phase2CMaterializationDataset {
   const clueRow = baseRow(3, {
-    responseText: "- 모터큐브",
+    responseText: "- 레이노 개봉점",
     storedMentions: [
       {
-        mentionId: "mention-motorcube-3",
-        displayName: "모터큐브",
+        mentionId: "mention-rayno-3",
+        displayName: "레이노 개봉점",
         position: 1,
-        canonicalKey: "auto:모터큐브",
+        canonicalKey: "auto:레이노개봉점",
       },
     ],
     attributions: [
       {
-        attributionId: "attr-motorcube-3",
-        measurementMentionId: "mention-motorcube-3",
-        canonicalKey: "auto:모터큐브",
-        domain: "motorcube.co.kr",
-        url: "https://motorcube.co.kr/",
-        title: "모터큐브 20년 수입차 전문",
+        attributionId: "attr-rayno-clue-3",
+        measurementMentionId: "mention-rayno-3",
+        canonicalKey: "auto:레이노개봉점",
+        domain: "oh-car.kr",
+        url: "https://oh-car.kr/rayno-gaebong",
+        title: "레이노 개봉점",
         attributionLevel: "section",
         evidence: { distance_chars: 90 },
         citationStartIndex: 55,
@@ -184,8 +184,8 @@ describe("Entity Facts v2 runtime materialization candidate", () => {
 
     expect(result.clueSupplement.source_clues).toEqual([
       {
-        domain: "motorcube.co.kr",
-        canonicalKey: "auto:모터큐브",
+        domain: "oh-car.kr",
+        canonicalKey: "auto:레이노개봉점",
         responseCount: 1,
         attributionCount: 1,
         evidenceTier: "near_section_title_match",
