@@ -64,6 +64,7 @@ export type EntityFactsV2ReadObservedSourceEntityDTO = {
   name: string;
   isTarget: boolean;
   responseCount: number;
+  evidence: "confirmed" | "clue";
 };
 
 export type EntityFactsV2ReadObservedSourceDTO = {
@@ -71,6 +72,8 @@ export type EntityFactsV2ReadObservedSourceDTO = {
   responseCount: number;
   targetResponseCount: number;
   competitorResponseCount: number;
+  clueResponseCount: number;
+  evidence: "confirmed" | "mixed" | "clue";
   linkedEntities: EntityFactsV2ReadObservedSourceEntityDTO[];
 };
 
