@@ -122,6 +122,10 @@ BEGIN
     RAISE EXCEPTION 'COMPETITOR_SOURCE_CLUE_OBSERVED_BASE_VERSION_MISMATCH';
   END IF;
 
+  IF NEW.source_replay_version <> v_observed.source_replay_version THEN
+    RAISE EXCEPTION 'COMPETITOR_SOURCE_CLUE_REPLAY_VERSION_MISMATCH';
+  END IF;
+
   SELECT COALESCE(
     array_agg(DISTINCT item->>'canonicalKey' ORDER BY item->>'canonicalKey'),
     ARRAY[]::text[]
