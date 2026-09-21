@@ -179,7 +179,7 @@ describe("Competitor source clue backfill dry-run", () => {
     expect(result.rows[0]?.source_clues_hash).toMatch(/^[0-9a-f]{64}$/u);
   });
 
-  it("fails closed when a clue duplicates an accepted entity-domain link", () => {
+  it("drops a clue when the same entity-domain is already an accepted source", () => {
     const base = baseExport();
     base.rows[0]!.observedSources = [
       {
@@ -201,13 +201,15 @@ describe("Competitor source clue backfill dry-run", () => {
       },
     ];
 
-    // Replay suppresses the same accepted pair before storage; the dry-run
-    // additionally protects the storage contract if such a pair appears.
     const result = buildCompetitorSourceClueBackfillDryRun(
       dataset(),
       base,
       { expectedRunCount: 1, expectedMeasurementCount: 1 },
     );
-    expect(result.rows[0]?.source_clues).toHaveLength(1);
+
+    expect(result.rows[0]?.source_clues).toEqual([]);
+    expect(result.summary.clueDomainCount).toBe(0);
+    expect(result.summary.newClueDomainCount).toBe(0);
+    expect(result.summary.combinedObservedSourceDomainCount).toBe(1);
   });
 });
