@@ -277,7 +277,7 @@ describe("Observed sources Read Gateway candidate", () => {
     expect(result).toEqual({
       ok: false,
       error: "UNRESOLVED_DISPLAY_EVIDENCE",
-      canonicalKey: "auto:레이노개봉점",
     });
+    expect(JSON.stringify(result)).not.toContain("auto:");
   });
 });
