@@ -167,6 +167,7 @@ WITH run_scope AS (
   ) AS identities
   FROM public.businesses b
   WHERE b.active=true
+    AND b.org_id=(SELECT org_id FROM run_scope)
 ), replay_rows AS (
   SELECT
     rm.measurement_id,
