@@ -83,11 +83,6 @@ describe("Competitor source clue Production 23-run baseline", () => {
         .map((run) => run.business),
     );
 
-    expect(withNewClues).toEqual(
-      expect.objectContaining
-        ? withNewClues
-        : withNewClues,
-    );
     expect(withNewClues.has("카스페이스 구로점")).toBe(true);
     expect(withNewClues.has("오토트리")).toBe(true);
     expect(withNewClues.has("커스텀개러지")).toBe(true);
