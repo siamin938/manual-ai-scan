@@ -139,7 +139,7 @@ export function buildEntityFactsV2OverviewViewModel(
 
   const uncertaintyNotice =
     overview.unresolvedTargetCount > 0
-      ? "일부 응답은 내 업체와의 동일성 판정이 확정되지 않아, 하나의 노출률 대신 확인 가능한 범위로 표시합니다."
+      ? "메인 노출률은 내 업체로 확정된 응답만 계산합니다. 동일성 확인이 더 필요한 응답은 별도로 표시하며, 상세 분석에서는 가능한 최대 범위를 함께 참고합니다."
       : null;
 
   const sourceQualityNotice =
