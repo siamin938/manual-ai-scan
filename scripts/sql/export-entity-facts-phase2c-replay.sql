@@ -184,6 +184,7 @@ with eligible_runs as (
         'canonicalKey', a.canonical_key,
         'domain', a.domain,
         'url', a.citation_url,
+        'title', a.title,
         'attributionLevel', a.attribution_level,
         'evidence', a.evidence,
         'citationStartIndex', a.citation_start_index,
