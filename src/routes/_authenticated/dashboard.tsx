@@ -335,6 +335,7 @@ function DashboardPage() {
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
                   이번 측정의 AI 답변에서 내 업체 또는 함께 관찰된 업체와 연결된 출처입니다.
+                  반복·직접 근거가 확인된 연결과, 제목까지 일치한 1회 근접 근거는 ‘연결 단서’로 구분합니다.
                   출처의 신뢰도나 추천 이유를 뜻하지는 않습니다.
                 </p>
                 {!model.sources.available ? (
@@ -358,24 +359,45 @@ function DashboardPage() {
                       {model.sources.rows.map((s) => (
                         <TableRow key={s.domain}>
                           <TableCell className="text-sm font-medium">
-                            {s.domain}
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span>{s.domain}</span>
+                              {s.evidence === "clue" && (
+                                <Badge variant="secondary">연결 단서</Badge>
+                              )}
+                              {s.evidence === "mixed" && (
+                                <Badge variant="outline">확인 + 단서</Badge>
+                              )}
+                            </span>
                           </TableCell>
                           <TableCell className="text-sm">
                             <span className="tabular-nums">{s.responseCount}건</span>
                             <span className="mt-0.5 block text-xs text-muted-foreground">
-                              내 업체 연결 {s.targetResponseCount}건 · 함께 관찰된 업체 연결{" "}
-                              {s.competitorResponseCount}건
+                              {s.evidence === "clue"
+                                ? `연결 단서 ${s.clueResponseCount}건`
+                                : `내 업체 연결 ${s.targetResponseCount}건 · 함께 관찰된 업체 연결 ${s.competitorResponseCount}건`}
+                              {s.evidence === "mixed" && s.clueResponseCount > 0
+                                ? ` · 추가 단서 ${s.clueResponseCount}건`
+                                : ""}
                             </span>
                           </TableCell>
                           <TableCell className="text-sm">
                             <div className="flex flex-wrap gap-1.5">
                               {s.linkedEntities.map((entity) => (
                                 <Badge
-                                  key={`${s.domain}:${entity.isTarget ? "target" : "other"}:${entity.name}`}
-                                  variant={entity.isTarget ? "default" : "outline"}
+                                  key={`${s.domain}:${entity.isTarget ? "target" : "other"}:${entity.name}:${entity.evidence}`}
+                                  variant={
+                                    entity.isTarget
+                                      ? "default"
+                                      : entity.evidence === "clue"
+                                        ? "secondary"
+                                        : "outline"
+                                  }
                                 >
                                   {entity.isTarget ? "내 업체" : entity.name}
-                                  {!entity.isTarget ? ` · ${entity.responseCount}건` : ""}
+                                  {!entity.isTarget && entity.evidence === "confirmed"
+                                    ? ` · ${entity.responseCount}건`
+                                    : ""}
+                                  {entity.evidence === "clue" ? " · 연결 단서" : ""}
                                 </Badge>
                               ))}
                             </div>
