@@ -143,7 +143,7 @@ function infrastructureHost(domain: string): boolean {
 function distanceChars(
   evidence: Record<string, unknown> | null | undefined,
 ): number | null {
-  const raw = evidence?.distance_chars;
+  const raw = evidence?.["distance_chars"];
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
   if (typeof raw === "string" && raw.trim()) {
     const parsed = Number(raw);
