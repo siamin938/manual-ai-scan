@@ -1,4 +1,11 @@
 import {
+  ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_ENGINE_VERSION,
+  ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_SOURCE_REPLAY_VERSION,
+  ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_VERSION,
+  mergeObservedSourcesWithCompetitorClues,
+  parseCompetitorSourceCluesV2,
+} from "./entity-facts-v2-read-gateway.source-clues";
+import {
   buildObservedSourcesCustomerDTO,
   ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION,
   ENTITY_FACTS_V2_OBSERVED_SOURCES_SOURCE_REPLAY_VERSION,
@@ -37,6 +44,7 @@ export type EntityFactsV2ReadGatewayStorageSnapshot = {
 };
 
 export type EntityFactsV2ObservedSourcesStorageSnapshot = {
+  observedSourceAggregateId: string;
   baseAggregateId: string;
   baseMaterializationId: string;
   sourceRunId: string;
@@ -46,6 +54,17 @@ export type EntityFactsV2ObservedSourcesStorageSnapshot = {
   observedSources: unknown;
 };
 
+export type EntityFactsV2CompetitorSourceClueStorageSnapshot = {
+  baseObservedSourceAggregateId: string;
+  baseAggregateId: string;
+  baseMaterializationId: string;
+  sourceRunId: string;
+  clueVersion: string;
+  sourceReplayVersion: string;
+  engineVersion: string;
+  sourceClues: unknown;
+};
+
 
 export type EntityFactsV2ReadGatewaySnapshot = {
   generatedAt: string;
@@ -53,6 +72,9 @@ export type EntityFactsV2ReadGatewaySnapshot = {
   scope: EntityFactsV2ReadScopeDTO;
   storage: EntityFactsV2ReadGatewayStorageSnapshot;
   observedSourcesStorage: EntityFactsV2ObservedSourcesStorageSnapshot | null;
+  competitorSourceClueStorage:
+    | EntityFactsV2CompetitorSourceClueStorageSnapshot
+    | null;
   registeredCompetitorNames: Record<string, string>;
   autoCompetitorEvidence: Record<
     string,
@@ -208,6 +230,64 @@ export function buildEntityFactsV2ReadGatewayFromSnapshot(
 
     observedSourcesStatus = "available";
     observedSources = customerObservedSources;
+  }
+
+  if (input.competitorSourceClueStorage) {
+    const clueStorage = input.competitorSourceClueStorage;
+    const observedStorage = input.observedSourcesStorage;
+
+    if (
+      !observedStorage ||
+      clueStorage.baseObservedSourceAggregateId !==
+        observedStorage.observedSourceAggregateId ||
+      clueStorage.baseAggregateId !== storage.aggregateId ||
+      clueStorage.baseMaterializationId !== storage.materializationId ||
+      clueStorage.sourceRunId !== scope.runId ||
+      clueStorage.clueVersion !==
+        ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_VERSION ||
+      clueStorage.sourceReplayVersion !==
+        ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_SOURCE_REPLAY_VERSION ||
+      clueStorage.engineVersion !==
+        ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_ENGINE_VERSION
+    ) {
+      return {
+        ok: false,
+        error: "INVALID_V2_DATA",
+        business,
+        runId: scope.runId,
+      };
+    }
+
+    const parsedClues = parseCompetitorSourceCluesV2(
+      clueStorage.sourceClues,
+    );
+    if (!parsedClues) {
+      return {
+        ok: false,
+        error: "INVALID_V2_DATA",
+        business,
+        runId: scope.runId,
+      };
+    }
+
+    const mergedSources = mergeObservedSourcesWithCompetitorClues({
+      observedSources,
+      sourceClues: parsedClues,
+      competitorCanonicalKeys: new Set(
+        aggregate.competitors.map((item) => item.canonicalKey),
+      ),
+      autoCompetitorEvidence: input.autoCompetitorEvidence,
+    });
+    if (!mergedSources) {
+      return {
+        ok: false,
+        error: "INVALID_V2_DATA",
+        business,
+        runId: scope.runId,
+      };
+    }
+
+    observedSources = mergedSources;
   }
 
   return {
