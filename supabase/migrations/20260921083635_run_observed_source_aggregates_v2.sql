@@ -1,6 +1,5 @@
--- CANDIDATE ONLY — do not apply directly to Production.
--- When approved, generate the real Supabase migration with the CLI and copy
--- the reviewed SQL into that generated migration file.
+-- Generated with Supabase CLI from the reviewed observed-source schema candidate.
+-- REVIEWED BUT NOT APPLIED TO PRODUCTION. Apply only after explicit approval.
 --
 -- Purpose:
 --   Add an append-only run-level supplement for observed source relationships
