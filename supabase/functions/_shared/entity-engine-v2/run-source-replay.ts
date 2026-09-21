@@ -8,6 +8,7 @@ import {
 import type { ReplayEntityMentionLinkV2 } from "./historical-measurement-replay.ts";
 
 export const RUN_SOURCE_REPLAY_VERSION = "0.1" as const;
+export const RUN_COMPETITOR_SOURCE_CLUE_VERSION = "0.1" as const;
 
 export type ReplayAttributionLevelV2 = "direct" | "section" | string;
 
@@ -17,6 +18,7 @@ export interface ReplayRawAttributionV2 {
   canonicalKey?: string | null;
   domain: string;
   url: string;
+  title?: string | null;
   attributionLevel: ReplayAttributionLevelV2;
   evidence?: Record<string, unknown> | null;
   citationStartIndex?: number | null;
@@ -57,6 +59,14 @@ export interface AcceptedReplayAttributionV2 {
   evidenceTier: "direct" | "near_section";
 }
 
+export interface ReplayCompetitorSourceClueV2 {
+  domain: string;
+  canonicalKey: string;
+  responseCount: number;
+  attributionCount: number;
+  evidenceTier: "near_section_title_match";
+}
+
 /**
  * Target-linked source evidence that is valid enough to show as a clue, but
  * not repeated enough to be promoted into targetCitationDomains.
@@ -78,6 +88,8 @@ export interface RunSourceReplayResultV2 {
     facts: MeasurementEntityFactsV2;
   }>;
   acceptedAttributions: AcceptedReplayAttributionV2[];
+  competitorSourceClueVersion: typeof RUN_COMPETITOR_SOURCE_CLUE_VERSION;
+  competitorSourceClues: ReplayCompetitorSourceClueV2[];
   targetReferenceSources: ReplayTargetReferenceSourceV2[];
   diagnostics: RunSourceReplayDiagnosticV2[];
 }
@@ -94,6 +106,25 @@ function normalizeCanonicalKey(value: string | null | undefined): string {
 
 function normalizeDomain(value: string): string {
   return value.trim().toLowerCase().replace(/^www\./u, "");
+}
+
+function normalizeIdentitySurface(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z가-힣]/giu, "");
+}
+
+function strictCompetitorTitleMatch(
+  canonicalKey: string | null,
+  title: string | null | undefined,
+): boolean {
+  const key = normalizeCanonicalKey(canonicalKey);
+  if (!key.startsWith("auto:")) return false;
+
+  const expected = normalizeIdentitySurface(key.slice("auto:".length));
+  const titleSurface = normalizeIdentitySurface(title ?? "");
+  return expected.length >= 4 && titleSurface.includes(expected);
 }
 
 function sourceGroup(domain: string): string {
@@ -348,6 +379,12 @@ export function replayRunSourcesV2(
   }
 
   const acceptedAttributions: AcceptedReplayAttributionV2[] = [];
+  const competitorClueAttributions: Array<{
+    domain: string;
+    canonicalKey: string;
+    measurementId: string;
+    attributionId: string;
+  }> = [];
   const targetReferenceResponses = new Map<string, Set<string>>();
   const builderAttributions = new Map<
     string,
@@ -391,6 +428,25 @@ export function replayRunSourcesV2(
         responses.add(measurement.measurementId);
         targetReferenceResponses.set(actionable.domain, responses);
       }
+
+      const mentionId = (attribution.measurementMentionId ?? "").trim();
+      const canonicalKey = mapping.resolved.canonicalKey
+        ? normalizeCanonicalKey(mapping.resolved.canonicalKey)
+        : "";
+      if (
+        mapping.resolved.side === "other" &&
+        actionable.tier === "near_section" &&
+        mentionId &&
+        canonicalKey &&
+        strictCompetitorTitleMatch(canonicalKey, attribution.title)
+      ) {
+        competitorClueAttributions.push({
+          domain: actionable.domain,
+          canonicalKey,
+          measurementId: measurement.measurementId,
+          attributionId: attribution.attributionId,
+        });
+      }
       continue;
     }
 
@@ -416,6 +472,46 @@ export function replayRunSourcesV2(
       evidenceTier: actionable.tier,
     });
   }
+
+  const competitorClueGroups = new Map<
+    string,
+    {
+      domain: string;
+      canonicalKey: string;
+      responses: Set<string>;
+      attributionIds: Set<string>;
+    }
+  >();
+  for (const clue of competitorClueAttributions) {
+    const groupKey = `${clue.domain}\u0000${clue.canonicalKey}`;
+    const group = competitorClueGroups.get(groupKey) ?? {
+      domain: clue.domain,
+      canonicalKey: clue.canonicalKey,
+      responses: new Set<string>(),
+      attributionIds: new Set<string>(),
+    };
+    group.responses.add(clue.measurementId);
+    group.attributionIds.add(clue.attributionId);
+    competitorClueGroups.set(groupKey, group);
+  }
+
+  const competitorSourceClues: ReplayCompetitorSourceClueV2[] = [
+    ...competitorClueGroups.values(),
+  ]
+    .map((group) => ({
+      domain: group.domain,
+      canonicalKey: group.canonicalKey,
+      responseCount: group.responses.size,
+      attributionCount: group.attributionIds.size,
+      evidenceTier: "near_section_title_match" as const,
+    }))
+    .sort(
+      (a, b) =>
+        b.responseCount - a.responseCount ||
+        b.attributionCount - a.attributionCount ||
+        a.domain.localeCompare(b.domain, "en") ||
+        a.canonicalKey.localeCompare(b.canonicalKey, "en"),
+    );
 
   const factsByMeasurement = measurements
     .map((measurement) => ({
@@ -463,6 +559,8 @@ export function replayRunSourcesV2(
     sourceReplayStatus: "evaluated",
     factsByMeasurement,
     acceptedAttributions,
+    competitorSourceClueVersion: RUN_COMPETITOR_SOURCE_CLUE_VERSION,
+    competitorSourceClues,
     targetReferenceSources,
     diagnostics,
   };
