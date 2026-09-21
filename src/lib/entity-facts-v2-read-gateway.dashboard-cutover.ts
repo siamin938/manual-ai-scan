@@ -142,10 +142,13 @@ export type EntityFactsV2DashboardSourceRow = {
   responseCount: number;
   targetResponseCount: number;
   competitorResponseCount: number;
+  clueResponseCount: number;
+  evidence: "confirmed" | "mixed" | "clue";
   linkedEntities: Array<{
     name: string;
     isTarget: boolean;
     responseCount: number;
+    evidence: "confirmed" | "clue";
   }>;
 };
 
@@ -313,10 +316,13 @@ export function buildEntityFactsV2DashboardCutoverModel(
       responseCount: item.responseCount,
       targetResponseCount: item.targetResponseCount,
       competitorResponseCount: item.competitorResponseCount,
+      clueResponseCount: item.clueResponseCount,
+      evidence: item.evidence,
       linkedEntities: item.linkedEntities.map((entity) => ({
         name: entity.name,
         isTarget: entity.isTarget,
         responseCount: entity.responseCount,
+        evidence: entity.evidence,
       })),
     }));
 
