@@ -60,7 +60,8 @@ export function buildRunObservedSourcesV2(
 
   for (const attribution of acceptedAttributions) {
     const domain = normalizeDomain(attribution.domain);
-    if (!domain) continue;
+    const canonicalKey = normalizeCanonicalKey(attribution.canonicalKey);
+    if (!domain || !canonicalKey) continue;
 
     const source = sources.get(domain) ?? {
       responses: new Set<string>(),
@@ -78,8 +79,7 @@ export function buildRunObservedSourcesV2(
     }
     source.attributionCount += 1;
 
-    const canonicalKey = normalizeCanonicalKey(attribution.canonicalKey);
-    if (canonicalKey) {
+    {
       const entity = source.entities.get(canonicalKey) ?? {
         side: attribution.side,
         responses: new Set<string>(),
