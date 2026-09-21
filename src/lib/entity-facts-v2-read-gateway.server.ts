@@ -271,7 +271,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     const { data: clueRows, error: clueError } = await v2Admin
       .from("run_competitor_source_clue_aggregates_v2")
       .select(
-        "base_observed_source_aggregate_id, base_aggregate_id, base_materialization_id, source_run_id, clue_version, source_replay_version, engine_version, source_clues",
+        "id, base_observed_source_aggregate_id, base_aggregate_id, base_materialization_id, org_id, business_id, source_run_id, clue_version, source_replay_version, engine_version, input_fingerprint, source_clues, source_clues_hash, created_at",
       )
       .eq("org_id", orgId)
       .eq("business_id", businessId)
