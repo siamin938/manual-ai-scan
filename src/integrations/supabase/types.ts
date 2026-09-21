@@ -2865,6 +2865,83 @@ export type Database = {
           },
         ]
       }
+      run_observed_source_aggregates_v2: {
+        Row: {
+          base_aggregate_id: string
+          base_materialization_id: string
+          business_id: string
+          created_at: string
+          engine_version: string
+          id: string
+          input_fingerprint: string
+          observed_sources: Json
+          observed_sources_hash: string
+          observed_sources_version: string
+          org_id: string
+          source_replay_version: string
+          source_run_id: string
+        }
+        Insert: {
+          base_aggregate_id: string
+          base_materialization_id: string
+          business_id: string
+          created_at?: string
+          engine_version: string
+          id?: string
+          input_fingerprint: string
+          observed_sources: Json
+          observed_sources_hash: string
+          observed_sources_version: string
+          org_id: string
+          source_replay_version: string
+          source_run_id: string
+        }
+        Update: {
+          base_aggregate_id?: string
+          base_materialization_id?: string
+          business_id?: string
+          created_at?: string
+          engine_version?: string
+          id?: string
+          input_fingerprint?: string
+          observed_sources?: Json
+          observed_sources_hash?: string
+          observed_sources_version?: string
+          org_id?: string
+          source_replay_version?: string
+          source_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_observed_source_aggregates_v2_base_aggregate_id_fkey"
+            columns: ["base_aggregate_id"]
+            isOneToOne: false
+            referencedRelation: "run_entity_fact_aggregates_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_observed_source_aggregates_v2_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_observed_source_aggregates_v2_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_observed_source_aggregates_v2_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_events: {
         Row: {
           created_at: string
