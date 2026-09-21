@@ -37,7 +37,6 @@ export type EntityFactsV2ObservedSourcesReadCandidateResponse =
   | {
       ok: false;
       error: "INVALID_CANDIDATE" | "UNRESOLVED_DISPLAY_EVIDENCE";
-      canonicalKey?: string;
     };
 
 const UUID_RE =
@@ -128,7 +127,6 @@ export function buildEntityFactsV2ObservedSourcesReadCandidate(args: {
         return {
           ok: false,
           error: "UNRESOLVED_DISPLAY_EVIDENCE",
-          canonicalKey: entity.canonicalKey,
         };
       }
 
