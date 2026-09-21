@@ -9,6 +9,7 @@ export const RUN_OBSERVED_SOURCES_AGGREGATE_CANDIDATE_VERSION = "0.1" as const;
 export type RunObservedSourcesAggregateCandidateIssueCode =
   | "INVALID_TARGET_BUSINESS_ID"
   | "TARGET_SOURCE_DOMAIN_PARITY_MISMATCH"
+  | "TARGET_SOURCE_RESPONSE_COUNT_MISMATCH"
   | "TARGET_ENTITY_KEY_MISMATCH"
   | "OTHER_ENTITY_NOT_IN_COMPETITORS"
   | "OBSERVED_SOURCE_COUNT_INVALID";
@@ -61,6 +62,12 @@ export function buildRunEntityFactsObservedSourcesAggregateCandidateV2(
   const competitorKeys = new Set(
     aggregate.competitors.map((item) => item.canonicalKey.trim()).filter(Boolean),
   );
+  const targetSourceResponseCountByDomain = new Map(
+    aggregate.targetSources.map((item) => [
+      normalizeDomain(item.domain),
+      item.responseCount,
+    ]),
+  );
 
   for (const source of observedSources) {
     const domain = normalizeDomain(source.domain);
@@ -83,6 +90,18 @@ export function buildRunEntityFactsObservedSourcesAggregateCandidateV2(
         ...(domain ? { domain } : {}),
       });
       continue;
+    }
+
+    const expectedTargetResponseCount =
+      targetSourceResponseCountByDomain.get(domain);
+    if (
+      source.targetResponseCount > 0 &&
+      expectedTargetResponseCount !== source.targetResponseCount
+    ) {
+      issues.push({
+        code: "TARGET_SOURCE_RESPONSE_COUNT_MISMATCH",
+        domain,
+      });
     }
 
     for (const entity of source.entities) {
