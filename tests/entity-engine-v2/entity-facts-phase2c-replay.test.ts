@@ -322,6 +322,54 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     expect(report.summary.sourceLinkedCompetitorCount).toBe(1);
   });
 
+  it("keeps strict singleton competitor sources as advisory clues without changing accepted sources", () => {
+    const report = replayPhase2CDataset(
+      dataset([
+        row(1, {
+          attributions: [
+            {
+              attributionId: "source-clue-1",
+              measurementMentionId: "mention-1",
+              canonicalKey: "auto:레이노개봉점",
+              domain: "rayno-example.co.kr",
+              url: "https://rayno-example.co.kr/gaebong",
+              title: "레이노 개봉점",
+              attributionLevel: "section",
+              evidence: { distance_chars: 100 },
+              citationStartIndex: 40,
+              entityEndIndex: 10,
+            },
+          ],
+        }),
+      ]),
+    );
+
+    const run = report.runs[0]!;
+    expect(run.proposed.targetSources).toEqual([]);
+    expect(run.proposed.observedSources).toEqual([]);
+    expect(run.proposed.observedSourceDomainCount).toBe(0);
+    expect(run.proposed.competitorSourceClues).toEqual([
+      {
+        domain: "rayno-example.co.kr",
+        canonicalKey: "auto:레이노개봉점",
+        responseCount: 1,
+        attributionCount: 1,
+        evidenceTier: "near_section_title_match",
+      },
+    ]);
+    expect(run.proposed.competitorSourceClueDomainCount).toBe(1);
+    expect(run.proposed.competitorSourceClueEntityLinkCount).toBe(1);
+    expect(run.proposed.newCompetitorSourceClueDomainCount).toBe(1);
+    expect(run.proposed.combinedObservedSourceDomainCount).toBe(1);
+
+    expect(report.summary.observedSourceDomainCount).toBe(0);
+    expect(report.summary.competitorSourceClueRunCount).toBe(1);
+    expect(report.summary.competitorSourceClueDomainCount).toBe(1);
+    expect(report.summary.competitorSourceClueEntityLinkCount).toBe(1);
+    expect(report.summary.newCompetitorSourceClueDomainCount).toBe(1);
+    expect(report.summary.combinedObservedSourceDomainCount).toBe(1);
+  });
+
   it("allows an evidence-backed newly confirmed competitor", () => {
     const report = replayPhase2CDataset(dataset([row(1)]));
     const run = report.runs[0]!;
