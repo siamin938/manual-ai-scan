@@ -130,6 +130,7 @@ describe("Phase 2C Run Source Replay v0.1", () => {
         evidenceTier: "direct",
       }),
     ]);
+    expect(result.targetReferenceSources).toEqual([]);
     expect(result.factsByMeasurement[0]?.facts.targetCitationDomains).toEqual([
       "example.com",
     ]);
@@ -154,6 +155,7 @@ describe("Phase 2C Run Source Replay v0.1", () => {
     ]);
 
     expect(result.acceptedAttributions).toEqual([]);
+    expect(result.targetReferenceSources).toEqual([]);
     expect(result.diagnostics).toEqual([
       expect.objectContaining({
         code: "ATTRIBUTION_ENTITY_MAPPING_UNRESOLVED",
@@ -176,16 +178,55 @@ describe("Phase 2C Run Source Replay v0.1", () => {
     const one = replayRunSourcesV2([
       measurement("m1", [targetObservation()], [section("a1")]),
     ]);
+    expect(one.acceptedAttributions).toEqual([]);
+    expect(one.targetReferenceSources).toEqual([
+      {
+        domain: "example.com",
+        responseCount: 1,
+        evidenceTier: "near_section",
+      },
+    ]);
     expect(one.factsByMeasurement[0]?.facts.targetCitationDomains).toEqual([]);
 
     const two = replayRunSourcesV2([
       measurement("m1", [targetObservation()], [section("a1")]),
       measurement("m2", [targetObservation()], [section("a2")]),
     ]);
+    expect(two.targetReferenceSources).toEqual([]);
     expect(two.factsByMeasurement.map((item) => item.facts.targetCitationDomains)).toEqual([
       ["example.com"],
       ["example.com"],
     ]);
+  });
+
+  it("keeps a single confirmed-target near-section source as a reference clue", () => {
+    const result = replayRunSourcesV2([
+      measurement(
+        "m1",
+        [targetObservation()],
+        [
+          rawAttribution({
+            attributionId: "hunnytip-target",
+            domain: "hunnytip.kr",
+            url: "https://www.hunnytip.kr/guro-tinting",
+            attributionLevel: "section",
+            evidence: { distance_chars: 151 },
+          }),
+        ],
+      ),
+    ]);
+
+    expect(
+      result.acceptedAttributions.filter((item) => item.side === "target"),
+    ).toEqual([]);
+    expect(result.targetReferenceSources).toEqual([
+      {
+        domain: "hunnytip.kr",
+        responseCount: 1,
+        evidenceTier: "near_section",
+      },
+    ]);
+    expect(result.factsByMeasurement[0]?.facts.targetCitationDomains).toEqual([]);
   });
 
   it("does not turn competitor attribution into a target source", () => {
@@ -204,6 +245,7 @@ describe("Phase 2C Run Source Replay v0.1", () => {
     ]);
 
     expect(result.acceptedAttributions[0]?.side).toBe("other");
+    expect(result.targetReferenceSources).toEqual([]);
     expect(result.factsByMeasurement[0]?.facts.targetCitationDomains).toEqual([]);
   });
 
@@ -221,6 +263,7 @@ describe("Phase 2C Run Source Replay v0.1", () => {
       ),
     ]);
     expect(result.acceptedAttributions).toEqual([]);
+    expect(result.targetReferenceSources).toEqual([]);
     expect(result.factsByMeasurement[0]?.facts.targetCitationDomains).toEqual([]);
   });
 
@@ -253,6 +296,7 @@ describe("Phase 2C Run Source Replay v0.1", () => {
       ),
     ]);
     expect(result.acceptedAttributions).toEqual([]);
+    expect(result.targetReferenceSources).toEqual([]);
   });
 
   it("excludes comparative-target attribution context", () => {
@@ -270,6 +314,7 @@ describe("Phase 2C Run Source Replay v0.1", () => {
       },
     ]);
     expect(result.acceptedAttributions).toEqual([]);
+    expect(result.targetReferenceSources).toEqual([]);
   });
 
   it("is deterministic under measurement and attribution ordering", () => {
