@@ -151,6 +151,19 @@ function fixture(): EntityFactsV2ReadGatewayDTO {
         partialResponseCount: 1,
       },
     ],
+    observedSourcesStatus: "available",
+    observedSources: [
+      {
+        domain: "hunnytip.kr",
+        responseCount: 2,
+        targetResponseCount: 0,
+        competitorResponseCount: 2,
+        linkedEntities: [
+          { name: "레이노 개봉점", isTarget: false, responseCount: 2 },
+          { name: "루마썬팅 오류점", isTarget: false, responseCount: 1 },
+        ],
+      },
+    ],
   };
 }
 
@@ -222,23 +235,31 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(serialized).not.toContain('"responseRatePct"');
   });
 
-  it("uses target-linked v2 sources without legacy reference-source claims", () => {
+  it("uses observed source supplement without overstating source trust", () => {
     const model = buildEntityFactsV2DashboardCutoverModel(fixture());
 
-    expect(model.sources.heading).toBe("내 업체에 연결된 출처");
+    expect(model.sources.heading).toBe("AI 답변에서 관찰된 주요 출처");
+    expect(model.sources.available).toBe(true);
     expect(model.sources.referenceSourcesAvailable).toBe(false);
+    expect(model.metricCards.targetSourceCount).toBe(1);
+    expect(model.metricCards.observedSourceCount).toBe(1);
     expect(model.sources.rows).toEqual([
       {
-        domain: "example.com",
-        responseCount: 3,
-        completeResponseCount: 2,
-        partialResponseCount: 1,
+        domain: "hunnytip.kr",
+        responseCount: 2,
+        targetResponseCount: 0,
+        competitorResponseCount: 2,
+        linkedEntities: [
+          { name: "레이노 개봉점", isTarget: false, responseCount: 2 },
+          { name: "루마썬팅 오류점", isTarget: false, responseCount: 1 },
+        ],
       },
     ]);
 
     const serialized = JSON.stringify(model.sources);
     expect(serialized).not.toContain("sampleTitle");
     expect(serialized).not.toContain("citationCount");
+    expect(serialized).not.toContain("canonicalKey");
   });
 
   it("keeps weak-question uncertainty distinct from confirmed missing", () => {
