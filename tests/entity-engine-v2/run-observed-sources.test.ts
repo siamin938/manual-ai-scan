@@ -117,6 +117,17 @@ describe("Run observed sources v0.1", () => {
     ]);
   });
 
+  it("excludes accepted attributions that cannot be tied to a canonical entity", () => {
+    const result = buildRunObservedSourcesV2([
+      accepted({
+        canonicalKey: null,
+        domain: "unresolved.example",
+      }),
+    ]);
+
+    expect(result).toEqual([]);
+  });
+
   it("deduplicates response counts while preserving attribution counts", () => {
     const result = buildRunObservedSourcesV2([
       accepted({
