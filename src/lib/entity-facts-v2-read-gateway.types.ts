@@ -60,6 +60,24 @@ export type EntityFactsV2ReadTargetSourceDTO = {
   partialResponseCount: number;
 };
 
+export type EntityFactsV2ReadObservedSourceEntityDTO = {
+  name: string;
+  isTarget: boolean;
+  responseCount: number;
+};
+
+export type EntityFactsV2ReadObservedSourceDTO = {
+  domain: string;
+  responseCount: number;
+  targetResponseCount: number;
+  competitorResponseCount: number;
+  linkedEntities: EntityFactsV2ReadObservedSourceEntityDTO[];
+};
+
+export type EntityFactsV2ReadObservedSourcesStatus =
+  | "available"
+  | "not_materialized";
+
 export type EntityFactsV2ReadBusinessDTO = {
   id: string;
   name: string;
@@ -89,6 +107,8 @@ export type EntityFactsV2ReadGatewayDTO = {
   questionAreas: EntityFactsV2ReadQuestionAreaDTO[];
   competitors: EntityFactsV2ReadCompetitorDTO[];
   targetSources: EntityFactsV2ReadTargetSourceDTO[];
+  observedSourcesStatus: EntityFactsV2ReadObservedSourcesStatus;
+  observedSources: EntityFactsV2ReadObservedSourceDTO[];
 };
 
 export type EntityFactsV2ReadGatewayResponse =
