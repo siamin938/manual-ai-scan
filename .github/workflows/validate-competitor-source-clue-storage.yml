@@ -1,0 +1,59 @@
+name: Validate competitor source clue storage
+
+on:
+  push:
+    branches:
+      - codex/v2-main-integration
+    paths:
+      - ".github/workflows/validate-competitor-source-clue-storage.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Entity Engine tests
+        run: bun run test -- tests/entity-engine-v2
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+      - name: Production build
+        run: bun run build
+
+      - name: Record validation and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p scripts/reports
+          cat > scripts/reports/competitor-source-clue-storage-validation.json <<JSON
+          {
+            "version": "competitor-source-clue-storage-validation-v0.1",
+            "validatedCommit": "$(git rev-parse HEAD)",
+            "entityEngineTests": "passed",
+            "typecheck": "passed",
+            "productionBuild": "passed",
+            "productionApplied": false
+          }
+          JSON
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/reports/competitor-source-clue-storage-validation.json
+          git rm .github/workflows/validate-competitor-source-clue-storage.yml
+          git commit -m "Record competitor source clue storage validation"
+          git push origin HEAD:codex/v2-main-integration
