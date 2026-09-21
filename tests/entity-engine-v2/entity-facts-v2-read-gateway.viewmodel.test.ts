@@ -87,7 +87,7 @@ describe("Entity Facts v2 customer View Model", () => {
       "유효 응답 24건 중 확정 노출 1건 · 추가 확인 필요 6건",
     );
     expect(vm.uncertaintyNotice).toContain(
-      "하나의 노출률 대신 확인 가능한 범위로 표시",
+      "메인 노출률은 내 업체로 확정된 응답만 계산",
     );
     expect(vm.sourceQualityNotice).toBe(
       "출처 연결 판정이 일부 미완료인 응답이 6건 있습니다.",
