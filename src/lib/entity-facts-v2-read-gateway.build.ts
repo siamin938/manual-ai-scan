@@ -16,6 +16,7 @@ import {
   type EntityFactsV2ReadBusinessDTO,
   type EntityFactsV2ReadCompetitorDTO,
   type EntityFactsV2ReadGatewayResponse,
+  type EntityFactsV2ReadObservedSourceDTO,
   type EntityFactsV2ReadScopeDTO,
 } from "./entity-facts-v2-read-gateway.types";
 
@@ -145,7 +146,7 @@ export function buildEntityFactsV2ReadGatewayFromSnapshot(
 
   let observedSourcesStatus: "available" | "not_materialized" =
     "not_materialized";
-  let observedSources = [];
+  let observedSources: EntityFactsV2ReadObservedSourceDTO[] = [];
 
   if (input.observedSourcesStorage) {
     const observedStorage = input.observedSourcesStorage;
