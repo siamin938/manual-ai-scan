@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildRunEntityFactsObservedSourcesAggregateCandidateV2,
@@ -86,6 +88,15 @@ function observedSources(): RunObservedSourceFactV2[] {
     },
   ];
 }
+
+const liveGatewaySource = readFileSync(
+  resolve(process.cwd(), "src/lib/entity-facts-v2-read-gateway.server.ts"),
+  "utf8",
+);
+const liveDashboardSource = readFileSync(
+  resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
+  "utf8",
+);
 
 describe("Observed sources Read Gateway candidate", () => {
   it("projects the Carspace hunnytip evidence into customer-safe source rows", () => {
@@ -233,6 +244,13 @@ describe("Observed sources Read Gateway candidate", () => {
         isTarget: false,
       }),
     ]);
+  });
+
+  it("keeps the candidate disconnected from the live gateway and dashboard", () => {
+    expect(liveGatewaySource).not.toContain(
+      "entity-facts-v2-read-gateway.observed-sources-candidate",
+    );
+    expect(liveDashboardSource).not.toContain("observedSources");
   });
 
   it("fails closed instead of exposing an auto key when display evidence is missing", () => {
