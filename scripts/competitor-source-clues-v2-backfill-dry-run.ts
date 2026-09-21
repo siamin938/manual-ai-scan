@@ -191,7 +191,14 @@ export function buildCompetitorSourceClueBackfillDryRun(
       base.observedSources,
     );
 
-    for (const clue of run.proposed.competitorSourceClues) {
+    const storageClues = run.proposed.competitorSourceClues.filter(
+      (clue) =>
+        !acceptedEntityDomains.has(
+          `${clue.domain.toLowerCase()}\u0000${clue.canonicalKey}`,
+        ),
+    );
+
+    for (const clue of storageClues) {
       invariant(
         clue.evidenceTier === "near_section_title_match" &&
           clue.responseCount === 1 &&
@@ -203,15 +210,9 @@ export function buildCompetitorSourceClueBackfillDryRun(
         competitorKeys.has(clue.canonicalKey),
         `SOURCE_CLUE_COMPETITOR_NOT_IN_BASE:${runId}:${clue.canonicalKey}`,
       );
-      invariant(
-        !acceptedEntityDomains.has(
-          `${clue.domain.toLowerCase()}\u0000${clue.canonicalKey}`,
-        ),
-        `SOURCE_CLUE_ALREADY_ACCEPTED:${runId}:${clue.domain}`,
-      );
     }
 
-    const pairKeys = run.proposed.competitorSourceClues.map(
+    const pairKeys = storageClues.map(
       (clue) => `${clue.domain.toLowerCase()}\u0000${clue.canonicalKey}`,
     );
     invariant(
@@ -219,7 +220,7 @@ export function buildCompetitorSourceClueBackfillDryRun(
       `SOURCE_CLUE_DUPLICATE_PAIR:${runId}`,
     );
 
-    const sourceCluesHash = sha256(run.proposed.competitorSourceClues);
+    const sourceCluesHash = sha256(storageClues);
     const inputFingerprint = sha256({
       baseAggregateId: base.baseAggregateId.toLowerCase(),
       baseObservedSourceAggregateId:
@@ -252,7 +253,7 @@ export function buildCompetitorSourceClueBackfillDryRun(
       source_replay_version: RUN_SOURCE_REPLAY_VERSION,
       engine_version: COMPETITOR_SOURCE_CLUE_STORAGE_ENGINE_VERSION,
       input_fingerprint: inputFingerprint,
-      source_clues: run.proposed.competitorSourceClues,
+      source_clues: storageClues,
       source_clues_hash: sourceCluesHash,
     });
   }
