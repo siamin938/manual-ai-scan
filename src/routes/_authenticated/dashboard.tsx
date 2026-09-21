@@ -187,9 +187,13 @@ function DashboardPage() {
               note="v2에서 확인된 업체만 표시"
             />
             <MetricCard
-              label="내 업체에 연결된 출처"
-              value={`${model.metricCards.targetSourceCount}곳`}
-              note="내 업체와 연결이 확인된 출처"
+              label="관찰된 주요 출처"
+              value={
+                model.sources.available
+                  ? `${model.metricCards.observedSourceCount}곳`
+                  : "준비 중"
+              }
+              note="내 업체 또는 함께 관찰된 업체와 연결된 출처"
             />
           </div>
 
@@ -330,19 +334,24 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
-                  AI 답변에서 내 업체와 연결이 확인된 출처입니다. 출처의 신뢰도나 추천 이유를 뜻하지는
-                  않습니다.
+                  이번 측정의 AI 답변에서 내 업체 또는 함께 관찰된 업체와 연결된 출처입니다.
+                  출처의 신뢰도나 추천 이유를 뜻하지는 않습니다.
                 </p>
-                {model.sources.rows.length === 0 ? (
+                {!model.sources.available ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
-                    이번 측정에서 내 업체에 연결된 출처가 확인되지 않았습니다.
+                    이번 측정의 출처 진단 데이터가 아직 준비되지 않았습니다.
+                  </p>
+                ) : model.sources.rows.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">
+                    이번 측정의 AI 답변에서 업체와 연결된 출처가 확인되지 않았습니다.
                   </p>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>출처</TableHead>
-                        <TableHead>연결된 답변</TableHead>
+                        <TableHead>관찰된 답변</TableHead>
+                        <TableHead>연결된 업체</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -354,11 +363,22 @@ function DashboardPage() {
                           <TableCell className="text-sm">
                             <span className="tabular-nums">{s.responseCount}건</span>
                             <span className="mt-0.5 block text-xs text-muted-foreground">
-                              출처 확인 완료 {s.completeResponseCount}건
-                              {s.partialResponseCount > 0
-                                ? ` · 일부 확인 ${s.partialResponseCount}건`
-                                : ""}
+                              내 업체 연결 {s.targetResponseCount}건 · 함께 관찰된 업체 연결{" "}
+                              {s.competitorResponseCount}건
                             </span>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <div className="flex flex-wrap gap-1.5">
+                              {s.linkedEntities.map((entity) => (
+                                <Badge
+                                  key={`${s.domain}:${entity.isTarget ? "target" : "other"}:${entity.name}`}
+                                  variant={entity.isTarget ? "default" : "outline"}
+                                >
+                                  {entity.isTarget ? "내 업체" : entity.name}
+                                  {!entity.isTarget ? ` · ${entity.responseCount}건` : ""}
+                                </Badge>
+                              ))}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
