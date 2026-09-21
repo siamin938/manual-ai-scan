@@ -67,6 +67,8 @@ function dto(overrides?: {
     questionAreas: [],
     competitors: [],
     targetSources: [],
+    observedSourcesStatus: "not_materialized",
+    observedSources: [],
   };
 }
 
