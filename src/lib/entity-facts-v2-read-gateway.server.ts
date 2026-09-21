@@ -161,6 +161,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     .eq("business_id", businessId)
     .eq("run_type", "audit")
     .eq("phase", "standalone")
+    .eq("diagnostic_scope", "customer")
     .eq("status", "completed")
     .is("experiment_id", null)
     .order("completed_at", { ascending: false })
