@@ -495,9 +495,26 @@ export function replayRunSourcesV2(
     competitorClueGroups.set(groupKey, group);
   }
 
+  const acceptedEntityDomains = new Set(
+    acceptedAttributions
+      .map((item) => {
+        const canonicalKey = item.canonicalKey
+          ? normalizeCanonicalKey(item.canonicalKey)
+          : "";
+        return canonicalKey ? `${item.domain}\u0000${canonicalKey}` : "";
+      })
+      .filter(Boolean),
+  );
+
   const competitorSourceClues: ReplayCompetitorSourceClueV2[] = [
     ...competitorClueGroups.values(),
   ]
+    .filter(
+      (group) =>
+        !acceptedEntityDomains.has(
+          `${group.domain}\u0000${group.canonicalKey}`,
+        ),
+    )
     .map((group) => ({
       domain: group.domain,
       canonicalKey: group.canonicalKey,
