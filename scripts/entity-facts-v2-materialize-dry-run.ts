@@ -44,6 +44,12 @@ export interface EntityFactsV2DryRunSummary {
   semanticMatch: true;
   unresolvedRunCount: number;
   sourcePartialRunCount: number;
+  observedSourceRunCount: number;
+  observedCompetitorSourceRunCount: number;
+  observedSourceDomainCount: number;
+  observedTargetSourceDomainCount: number;
+  observedCompetitorSourceDomainCount: number;
+  sourceLinkedCompetitorCount: number;
   hashChecksOk: true;
   scopeChecksOk: true;
   duplicateMeasurementIds: 0;
@@ -368,6 +374,15 @@ export function validateEntityFactsV2MaterializationDryRun(
     semanticMatch: true,
     unresolvedRunCount,
     sourcePartialRunCount,
+    observedSourceRunCount: replay.summary.observedSourceRunCount,
+    observedCompetitorSourceRunCount:
+      replay.summary.observedCompetitorSourceRunCount,
+    observedSourceDomainCount: replay.summary.observedSourceDomainCount,
+    observedTargetSourceDomainCount:
+      replay.summary.observedTargetSourceDomainCount,
+    observedCompetitorSourceDomainCount:
+      replay.summary.observedCompetitorSourceDomainCount,
+    sourceLinkedCompetitorCount: replay.summary.sourceLinkedCompetitorCount,
     hashChecksOk: true,
     scopeChecksOk: true,
     duplicateMeasurementIds: 0,
