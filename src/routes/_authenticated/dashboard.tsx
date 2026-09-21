@@ -193,7 +193,7 @@ function DashboardPage() {
                   ? `${model.metricCards.observedSourceCount}곳`
                   : "준비 중"
               }
-              note="내 업체 또는 함께 관찰된 업체와 연결된 출처"
+              note="확인된 연결과 연결 단서를 포함한 출처"
             />
           </div>
 
@@ -370,15 +370,22 @@ function DashboardPage() {
                             </span>
                           </TableCell>
                           <TableCell className="text-sm">
-                            <span className="tabular-nums">{s.responseCount}건</span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              {s.evidence === "clue"
-                                ? `연결 단서 ${s.clueResponseCount}건`
-                                : `내 업체 연결 ${s.targetResponseCount}건 · 함께 관찰된 업체 연결 ${s.competitorResponseCount}건`}
-                              {s.evidence === "mixed" && s.clueResponseCount > 0
-                                ? ` · 추가 단서 ${s.clueResponseCount}건`
-                                : ""}
-                            </span>
+                            {s.evidence === "clue" ? (
+                              <span className="text-sm">
+                                AI 답변 {s.clueResponseCount}건에서 단서 확인
+                              </span>
+                            ) : (
+                              <>
+                                <span className="tabular-nums">{s.responseCount}건</span>
+                                <span className="mt-0.5 block text-xs text-muted-foreground">
+                                  내 업체 연결 {s.targetResponseCount}건 · 함께 관찰된 업체 연결{" "}
+                                  {s.competitorResponseCount}건
+                                  {s.evidence === "mixed" && s.clueResponseCount > 0
+                                    ? ` · 추가 단서 ${s.clueResponseCount}건`
+                                    : ""}
+                                </span>
+                              </>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm">
                             <div className="flex flex-wrap gap-1.5">
@@ -529,7 +536,9 @@ function BenchmarkCard({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium">{g.label}</p>
                   <Badge variant={g.targetConnected ? "default" : "secondary"}>
-                    {g.targetConnected ? "내 업체에서도 관찰" : "내 업체에서는 미관찰"}
+                    {g.targetConnected
+                      ? "최근 측정에서 내 업체 직접 연결 확인"
+                      : "최근 측정에서 내 업체 직접 연결 미확인"}
                   </Badge>
                 </div>
                 {g.sites.length > 0 && (
