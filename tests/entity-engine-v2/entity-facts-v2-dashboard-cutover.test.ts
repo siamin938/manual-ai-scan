@@ -158,9 +158,37 @@ function fixture(): EntityFactsV2ReadGatewayDTO {
         responseCount: 2,
         targetResponseCount: 0,
         competitorResponseCount: 2,
+        clueResponseCount: 0,
+        evidence: "confirmed",
         linkedEntities: [
-          { name: "레이노 개봉점", isTarget: false, responseCount: 2 },
-          { name: "루마썬팅 오류점", isTarget: false, responseCount: 1 },
+          {
+            name: "레이노 개봉점",
+            isTarget: false,
+            responseCount: 2,
+            evidence: "confirmed",
+          },
+          {
+            name: "루마썬팅 오류점",
+            isTarget: false,
+            responseCount: 1,
+            evidence: "confirmed",
+          },
+        ],
+      },
+      {
+        domain: "silliskorea.com",
+        responseCount: 1,
+        targetResponseCount: 0,
+        competitorResponseCount: 0,
+        clueResponseCount: 1,
+        evidence: "clue",
+        linkedEntities: [
+          {
+            name: "실리스코리아",
+            isTarget: false,
+            responseCount: 1,
+            evidence: "clue",
+          },
         ],
       },
     ],
@@ -242,16 +270,44 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(model.sources.available).toBe(true);
     expect(model.sources.referenceSourcesAvailable).toBe(false);
     expect(model.metricCards.targetSourceCount).toBe(1);
-    expect(model.metricCards.observedSourceCount).toBe(1);
+    expect(model.metricCards.observedSourceCount).toBe(2);
     expect(model.sources.rows).toEqual([
       {
         domain: "hunnytip.kr",
         responseCount: 2,
         targetResponseCount: 0,
         competitorResponseCount: 2,
+        clueResponseCount: 0,
+        evidence: "confirmed",
         linkedEntities: [
-          { name: "레이노 개봉점", isTarget: false, responseCount: 2 },
-          { name: "루마썬팅 오류점", isTarget: false, responseCount: 1 },
+          {
+            name: "레이노 개봉점",
+            isTarget: false,
+            responseCount: 2,
+            evidence: "confirmed",
+          },
+          {
+            name: "루마썬팅 오류점",
+            isTarget: false,
+            responseCount: 1,
+            evidence: "confirmed",
+          },
+        ],
+      },
+      {
+        domain: "silliskorea.com",
+        responseCount: 1,
+        targetResponseCount: 0,
+        competitorResponseCount: 0,
+        clueResponseCount: 1,
+        evidence: "clue",
+        linkedEntities: [
+          {
+            name: "실리스코리아",
+            isTarget: false,
+            responseCount: 1,
+            evidence: "clue",
+          },
         ],
       },
     ]);
