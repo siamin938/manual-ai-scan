@@ -2,6 +2,8 @@ import {
   pickEntityFactsV2AutoCompetitorDisplayName,
   type EntityFactsV2CompetitorDisplayEvidence,
   type EntityFactsV2ReadBusinessDTO,
+  type EntityFactsV2ReadObservedSourceDTO,
+  type EntityFactsV2ReadObservedSourceEntityDTO,
 } from "./entity-facts-v2-read-gateway.types";
 
 export const ENTITY_FACTS_V2_OBSERVED_SOURCES_VERSION = "0.1" as const;
@@ -26,20 +28,6 @@ export type ParsedObservedSourceV2 = {
   otherResponseCount: number;
   attributionCount: number;
   entities: ParsedObservedSourceEntityV2[];
-};
-
-export type EntityFactsV2ReadObservedSourceEntityDTO = {
-  name: string;
-  isTarget: boolean;
-  responseCount: number;
-};
-
-export type EntityFactsV2ReadObservedSourceDTO = {
-  domain: string;
-  responseCount: number;
-  targetResponseCount: number;
-  competitorResponseCount: number;
-  linkedEntities: EntityFactsV2ReadObservedSourceEntityDTO[];
 };
 
 type Obj = Record<string, unknown>;
