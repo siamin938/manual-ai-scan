@@ -88,46 +88,28 @@ function baseRow(
 }
 
 function dataset(): Phase2CMaterializationDataset {
-  const first = baseRow(1, {
-    responseText: "- 레이노 개봉점\n- 실리스코리아",
+  const clueRow = baseRow(3, {
+    responseText: "- 모터큐브",
     storedMentions: [
       {
-        mentionId: "mention-rayno-1",
-        displayName: "레이노 개봉점",
+        mentionId: "mention-motorcube-3",
+        displayName: "모터큐브",
         position: 1,
-        canonicalKey: "auto:레이노개봉점",
-      },
-      {
-        mentionId: "mention-sillis-1",
-        displayName: "실리스코리아",
-        position: 2,
-        canonicalKey: "auto:실리스코리아",
+        canonicalKey: "auto:모터큐브",
       },
     ],
     attributions: [
       {
-        attributionId: "attr-rayno-1",
-        measurementMentionId: "mention-rayno-1",
-        canonicalKey: "auto:레이노개봉점",
-        domain: "hunnytip.kr",
-        url: "https://hunnytip.kr/1",
-        title: "레이노 개봉점",
-        attributionLevel: "section",
-        evidence: { distance_chars: 110 },
-        citationStartIndex: 60,
-        entityEndIndex: 20,
-      },
-      {
-        attributionId: "attr-sillis-1",
-        measurementMentionId: "mention-sillis-1",
-        canonicalKey: "auto:실리스코리아",
-        domain: "silliskorea.com",
-        url: "https://silliskorea.com/",
-        title: "실리스코리아",
+        attributionId: "attr-motorcube-3",
+        measurementMentionId: "mention-motorcube-3",
+        canonicalKey: "auto:모터큐브",
+        domain: "motorcube.co.kr",
+        url: "https://motorcube.co.kr/",
+        title: "모터큐브 20년 수입차 전문",
         attributionLevel: "section",
         evidence: { distance_chars: 90 },
-        citationStartIndex: 80,
-        entityEndIndex: 35,
+        citationStartIndex: 55,
+        entityEndIndex: 12,
       },
     ],
   });
@@ -135,7 +117,7 @@ function dataset(): Phase2CMaterializationDataset {
   return {
     version: "entity-facts-phase2c-export-v0.1",
     publicIdentities: [],
-    rows: [first, baseRow(2)],
+    rows: [baseRow(1), baseRow(2), clueRow],
   };
 }
 
@@ -187,7 +169,7 @@ describe("Entity Facts v2 runtime materialization candidate", () => {
       "run_competitor_source_clue_aggregates_v2",
     ]);
 
-    expect(result.bundle.measurementRows).toHaveLength(2);
+    expect(result.bundle.measurementRows).toHaveLength(3);
     expect(result.bundle.aggregateRows).toHaveLength(1);
     expect(result.bundle.aggregateRows[0]?.contract_ok).toBe(true);
 
@@ -202,8 +184,8 @@ describe("Entity Facts v2 runtime materialization candidate", () => {
 
     expect(result.clueSupplement.source_clues).toEqual([
       {
-        domain: "silliskorea.com",
-        canonicalKey: "auto:실리스코리아",
+        domain: "motorcube.co.kr",
+        canonicalKey: "auto:모터큐브",
         responseCount: 1,
         attributionCount: 1,
         evidenceTier: "near_section_title_match",
@@ -229,7 +211,7 @@ describe("Entity Facts v2 runtime materialization candidate", () => {
       dataset: dataset(),
       run: runState(),
       existing: {
-        measurementFactCount: 2,
+        measurementFactCount: 3,
         aggregateRowCount: 1,
         observedSourceRowCount: 1,
         competitorSourceClueRowCount: 1,
@@ -311,7 +293,7 @@ describe("Entity Facts v2 runtime materialization candidate", () => {
     expect(source).not.toMatch(/\bfetch\s*\(/u);
     expect(source).not.toMatch(/\.insert\s*\(/u);
     expect(source).not.toMatch(/\.upsert\s*\(/u);
-    expect(source).not.toMatch(/\.update\s*\(/u);
+    expect(source).not.toMatch(/\.from\s*\(/u);
     expect(source).not.toMatch(/\.delete\s*\(/u);
   });
 });
