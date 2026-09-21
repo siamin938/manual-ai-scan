@@ -288,6 +288,13 @@ describe("Entity Facts v2 Read Gateway", () => {
           intentCount: 1,
           top3ResponseCount: 1,
         },
+        {
+          canonicalKey: "auto:실리스코리아",
+          responseCount: 1,
+          questionCount: 1,
+          intentCount: 1,
+          top3ResponseCount: 1,
+        },
       ],
     };
 
