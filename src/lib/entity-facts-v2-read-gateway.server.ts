@@ -8,6 +8,11 @@ import {
   ENTITY_FACTS_V2_OBSERVED_SOURCES_VERSION,
 } from "./entity-facts-v2-read-gateway.observed-sources";
 import {
+  ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_ENGINE_VERSION,
+  ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_SOURCE_REPLAY_VERSION,
+  ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_VERSION,
+} from "./entity-facts-v2-read-gateway.source-clues";
+import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
   ENTITY_FACTS_V2_READ_FACT_VERSION,
@@ -54,6 +59,23 @@ type EntityFactsV2ObservedSourceStorageRow = {
   created_at: string;
 };
 
+type EntityFactsV2CompetitorSourceClueStorageRow = {
+  id: string;
+  base_aggregate_id: string;
+  base_observed_source_aggregate_id: string;
+  base_materialization_id: string;
+  org_id: string;
+  business_id: string;
+  source_run_id: string;
+  clue_version: string;
+  source_replay_version: string;
+  engine_version: string;
+  input_fingerprint: string;
+  source_clues: Json;
+  source_clues_hash: string;
+  created_at: string;
+};
+
 type EntityFactsV2Database = Omit<Database, "public"> & {
   public: Omit<Database["public"], "Tables"> & {
     Tables: Database["public"]["Tables"] & {
@@ -65,6 +87,12 @@ type EntityFactsV2Database = Omit<Database, "public"> & {
       };
       run_observed_source_aggregates_v2: {
         Row: EntityFactsV2ObservedSourceStorageRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      run_competitor_source_clue_aggregates_v2: {
+        Row: EntityFactsV2CompetitorSourceClueStorageRow;
         Insert: never;
         Update: never;
         Relationships: [];
@@ -204,7 +232,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   const { data: observedRows, error: observedError } = await v2Admin
     .from("run_observed_source_aggregates_v2")
     .select(
-      "base_aggregate_id, base_materialization_id, source_run_id, observed_sources_version, source_replay_version, engine_version, observed_sources",
+      "id, base_aggregate_id, base_materialization_id, source_run_id, observed_sources_version, source_replay_version, engine_version, observed_sources",
     )
     .eq("org_id", orgId)
     .eq("business_id", businessId)
@@ -237,6 +265,50 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   }
 
   const observedStorage = observedRows?.[0] ?? null;
+
+  let clueStorage: EntityFactsV2CompetitorSourceClueStorageRow | null = null;
+  if (observedStorage) {
+    const { data: clueRows, error: clueError } = await v2Admin
+      .from("run_competitor_source_clue_aggregates_v2")
+      .select(
+        "base_observed_source_aggregate_id, base_aggregate_id, base_materialization_id, source_run_id, clue_version, source_replay_version, engine_version, source_clues",
+      )
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("source_run_id", run.id)
+      .eq("base_aggregate_id", storage.id)
+      .eq("base_observed_source_aggregate_id", observedStorage.id)
+      .eq("clue_version", ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_VERSION)
+      .eq(
+        "source_replay_version",
+        ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_SOURCE_REPLAY_VERSION,
+      )
+      .eq(
+        "engine_version",
+        ENTITY_FACTS_V2_COMPETITOR_SOURCE_CLUE_ENGINE_VERSION,
+      )
+      .limit(2);
+
+    if (clueError) {
+      return {
+        ok: false,
+        error: "INTERNAL_ERROR",
+        business: businessDTO,
+        runId: run.id,
+      };
+    }
+
+    if (clueRows && clueRows.length > 1) {
+      return {
+        ok: false,
+        error: "INVALID_V2_DATA",
+        business: businessDTO,
+        runId: run.id,
+      };
+    }
+
+    clueStorage = clueRows?.[0] ?? null;
+  }
 
   const competitorBusinessIds = [
     ...new Set(
@@ -397,6 +469,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     },
     observedSourcesStorage: observedStorage
       ? {
+          observedSourceAggregateId: observedStorage.id,
           baseAggregateId: observedStorage.base_aggregate_id,
           baseMaterializationId: observedStorage.base_materialization_id,
           sourceRunId: observedStorage.source_run_id,
@@ -404,6 +477,19 @@ export async function fetchEntityFactsV2ReadGateway(args: {
           sourceReplayVersion: observedStorage.source_replay_version,
           engineVersion: observedStorage.engine_version,
           observedSources: observedStorage.observed_sources,
+        }
+      : null,
+    competitorSourceClueStorage: clueStorage
+      ? {
+          baseObservedSourceAggregateId:
+            clueStorage.base_observed_source_aggregate_id,
+          baseAggregateId: clueStorage.base_aggregate_id,
+          baseMaterializationId: clueStorage.base_materialization_id,
+          sourceRunId: clueStorage.source_run_id,
+          clueVersion: clueStorage.clue_version,
+          sourceReplayVersion: clueStorage.source_replay_version,
+          engineVersion: clueStorage.engine_version,
+          sourceClues: clueStorage.source_clues,
         }
       : null,
     registeredCompetitorNames,
