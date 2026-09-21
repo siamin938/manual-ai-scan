@@ -12,6 +12,7 @@ import {
 } from "./entity-facts-phase2c-replay";
 import { MEASUREMENT_ENTITY_FACTS_VERSION } from "../supabase/functions/_shared/entity-engine-v2/measurement-entity-facts";
 import { RUN_ENTITY_FACTS_AGGREGATE_VERSION } from "../supabase/functions/_shared/entity-engine-v2/run-entity-facts-aggregate";
+import { buildRunEntityFactsObservedSourcesAggregateCandidateV2 } from "../supabase/functions/_shared/entity-engine-v2/run-entity-facts-observed-sources.candidate";
 
 export const ENTITY_FACTS_V2_DRY_RUN_VERSION = "0.1" as const;
 export const ENTITY_FACTS_V2_DRY_RUN_ENGINE_VERSION =
@@ -51,6 +52,7 @@ export interface EntityFactsV2DryRunSummary {
   observedCompetitorSourceDomainCount: number;
   sourceLinkedCompetitorCount: number;
   observedTargetSourceParity: true;
+  observedSourcesAggregateCandidateContractOk: true;
   hashChecksOk: true;
   scopeChecksOk: true;
   duplicateMeasurementIds: 0;
@@ -326,6 +328,18 @@ export function validateEntityFactsV2MaterializationDryRun(
         stableJson(aggregateTargetSourceDomains),
       `DRY_RUN_OBSERVED_TARGET_SOURCE_MISMATCH:${aggregateRow.source_run_id}`,
     );
+
+    const observedSourcesCandidate =
+      buildRunEntityFactsObservedSourcesAggregateCandidateV2(
+        aggregateRow.business_id,
+        aggregateRow.aggregate,
+        replayRun.proposed.observedSources,
+      );
+    invariant(
+      observedSourcesCandidate.candidateContractOk === true &&
+        observedSourcesCandidate.candidateContractIssues.length === 0,
+      `DRY_RUN_OBSERVED_SOURCES_CANDIDATE_CONTRACT_FAILED:${aggregateRow.source_run_id}`,
+    );
   }
 
   const unresolvedRunCount = bundle.aggregateRows.filter(
@@ -398,6 +412,7 @@ export function validateEntityFactsV2MaterializationDryRun(
       replay.summary.observedCompetitorSourceDomainCount,
     sourceLinkedCompetitorCount: replay.summary.sourceLinkedCompetitorCount,
     observedTargetSourceParity: true,
+    observedSourcesAggregateCandidateContractOk: true,
     hashChecksOk: true,
     scopeChecksOk: true,
     duplicateMeasurementIds: 0,
