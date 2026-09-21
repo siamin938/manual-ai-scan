@@ -16,6 +16,7 @@ on:
       - "scripts/entity-v2-shadow-replay.ts"
       - "scripts/entity-facts-phase2c-replay.ts"
       - "scripts/entity-facts-v2-materialize.ts"
+      - "scripts/entity-facts-v2-runtime-materialization-candidate.ts"
       - "scripts/entity-facts-v2-materialize-dry-run.ts"
       - "scripts/observed-sources-v2-backfill-dry-run.ts"
       - "scripts/competitor-source-clues-v2-backfill-dry-run.ts"
