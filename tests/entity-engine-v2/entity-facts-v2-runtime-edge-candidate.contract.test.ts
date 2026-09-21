@@ -283,6 +283,9 @@ describe("Entity Facts v2 runtime Edge candidate contract", () => {
     expect(rpcSql).toContain("RUNTIME_V2_PARTIAL_EXISTING_STATE");
     expect(rpcSql).toContain("RUNTIME_V2_POSTPROCESS_NOT_READY");
     expect(rpcSql).toContain("RUNTIME_V2_CITATION_ATTRIBUTION_NOT_READY");
+    expect(rpcSql).toContain(
+      "AND b.org_id=(SELECT org_id FROM run_scope)",
+    );
 
     const measurementInsert = rpcSql.indexOf(
       "INSERT INTO public.measurement_entity_facts_v2",
@@ -316,6 +319,11 @@ describe("Entity Facts v2 runtime Edge candidate contract", () => {
     expect(orchestrationSql).toContain("'*/2 * * * *'");
     expect(orchestrationSql).toContain(
       "entity_facts_v2_materialization_completed",
+    );
+    expect(orchestrationSql).toContain("EXCEPTION");
+    expect(orchestrationSql).toContain("WHEN OTHERS THEN");
+    expect(orchestrationSql).toContain(
+      "The watchdog will retry the materialization path.",
     );
     expect(orchestrationSql).toContain(
       "r.status='completed'::public.run_status",
