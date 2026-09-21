@@ -46,6 +46,12 @@ describe("Competitor source clue storage candidate", () => {
     expect(sql).toContain(
       "COMPETITOR_SOURCE_CLUE_OBSERVED_BASE_VERSION_MISMATCH",
     );
+    expect(sql).toContain(
+      "COMPETITOR_SOURCE_CLUE_REPLAY_VERSION_MISMATCH",
+    );
+    expect(sql).toContain(
+      "NEW.source_replay_version <> v_observed.source_replay_version",
+    );
   });
 
   it("keeps clues competitor-only, singleton, advisory and non-overlapping", () => {
