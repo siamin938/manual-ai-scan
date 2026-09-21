@@ -12,6 +12,16 @@ const executable = sql
   .filter((line) => !line.trim().startsWith("--"))
   .join("\n");
 
+const officialMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/20260921110146_run_competitor_source_clue_aggregates_v2.sql",
+);
+const officialSql = readFileSync(officialMigrationPath, "utf8");
+const officialExecutable = officialSql
+  .split(/\r?\n/u)
+  .filter((line) => !line.trim().startsWith("--"))
+  .join("\n");
+
 describe("Competitor source clue storage candidate", () => {
   it("remains candidate-only and separate from confirmed observed sources", () => {
     expect(path.replaceAll("\\", "/")).not.toContain("/supabase/migrations/");
@@ -25,6 +35,12 @@ describe("Competitor source clue storage candidate", () => {
     expect(executable).not.toMatch(
       /(?:UPDATE|DELETE\s+FROM|TRUNCATE\s+TABLE)\s+public\.(?:measurement_entity_facts_v2|run_entity_fact_aggregates_v2|run_observed_source_aggregates_v2)/iu,
     );
+  });
+
+  it("has a Supabase-CLI-generated official migration that is still unapplied", () => {
+    expect(officialSql).toContain("Generated with Supabase CLI");
+    expect(officialSql).toContain("NOT APPLIED TO PRODUCTION");
+    expect(officialExecutable).toBe(executable);
   });
 
   it("pins every clue supplement to the immutable aggregate and observed-source row", () => {
