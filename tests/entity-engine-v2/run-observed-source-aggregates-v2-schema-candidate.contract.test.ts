@@ -46,7 +46,7 @@ describe("Observed source aggregate storage candidate contract", () => {
       "run_observed_source_aggregates_v2_base_version_uq",
     );
     expect(sql).toMatch(
-      /base_aggregate_id,[\s\S]*observed_sources_version,[\s\S]*engine_version/u,
+      /base_aggregate_id,[\s\S]*observed_sources_version,[\s\S]*source_replay_version,[\s\S]*engine_version/u,
     );
   });
 
