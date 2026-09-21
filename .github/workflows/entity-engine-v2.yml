@@ -27,6 +27,7 @@ on:
       - "scripts/sql/export-entity-v2-replay.sql"
       - "scripts/sql/export-entity-facts-phase2c-replay.sql"
       - "scripts/sql/export-observed-source-v2-backfill-base.sql"
+      - "scripts/reports/competitor-source-clue-production-baseline-v01.json"
       - "scripts/sql/run-observed-source-aggregates-v2-migration-candidate.sql"
       - ".github/workflows/entity-engine-v2.yml"
   workflow_dispatch:
