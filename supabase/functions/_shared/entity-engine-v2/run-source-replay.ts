@@ -50,6 +50,7 @@ export interface AcceptedReplayAttributionV2 {
   measurementId: string;
   attributionId: string;
   entityRef: string;
+  canonicalKey: string | null;
   side: "target" | "other";
   domain: string;
   url: string;
@@ -406,6 +407,9 @@ export function replayRunSourcesV2(
       measurementId: measurement.measurementId,
       attributionId: attribution.attributionId,
       entityRef: mapping.resolved.entityRef,
+      canonicalKey: mapping.resolved.canonicalKey
+        ? normalizeCanonicalKey(mapping.resolved.canonicalKey)
+        : null,
       side: mapping.resolved.side,
       domain: actionable.domain,
       url: attribution.url,
