@@ -56,6 +56,19 @@ export interface AcceptedReplayAttributionV2 {
   evidenceTier: "direct" | "near_section";
 }
 
+/**
+ * Target-linked source evidence that is valid enough to show as a clue, but
+ * not repeated enough to be promoted into targetCitationDomains.
+ *
+ * This is intentionally advisory output only: it must never turn unresolved
+ * identity or competitor evidence into a target source.
+ */
+export interface ReplayTargetReferenceSourceV2 {
+  domain: string;
+  responseCount: number;
+  evidenceTier: "near_section";
+}
+
 export interface RunSourceReplayResultV2 {
   version: typeof RUN_SOURCE_REPLAY_VERSION;
   sourceReplayStatus: "evaluated";
@@ -64,6 +77,7 @@ export interface RunSourceReplayResultV2 {
     facts: MeasurementEntityFactsV2;
   }>;
   acceptedAttributions: AcceptedReplayAttributionV2[];
+  targetReferenceSources: ReplayTargetReferenceSourceV2[];
   diagnostics: RunSourceReplayDiagnosticV2[];
 }
 
@@ -333,6 +347,7 @@ export function replayRunSourcesV2(
   }
 
   const acceptedAttributions: AcceptedReplayAttributionV2[] = [];
+  const targetReferenceResponses = new Map<string, Set<string>>();
   const builderAttributions = new Map<
     string,
     MeasurementAttributionObservationV2[]
@@ -365,7 +380,18 @@ export function replayRunSourcesV2(
     const accepted =
       actionable.tier === "direct" ||
       (nearSupport.get(supportKey)?.size ?? 0) >= 2;
-    if (!accepted) continue;
+    if (!accepted) {
+      if (
+        mapping.resolved.side === "target" &&
+        actionable.tier === "near_section"
+      ) {
+        const responses =
+          targetReferenceResponses.get(actionable.domain) ?? new Set<string>();
+        responses.add(measurement.measurementId);
+        targetReferenceResponses.set(actionable.domain, responses);
+      }
+      continue;
+    }
 
     current.push({
       attributionId: attribution.attributionId,
@@ -402,6 +428,20 @@ export function replayRunSourcesV2(
     }))
     .sort((a, b) => a.measurementId.localeCompare(b.measurementId, "en"));
 
+  const targetReferenceSources: ReplayTargetReferenceSourceV2[] = [
+    ...targetReferenceResponses.entries(),
+  ]
+    .map(([domain, responses]) => ({
+      domain,
+      responseCount: responses.size,
+      evidenceTier: "near_section" as const,
+    }))
+    .sort(
+      (a, b) =>
+        b.responseCount - a.responseCount ||
+        a.domain.localeCompare(b.domain, "en"),
+    );
+
   acceptedAttributions.sort(
     (a, b) =>
       a.measurementId.localeCompare(b.measurementId, "en") ||
@@ -419,6 +459,7 @@ export function replayRunSourcesV2(
     sourceReplayStatus: "evaluated",
     factsByMeasurement,
     acceptedAttributions,
+    targetReferenceSources,
     diagnostics,
   };
 }
