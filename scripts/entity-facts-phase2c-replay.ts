@@ -20,6 +20,10 @@ import {
   replayRunSourcesV2,
   type ReplayRawAttributionV2,
 } from "../supabase/functions/_shared/entity-engine-v2/run-source-replay";
+import {
+  buildRunObservedSourcesV2,
+  type RunObservedSourceFactV2,
+} from "../supabase/functions/_shared/entity-engine-v2/run-observed-sources";
 
 export interface Phase2CCurrentCompetitorBaseline {
   canonicalKey: string;
@@ -104,8 +108,13 @@ export interface Phase2CRunDiff {
     questionAreas: RunQuestionAreaV2[];
     competitors: RunCompetitorFactV2[];
     targetSources: RunTargetSourceFactV2[];
+    observedSources: RunObservedSourceFactV2[];
     sourceReplayStatus: "evaluated";
     sourceDomainCount: number;
+    observedSourceDomainCount: number;
+    observedTargetSourceDomainCount: number;
+    observedCompetitorSourceDomainCount: number;
+    sourceLinkedCompetitorCount: number;
     sourcePartialMeasurementCount: number;
     acceptedAttributionCount: number;
     sourceDiagnosticCount: number;
@@ -165,6 +174,12 @@ export interface Phase2CReplayReport {
     unresolvedRunCount: number;
     sourceReplayStatus: "evaluated";
     sourcePartialRunCount: number;
+    observedSourceRunCount: number;
+    observedCompetitorSourceRunCount: number;
+    observedSourceDomainCount: number;
+    observedTargetSourceDomainCount: number;
+    observedCompetitorSourceDomainCount: number;
+    sourceLinkedCompetitorCount: number;
     acceptedAttributionCount: number;
     sourceDiagnosticCount: number;
   };
@@ -534,6 +549,9 @@ export function replayPhase2CDataset(
         item.facts,
       ]),
     );
+    const observedSources = buildRunObservedSourcesV2(
+      sourceReplay.acceptedAttributions,
+    );
 
     const factsRecords: RunMeasurementFactRecordV2[] = preliminary.map(
       ({ row, replay }) => ({
@@ -577,8 +595,23 @@ export function replayPhase2CDataset(
       questionAreas: aggregate.questionAreas,
       competitors: aggregate.competitors,
       targetSources: aggregate.targetSources,
+      observedSources,
       sourceReplayStatus: "evaluated" as const,
       sourceDomainCount: aggregate.targetSources.length,
+      observedSourceDomainCount: observedSources.length,
+      observedTargetSourceDomainCount: observedSources.filter(
+        (source) => source.targetResponseCount > 0,
+      ).length,
+      observedCompetitorSourceDomainCount: observedSources.filter(
+        (source) => source.otherResponseCount > 0,
+      ).length,
+      sourceLinkedCompetitorCount: new Set(
+        observedSources.flatMap((source) =>
+          source.entities
+            .filter((entity) => entity.side === "other")
+            .map((entity) => entity.canonicalKey),
+        ),
+      ).size,
       sourcePartialMeasurementCount:
         aggregate.overview.sourcePartialMeasurementCount,
       acceptedAttributionCount: sourceReplay.acceptedAttributions.length,
@@ -668,6 +701,28 @@ export function replayPhase2CDataset(
       sourcePartialRunCount: runs.filter(
         (run) => run.proposed.sourcePartialMeasurementCount > 0,
       ).length,
+      observedSourceRunCount: runs.filter(
+        (run) => run.proposed.observedSourceDomainCount > 0,
+      ).length,
+      observedCompetitorSourceRunCount: runs.filter(
+        (run) => run.proposed.observedCompetitorSourceDomainCount > 0,
+      ).length,
+      observedSourceDomainCount: runs.reduce(
+        (sum, run) => sum + run.proposed.observedSourceDomainCount,
+        0,
+      ),
+      observedTargetSourceDomainCount: runs.reduce(
+        (sum, run) => sum + run.proposed.observedTargetSourceDomainCount,
+        0,
+      ),
+      observedCompetitorSourceDomainCount: runs.reduce(
+        (sum, run) => sum + run.proposed.observedCompetitorSourceDomainCount,
+        0,
+      ),
+      sourceLinkedCompetitorCount: runs.reduce(
+        (sum, run) => sum + run.proposed.sourceLinkedCompetitorCount,
+        0,
+      ),
       acceptedAttributionCount: runs.reduce(
         (sum, run) => sum + run.proposed.acceptedAttributionCount,
         0,
