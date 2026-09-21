@@ -88,19 +88,16 @@ export function buildRunObservedSourcesV2(
         attributionCount: 0,
       };
 
-      if (entity.side !== attribution.side) {
-        // A single canonical key must not silently cross target/other sides.
-        continue;
+      if (entity.side === attribution.side) {
+        entity.responses.add(attribution.measurementId);
+        if (attribution.evidenceTier === "direct") {
+          entity.directResponses.add(attribution.measurementId);
+        } else {
+          entity.nearSectionResponses.add(attribution.measurementId);
+        }
+        entity.attributionCount += 1;
+        source.entities.set(canonicalKey, entity);
       }
-
-      entity.responses.add(attribution.measurementId);
-      if (attribution.evidenceTier === "direct") {
-        entity.directResponses.add(attribution.measurementId);
-      } else {
-        entity.nearSectionResponses.add(attribution.measurementId);
-      }
-      entity.attributionCount += 1;
-      source.entities.set(canonicalKey, entity);
     }
 
     sources.set(domain, source);
