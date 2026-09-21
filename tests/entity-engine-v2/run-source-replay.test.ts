@@ -364,6 +364,51 @@ describe("Phase 2C Run Source Replay v0.1", () => {
     expect(result.competitorSourceClues).toEqual([]);
   });
 
+  it("does not duplicate an already accepted competitor entity-domain as a clue", () => {
+    const competitor = {
+      ...otherObservation(),
+      canonicalKey: "auto:모터큐브",
+    };
+
+    const result = replayRunSourcesV2([
+      measurement(
+        "m1",
+        [competitor],
+        [
+          rawAttribution({
+            attributionId: "direct-source",
+            measurementMentionId: "mention-motorcube",
+            canonicalKey: "auto:모터큐브",
+            domain: "motorcube.co.kr",
+            url: "https://motorcube.co.kr/direct",
+            title: "모터큐브",
+            attributionLevel: "direct",
+          }),
+          rawAttribution({
+            attributionId: "section-source",
+            measurementMentionId: "mention-motorcube",
+            canonicalKey: "auto:모터큐브",
+            domain: "motorcube.co.kr",
+            url: "https://motorcube.co.kr/section",
+            title: "모터큐브 20년 수입차 전문",
+            attributionLevel: "section",
+            evidence: { distance_chars: 120 },
+          }),
+        ],
+        [{ entityRef: "other-ref", mentionIds: ["mention-motorcube"] }],
+      ),
+    ]);
+
+    expect(result.acceptedAttributions).toEqual([
+      expect.objectContaining({
+        attributionId: "direct-source",
+        canonicalKey: "auto:모터큐브",
+        domain: "motorcube.co.kr",
+      }),
+    ]);
+    expect(result.competitorSourceClues).toEqual([]);
+  });
+
   it("does not turn competitor attribution into a target source", () => {
     const result = replayRunSourcesV2([
       measurement(
