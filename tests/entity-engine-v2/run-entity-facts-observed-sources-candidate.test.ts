@@ -136,6 +136,50 @@ describe("Observed sources aggregate candidate v0.1", () => {
     });
   });
 
+  it("fails closed if observed target response counts diverge from targetSources", () => {
+    const observed: RunObservedSourceFactV2[] = [
+      {
+        domain: "target.example",
+        responseCount: 2,
+        targetResponseCount: 2,
+        otherResponseCount: 0,
+        attributionCount: 2,
+        entities: [
+          {
+            canonicalKey: `business:${TARGET}`,
+            side: "target",
+            responseCount: 2,
+            attributionCount: 2,
+            directResponseCount: 2,
+            nearSectionResponseCount: 0,
+          },
+        ],
+      },
+    ];
+
+    const result =
+      buildRunEntityFactsObservedSourcesAggregateCandidateV2(
+        TARGET,
+        aggregate({
+          targetSources: [
+            {
+              domain: "target.example",
+              responseCount: 1,
+              completeResponseCount: 1,
+              partialResponseCount: 0,
+            },
+          ],
+        }),
+        observed,
+      );
+
+    expect(result.candidateContractOk).toBe(false);
+    expect(result.candidateContractIssues).toContainEqual({
+      code: "TARGET_SOURCE_RESPONSE_COUNT_MISMATCH",
+      domain: "target.example",
+    });
+  });
+
   it("fails closed if an observed competitor is not in the authoritative competitor set", () => {
     const observed = hunnytip();
     observed[0]!.entities[0] = {
