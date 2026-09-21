@@ -1,0 +1,44 @@
+name: Generate competitor source clue migration
+
+on:
+  push:
+    branches:
+      - codex/v2-main-integration
+    paths:
+      - ".github/workflows/generate-competitor-source-clue-migration.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Generate migration with Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes supabase@2.113.0 migration new run_competitor_source_clue_aggregates_v2
+          migration_path="$(find supabase/migrations -maxdepth 1 -type f -name '*_run_competitor_source_clue_aggregates_v2.sql' | sort | tail -n 1)"
+          test -n "$migration_path"
+          {
+            echo "-- Generated with Supabase CLI from the reviewed competitor-source-clue schema candidate."
+            echo "-- REVIEWED BUT NOT APPLIED TO PRODUCTION. Apply only after explicit approval."
+            tail -n +2 scripts/sql/run-competitor-source-clue-aggregates-v2-migration-candidate.sql
+          } > "$migration_path"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$migration_path"
+          git rm .github/workflows/generate-competitor-source-clue-migration.yml
+          git commit -m "Add competitor source clue aggregate migration"
+          git push origin HEAD:codex/v2-main-integration
