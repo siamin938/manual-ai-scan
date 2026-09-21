@@ -12,6 +12,16 @@ const executableSql = sql
   .filter((line) => !line.trim().startsWith("--"))
   .join("\n");
 
+const officialMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/20260921083635_run_observed_source_aggregates_v2.sql",
+);
+const officialSql = readFileSync(officialMigrationPath, "utf8");
+const officialExecutableSql = officialSql
+  .split(/\r?\n/u)
+  .filter((line) => !line.trim().startsWith("--"))
+  .join("\n");
+
 describe("Observed source aggregate storage candidate contract", () => {
   it("stays outside the applied Supabase migration directory", () => {
     expect(candidatePath.replaceAll("\\", "/")).not.toContain(
@@ -19,6 +29,13 @@ describe("Observed source aggregate storage candidate contract", () => {
     );
     expect(sql).toContain("CANDIDATE ONLY");
     expect(sql).toContain("do not apply directly to Production");
+  });
+
+  it("has a Supabase-CLI-generated official migration that is still unapplied", () => {
+    expect(officialSql).toContain("Generated with Supabase CLI");
+    expect(officialSql).toContain("NOT APPLIED TO PRODUCTION");
+    expect(officialSql).not.toContain("CANDIDATE ONLY");
+    expect(officialExecutableSql).toBe(executableSql);
   });
 
   it("creates a separate append-only supplement instead of altering Entity Facts v2", () => {
