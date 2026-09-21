@@ -218,6 +218,8 @@ describe("Entity Facts v2 Read Gateway", () => {
         failedJobs: 0,
       },
       storage: {
+        aggregateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materializationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         sourceRunId: "33333333-3333-4333-8333-333333333333",
         factVersion: "0.3",
         aggregateVersion: "0.1",
@@ -239,6 +241,7 @@ describe("Entity Facts v2 Read Gateway", () => {
           ],
         },
       },
+      observedSourcesStorage: null,
       registeredCompetitorNames: {},
       autoCompetitorEvidence: {
         "auto:카메오랩분당센터": [
@@ -265,6 +268,125 @@ describe("Entity Facts v2 Read Gateway", () => {
     );
   });
 
+  it("projects observed source supplement into customer-safe rows", () => {
+    const aggregate = {
+      ...validAggregate(),
+      targetSources: [],
+      competitors: [
+        {
+          canonicalKey: "auto:레이노개봉점",
+          responseCount: 2,
+          questionCount: 2,
+          intentCount: 1,
+          top3ResponseCount: 2,
+        },
+        {
+          canonicalKey: "auto:루마썬팅오류점",
+          responseCount: 1,
+          questionCount: 1,
+          intentCount: 1,
+          top3ResponseCount: 1,
+        },
+      ],
+    };
+
+    const result = buildEntityFactsV2ReadGatewayFromSnapshot({
+      generatedAt: "2026-09-21T00:00:00.000Z",
+      business: {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "카스페이스 구로점",
+        category: null,
+        region: null,
+        city: null,
+      },
+      scope: {
+        runId: "33333333-3333-4333-8333-333333333333",
+        runName: "최근 측정",
+        measuredAt: "2026-09-20T00:00:00.000Z",
+        providers: ["openai"],
+        repetitions: 1,
+        totalJobs: 24,
+        completedJobs: 24,
+        failedJobs: 0,
+      },
+      storage: {
+        aggregateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        materializationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        sourceRunId: "33333333-3333-4333-8333-333333333333",
+        factVersion: "0.3",
+        aggregateVersion: "0.1",
+        engineVersion:
+          "entity-facts-v2:mef0.3:hist0.1:te0.3:src0.1:agg0.1:mat0.1",
+        measurementCount: 24,
+        validMeasurementCount: 24,
+        contractOk: true,
+        aggregate,
+      },
+      observedSourcesStorage: {
+        baseAggregateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        baseMaterializationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        sourceRunId: "33333333-3333-4333-8333-333333333333",
+        observedSourcesVersion: "0.1",
+        sourceReplayVersion: "0.1",
+        engineVersion: "observed-sources-v2:src0.1:obs0.1:store0.1",
+        observedSources: [
+          {
+            domain: "hunnytip.kr",
+            responseCount: 2,
+            targetResponseCount: 0,
+            otherResponseCount: 2,
+            attributionCount: 3,
+            entities: [
+              {
+                canonicalKey: "auto:레이노개봉점",
+                side: "other",
+                responseCount: 2,
+                attributionCount: 2,
+                directResponseCount: 0,
+                nearSectionResponseCount: 2,
+              },
+              {
+                canonicalKey: "auto:루마썬팅오류점",
+                side: "other",
+                responseCount: 1,
+                attributionCount: 1,
+                directResponseCount: 0,
+                nearSectionResponseCount: 1,
+              },
+            ],
+          },
+        ],
+      },
+      registeredCompetitorNames: {},
+      autoCompetitorEvidence: {
+        "auto:레이노개봉점": [{ label: "레이노 개봉점", priority: 1 }],
+        "auto:루마썬팅오류점": [
+          { label: "루마썬팅 오류점", priority: 1 },
+        ],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.observedSourcesStatus).toBe("available");
+    expect(result.data.observedSources).toEqual([
+      {
+        domain: "hunnytip.kr",
+        responseCount: 2,
+        targetResponseCount: 0,
+        competitorResponseCount: 2,
+        linkedEntities: [
+          { name: "레이노 개봉점", isTarget: false, responseCount: 2 },
+          { name: "루마썬팅 오류점", isTarget: false, responseCount: 1 },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(result.data.observedSources)).not.toContain("auto:");
+    expect(JSON.stringify(result.data.observedSources)).not.toContain(
+      "canonicalKey",
+    );
+  });
+
   it("reads only the exact latest standalone audit run aggregate", () => {
     expect(serverSource).toContain('.from("measurement_runs")');
     expect(serverSource).toContain('.eq("run_type", "audit")');
@@ -276,6 +398,7 @@ describe("Entity Facts v2 Read Gateway", () => {
     );
 
     expect(serverSource).toContain('.from("run_entity_fact_aggregates_v2")');
+    expect(serverSource).toContain('.from("run_observed_source_aggregates_v2")');
     expect(serverSource).toContain('.eq("source_run_id", run.id)');
     expect(serverSource).toContain(
       '.eq("fact_version", ENTITY_FACTS_V2_READ_FACT_VERSION)',
