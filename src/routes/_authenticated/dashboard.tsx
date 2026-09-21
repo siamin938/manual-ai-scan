@@ -172,14 +172,28 @@ function DashboardPage() {
           <div className="grid overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:gap-px">
             <MetricCard
               highlight
-              label="최근 측정 · AI 노출"
-              value={model.metricCards.visibility.valueText}
-              note={model.metricCards.visibility.summaryText}
+              label="확정 AI 노출률"
+              value={pctRange(
+                model.metricCards.visibility.lowerPct,
+                model.metricCards.visibility.lowerPct,
+              )}
+              note={
+                model.metricCards.visibility.unresolvedCount > 0
+                  ? `유효 응답 ${model.metricCards.visibility.validCount}건 중 확정 노출 ${model.metricCards.visibility.confirmedCount}건 · 추가 확인 ${model.metricCards.visibility.unresolvedCount}건`
+                  : `유효 응답 ${model.metricCards.visibility.validCount}건 중 확정 노출 ${model.metricCards.visibility.confirmedCount}건`
+              }
             />
             <MetricCard
-              label="최근 측정 · 상위 3곳 노출"
-              value={model.metricCards.top3.valueText}
-              note={model.metricCards.top3.summaryText}
+              label="확정 상위 3곳 노출률"
+              value={pctRange(
+                model.metricCards.top3.lowerPct,
+                model.metricCards.top3.lowerPct,
+              )}
+              note={
+                model.metricCards.top3.unresolvedCount > 0
+                  ? `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건 · 추가 확인 ${model.metricCards.top3.unresolvedCount}건`
+                  : `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건`
+              }
             />
             <MetricCard
               label="함께 관찰된 업체"
@@ -204,14 +218,29 @@ function DashboardPage() {
             </CardHeader>
             <CardContent className="grid gap-3 pt-5 text-base leading-7 lg:grid-cols-2 lg:gap-x-10">
               <p className="font-medium">
-                AI 노출 범위 {model.recentSummary.visibility.valueText}
+                확정 AI 노출률{" "}
+                {pctRange(
+                  model.recentSummary.visibility.lowerPct,
+                  model.recentSummary.visibility.lowerPct,
+                )}
               </p>
               <p className="text-muted-foreground">
-                {model.recentSummary.visibility.summaryText}
+                유효 응답 {model.recentSummary.visibility.validCount}건 중 확정 노출{" "}
+                {model.recentSummary.visibility.confirmedCount}건
+                {model.recentSummary.visibility.unresolvedCount > 0
+                  ? ` · 추가 확인 ${model.recentSummary.visibility.unresolvedCount}건`
+                  : ""}
               </p>
-              <p className="text-muted-foreground">
-                {model.recentSummary.visibility.evidenceText}
-              </p>
+              {model.recentSummary.visibility.unresolvedCount > 0 &&
+                model.recentSummary.visibility.upperPct !== null && (
+                  <p className="text-sm text-muted-foreground">
+                    추가 확인이 필요한 응답까지 모두 같은 업체로 확인될 경우 최대{" "}
+                    {pctRange(
+                      model.recentSummary.visibility.upperPct,
+                      model.recentSummary.visibility.upperPct,
+                    )}
+                  </p>
+                )}
               {model.recentSummary.uncertaintyNotice && (
                 <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground lg:col-span-2">
                   {model.recentSummary.uncertaintyNotice}
