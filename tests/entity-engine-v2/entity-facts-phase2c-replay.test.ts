@@ -253,6 +253,75 @@ describe("Phase 2C historical dataset replay v0.1", () => {
     ]);
   });
 
+  it("adds accepted competitor sources to observedSources without turning them into targetSources", () => {
+    const report = replayPhase2CDataset(
+      dataset([
+        row(1, {
+          attributions: [
+            {
+              attributionId: "source-1",
+              measurementMentionId: "mention-1",
+              canonicalKey: "auto:레이노개봉점",
+              domain: "hunnytip.kr",
+              url: "https://hunnytip.kr/one",
+              attributionLevel: "section",
+              evidence: { distance_chars: 120 },
+              citationStartIndex: 40,
+              entityEndIndex: 10,
+            },
+          ],
+        }),
+        row(2, {
+          attributions: [
+            {
+              attributionId: "source-2",
+              measurementMentionId: "mention-2",
+              canonicalKey: "auto:레이노개봉점",
+              domain: "hunnytip.kr",
+              url: "https://hunnytip.kr/two",
+              attributionLevel: "section",
+              evidence: { distance_chars: 140 },
+              citationStartIndex: 42,
+              entityEndIndex: 10,
+            },
+          ],
+        }),
+      ]),
+    );
+
+    const run = report.runs[0]!;
+    expect(run.proposed.targetSources).toEqual([]);
+    expect(run.proposed.observedSourceDomainCount).toBe(1);
+    expect(run.proposed.observedTargetSourceDomainCount).toBe(0);
+    expect(run.proposed.observedCompetitorSourceDomainCount).toBe(1);
+    expect(run.proposed.sourceLinkedCompetitorCount).toBe(1);
+    expect(run.proposed.observedSources).toEqual([
+      {
+        domain: "hunnytip.kr",
+        responseCount: 2,
+        targetResponseCount: 0,
+        otherResponseCount: 2,
+        attributionCount: 2,
+        entities: [
+          {
+            canonicalKey: "auto:레이노개봉점",
+            side: "other",
+            responseCount: 2,
+            attributionCount: 2,
+            directResponseCount: 0,
+            nearSectionResponseCount: 2,
+          },
+        ],
+      },
+    ]);
+    expect(report.summary.observedSourceRunCount).toBe(1);
+    expect(report.summary.observedCompetitorSourceRunCount).toBe(1);
+    expect(report.summary.observedSourceDomainCount).toBe(1);
+    expect(report.summary.observedTargetSourceDomainCount).toBe(0);
+    expect(report.summary.observedCompetitorSourceDomainCount).toBe(1);
+    expect(report.summary.sourceLinkedCompetitorCount).toBe(1);
+  });
+
   it("allows an evidence-backed newly confirmed competitor", () => {
     const report = replayPhase2CDataset(dataset([row(1)]));
     const run = report.runs[0]!;
