@@ -3554,6 +3554,18 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      commit_entity_facts_v2_runtime_materialization_v01: {
+        Args: {
+          p_aggregate_row: Json
+          p_clue_supplement: Json
+          p_engine_version: string
+          p_materialization_id: string
+          p_measurement_rows: Json
+          p_observed_supplement: Json
+          p_run_id: string
+        }
+        Returns: Json
+      }
       consume_measurement_market_shadow_nonce_v01: {
         Args: { p_business_id: string; p_org_id: string; p_token_hash: string }
         Returns: boolean
@@ -3648,6 +3660,10 @@ export type Database = {
           source_key: string
           source_name: string
         }[]
+      }
+      get_entity_facts_v2_runtime_context_v01: {
+        Args: { p_run_id: string }
+        Returns: Json
       }
       get_first_run_content_source_observations_v01: {
         Args: { p_business_id: string; p_org_id: string; p_run_id: string }
