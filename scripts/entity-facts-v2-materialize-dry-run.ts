@@ -50,6 +50,7 @@ export interface EntityFactsV2DryRunSummary {
   observedTargetSourceDomainCount: number;
   observedCompetitorSourceDomainCount: number;
   sourceLinkedCompetitorCount: number;
+  observedTargetSourceParity: true;
   hashChecksOk: true;
   scopeChecksOk: true;
   duplicateMeasurementIds: 0;
@@ -312,6 +313,19 @@ export function validateEntityFactsV2MaterializationDryRun(
       ) === stableJson(replaySemantics(replayRun)),
       `DRY_RUN_SEMANTIC_MISMATCH:${aggregateRow.source_run_id}`,
     );
+
+    const aggregateTargetSourceDomains = aggregateRow.aggregate.targetSources
+      .map((source) => source.domain)
+      .sort((a, b) => a.localeCompare(b, "en"));
+    const observedTargetSourceDomains = replayRun.proposed.observedSources
+      .filter((source) => source.targetResponseCount > 0)
+      .map((source) => source.domain)
+      .sort((a, b) => a.localeCompare(b, "en"));
+    invariant(
+      stableJson(observedTargetSourceDomains) ===
+        stableJson(aggregateTargetSourceDomains),
+      `DRY_RUN_OBSERVED_TARGET_SOURCE_MISMATCH:${aggregateRow.source_run_id}`,
+    );
   }
 
   const unresolvedRunCount = bundle.aggregateRows.filter(
@@ -383,6 +397,7 @@ export function validateEntityFactsV2MaterializationDryRun(
     observedCompetitorSourceDomainCount:
       replay.summary.observedCompetitorSourceDomainCount,
     sourceLinkedCompetitorCount: replay.summary.sourceLinkedCompetitorCount,
+    observedTargetSourceParity: true,
     hashChecksOk: true,
     scopeChecksOk: true,
     duplicateMeasurementIds: 0,
