@@ -105,6 +105,7 @@ describe("Entity Facts v2 materializer dry-run validator", () => {
     expect(summary.observedCompetitorSourceDomainCount).toBe(0);
     expect(summary.sourceLinkedCompetitorCount).toBe(0);
     expect(summary.observedTargetSourceParity).toBe(true);
+    expect(summary.observedSourcesAggregateCandidateContractOk).toBe(true);
     expect(summary.regressionRun?.matched).toBe(true);
   });
 
@@ -189,6 +190,7 @@ describe("Entity Facts v2 materializer dry-run validator", () => {
     expect(summary.observedCompetitorSourceDomainCount).toBe(1);
     expect(summary.sourceLinkedCompetitorCount).toBe(1);
     expect(summary.observedTargetSourceParity).toBe(true);
+    expect(summary.observedSourcesAggregateCandidateContractOk).toBe(true);
   });
 
   it("fails closed on an unexpected historical corpus size", () => {
