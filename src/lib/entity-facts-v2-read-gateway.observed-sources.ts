@@ -243,6 +243,7 @@ export function buildObservedSourcesCustomerDTO(args: {
         name,
         isTarget,
         responseCount: entity.responseCount,
+        evidence: "confirmed",
       });
     }
 
@@ -258,6 +259,8 @@ export function buildObservedSourcesCustomerDTO(args: {
       responseCount: source.responseCount,
       targetResponseCount: source.targetResponseCount,
       competitorResponseCount: source.otherResponseCount,
+      clueResponseCount: 0,
+      evidence: "confirmed",
       linkedEntities,
     });
   }
