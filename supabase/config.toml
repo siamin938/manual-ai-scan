@@ -42,6 +42,11 @@ verify_jwt = false
 [functions.visibility-citation-attribution]
 verify_jwt = false
 
+# Internal Entity Facts v2 materialization worker. It authenticates with
+# x-visibility-postprocess-token and performs no paid provider call.
+[functions.entity-facts-v2-materialize-run]
+verify_jwt = false
+
 # Browser-facing benchmark endpoint. Platform JWT is required and the body also
 # validates the user and organization membership before service-role reads.
 [functions.visibility-benchmark]
