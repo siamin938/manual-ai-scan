@@ -1,4 +1,11 @@
 import {
+  buildObservedSourcesCustomerDTO,
+  ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION,
+  ENTITY_FACTS_V2_OBSERVED_SOURCES_SOURCE_REPLAY_VERSION,
+  ENTITY_FACTS_V2_OBSERVED_SOURCES_VERSION,
+  parseObservedSourcesV2,
+} from "./entity-facts-v2-read-gateway.observed-sources";
+import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
   ENTITY_FACTS_V2_READ_FACT_VERSION,
@@ -16,6 +23,8 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 export type EntityFactsV2ReadGatewayStorageSnapshot = {
+  aggregateId: string;
+  materializationId: string;
   sourceRunId: string;
   factVersion: string;
   aggregateVersion: string;
@@ -26,11 +35,23 @@ export type EntityFactsV2ReadGatewayStorageSnapshot = {
   aggregate: unknown;
 };
 
+export type EntityFactsV2ObservedSourcesStorageSnapshot = {
+  baseAggregateId: string;
+  baseMaterializationId: string;
+  sourceRunId: string;
+  observedSourcesVersion: string;
+  sourceReplayVersion: string;
+  engineVersion: string;
+  observedSources: unknown;
+};
+
+
 export type EntityFactsV2ReadGatewaySnapshot = {
   generatedAt: string;
   business: EntityFactsV2ReadBusinessDTO;
   scope: EntityFactsV2ReadScopeDTO;
   storage: EntityFactsV2ReadGatewayStorageSnapshot;
+  observedSourcesStorage: EntityFactsV2ObservedSourcesStorageSnapshot | null;
   registeredCompetitorNames: Record<string, string>;
   autoCompetitorEvidence: Record<
     string,
@@ -59,6 +80,8 @@ export function buildEntityFactsV2ReadGatewayFromSnapshot(
   if (
     !UUID_RE.test(targetBusinessId) ||
     !UUID_RE.test(scope.runId) ||
+    !UUID_RE.test(storage.aggregateId) ||
+    !UUID_RE.test(storage.materializationId) ||
     storage.sourceRunId !== scope.runId ||
     storage.factVersion !== ENTITY_FACTS_V2_READ_FACT_VERSION ||
     storage.aggregateVersion !== ENTITY_FACTS_V2_READ_AGGREGATE_VERSION ||
@@ -120,6 +143,72 @@ export function buildEntityFactsV2ReadGatewayFromSnapshot(
     });
   }
 
+  let observedSourcesStatus: "available" | "not_materialized" =
+    "not_materialized";
+  let observedSources = [];
+
+  if (input.observedSourcesStorage) {
+    const observedStorage = input.observedSourcesStorage;
+    if (
+      observedStorage.baseAggregateId !== storage.aggregateId ||
+      observedStorage.baseMaterializationId !== storage.materializationId ||
+      observedStorage.sourceRunId !== scope.runId ||
+      observedStorage.observedSourcesVersion !==
+        ENTITY_FACTS_V2_OBSERVED_SOURCES_VERSION ||
+      observedStorage.sourceReplayVersion !==
+        ENTITY_FACTS_V2_OBSERVED_SOURCES_SOURCE_REPLAY_VERSION ||
+      observedStorage.engineVersion !==
+        ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION
+    ) {
+      return {
+        ok: false,
+        error: "INVALID_V2_DATA",
+        business,
+        runId: scope.runId,
+      };
+    }
+
+    const parsedObservedSources = parseObservedSourcesV2(
+      observedStorage.observedSources,
+    );
+    if (!parsedObservedSources) {
+      return {
+        ok: false,
+        error: "INVALID_V2_DATA",
+        business,
+        runId: scope.runId,
+      };
+    }
+
+    const customerObservedSources = buildObservedSourcesCustomerDTO({
+      business,
+      observedSources: parsedObservedSources,
+      competitorCanonicalKeys: new Set(
+        aggregate.competitors.map((item) => item.canonicalKey),
+      ),
+      targetSourceResponseCountByDomain: new Map(
+        aggregate.targetSources.map((item) => [
+          item.domain.toLowerCase().replace(/^www\./u, ""),
+          item.responseCount,
+        ]),
+      ),
+      registeredCompetitorNames: input.registeredCompetitorNames,
+      autoCompetitorEvidence: input.autoCompetitorEvidence,
+    });
+
+    if (!customerObservedSources) {
+      return {
+        ok: false,
+        error: "INVALID_V2_DATA",
+        business,
+        runId: scope.runId,
+      };
+    }
+
+    observedSourcesStatus = "available";
+    observedSources = customerObservedSources;
+  }
+
   return {
     ok: true,
     data: {
@@ -132,6 +221,8 @@ export function buildEntityFactsV2ReadGatewayFromSnapshot(
       questionAreas: aggregate.questionAreas,
       competitors,
       targetSources: aggregate.targetSources,
+      observedSourcesStatus,
+      observedSources,
     },
   };
 }
