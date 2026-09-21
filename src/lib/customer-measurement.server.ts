@@ -192,6 +192,7 @@ export async function createCustomerMeasurementRun(args: {
         name: runName,
         run_type: "audit",
         phase: "standalone",
+        diagnostic_scope: "customer",
         status: "draft",
         selected_providers: ["openai"],
         repetitions: CUSTOMER_RUN_REPETITIONS,
