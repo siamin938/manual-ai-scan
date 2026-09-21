@@ -783,6 +783,7 @@ export async function startExperimentBaselineImpl(args: {
       name: `${experiment.name} · Baseline`,
       run_type: "experiment",
       phase: "baseline",
+      diagnostic_scope: "internal_qa",
       status: "draft",
       selected_providers: ["openai"],
       repetitions: BASELINE_REPETITIONS,
