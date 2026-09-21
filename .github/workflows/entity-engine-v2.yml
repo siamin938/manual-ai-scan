@@ -18,6 +18,7 @@ on:
       - "scripts/entity-facts-v2-materialize.ts"
       - "scripts/entity-facts-v2-materialize-dry-run.ts"
       - "scripts/observed-sources-v2-backfill-dry-run.ts"
+      - "scripts/competitor-source-clues-v2-backfill-dry-run.ts"
       - "scripts/entity-facts-v2-production-backfill.ts"
       - ".github/workflows/entity-facts-v2-production-backfill.yml"
       - "scripts/entity-facts-v2-production-backfill-execute.ts"
@@ -27,8 +28,10 @@ on:
       - "scripts/sql/export-entity-v2-replay.sql"
       - "scripts/sql/export-entity-facts-phase2c-replay.sql"
       - "scripts/sql/export-observed-source-v2-backfill-base.sql"
+      - "scripts/sql/export-competitor-source-clue-v2-backfill-base.sql"
       - "scripts/reports/competitor-source-clue-production-baseline-v01.json"
       - "scripts/sql/run-observed-source-aggregates-v2-migration-candidate.sql"
+      - "scripts/sql/run-competitor-source-clue-aggregates-v2-migration-candidate.sql"
       - ".github/workflows/entity-engine-v2.yml"
   workflow_dispatch:
 
