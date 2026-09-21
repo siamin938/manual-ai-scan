@@ -1857,7 +1857,6 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_origin: string
-          diagnostic_scope: string
           estimated_cost_usd: number
           experiment_id: string | null
           failed_jobs: number
@@ -1884,7 +1883,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_origin: string
-          diagnostic_scope?: string
           estimated_cost_usd?: number
           experiment_id?: string | null
           failed_jobs?: number
@@ -1911,7 +1909,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_origin?: string
-          diagnostic_scope?: string
           estimated_cost_usd?: number
           experiment_id?: string | null
           failed_jobs?: number
