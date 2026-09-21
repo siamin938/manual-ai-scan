@@ -1,0 +1,261 @@
+{
+  "version": "competitor-source-clue-production-baseline-v0.1",
+  "source": "Read-only validation of the 23 immutable Production Entity Facts v2 runs on 2026-09-21.",
+  "rules": {
+    "existingConfirmedSources": "unchanged",
+    "clueSide": "other",
+    "clueEvidence": "near_section",
+    "maxDistanceChars": 250,
+    "requiresMeasurementMentionId": true,
+    "requiresAutoCanonicalKey": true,
+    "requiresFullCanonicalSurfaceInCitationTitle": true,
+    "excludesComparativeContext": true,
+    "excludesInfrastructureHosts": true,
+    "excludesNearSectionNews": true,
+    "excludesAlreadyAcceptedEntityDomainLinks": true,
+    "customerSemantics": "advisory_only"
+  },
+  "summary": {
+    "runCount": 23,
+    "acceptedObservedSourceDomainCount": 94,
+    "competitorSourceClueRunCount": 13,
+    "competitorSourceClueDomainCount": 32,
+    "competitorSourceClueEntityLinkCount": 32,
+    "newCompetitorSourceClueDomainCount": 28,
+    "combinedObservedSourceDomainCount": 122
+  },
+  "runs": [
+    {
+      "runId": "775e6a09-2404-4c46-a439-2909b28c9729",
+      "business": "액슬론 모터 스튜디오",
+      "accepted": 9,
+      "clueDomains": 1,
+      "clueEntityLinks": 1,
+      "newClueDomains": 1,
+      "combined": 10
+    },
+    {
+      "runId": "1f53c94a-2906-4fcc-abf1-e38edc71d6d4",
+      "business": "오토트리",
+      "accepted": 5,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 5
+    },
+    {
+      "runId": "cbaf0b08-046f-48a9-9b47-14e3be7762b2",
+      "business": "오토트리",
+      "accepted": 5,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 5
+    },
+    {
+      "runId": "cebdcc9c-e6f1-4976-8adb-41117da6bfda",
+      "business": "오토트리",
+      "accepted": 8,
+      "clueDomains": 2,
+      "clueEntityLinks": 2,
+      "newClueDomains": 1,
+      "combined": 9
+    },
+    {
+      "runId": "06b91de6-bec9-4234-83e0-3710710ecb36",
+      "business": "카스페이스 구로 본점",
+      "accepted": 5,
+      "clueDomains": 3,
+      "clueEntityLinks": 3,
+      "newClueDomains": 2,
+      "combined": 7
+    },
+    {
+      "runId": "99cc1d74-3ae1-419c-826c-8d411ee03a44",
+      "business": "카스페이스 구로 본점",
+      "accepted": 3,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 3
+    },
+    {
+      "runId": "28a793c9-c24d-41ff-9037-f08abc21b3ca",
+      "business": "카스페이스 구로점",
+      "accepted": 1,
+      "clueDomains": 4,
+      "clueEntityLinks": 4,
+      "newClueDomains": 4,
+      "combined": 5
+    },
+    {
+      "runId": "0edb5d99-a820-40b0-852c-431f29cc52b4",
+      "business": "커스텀개러지",
+      "accepted": 2,
+      "clueDomains": 1,
+      "clueEntityLinks": 1,
+      "newClueDomains": 1,
+      "combined": 3
+    },
+    {
+      "runId": "ac940ca3-edc7-4b1e-8ac3-e2af9d166782",
+      "business": "커스텀개러지",
+      "accepted": 0,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 0
+    },
+    {
+      "runId": "d801ebf9-4f1a-42f4-8b9c-a9cb5f703e7f",
+      "business": "커스텀개러지",
+      "accepted": 8,
+      "clueDomains": 4,
+      "clueEntityLinks": 4,
+      "newClueDomains": 3,
+      "combined": 11
+    },
+    {
+      "runId": "eadcc4f4-989e-462e-b3ba-2257bb0cdeff",
+      "business": "커스텀개러지",
+      "accepted": 1,
+      "clueDomains": 2,
+      "clueEntityLinks": 2,
+      "newClueDomains": 2,
+      "combined": 3
+    },
+    {
+      "runId": "2eea63b3-5b37-4299-80d9-a5c69085aa0a",
+      "business": "타이어프로 봉일천점",
+      "accepted": 9,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 9
+    },
+    {
+      "runId": "4e788705-8740-4119-bfef-2b5bec04c7d2",
+      "business": "타이어프로 봉일천점",
+      "accepted": 9,
+      "clueDomains": 5,
+      "clueEntityLinks": 5,
+      "newClueDomains": 5,
+      "combined": 14
+    },
+    {
+      "runId": "015cce8c-d5e6-4260-8a2d-acafb58e5d16",
+      "business": "현대엑스티어 판교",
+      "accepted": 5,
+      "clueDomains": 1,
+      "clueEntityLinks": 1,
+      "newClueDomains": 1,
+      "combined": 6
+    },
+    {
+      "runId": "0b324158-4470-4cd9-bd59-dd66accf662b",
+      "business": "현대엑스티어 판교",
+      "accepted": 0,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 0
+    },
+    {
+      "runId": "0d322a0f-71dd-4477-8cd8-9c316e063db5",
+      "business": "현대엑스티어 판교",
+      "accepted": 0,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 0
+    },
+    {
+      "runId": "5169511c-bed9-48cd-953f-522e97bcbee2",
+      "business": "현대엑스티어 판교",
+      "accepted": 0,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 0
+    },
+    {
+      "runId": "60013c1d-8bc5-48ea-970b-125537aea35a",
+      "business": "현대엑스티어 판교",
+      "accepted": 0,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 0
+    },
+    {
+      "runId": "bad9250c-af54-4efc-9b82-c0eb9b551ffc",
+      "business": "현대엑스티어 판교",
+      "accepted": 3,
+      "clueDomains": 3,
+      "clueEntityLinks": 3,
+      "newClueDomains": 3,
+      "combined": 6
+    },
+    {
+      "runId": "c2d55341-7f12-436b-8ff8-16db09cca68a",
+      "business": "현대엑스티어 판교",
+      "accepted": 0,
+      "clueDomains": 0,
+      "clueEntityLinks": 0,
+      "newClueDomains": 0,
+      "combined": 0
+    },
+    {
+      "runId": "cb08c8b4-479d-4cbd-9175-c705d4d71c61",
+      "business": "현대엑스티어 판교",
+      "accepted": 9,
+      "clueDomains": 3,
+      "clueEntityLinks": 3,
+      "newClueDomains": 2,
+      "combined": 11
+    },
+    {
+      "runId": "d987eeb2-9b25-4db5-a81a-3e5760d2783a",
+      "business": "현대엑스티어 판교",
+      "accepted": 6,
+      "clueDomains": 1,
+      "clueEntityLinks": 1,
+      "newClueDomains": 1,
+      "combined": 7
+    },
+    {
+      "runId": "fafe8e3f-3f8f-4036-81bb-fdafd7101cf3",
+      "business": "현대엑스티어 판교",
+      "accepted": 6,
+      "clueDomains": 2,
+      "clueEntityLinks": 2,
+      "newClueDomains": 2,
+      "combined": 8
+    }
+  ],
+  "kaspaceLatest": {
+    "runId": "28a793c9-c24d-41ff-9037-f08abc21b3ca",
+    "acceptedDomains": [
+      "hunnytip.kr"
+    ],
+    "newClueDomains": [
+      {
+        "domain": "silliskorea.com",
+        "canonicalKey": "auto:실리스코리아"
+      },
+      {
+        "domain": "pf.kakao.com",
+        "canonicalKey": "auto:제이존jzone"
+      },
+      {
+        "domain": "carcarescenter.com",
+        "canonicalKey": "auto:퀀텀팩토리서초점"
+      },
+      {
+        "domain": "motorcube.co.kr",
+        "canonicalKey": "auto:모터큐브"
+      }
+    ],
+    "combinedDomainCount": 5
+  }
+}
