@@ -1,0 +1,122 @@
+{
+  "version": "measurement-run-diagnostic-scope-classification-v0.1",
+  "generatedFrom": "Production read-only simulation",
+  "runtimeRule": "Customer representative selection uses measurement_runs.diagnostic_scope only; it must not infer scope from run name, question count, or timestamp.",
+  "proposedSummary": {
+    "allRuns": 28,
+    "customer": 17,
+    "internalQa": 11,
+    "completedStandaloneInternalQa": 7,
+    "representativeBusinesses": 8
+  },
+  "reviewedInternalQaStandaloneRuns": [
+    {
+      "runId": "60013c1d-8bc5-48ea-970b-125537aea35a",
+      "business": "현대엑스티어 판교",
+      "name": "최초 자동측정 스모크테스트 v1",
+      "measurementCount": 6
+    },
+    {
+      "runId": "5169511c-bed9-48cd-953f-522e97bcbee2",
+      "business": "현대엑스티어 판교",
+      "name": "v1.1.2 1건 실전검증",
+      "measurementCount": 1
+    },
+    {
+      "runId": "0b324158-4470-4cd9-bd59-dd66accf662b",
+      "business": "현대엑스티어 판교",
+      "name": "v1.1.4 직접 저장 검증",
+      "measurementCount": 1
+    },
+    {
+      "runId": "0d322a0f-71dd-4477-8cd8-9c316e063db5",
+      "business": "현대엑스티어 판교",
+      "name": "v1.2.3 신규측정 스모크테스트",
+      "measurementCount": 1
+    },
+    {
+      "runId": "c2d55341-7f12-436b-8ff8-16db09cca68a",
+      "business": "현대엑스티어 판교",
+      "name": "v1.2.3 버전기록 최종확인",
+      "measurementCount": 1
+    },
+    {
+      "runId": "ac940ca3-edc7-4b1e-8ac3-e2af9d166782",
+      "business": "커스텀개러지",
+      "name": "커스텀개러지 런칭 리허설 v1",
+      "measurementCount": 10
+    },
+    {
+      "runId": "feed36b9-a1d9-419f-8408-98832d6ec428",
+      "business": "현대엑스티어 판교",
+      "name": "v2 자동생성 E2E 스모크 1문항 2026-09-21",
+      "measurementCount": 1
+    }
+  ],
+  "representativeRunsAfterClassification": [
+    {
+      "orgId": "547321ad-3521-4c28-9fec-42db62efcd06",
+      "businessId": "8f30c663-32db-4c80-8974-d8cbb02f9307",
+      "business": "액슬론 모터 스튜디오",
+      "runId": "775e6a09-2404-4c46-a439-2909b28c9729",
+      "measurementCount": 24,
+      "hasV2": true
+    },
+    {
+      "orgId": "547321ad-3521-4c28-9fec-42db62efcd06",
+      "businessId": "fe215735-bc9f-420c-b445-6d0818edde99",
+      "business": "오토트리",
+      "runId": "cebdcc9c-e6f1-4976-8adb-41117da6bfda",
+      "measurementCount": 24,
+      "hasV2": true
+    },
+    {
+      "orgId": "2673c44f-6706-4207-88f4-f2359b34df68",
+      "businessId": "8fa9168b-4dc2-4417-b2ef-bbdafd842c38",
+      "business": "카스페이스 구로 본점",
+      "runId": "06b91de6-bec9-4234-83e0-3710710ecb36",
+      "measurementCount": 24,
+      "hasV2": true
+    },
+    {
+      "orgId": "547321ad-3521-4c28-9fec-42db62efcd06",
+      "businessId": "c9cb39d5-9f04-46ec-8018-14156670446d",
+      "business": "카스페이스 구로점",
+      "runId": "28a793c9-c24d-41ff-9037-f08abc21b3ca",
+      "measurementCount": 24,
+      "hasV2": true
+    },
+    {
+      "orgId": "547321ad-3521-4c28-9fec-42db62efcd06",
+      "businessId": "f302a891-2c8b-4b9b-a10f-1220101dfc98",
+      "business": "커스텀개러지",
+      "runId": "d801ebf9-4f1a-42f4-8b9c-a9cb5f703e7f",
+      "measurementCount": 24,
+      "hasV2": true
+    },
+    {
+      "orgId": "547321ad-3521-4c28-9fec-42db62efcd06",
+      "businessId": "483022a4-30c9-4f6d-9cf4-19a30c2f58d2",
+      "business": "타이어프로 봉일천점",
+      "runId": "2eea63b3-5b37-4299-80d9-a5c69085aa0a",
+      "measurementCount": 24,
+      "hasV2": true
+    },
+    {
+      "orgId": "547321ad-3521-4c28-9fec-42db62efcd06",
+      "businessId": "a0d95431-fe9f-4bea-a02b-02fd3ea9f2a2",
+      "business": "현대엑스티어 판교",
+      "runId": "bad9250c-af54-4efc-9b82-c0eb9b551ffc",
+      "measurementCount": 24,
+      "hasV2": true
+    },
+    {
+      "orgId": "2673c44f-6706-4207-88f4-f2359b34df68",
+      "businessId": "8b345a25-6dfe-420e-bb4b-e0a1dc4cedf8",
+      "business": "현대엑스티어 판교",
+      "runId": "fafe8e3f-3f8f-4036-81bb-fdafd7101cf3",
+      "measurementCount": 24,
+      "hasV2": true
+    }
+  ]
+}
