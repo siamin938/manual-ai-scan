@@ -2789,6 +2789,93 @@ export type Database = {
           },
         ]
       }
+      run_competitor_source_clue_aggregates_v2: {
+        Row: {
+          base_aggregate_id: string
+          base_materialization_id: string
+          base_observed_source_aggregate_id: string
+          business_id: string
+          clue_version: string
+          created_at: string
+          engine_version: string
+          id: string
+          input_fingerprint: string
+          org_id: string
+          source_clues: Json
+          source_clues_hash: string
+          source_replay_version: string
+          source_run_id: string
+        }
+        Insert: {
+          base_aggregate_id: string
+          base_materialization_id: string
+          base_observed_source_aggregate_id: string
+          business_id: string
+          clue_version: string
+          created_at?: string
+          engine_version: string
+          id?: string
+          input_fingerprint: string
+          org_id: string
+          source_clues: Json
+          source_clues_hash: string
+          source_replay_version: string
+          source_run_id: string
+        }
+        Update: {
+          base_aggregate_id?: string
+          base_materialization_id?: string
+          base_observed_source_aggregate_id?: string
+          business_id?: string
+          clue_version?: string
+          created_at?: string
+          engine_version?: string
+          id?: string
+          input_fingerprint?: string
+          org_id?: string
+          source_clues?: Json
+          source_clues_hash?: string
+          source_replay_version?: string
+          source_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_competitor_source_clue_ag_base_observed_source_aggrega_fkey"
+            columns: ["base_observed_source_aggregate_id"]
+            isOneToOne: false
+            referencedRelation: "run_observed_source_aggregates_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_competitor_source_clue_aggregates_v2_base_aggregate_id_fkey"
+            columns: ["base_aggregate_id"]
+            isOneToOne: false
+            referencedRelation: "run_entity_fact_aggregates_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_competitor_source_clue_aggregates_v2_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_competitor_source_clue_aggregates_v2_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_competitor_source_clue_aggregates_v2_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       run_entity_fact_aggregates_v2: {
         Row: {
           aggregate: Json
