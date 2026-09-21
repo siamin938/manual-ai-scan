@@ -229,6 +229,141 @@ describe("Phase 2C Run Source Replay v0.1", () => {
     expect(result.factsByMeasurement[0]?.facts.targetCitationDomains).toEqual([]);
   });
 
+  it("keeps a single exact-title competitor near-section source as a clue", () => {
+    const competitor = {
+      ...otherObservation(),
+      canonicalKey: "auto:실리스코리아",
+    };
+
+    const result = replayRunSourcesV2([
+      measurement(
+        "m1",
+        [competitor],
+        [
+          rawAttribution({
+            attributionId: "clue-1",
+            measurementMentionId: "mention-sillis",
+            canonicalKey: "auto:실리스코리아",
+            domain: "silliskorea.com",
+            url: "https://silliskorea.com/",
+            title: "실리스코리아",
+            attributionLevel: "section",
+            evidence: { distance_chars: 97 },
+          }),
+        ],
+        [{ entityRef: "other-ref", mentionIds: ["mention-sillis"] }],
+      ),
+    ]);
+
+    expect(result.acceptedAttributions).toEqual([]);
+    expect(result.competitorSourceClueVersion).toBe("0.1");
+    expect(result.competitorSourceClues).toEqual([
+      {
+        domain: "silliskorea.com",
+        canonicalKey: "auto:실리스코리아",
+        responseCount: 1,
+        attributionCount: 1,
+        evidenceTier: "near_section_title_match",
+      },
+    ]);
+    expect(result.targetReferenceSources).toEqual([]);
+  });
+
+  it("does not create a competitor clue from a partial or different title surface", () => {
+    const competitor = {
+      ...otherObservation(),
+      canonicalKey: "auto:카페인w남양주점",
+    };
+
+    const result = replayRunSourcesV2([
+      measurement(
+        "m1",
+        [competitor],
+        [
+          rawAttribution({
+            attributionId: "clue-noise",
+            measurementMentionId: "mention-caffeine",
+            canonicalKey: "auto:카페인w남양주점",
+            domain: "ppf.co.kr",
+            url: "https://ppf.co.kr/namyangju",
+            title: "경기 남양주 : 테크닉 남양주점 – PPF",
+            attributionLevel: "section",
+            evidence: { distance_chars: 100 },
+          }),
+        ],
+        [{ entityRef: "other-ref", mentionIds: ["mention-caffeine"] }],
+      ),
+    ]);
+
+    expect(result.acceptedAttributions).toEqual([]);
+    expect(result.competitorSourceClues).toEqual([]);
+  });
+
+  it("does not create a clue from canonical-key fallback without an exact mention link", () => {
+    const competitor = {
+      ...otherObservation(),
+      canonicalKey: "auto:모터큐브",
+    };
+
+    const result = replayRunSourcesV2([
+      measurement(
+        "m1",
+        [competitor],
+        [
+          rawAttribution({
+            attributionId: "fallback-only",
+            measurementMentionId: null,
+            canonicalKey: "auto:모터큐브",
+            domain: "motorcube.co.kr",
+            url: "https://motorcube.co.kr/",
+            title: "모터큐브 20년 수입차 전문",
+            attributionLevel: "section",
+            evidence: { distance_chars: 100 },
+          }),
+        ],
+      ),
+    ]);
+
+    expect(result.acceptedAttributions).toEqual([]);
+    expect(result.competitorSourceClues).toEqual([]);
+  });
+
+  it("promotes repeated near-section competitor evidence to accepted source instead of clue", () => {
+    const competitor = {
+      ...otherObservation(),
+      canonicalKey: "auto:레이노개봉점",
+    };
+    const section = (id: string, mentionId: string): ReplayRawAttributionV2 =>
+      rawAttribution({
+        attributionId: id,
+        measurementMentionId: mentionId,
+        canonicalKey: "auto:레이노개봉점",
+        domain: "hunnytip.kr",
+        url: `https://hunnytip.kr/${id}`,
+        title: "레이노 개봉점",
+        attributionLevel: "section",
+        evidence: { distance_chars: 120 },
+      });
+
+    const result = replayRunSourcesV2([
+      measurement(
+        "m1",
+        [competitor],
+        [section("a1", "mention-1")],
+        [{ entityRef: "other-ref", mentionIds: ["mention-1"] }],
+      ),
+      measurement(
+        "m2",
+        [competitor],
+        [section("a2", "mention-2")],
+        [{ entityRef: "other-ref", mentionIds: ["mention-2"] }],
+      ),
+    ]);
+
+    expect(result.acceptedAttributions).toHaveLength(2);
+    expect(result.competitorSourceClues).toEqual([]);
+  });
+
   it("does not turn competitor attribution into a target source", () => {
     const result = replayRunSourcesV2([
       measurement(
