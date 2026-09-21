@@ -82,6 +82,8 @@ DECLARE
   v_entity_attribution_count integer;
   v_direct_response_count integer;
   v_near_section_response_count integer;
+  v_base_target_response_count integer;
+  v_entity_attribution_sum integer;
 BEGIN
   SELECT *
     INTO v_base
@@ -152,11 +154,11 @@ BEGIN
     v_domain := lower(regexp_replace(v_source->>'domain', '^www\\.', ''));
 
     IF
-      jsonb_typeof(v_source->'responseCount') <> 'number'
-      OR jsonb_typeof(v_source->'targetResponseCount') <> 'number'
-      OR jsonb_typeof(v_source->'otherResponseCount') <> 'number'
-      OR jsonb_typeof(v_source->'attributionCount') <> 'number'
-      OR jsonb_typeof(v_source->'entities') <> 'array'
+      jsonb_typeof(v_source->'responseCount') IS DISTINCT FROM 'number'
+      OR jsonb_typeof(v_source->'targetResponseCount') IS DISTINCT FROM 'number'
+      OR jsonb_typeof(v_source->'otherResponseCount') IS DISTINCT FROM 'number'
+      OR jsonb_typeof(v_source->'attributionCount') IS DISTINCT FROM 'number'
+      OR jsonb_typeof(v_source->'entities') IS DISTINCT FROM 'array'
     THEN
       RAISE EXCEPTION 'OBSERVED_SOURCE_JSON_CONTRACT_INVALID:%', v_domain;
     END IF;
@@ -167,10 +169,10 @@ BEGIN
     v_attribution_count := (v_source->>'attributionCount')::integer;
 
     IF
-      v_response_count < 0
+      v_response_count <= 0
       OR v_target_response_count < 0
       OR v_other_response_count < 0
-      OR v_attribution_count < 0
+      OR v_attribution_count <= 0
       OR v_response_count < greatest(
         v_target_response_count,
         v_other_response_count
@@ -183,6 +185,34 @@ BEGIN
 
     IF jsonb_array_length(v_source->'entities') = 0 THEN
       RAISE EXCEPTION 'OBSERVED_SOURCE_ENTITY_LIST_EMPTY:%', v_domain;
+    END IF;
+
+    IF
+      (v_target_response_count > 0) IS DISTINCT FROM EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(v_source->'entities') AS entity
+        WHERE entity->>'side' = 'target'
+      )
+      OR
+      (v_other_response_count > 0) IS DISTINCT FROM EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(v_source->'entities') AS entity
+        WHERE entity->>'side' = 'other'
+      )
+    THEN
+      RAISE EXCEPTION 'OBSERVED_SOURCE_SIDE_COUNT_MISMATCH:%', v_domain;
+    END IF;
+
+    SELECT COALESCE(
+      sum((entity->>'attributionCount')::integer),
+      0
+    )
+    INTO v_entity_attribution_sum
+    FROM jsonb_array_elements(v_source->'entities') AS entity
+    WHERE jsonb_typeof(entity->'attributionCount') = 'number';
+
+    IF v_entity_attribution_sum <> v_attribution_count THEN
+      RAISE EXCEPTION 'OBSERVED_SOURCE_ATTRIBUTION_COUNT_MISMATCH:%', v_domain;
     END IF;
 
     IF (
@@ -207,11 +237,12 @@ BEGIN
       IF
         v_entity_key IS NULL
         OR v_entity_key = ''
+        OR v_entity_side IS NULL
         OR v_entity_side NOT IN ('target', 'other')
-        OR jsonb_typeof(v_entity->'responseCount') <> 'number'
-        OR jsonb_typeof(v_entity->'attributionCount') <> 'number'
-        OR jsonb_typeof(v_entity->'directResponseCount') <> 'number'
-        OR jsonb_typeof(v_entity->'nearSectionResponseCount') <> 'number'
+        OR jsonb_typeof(v_entity->'responseCount') IS DISTINCT FROM 'number'
+        OR jsonb_typeof(v_entity->'attributionCount') IS DISTINCT FROM 'number'
+        OR jsonb_typeof(v_entity->'directResponseCount') IS DISTINCT FROM 'number'
+        OR jsonb_typeof(v_entity->'nearSectionResponseCount') IS DISTINCT FROM 'number'
       THEN
         RAISE EXCEPTION 'OBSERVED_SOURCE_ENTITY_CONTRACT_INVALID:%', v_domain;
       END IF;
@@ -223,8 +254,8 @@ BEGIN
         (v_entity->>'nearSectionResponseCount')::integer;
 
       IF
-        v_entity_response_count < 0
-        OR v_entity_attribution_count < 0
+        v_entity_response_count <= 0
+        OR v_entity_attribution_count <= 0
         OR v_direct_response_count < 0
         OR v_near_section_response_count < 0
         OR v_entity_response_count > v_response_count
@@ -239,12 +270,33 @@ BEGIN
         IF v_entity_key <> v_target_key THEN
           RAISE EXCEPTION 'OBSERVED_SOURCE_TARGET_KEY_MISMATCH:%', v_domain;
         END IF;
+        IF v_entity_response_count > v_target_response_count THEN
+          RAISE EXCEPTION 'OBSERVED_SOURCE_ENTITY_COUNT_INVALID:%', v_domain;
+        END IF;
       ELSE
+        IF v_entity_response_count > v_other_response_count THEN
+          RAISE EXCEPTION 'OBSERVED_SOURCE_ENTITY_COUNT_INVALID:%', v_domain;
+        END IF;
         IF NOT (v_entity_key = ANY(v_base_competitor_keys)) THEN
           RAISE EXCEPTION 'OBSERVED_SOURCE_COMPETITOR_NOT_IN_BASE:%', v_domain;
         END IF;
       END IF;
     END LOOP;
+
+    IF v_target_response_count > 0 THEN
+      SELECT (item->>'responseCount')::integer
+        INTO v_base_target_response_count
+      FROM jsonb_array_elements(v_base.aggregate->'targetSources') AS item
+      WHERE lower(regexp_replace(item->>'domain', '^www\\.', '')) = v_domain
+      LIMIT 1;
+
+      IF
+        v_base_target_response_count IS NULL
+        OR v_base_target_response_count <> v_target_response_count
+      THEN
+        RAISE EXCEPTION 'OBSERVED_SOURCE_TARGET_RESPONSE_COUNT_MISMATCH:%', v_domain;
+      END IF;
+    END IF;
   END LOOP;
 
   SELECT COALESCE(
