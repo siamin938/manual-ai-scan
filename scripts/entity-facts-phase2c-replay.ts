@@ -18,6 +18,7 @@ import {
 import type { RawParserTargetSignalV2 } from "../supabase/functions/_shared/entity-engine-v2/measurement-entity-facts";
 import {
   replayRunSourcesV2,
+  type ReplayCompetitorSourceClueV2,
   type ReplayRawAttributionV2,
 } from "../supabase/functions/_shared/entity-engine-v2/run-source-replay";
 import {
@@ -109,11 +110,16 @@ export interface Phase2CRunDiff {
     competitors: RunCompetitorFactV2[];
     targetSources: RunTargetSourceFactV2[];
     observedSources: RunObservedSourceFactV2[];
+    competitorSourceClues: ReplayCompetitorSourceClueV2[];
     sourceReplayStatus: "evaluated";
     sourceDomainCount: number;
     observedSourceDomainCount: number;
     observedTargetSourceDomainCount: number;
     observedCompetitorSourceDomainCount: number;
+    competitorSourceClueDomainCount: number;
+    competitorSourceClueEntityLinkCount: number;
+    newCompetitorSourceClueDomainCount: number;
+    combinedObservedSourceDomainCount: number;
     sourceLinkedCompetitorCount: number;
     sourcePartialMeasurementCount: number;
     acceptedAttributionCount: number;
@@ -179,6 +185,11 @@ export interface Phase2CReplayReport {
     observedSourceDomainCount: number;
     observedTargetSourceDomainCount: number;
     observedCompetitorSourceDomainCount: number;
+    competitorSourceClueRunCount: number;
+    competitorSourceClueDomainCount: number;
+    competitorSourceClueEntityLinkCount: number;
+    newCompetitorSourceClueDomainCount: number;
+    combinedObservedSourceDomainCount: number;
     sourceLinkedCompetitorCount: number;
     acceptedAttributionCount: number;
     sourceDiagnosticCount: number;
@@ -581,6 +592,20 @@ export function replayPhase2CDataset(
           .filter(Boolean),
       ),
     ].sort((a, b) => a.localeCompare(b, "en"));
+    const observedSourceDomains = new Set(
+      observedSources.map((source) => source.domain),
+    );
+    const competitorSourceClueDomains = new Set(
+      sourceReplay.competitorSourceClues.map((clue) => clue.domain),
+    );
+    const newCompetitorSourceClueDomains = [
+      ...competitorSourceClueDomains,
+    ].filter((domain) => !observedSourceDomains.has(domain));
+    const combinedObservedSourceDomains = new Set([
+      ...observedSourceDomains,
+      ...competitorSourceClueDomains,
+    ]);
+
     const proposed = {
       confirmedMentionCount: aggregate.overview.confirmedMentionCount,
       unresolvedTargetCount: aggregate.overview.unresolvedTargetCount,
@@ -596,6 +621,7 @@ export function replayPhase2CDataset(
       competitors: aggregate.competitors,
       targetSources: aggregate.targetSources,
       observedSources,
+      competitorSourceClues: sourceReplay.competitorSourceClues,
       sourceReplayStatus: "evaluated" as const,
       sourceDomainCount: aggregate.targetSources.length,
       observedSourceDomainCount: observedSources.length,
@@ -605,6 +631,13 @@ export function replayPhase2CDataset(
       observedCompetitorSourceDomainCount: observedSources.filter(
         (source) => source.otherResponseCount > 0,
       ).length,
+      competitorSourceClueDomainCount: competitorSourceClueDomains.size,
+      competitorSourceClueEntityLinkCount:
+        sourceReplay.competitorSourceClues.length,
+      newCompetitorSourceClueDomainCount:
+        newCompetitorSourceClueDomains.length,
+      combinedObservedSourceDomainCount:
+        combinedObservedSourceDomains.size,
       sourceLinkedCompetitorCount: new Set(
         observedSources.flatMap((source) =>
           source.entities
@@ -717,6 +750,25 @@ export function replayPhase2CDataset(
       ),
       observedCompetitorSourceDomainCount: runs.reduce(
         (sum, run) => sum + run.proposed.observedCompetitorSourceDomainCount,
+        0,
+      ),
+      competitorSourceClueRunCount: runs.filter(
+        (run) => run.proposed.competitorSourceClueDomainCount > 0,
+      ).length,
+      competitorSourceClueDomainCount: runs.reduce(
+        (sum, run) => sum + run.proposed.competitorSourceClueDomainCount,
+        0,
+      ),
+      competitorSourceClueEntityLinkCount: runs.reduce(
+        (sum, run) => sum + run.proposed.competitorSourceClueEntityLinkCount,
+        0,
+      ),
+      newCompetitorSourceClueDomainCount: runs.reduce(
+        (sum, run) => sum + run.proposed.newCompetitorSourceClueDomainCount,
+        0,
+      ),
+      combinedObservedSourceDomainCount: runs.reduce(
+        (sum, run) => sum + run.proposed.combinedObservedSourceDomainCount,
         0,
       ),
       sourceLinkedCompetitorCount: runs.reduce(
