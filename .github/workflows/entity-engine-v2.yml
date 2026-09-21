@@ -25,6 +25,7 @@ on:
       - ".github/workflows/entity-facts-v2-production-preflight.yml"
       - "scripts/sql/export-entity-v2-replay.sql"
       - "scripts/sql/export-entity-facts-phase2c-replay.sql"
+      - "scripts/sql/run-observed-source-aggregates-v2-migration-candidate.sql"
       - ".github/workflows/entity-engine-v2.yml"
   workflow_dispatch:
 
