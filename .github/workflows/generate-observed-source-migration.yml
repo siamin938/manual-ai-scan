@@ -1,0 +1,45 @@
+name: Generate observed source migration artifact
+
+on:
+  push:
+    branches:
+      - codex/v2-main-integration
+    paths:
+      - ".github/workflows/generate-observed-source-migration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Generate migration filename with Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes supabase@2.113.0 migration new run_observed_source_aggregates_v2
+          migration_path="$(find supabase/migrations -maxdepth 1 -type f -name '*_run_observed_source_aggregates_v2.sql' | sort | tail -n 1)"
+          test -n "$migration_path"
+          cp scripts/sql/run-observed-source-aggregates-v2-migration-candidate.sql "$migration_path"
+          printf '%s\n' "$migration_path" > /tmp/observed-source-migration-path.txt
+          cat /tmp/observed-source-migration-path.txt
+
+      - name: Upload generated migration
+        uses: actions/upload-artifact@v4
+        with:
+          name: observed-source-migration-generated
+          path: |
+            supabase/migrations/*_run_observed_source_aggregates_v2.sql
+            /tmp/observed-source-migration-path.txt
+          if-no-files-found: error
+          retention-days: 1
