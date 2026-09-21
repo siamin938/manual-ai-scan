@@ -45,6 +45,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS run_observed_source_aggregates_v2_base_version
   ON public.run_observed_source_aggregates_v2 (
     base_aggregate_id,
     observed_sources_version,
+    source_replay_version,
     engine_version
   );
 
