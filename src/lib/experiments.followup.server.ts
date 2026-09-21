@@ -736,6 +736,7 @@ export async function startExperimentFollowupImpl(args: {
       name: `${experiment.name} · Follow-up`,
       run_type: "experiment",
       phase: "followup",
+      diagnostic_scope: "internal_qa",
       status: "draft",
       selected_providers: ["openai"],
       repetitions: ctx.baseline.planned.repetitions,
