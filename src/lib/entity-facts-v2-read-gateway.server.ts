@@ -3,6 +3,11 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { buildEntityFactsV2ReadGatewayFromSnapshot } from "./entity-facts-v2-read-gateway.build";
 import {
+  ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION,
+  ENTITY_FACTS_V2_OBSERVED_SOURCES_SOURCE_REPLAY_VERSION,
+  ENTITY_FACTS_V2_OBSERVED_SOURCES_VERSION,
+} from "./entity-facts-v2-read-gateway.observed-sources";
+import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
   ENTITY_FACTS_V2_READ_FACT_VERSION,
@@ -33,11 +38,33 @@ type EntityFactsV2AggregateStorageRow = {
   created_at: string;
 };
 
+type EntityFactsV2ObservedSourceStorageRow = {
+  id: string;
+  base_aggregate_id: string;
+  base_materialization_id: string;
+  org_id: string;
+  business_id: string;
+  source_run_id: string;
+  observed_sources_version: string;
+  source_replay_version: string;
+  engine_version: string;
+  input_fingerprint: string;
+  observed_sources: Json;
+  observed_sources_hash: string;
+  created_at: string;
+};
+
 type EntityFactsV2Database = Omit<Database, "public"> & {
   public: Omit<Database["public"], "Tables"> & {
     Tables: Database["public"]["Tables"] & {
       run_entity_fact_aggregates_v2: {
         Row: EntityFactsV2AggregateStorageRow;
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      run_observed_source_aggregates_v2: {
+        Row: EntityFactsV2ObservedSourceStorageRow;
         Insert: never;
         Update: never;
         Relationships: [];
@@ -123,7 +150,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   const { data: aggregateRows, error: aggregateError } = await v2Admin
     .from("run_entity_fact_aggregates_v2")
     .select(
-      "source_run_id, fact_version, aggregate_version, engine_version, measurement_count, valid_measurement_count, contract_ok, aggregate",
+      "id, materialization_id, source_run_id, fact_version, aggregate_version, engine_version, measurement_count, valid_measurement_count, contract_ok, aggregate",
     )
     .eq("org_id", orgId)
     .eq("business_id", businessId)
@@ -173,6 +200,43 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       runId: run.id,
     };
   }
+
+  const { data: observedRows, error: observedError } = await v2Admin
+    .from("run_observed_source_aggregates_v2")
+    .select(
+      "base_aggregate_id, base_materialization_id, source_run_id, observed_sources_version, source_replay_version, engine_version, observed_sources",
+    )
+    .eq("org_id", orgId)
+    .eq("business_id", businessId)
+    .eq("source_run_id", run.id)
+    .eq("base_aggregate_id", storage.id)
+    .eq("observed_sources_version", ENTITY_FACTS_V2_OBSERVED_SOURCES_VERSION)
+    .eq(
+      "source_replay_version",
+      ENTITY_FACTS_V2_OBSERVED_SOURCES_SOURCE_REPLAY_VERSION,
+    )
+    .eq("engine_version", ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION)
+    .limit(2);
+
+  if (observedError) {
+    return {
+      ok: false,
+      error: "INTERNAL_ERROR",
+      business: businessDTO,
+      runId: run.id,
+    };
+  }
+
+  if (observedRows && observedRows.length > 1) {
+    return {
+      ok: false,
+      error: "INVALID_V2_DATA",
+      business: businessDTO,
+      runId: run.id,
+    };
+  }
+
+  const observedStorage = observedRows?.[0] ?? null;
 
   const competitorBusinessIds = [
     ...new Set(
@@ -320,6 +384,8 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       failedJobs: run.failed_jobs,
     },
     storage: {
+      aggregateId: storage.id,
+      materializationId: storage.materialization_id,
       sourceRunId: storage.source_run_id,
       factVersion: storage.fact_version,
       aggregateVersion: storage.aggregate_version,
@@ -329,6 +395,17 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       contractOk: storage.contract_ok,
       aggregate: storage.aggregate,
     },
+    observedSourcesStorage: observedStorage
+      ? {
+          baseAggregateId: observedStorage.base_aggregate_id,
+          baseMaterializationId: observedStorage.base_materialization_id,
+          sourceRunId: observedStorage.source_run_id,
+          observedSourcesVersion: observedStorage.observed_sources_version,
+          sourceReplayVersion: observedStorage.source_replay_version,
+          engineVersion: observedStorage.engine_version,
+          observedSources: observedStorage.observed_sources,
+        }
+      : null,
     registeredCompetitorNames,
     autoCompetitorEvidence,
   });
