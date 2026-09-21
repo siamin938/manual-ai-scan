@@ -242,6 +242,7 @@ describe("Entity Facts v2 Read Gateway", () => {
         },
       },
       observedSourcesStorage: null,
+      competitorSourceClueStorage: null,
       registeredCompetitorNames: {},
       autoCompetitorEvidence: {
         "auto:카메오랩분당센터": [
@@ -323,6 +324,7 @@ describe("Entity Facts v2 Read Gateway", () => {
         aggregate,
       },
       observedSourcesStorage: {
+        observedSourceAggregateId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         baseAggregateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         baseMaterializationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         sourceRunId: "33333333-3333-4333-8333-333333333333",
@@ -357,11 +359,34 @@ describe("Entity Facts v2 Read Gateway", () => {
           },
         ],
       },
+      competitorSourceClueStorage: {
+        baseObservedSourceAggregateId:
+          "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        baseAggregateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        baseMaterializationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        sourceRunId: "33333333-3333-4333-8333-333333333333",
+        clueVersion: "0.1",
+        sourceReplayVersion: "0.1",
+        engineVersion:
+          "competitor-source-clues-v2:src0.1:clue0.1:store0.1",
+        sourceClues: [
+          {
+            domain: "silliskorea.com",
+            canonicalKey: "auto:실리스코리아",
+            responseCount: 1,
+            attributionCount: 1,
+            evidenceTier: "near_section_title_match",
+          },
+        ],
+      },
       registeredCompetitorNames: {},
       autoCompetitorEvidence: {
         "auto:레이노개봉점": [{ label: "레이노 개봉점", priority: 1 }],
         "auto:루마썬팅오류점": [
           { label: "루마썬팅 오류점", priority: 1 },
+        ],
+        "auto:실리스코리아": [
+          { label: "실리스코리아", priority: 1 },
         ],
       },
     });
@@ -375,9 +400,37 @@ describe("Entity Facts v2 Read Gateway", () => {
         responseCount: 2,
         targetResponseCount: 0,
         competitorResponseCount: 2,
+        clueResponseCount: 0,
+        evidence: "confirmed",
         linkedEntities: [
-          { name: "레이노 개봉점", isTarget: false, responseCount: 2 },
-          { name: "루마썬팅 오류점", isTarget: false, responseCount: 1 },
+          {
+            name: "레이노 개봉점",
+            isTarget: false,
+            responseCount: 2,
+            evidence: "confirmed",
+          },
+          {
+            name: "루마썬팅 오류점",
+            isTarget: false,
+            responseCount: 1,
+            evidence: "confirmed",
+          },
+        ],
+      },
+      {
+        domain: "silliskorea.com",
+        responseCount: 1,
+        targetResponseCount: 0,
+        competitorResponseCount: 0,
+        clueResponseCount: 1,
+        evidence: "clue",
+        linkedEntities: [
+          {
+            name: "실리스코리아",
+            isTarget: false,
+            responseCount: 1,
+            evidence: "clue",
+          },
         ],
       },
     ]);
@@ -399,6 +452,9 @@ describe("Entity Facts v2 Read Gateway", () => {
 
     expect(serverSource).toContain('.from("run_entity_fact_aggregates_v2")');
     expect(serverSource).toContain('.from("run_observed_source_aggregates_v2")');
+    expect(serverSource).toContain(
+      '.from("run_competitor_source_clue_aggregates_v2")',
+    );
     expect(serverSource).toContain('.eq("source_run_id", run.id)');
     expect(serverSource).toContain(
       '.eq("fact_version", ENTITY_FACTS_V2_READ_FACT_VERSION)',
