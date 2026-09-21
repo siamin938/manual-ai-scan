@@ -122,6 +122,11 @@ BEGIN
   );
 
   RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Never break the existing citation-attribution completion event.
+    -- The watchdog will retry the materialization path.
+    RETURN NEW;
 END;
 $function$;
 
