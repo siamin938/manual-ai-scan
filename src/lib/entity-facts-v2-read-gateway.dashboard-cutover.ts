@@ -65,7 +65,7 @@ export const ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP: readonly EntityFactsV2Dashbo
     {
       section: "source_count",
       mode: "direct_v2",
-      note: "Use v2 targetSources count and relabel the section as target-linked sources.",
+      note: "Use the observed-source supplement domain count while preserving strict targetSources separately.",
     },
     {
       section: "competitor_list",
@@ -80,7 +80,7 @@ export const ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP: readonly EntityFactsV2Dashbo
     {
       section: "source_list",
       mode: "direct_v2",
-      note: "Use v2 targetSources only. Do not claim source trust, recommendation reason or sample title.",
+      note: "Use the accepted observed-source supplement for target + confirmed competitors. Do not claim source trust or causal recommendation reason.",
     },
     {
       section: "question_groups",
@@ -140,8 +140,13 @@ export type EntityFactsV2DashboardCompetitorRow = {
 export type EntityFactsV2DashboardSourceRow = {
   domain: string;
   responseCount: number;
-  completeResponseCount: number;
-  partialResponseCount: number;
+  targetResponseCount: number;
+  competitorResponseCount: number;
+  linkedEntities: Array<{
+    name: string;
+    isTarget: boolean;
+    responseCount: number;
+  }>;
 };
 
 export type EntityFactsV2DashboardQuestionAreaRow = {
@@ -189,6 +194,7 @@ export type EntityFactsV2DashboardCutoverModel = {
     top3: EntityFactsV2MetricViewModel;
     competitorCount: number;
     targetSourceCount: number;
+    observedSourceCount: number;
   };
   competitors: {
     heading: "AI 답변에서 함께 관찰된 업체";
@@ -200,7 +206,8 @@ export type EntityFactsV2DashboardCutoverModel = {
     rows: EntityFactsV2DashboardQuestionAreaRow[];
   };
   sources: {
-    heading: "내 업체에 연결된 출처";
+    heading: "AI 답변에서 관찰된 주요 출처";
+    available: boolean;
     rows: EntityFactsV2DashboardSourceRow[];
     referenceSourcesAvailable: false;
   };
@@ -300,14 +307,18 @@ export function buildEntityFactsV2DashboardCutoverModel(
         };
       });
 
-  const sources: EntityFactsV2DashboardSourceRow[] = dto.targetSources.map(
-    (item) => ({
+  const sources: EntityFactsV2DashboardSourceRow[] =
+    dto.observedSources.map((item) => ({
       domain: item.domain,
       responseCount: item.responseCount,
-      completeResponseCount: item.completeResponseCount,
-      partialResponseCount: item.partialResponseCount,
-    }),
-  );
+      targetResponseCount: item.targetResponseCount,
+      competitorResponseCount: item.competitorResponseCount,
+      linkedEntities: item.linkedEntities.map((entity) => ({
+        name: entity.name,
+        isTarget: entity.isTarget,
+        responseCount: entity.responseCount,
+      })),
+    }));
 
   const questionGroups: EntityFactsV2DashboardQuestionGroupRow[] =
     dto.questionGroups.map((item) => ({
@@ -343,6 +354,7 @@ export function buildEntityFactsV2DashboardCutoverModel(
       top3: overviewVm.top3,
       competitorCount: dto.competitors.length,
       targetSourceCount: dto.targetSources.length,
+      observedSourceCount: dto.observedSources.length,
     },
     competitors: {
       heading: "AI 답변에서 함께 관찰된 업체",
@@ -354,7 +366,8 @@ export function buildEntityFactsV2DashboardCutoverModel(
       rows: weakQuestions,
     },
     sources: {
-      heading: "내 업체에 연결된 출처",
+      heading: "AI 답변에서 관찰된 주요 출처",
+      available: dto.observedSourcesStatus === "available",
       rows: sources,
       referenceSourcesAvailable: false,
     },
