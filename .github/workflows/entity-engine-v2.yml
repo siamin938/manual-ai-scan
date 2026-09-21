@@ -17,6 +17,7 @@ on:
       - "scripts/entity-facts-phase2c-replay.ts"
       - "scripts/entity-facts-v2-materialize.ts"
       - "scripts/entity-facts-v2-materialize-dry-run.ts"
+      - "scripts/observed-sources-v2-backfill-dry-run.ts"
       - "scripts/entity-facts-v2-production-backfill.ts"
       - ".github/workflows/entity-facts-v2-production-backfill.yml"
       - "scripts/entity-facts-v2-production-backfill-execute.ts"
@@ -25,6 +26,7 @@ on:
       - ".github/workflows/entity-facts-v2-production-preflight.yml"
       - "scripts/sql/export-entity-v2-replay.sql"
       - "scripts/sql/export-entity-facts-phase2c-replay.sql"
+      - "scripts/sql/export-observed-source-v2-backfill-base.sql"
       - "scripts/sql/run-observed-source-aggregates-v2-migration-candidate.sql"
       - ".github/workflows/entity-engine-v2.yml"
   workflow_dispatch:
