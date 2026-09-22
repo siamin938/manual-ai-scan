@@ -71,6 +71,7 @@ function buildConfirmedSourceGap(
       a.domain.localeCompare(b.domain),
   );
   const top = sorted[0];
+  if (!top) return null;
 
   return {
     rank: 0,
