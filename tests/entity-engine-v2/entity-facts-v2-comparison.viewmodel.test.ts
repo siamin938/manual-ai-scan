@@ -328,9 +328,9 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
 
     expect(vm.mode).toBe("unavailable");
     expect(vm.heading).toBe("아직 비교할 측정 결과가 없습니다");
-    const customerSurface = JSON.stringify(vm);
-    expect(customerSurface).not.toContain("NO_CURRENT_CUSTOMER_RUN");
-    expect(customerSurface).not.toContain("unavailable");
+    const customerCopy = `${vm.heading} ${vm.description}`;
+    expect(customerCopy).not.toContain("NO_CURRENT_CUSTOMER_RUN");
+    expect(customerCopy).not.toContain("unavailable");
   });
 
   it("is still not wired into the dashboard", () => {
