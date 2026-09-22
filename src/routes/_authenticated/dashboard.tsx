@@ -67,6 +67,46 @@ function weakQuestionBadgeVariant(
   return "outline";
 }
 
+function questionGroupResult(
+  group: Pick<
+    (typeof model.questionGroups)[number],
+    "confirmedMentionCount" | "validCount" | "unresolvedTargetCount"
+  >,
+): { label: string; variant: "default" | "secondary" | "outline" } {
+  if (group.confirmedMentionCount > 0) {
+    if (
+      group.confirmedMentionCount === group.validCount &&
+      group.unresolvedTargetCount === 0
+    ) {
+      return { label: "노출 확인", variant: "default" };
+    }
+    return { label: "일부 노출 확인", variant: "outline" };
+  }
+  if (group.unresolvedTargetCount > 0) {
+    return { label: "추가 확인 필요", variant: "secondary" };
+  }
+  return { label: "노출 미확인", variant: "outline" };
+}
+
+function questionGroupEvidenceText(
+  group: Pick<
+    (typeof model.questionGroups)[number],
+    "confirmedMentionCount" | "validCount" | "unresolvedTargetCount"
+  >,
+): string {
+  const total = `총 ${group.validCount}개 질문`;
+  if (group.confirmedMentionCount > 0 && group.unresolvedTargetCount > 0) {
+    return `${total} 중 확정 노출 ${group.confirmedMentionCount}개 · 추가 확인 ${group.unresolvedTargetCount}개`;
+  }
+  if (group.confirmedMentionCount > 0) {
+    return `${total} 중 확정 노출 ${group.confirmedMentionCount}개`;
+  }
+  if (group.unresolvedTargetCount > 0) {
+    return `${total} 중 추가 확인 ${group.unresolvedTargetCount}개`;
+  }
+  return `${total}에서 확정 노출 없음`;
+}
+
 function DashboardPage() {
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
