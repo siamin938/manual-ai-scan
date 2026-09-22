@@ -333,14 +333,20 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
     expect(customerCopy).not.toContain("unavailable");
   });
 
-  it("is still not wired into the dashboard", () => {
+  it("renders only the customer-safe comparison ViewModel on the dashboard", () => {
     const dashboardSource = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
       "utf8",
     );
-    expect(dashboardSource).not.toContain(
+    expect(dashboardSource).toContain(
       "buildEntityFactsV2ComparisonViewModel",
     );
-    expect(dashboardSource).not.toContain("getEntityFactsV2Comparison");
+    expect(dashboardSource).toContain("getEntityFactsV2Comparison");
+    expect(dashboardSource).toContain("<ComparisonCard model={comparisonModel} />");
+    expect(dashboardSource).toContain("model.comparisonAvailable");
+    expect(dashboardSource).toContain("metric.comparisonSentence");
+    expect(dashboardSource).not.toContain("comparisonResult.data.status");
+    expect(dashboardSource).not.toContain("comparisonResult.data.reason");
+    expect(dashboardSource).not.toContain("request_fingerprint");
   });
 });
