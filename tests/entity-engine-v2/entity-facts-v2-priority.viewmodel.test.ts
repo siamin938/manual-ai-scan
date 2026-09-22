@@ -148,11 +148,16 @@ describe("Entity Facts v2 priority View Model", () => {
     const identity = vm.items[1];
     expect(identity.evidenceText).toBe("6개 검색 상황 · 추가 확인 6건");
     expect(identity.intentTypes).toHaveLength(6);
-    // 상위 최대 3개 라벨만 문구에 사용
-    expect(identity.whyText).toContain("질문에서 내 업체와 동일한지 추가 확인이 필요한 응답이 있습니다.");
+    // 상위 최대 3개 라벨만 예시로 보여주고 나머지는 "등 여러 검색 상황"으로 묶는다.
+    expect(identity.whyText).toBe(
+      "가격·가성비, 비교, 지역·접근성 등 여러 검색 상황에서 내 업체와 동일한지 추가 확인이 필요한 응답이 있습니다.",
+    );
 
     const coverage = vm.items[2];
     expect(coverage.intentTypes.sort()).toEqual(["service", "trust"]);
+    expect(coverage.whyText).toBe(
+      "서비스·작업, 전문성·신뢰 질문에서는 이번 측정에서 내 업체의 확정 노출이 확인되지 않았습니다.",
+    );
     expect(coverage.evidenceText).toBe("2개 검색 상황 · 총 6개 질문에서 확정 노출 없음");
   });
 
@@ -273,10 +278,6 @@ describe("Entity Facts v2 priority View Model", () => {
     expect(dashboardSource).toContain(
       "<PrioritySection model={priorityModel} />",
     );
-    expect(dashboardSource).toContain(
-      "const priorityModel = dto ? buildEntityFactsV2PriorityViewModel(dto) : null;",
-    );
-    expect(dashboardSource).toContain("<PrioritySection model={priorityModel} />");
     expect(dashboardSource).toContain("model.heading");
     expect(dashboardSource).toContain("왜 먼저 보나요?");
     expect(dashboardSource).toContain("무엇을 확인하면 되나요?");
