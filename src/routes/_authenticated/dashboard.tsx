@@ -67,6 +67,46 @@ function weakQuestionBadgeVariant(
   return "outline";
 }
 
+type QuestionGroupCounts = {
+  confirmedMentionCount: number;
+  validCount: number;
+  unresolvedTargetCount: number;
+};
+
+function questionGroupResult(
+  group: QuestionGroupCounts,
+): { label: string; variant: "default" | "secondary" | "outline" } {
+  if (group.confirmedMentionCount > 0) {
+    if (
+      group.confirmedMentionCount === group.validCount &&
+      group.unresolvedTargetCount === 0
+    ) {
+      return { label: "노출 확인", variant: "default" };
+    }
+    return { label: "일부 노출 확인", variant: "outline" };
+  }
+  if (group.unresolvedTargetCount > 0) {
+    return { label: "추가 확인 필요", variant: "secondary" };
+  }
+  return { label: "노출 미확인", variant: "outline" };
+}
+
+function questionGroupEvidenceText(
+  group: QuestionGroupCounts,
+): string {
+  const total = `총 ${group.validCount}개 질문`;
+  if (group.confirmedMentionCount > 0 && group.unresolvedTargetCount > 0) {
+    return `${total} 중 확정 노출 ${group.confirmedMentionCount}개 · 추가 확인 ${group.unresolvedTargetCount}개`;
+  }
+  if (group.confirmedMentionCount > 0) {
+    return `${total} 중 확정 노출 ${group.confirmedMentionCount}개`;
+  }
+  if (group.unresolvedTargetCount > 0) {
+    return `${total} 중 추가 확인 ${group.unresolvedTargetCount}개`;
+  }
+  return `${total}에서 확정 노출 없음`;
+}
+
 function DashboardPage() {
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
@@ -484,7 +524,8 @@ function DashboardPage() {
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
-                비슷한 검색 상황끼리 묶어 확정 노출과 추가 확인이 필요한 범위를 함께 표시합니다.
+                비슷한 검색 질문을 묶어 내 업체가 실제로 확인된 질문과 추가 확인이 필요한 질문을
+                보여드립니다.
               </p>
               {model.questionGroups.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
@@ -495,30 +536,27 @@ function DashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>검색 상황</TableHead>
-                      <TableHead>노출 범위</TableHead>
-                      <TableHead>근거</TableHead>
+                      <TableHead>결과</TableHead>
+                      <TableHead>확인 내용</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {model.questionGroups.map((g) => (
-                      <TableRow key={g.intentType}>
-                        <TableCell className="text-sm">
-                          {intentLabel(g.intentType)}
-                        </TableCell>
-                        <TableCell className="text-sm tabular-nums">
-                          {pctRange(
-                            g.visibilityLowerBoundPct,
-                            g.visibilityUpperBoundPct,
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          확정 {g.confirmedMentionCount}/{g.validCount}
-                          {g.unresolvedTargetCount > 0
-                            ? ` · 추가 확인 ${g.unresolvedTargetCount}`
-                            : ""}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {model.questionGroups.map((g) => {
+                      const result = questionGroupResult(g);
+                      return (
+                        <TableRow key={g.intentType}>
+                          <TableCell className="text-sm">
+                            {intentLabel(g.intentType)}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <Badge variant={result.variant}>{result.label}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {questionGroupEvidenceText(g)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
