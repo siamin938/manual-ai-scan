@@ -536,13 +536,14 @@ function DashboardPage() {
                 {dto.scope.completedJobs}/{dto.scope.totalJobs}
               </p>
               <p>
-                현재 화면의 최근 측정 진단은 Entity Facts v2의 확정/미확정 판정을 사용합니다.
-                미확정 응답이 있으면 하나의 숫자로 합치지 않고 하한~상한 범위로 표시합니다.
+                최근 측정의 메인 노출률은 내 업체로 확정된 응답만 계산합니다. 추가 확인이 필요한
+                응답은 별도로 표시하며, 가능한 최대 범위는 상세 정보에서 참고할 수 있습니다.
               </p>
               <p>
-                반복 종합, 시간에 따른 추세, 경쟁업체 상세 비교는 v2 역사 집계 계약이 준비되기 전까지
-                표시하지 않습니다.
+                이전 측정 비교는 같은 질문과 측정 조건이 확인되는 경우에만 제공합니다. 충분한 동일
+                조건 측정이 쌓이기 전까지 시간 추세와 경쟁업체 상세 비교는 표시하지 않습니다.
               </p>
+
             </CardContent>
           </Card>
         </>
@@ -556,6 +557,19 @@ function ComparisonCard({
 }: {
   model: ReturnType<typeof buildEntityFactsV2ComparisonViewModel>;
 }) {
+  if (!model.comparisonAvailable) {
+    return (
+      <Card>
+        <CardContent className="space-y-1.5 py-4">
+          <p className="text-sm font-semibold">이전 측정 비교</p>
+          <p className="text-xs leading-5 text-muted-foreground">
+            {model.heading}. {model.description}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
@@ -566,6 +580,7 @@ function ComparisonCard({
         <p className="text-sm leading-6 text-muted-foreground">
           {model.description}
         </p>
+
 
         {model.comparisonAvailable && model.visibility && model.top3 && (
           <div className="grid gap-4 md:grid-cols-2">
