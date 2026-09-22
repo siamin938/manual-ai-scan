@@ -92,10 +92,7 @@ function questionGroupResult(
 }
 
 function questionGroupEvidenceText(
-  group: Pick<
-    (typeof model.questionGroups)[number],
-    "confirmedMentionCount" | "validCount" | "unresolvedTargetCount"
-  >,
+  group: QuestionGroupCounts,
 ): string {
   const total = `총 ${group.validCount}개 질문`;
   if (group.confirmedMentionCount > 0 && group.unresolvedTargetCount > 0) {
