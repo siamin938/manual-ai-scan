@@ -146,8 +146,8 @@ describe("Entity Facts v2 priority View Model", () => {
     expect(sourceGap.whyText).not.toContain("함께 관찰된 업체,");
 
     const identity = vm.items[1];
-    expect(identity.evidenceText).toBe("5개 검색 상황 · 추가 확인 5건");
-    expect(identity.intentTypes).toHaveLength(5);
+    expect(identity.evidenceText).toBe("6개 검색 상황 · 추가 확인 6건");
+    expect(identity.intentTypes).toHaveLength(6);
     // 상위 최대 3개 라벨만 문구에 사용
     expect(identity.whyText).toContain("질문에서 내 업체와 동일한지 추가 확인이 필요한 응답이 있습니다.");
 
