@@ -67,11 +67,14 @@ function weakQuestionBadgeVariant(
   return "outline";
 }
 
+type QuestionGroupCounts = {
+  confirmedMentionCount: number;
+  validCount: number;
+  unresolvedTargetCount: number;
+};
+
 function questionGroupResult(
-  group: Pick<
-    (typeof model.questionGroups)[number],
-    "confirmedMentionCount" | "validCount" | "unresolvedTargetCount"
-  >,
+  group: QuestionGroupCounts,
 ): { label: string; variant: "default" | "secondary" | "outline" } {
   if (group.confirmedMentionCount > 0) {
     if (
