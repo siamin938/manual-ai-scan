@@ -8,6 +8,7 @@ import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.
 import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-read-gateway.dashboard-cutover";
 import { getEntityFactsV2Comparison } from "@/lib/entity-facts-v2-comparison.functions";
 import { buildEntityFactsV2ComparisonViewModel } from "@/lib/entity-facts-v2-comparison.viewmodel";
+import { buildEntityFactsV2PriorityViewModel } from "@/lib/entity-facts-v2-priority.viewmodel";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import {
   BusinessSelector,
@@ -157,6 +158,7 @@ function DashboardPage() {
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
+  const priorityModel = dto ? buildEntityFactsV2PriorityViewModel(dto) : null;
   const comparisonResult = comparisonQuery.data;
   const comparisonModel =
     comparisonResult && comparisonResult.ok
@@ -323,6 +325,10 @@ function DashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {priorityModel && priorityModel.items.length > 0 && (
+            <PrioritySection model={priorityModel} />
+          )}
 
           {comparisonModel && <ComparisonCard model={comparisonModel} />}
           {(comparisonQuery.isError ||
@@ -587,6 +593,64 @@ function DashboardPage() {
         </>
       )}
     </div>
+  );
+}
+
+function PrioritySection({
+  model,
+}: {
+  model: ReturnType<typeof buildEntityFactsV2PriorityViewModel>;
+}) {
+  return (
+    <Card className="report-section border-t-2 border-t-primary">
+      <CardHeader className="border-b bg-muted/20">
+        <p className="report-kicker">우선 확인</p>
+        <CardTitle className="text-xl">{model.heading}</CardTitle>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {model.description}
+        </p>
+      </CardHeader>
+      <CardContent className="grid gap-4 pt-5 lg:grid-cols-3">
+        {model.items.map((item) => (
+          <div key={item.kind} className="rounded-lg border p-4">
+            <div className="flex items-center gap-2">
+              <Badge variant={item.rank === 1 ? "default" : "outline"}>
+                {item.rank}순위
+              </Badge>
+              {item.sourceDomain && (
+                <span className="truncate text-xs text-muted-foreground">
+                  {item.sourceDomain}
+                </span>
+              )}
+            </div>
+
+            <p className="mt-3 text-base font-semibold leading-6">
+              {item.title}
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <p className="text-xs font-medium">왜 먼저 보나요?</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {item.whyText}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium">무엇을 확인하면 되나요?</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {item.actionText}
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
+              근거 · {item.evidenceText}
+            </p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
