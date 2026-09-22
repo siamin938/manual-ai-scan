@@ -167,8 +167,17 @@ describe("Entity Facts v2 comparison contract", () => {
     );
   });
 
-  it("is not wired into the customer dashboard yet", () => {
-    expect(dashboardSource).not.toContain("getEntityFactsV2Comparison");
-    expect(dashboardSource).not.toContain("entity-facts-v2-comparison");
+  it("wires the customer-safe comparison path into the dashboard without legacy repeat truth", () => {
+    expect(dashboardSource).toContain("getEntityFactsV2Comparison");
+    expect(dashboardSource).toContain(
+      "buildEntityFactsV2ComparisonViewModel",
+    );
+    expect(dashboardSource).toContain(
+      'queryKey: ["entity-facts-v2-comparison", activeOrgId, businessId]',
+    );
+    expect(dashboardSource).not.toContain("getVisibilityRepeatAggregate");
+    expect(dashboardSource).not.toContain("getVisibilityRepeatContext");
+    expect(dashboardSource).not.toContain("was_client_mentioned");
+    expect(dashboardSource).not.toContain("client_position");
   });
 });
