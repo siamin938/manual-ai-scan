@@ -259,12 +259,27 @@ describe("Entity Facts v2 priority View Model", () => {
     }
   });
 
-  it("is not wired into the dashboard yet", () => {
+  it("wires only the v2-native priority ViewModel into the dashboard", () => {
     const dashboardSource = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
       "utf8",
     );
-    expect(dashboardSource).not.toContain("entity-facts-v2-priority");
-    expect(dashboardSource).not.toContain("buildEntityFactsV2PriorityViewModel");
+    expect(dashboardSource).toContain(
+      'import { buildEntityFactsV2PriorityViewModel } from "@/lib/entity-facts-v2-priority.viewmodel";',
+    );
+    expect(dashboardSource).toContain(
+      "const priorityModel = dto ? buildEntityFactsV2PriorityViewModel(dto) : null;",
+    );
+    expect(dashboardSource).toContain(
+      "<PrioritySection model={priorityModel} />",
+    );
+    expect(dashboardSource).toContain("지금 어디부터 볼까요?");
+    expect(dashboardSource).toContain("왜 먼저 보나요?");
+    expect(dashboardSource).toContain("무엇을 확인하면 되나요?");
+    expect(dashboardSource).not.toContain("ActionRecommendationsSection");
+    expect(dashboardSource).not.toContain("getActionRecommendations");
+    expect(dashboardSource).not.toContain("visibility-actions");
+    expect(dashboardSource).not.toContain("was_client_mentioned");
+    expect(dashboardSource).not.toContain("client_position");
   });
 });
