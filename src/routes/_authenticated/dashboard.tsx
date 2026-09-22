@@ -6,6 +6,8 @@ import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
 import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-read-gateway.dashboard-cutover";
+import { getEntityFactsV2Comparison } from "@/lib/entity-facts-v2-comparison.functions";
+import { buildEntityFactsV2ComparisonViewModel } from "@/lib/entity-facts-v2-comparison.viewmodel";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import {
   BusinessSelector,
@@ -83,6 +85,19 @@ function DashboardPage() {
       }),
   });
 
+  const fetchComparison = useServerFn(getEntityFactsV2Comparison);
+  const comparisonQuery = useQuery({
+    queryKey: ["entity-facts-v2-comparison", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: () =>
+      fetchComparison({
+        data: {
+          orgId: activeOrgId as string,
+          businessId: businessId as string,
+        },
+      }),
+  });
+
   const fetchBenchmark = useServerFn(getVisibilityBenchmark);
   const benchmarkQuery = useQuery({
     queryKey: ["visibility-benchmark", activeOrgId, businessId],
@@ -102,6 +117,11 @@ function DashboardPage() {
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
+  const comparisonResult = comparisonQuery.data;
+  const comparisonModel =
+    comparisonResult && comparisonResult.ok
+      ? buildEntityFactsV2ComparisonViewModel(comparisonResult.data)
+      : null;
 
   return (
     <div className="space-y-8 lg:space-y-10">
@@ -264,7 +284,15 @@ function DashboardPage() {
             </CardContent>
           </Card>
 
-
+          {comparisonModel && <ComparisonCard model={comparisonModel} />}
+          {(comparisonQuery.isError ||
+            (comparisonResult && !comparisonResult.ok)) && (
+            <Card className="report-section">
+              <CardContent className="py-5 text-sm text-muted-foreground">
+                이전 측정 비교 정보를 불러오지 못했습니다. 최근 측정 결과에는 영향이 없습니다.
+              </CardContent>
+            </Card>
+          )}
 
           <p className="border-b border-border pb-5 text-sm text-muted-foreground">
             분석에 사용한 유효 AI 답변 {model.recentSummary.validCount}건 · 최근 측정{" "}
@@ -520,6 +548,71 @@ function DashboardPage() {
         </>
       )}
     </div>
+  );
+}
+
+function ComparisonCard({
+  model,
+}: {
+  model: ReturnType<typeof buildEntityFactsV2ComparisonViewModel>;
+}) {
+  return (
+    <Card className="report-section">
+      <CardHeader className="border-b bg-muted/20">
+        <p className="report-kicker">MEASUREMENT COMPARISON</p>
+        <CardTitle className="text-xl">{model.heading}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-5">
+        <p className="text-sm leading-6 text-muted-foreground">
+          {model.description}
+        </p>
+
+        {model.comparisonAvailable && model.visibility && model.top3 && (
+          <div className="grid gap-4 md:grid-cols-2">
+            {[model.visibility, model.top3].map((metric) => (
+              <div key={metric.label} className="rounded-md border p-4">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {metric.label}
+                </p>
+                <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="text-2xl font-semibold tabular-nums">
+                    {metric.currentValueText}
+                  </span>
+                  {metric.deltaText && (
+                    <Badge variant="outline">{metric.deltaText}</Badge>
+                  )}
+                </div>
+                {metric.previousValueText && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    이전 동일 조건 측정 {metric.previousValueText}
+                  </p>
+                )}
+                {metric.comparisonSentence && (
+                  <p className="mt-3 text-sm">{metric.comparisonSentence}</p>
+                )}
+                {metric.uncertaintyText && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {metric.uncertaintyText}
+                  </p>
+                )}
+                {metric.maximumNotice && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {metric.maximumNotice}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {model.trendAvailable &&
+          model.compatibleMeasurementCount !== null && (
+            <p className="text-xs text-muted-foreground">
+              동일 조건 측정 {model.compatibleMeasurementCount}회가 확인되었습니다.
+            </p>
+          )}
+      </CardContent>
+    </Card>
   );
 }
 
