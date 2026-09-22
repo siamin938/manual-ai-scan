@@ -273,7 +273,11 @@ describe("Entity Facts v2 priority View Model", () => {
     expect(dashboardSource).toContain(
       "<PrioritySection model={priorityModel} />",
     );
-    expect(dashboardSource).toContain("지금 어디부터 볼까요?");
+    expect(dashboardSource).toContain(
+      "const priorityModel = dto ? buildEntityFactsV2PriorityViewModel(dto) : null;",
+    );
+    expect(dashboardSource).toContain("<PrioritySection model={priorityModel} />");
+    expect(dashboardSource).toContain("model.heading");
     expect(dashboardSource).toContain("왜 먼저 보나요?");
     expect(dashboardSource).toContain("무엇을 확인하면 되나요?");
     expect(dashboardSource).not.toContain("ActionRecommendationsSection");
