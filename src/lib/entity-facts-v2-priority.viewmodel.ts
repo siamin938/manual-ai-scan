@@ -43,9 +43,15 @@ function topLabels(entries: GroupEntry[], max = 3): string[] {
   return entries.slice(0, max).map((e) => e.label);
 }
 
-function joinLabels(labels: string[]): string {
-  if (labels.length <= 1) return labels[0] ?? "";
-  return `${labels.slice(0, -1).join(", ")}·${labels[labels.length - 1]}`;
+function intentScopeText(
+  entries: GroupEntry[],
+  suffix: "에서" | "에서는",
+): string {
+  const labels = topLabels(entries);
+  const labelText = labels.join(", ");
+  return entries.length > labels.length
+    ? `${labelText} 등 여러 검색 상황${suffix}`
+    : `${labelText} 질문${suffix}`;
 }
 
 function buildConfirmedSourceGap(
@@ -104,13 +110,13 @@ function buildIdentityCheck(
     (sum, g) => sum + g.unresolvedTargetCount,
     0,
   );
-  const labels = joinLabels(topLabels(sorted));
+  const scopeText = intentScopeText(sorted, "에서");
 
   return {
     rank: 0,
     kind: "identity_check",
     title: "추가 확인이 필요한 질문부터 확인해보세요",
-    whyText: `${labels} 질문에서 내 업체와 동일한지 추가 확인이 필요한 응답이 있습니다.`,
+    whyText: `${scopeText} 내 업체와 동일한지 추가 확인이 필요한 응답이 있습니다.`,
     actionText:
       "업체명·지점명·서비스명이 여러 표현으로 잡히는지 확인해보세요.",
     evidenceText: `${sorted.length}개 검색 상황 · 추가 확인 ${totalUnresolved}건`,
@@ -137,13 +143,13 @@ function buildQuestionCoverageGap(
     );
 
   const totalValid = sorted.reduce((sum, g) => sum + g.validCount, 0);
-  const labels = joinLabels(topLabels(sorted));
+  const scopeText = intentScopeText(sorted, "에서는");
 
   return {
     rank: 0,
     kind: "question_coverage_gap",
     title: "노출이 확인되지 않은 질문 유형을 점검해보세요",
-    whyText: `${labels} 질문에서는 이번 측정에서 내 업체의 확정 노출이 확인되지 않았습니다.`,
+    whyText: `${scopeText} 이번 측정에서 내 업체의 확정 노출이 확인되지 않았습니다.`,
     actionText:
       "해당 서비스·전문성 정보가 홈페이지나 업체 프로필에 명확하게 드러나는지 확인해보세요.",
     evidenceText: `${sorted.length}개 검색 상황 · 총 ${totalValid}개 질문에서 확정 노출 없음`,
