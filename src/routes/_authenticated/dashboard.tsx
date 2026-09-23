@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -95,23 +96,29 @@ function questionGroupResult(
 function questionGroupEvidenceText(
   group: QuestionGroupCounts,
 ): string {
-  const total = `총 ${group.validCount}개 질문`;
+  const total = `${group.validCount}개 질문`;
   if (group.confirmedMentionCount > 0 && group.unresolvedTargetCount > 0) {
-    return `${total} 중 확정 노출 ${group.confirmedMentionCount}개 · 추가 확인 ${group.unresolvedTargetCount}개`;
+    return `${total} 중 ${group.confirmedMentionCount}개 확정 · ${group.unresolvedTargetCount}개 추가 확인`;
   }
   if (group.confirmedMentionCount > 0) {
-    return `${total} 중 확정 노출 ${group.confirmedMentionCount}개`;
+    return `${total} 중 ${group.confirmedMentionCount}개 확정`;
   }
   if (group.unresolvedTargetCount > 0) {
-    return `${total} 중 추가 확인 ${group.unresolvedTargetCount}개`;
+    return `${total} 중 ${group.unresolvedTargetCount}개 추가 확인`;
   }
-  return `${total}에서 확정 노출 없음`;
+  return `${total} 모두 노출 미확인`;
 }
 
 function DashboardPage() {
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
   const businessId = businesses.selectedBusinessId;
+  const [expandedCompetitorBusinessId, setExpandedCompetitorBusinessId] =
+    useState<string | null>(null);
+  const [expandedWeakQuestionBusinessId, setExpandedWeakQuestionBusinessId] =
+    useState<string | null>(null);
+  const showAllCompetitors = expandedCompetitorBusinessId === businessId;
+  const showAllWeakQuestions = expandedWeakQuestionBusinessId === businessId;
 
   const fetchV2 = useServerFn(getEntityFactsV2ReadGateway);
   const query = useQuery({
@@ -253,14 +260,14 @@ function DashboardPage() {
               )}
               note={
                 model.metricCards.top3.unresolvedCount > 0
-                  ? `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건 · 추가 확인 ${model.metricCards.top3.unresolvedCount}건`
+                  ? `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건 · 상위 3곳 여부 추가 확인 ${model.metricCards.top3.unresolvedCount}건`
                   : `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건`
               }
             />
             <MetricCard
               label="함께 관찰된 업체"
               value={`${model.metricCards.competitorCount}곳`}
-              note="v2에서 확인된 업체만 표시"
+              note="이번 측정에서 업체로 확인된 항목"
             />
             <MetricCard
               label="관찰된 주요 출처"
@@ -355,8 +362,8 @@ function DashboardPage() {
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
-                이번 측정의 AI 답변에서 업체로 확인된 항목입니다. 아직 v2 기준의 반복 관찰·신규·등급
-                판정은 붙이지 않습니다.
+                이번 측정의 AI 답변에서 업체로 확인된 항목입니다. 같은 업체가 여러 답변에서
+                보인 횟수를 함께 표시합니다.
               </p>
               {model.competitors.rows.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
@@ -371,7 +378,9 @@ function DashboardPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {model.competitors.rows.map((c) => (
+                    {model.competitors.rows
+                      .slice(0, showAllCompetitors ? model.competitors.rows.length : 6)
+                      .map((c) => (
                       <TableRow key={c.name}>
                         <TableCell className="text-sm">
                           <span className="flex flex-wrap items-center gap-2">
@@ -390,6 +399,23 @@ function DashboardPage() {
                   </TableBody>
                 </Table>
               )}
+              {model.competitors.rows.length > 6 && (
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setExpandedCompetitorBusinessId(
+                        showAllCompetitors ? null : businessId,
+                      )
+                    }
+                  >
+                    {showAllCompetitors
+                      ? "접기"
+                      : `전체 ${model.competitors.rows.length}곳 보기`}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -407,7 +433,9 @@ function DashboardPage() {
                     현재 우선 확인할 질문이 없습니다.
                   </p>
                 ) : (
-                  model.weakQuestions.rows.slice(0, 12).map((q) => (
+                  model.weakQuestions.rows
+                    .slice(0, showAllWeakQuestions ? model.weakQuestions.rows.length : 6)
+                    .map((q) => (
                     <div key={q.questionId} className="rounded-md border p-3">
                       <div className="flex items-start justify-between gap-3">
                         <p className="text-sm font-medium">{q.questionText}</p>
@@ -417,9 +445,6 @@ function DashboardPage() {
                       </div>
                       <p className="mt-2 text-xs text-muted-foreground">
                         {intentLabel(q.intentType)}
-                        {q.visibilityDisplayText
-                          ? ` · 노출 범위 ${q.visibilityDisplayText}`
-                          : ""}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         확정 노출 {q.confirmedMentionCount}건 · 추가 확인 필요{" "}
@@ -427,6 +452,23 @@ function DashboardPage() {
                       </p>
                     </div>
                   ))
+                )}
+                {model.weakQuestions.rows.length > 6 && (
+                  <div className="flex justify-center pt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setExpandedWeakQuestionBusinessId(
+                          showAllWeakQuestions ? null : businessId,
+                        )
+                      }
+                    >
+                      {showAllWeakQuestions
+                        ? "접기"
+                        : `전체 ${model.weakQuestions.rows.length}개 질문 보기`}
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -438,8 +480,7 @@ function DashboardPage() {
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
                   이번 측정의 AI 답변에서 내 업체 또는 함께 관찰된 업체와 연결된 출처입니다.
-                  반복·직접 근거가 확인된 연결과, 제목까지 일치한 1회 근접 근거는 ‘연결 단서’로 구분합니다.
-                  출처의 신뢰도나 추천 이유를 뜻하지는 않습니다.
+                  연결이 아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로 표시합니다.
                 </p>
                 {!model.sources.available ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
@@ -675,7 +716,7 @@ function ComparisonCard({
   return (
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
-        <p className="report-kicker">MEASUREMENT COMPARISON</p>
+        <p className="report-kicker">측정 비교</p>
         <CardTitle className="text-xl">{model.heading}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
