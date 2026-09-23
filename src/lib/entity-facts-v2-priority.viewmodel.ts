@@ -115,11 +115,11 @@ function buildIdentityCheck(
   return {
     rank: 0,
     kind: "identity_check",
-    title: "추가 확인이 필요한 질문부터 확인해보세요",
-    whyText: `${scopeText} 내 업체와 동일한지 추가 확인이 필요한 응답이 있습니다.`,
+    title: "AI가 내 업체인지 확신하지 못한 답변을 확인해보세요",
+    whyText: `${scopeText} 내 업체일 가능성은 있었지만, 같은 업체라고 확정할 근거가 부족한 응답이 있습니다.`,
     actionText:
-      "업체명·지점명·서비스명이 여러 표현으로 잡히는지 확인해보세요.",
-    evidenceText: `${sorted.length}개 검색 상황 · 추가 확인 ${totalUnresolved}건`,
+      "홈페이지·네이버 플레이스·업체 프로필에서 업체명·지점명·대표 서비스명이 같은 방식으로 표시되는지 확인해보세요.",
+    evidenceText: `${sorted.length}개 검색 상황 · 업체 확인 필요 ${totalUnresolved}건`,
     intentTypes: sorted.map((g) => g.intentType),
   };
 }
@@ -148,11 +148,11 @@ function buildQuestionCoverageGap(
   return {
     rank: 0,
     kind: "question_coverage_gap",
-    title: "노출이 확인되지 않은 질문 유형을 점검해보세요",
-    whyText: `${scopeText} 이번 측정에서 내 업체의 확정 노출이 확인되지 않았습니다.`,
+    title: "아직 한 번도 노출되지 않은 검색 주제를 확인해보세요",
+    whyText: `${scopeText} 이번 측정에서는 내 업체가 한 번도 확정 노출되지 않았습니다.`,
     actionText:
-      "해당 서비스·전문성 정보가 홈페이지나 업체 프로필에 명확하게 드러나는지 확인해보세요.",
-    evidenceText: `${sorted.length}개 검색 상황 · 총 ${totalValid}개 질문에서 확정 노출 없음`,
+      "이 검색 주제에서 고객이 찾는 서비스·전문성 정보가 홈페이지나 업체 프로필에 실제로 적혀 있는지 확인해보세요.",
+    evidenceText: `${sorted.length}개 검색 상황 · ${totalValid}개 질문 모두 노출 미확인`,
     intentTypes: sorted.map((g) => g.intentType),
   };
 }
