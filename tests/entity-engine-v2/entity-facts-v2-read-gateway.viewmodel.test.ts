@@ -90,7 +90,7 @@ describe("Entity Facts v2 customer View Model", () => {
       "메인 노출률은 내 업체로 확정된 응답만 계산",
     );
     expect(vm.sourceQualityNotice).toBe(
-      "출처 연결 판정이 일부 미완료인 응답이 6건 있습니다.",
+      "출처 연결을 추가로 확인할 응답이 6건 있습니다.",
     );
     expect(vm.visibility.valueText).not.toContain("25%");
   });
