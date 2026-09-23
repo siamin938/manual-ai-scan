@@ -14,7 +14,7 @@ const executable = sql
 
 const officialMigrationPath = resolve(
   process.cwd(),
-  "supabase/migrations/20260921110146_run_competitor_source_clue_aggregates_v2.sql",
+  "supabase/migrations/20260921111154_run_competitor_source_clue_aggregates_v2.sql",
 );
 const officialSql = readFileSync(officialMigrationPath, "utf8");
 const officialExecutable = officialSql
@@ -37,9 +37,8 @@ describe("Competitor source clue storage candidate", () => {
     );
   });
 
-  it("has a Supabase-CLI-generated official migration that is still unapplied", () => {
+  it("matches the Production-applied official migration executable SQL", () => {
     expect(officialSql).toContain("Generated with Supabase CLI");
-    expect(officialSql).toContain("NOT APPLIED TO PRODUCTION");
     expect(officialExecutable).toBe(executable);
   });
 
