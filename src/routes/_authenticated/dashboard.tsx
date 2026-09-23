@@ -9,7 +9,7 @@ import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.
 import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-read-gateway.dashboard-cutover";
 import { getEntityFactsV2Comparison } from "@/lib/entity-facts-v2-comparison.functions";
 import { buildEntityFactsV2ComparisonViewModel } from "@/lib/entity-facts-v2-comparison.viewmodel";
-import { buildEntityFactsV2PriorityViewModel } from "@/lib/entity-facts-v2-priority.viewmodel";
+import { buildEntityFactsV2PriorityV02ViewModel } from "@/lib/entity-facts-v2-priority-v02.viewmodel";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import {
   BusinessSelector,
@@ -165,7 +165,7 @@ function DashboardPage() {
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
-  const priorityModel = dto ? buildEntityFactsV2PriorityViewModel(dto) : null;
+  const priorityModel = dto ? buildEntityFactsV2PriorityV02ViewModel(dto) : null;
   const comparisonResult = comparisonQuery.data;
   const comparisonModel =
     comparisonResult && comparisonResult.ok
@@ -637,10 +637,29 @@ function DashboardPage() {
   );
 }
 
+function priorityKindLabel(
+  kind:
+    | "confirmed_source_gap"
+    | "visible_not_top3"
+    | "identity_uncertain"
+    | "missing_questions",
+): string {
+  switch (kind) {
+    case "confirmed_source_gap":
+      return "출처";
+    case "visible_not_top3":
+      return "상위 노출";
+    case "identity_uncertain":
+      return "업체 확인";
+    case "missing_questions":
+      return "미노출 질문";
+  }
+}
+
 function PrioritySection({
   model,
 }: {
-  model: ReturnType<typeof buildEntityFactsV2PriorityViewModel>;
+  model: ReturnType<typeof buildEntityFactsV2PriorityV02ViewModel>;
 }) {
   return (
     <Card className="report-section border-t-2 border-t-primary">
@@ -654,10 +673,11 @@ function PrioritySection({
       <CardContent className="grid gap-4 pt-5 lg:grid-cols-3">
         {model.items.map((item) => (
           <div key={item.kind} className="rounded-lg border p-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant={item.rank === 1 ? "default" : "outline"}>
                 {item.rank}순위
               </Badge>
+              <Badge variant="secondary">{priorityKindLabel(item.kind)}</Badge>
               {item.sourceDomain && (
                 <span className="truncate text-xs text-muted-foreground">
                   {item.sourceDomain}
@@ -669,20 +689,34 @@ function PrioritySection({
               {item.title}
             </p>
 
-            <div className="mt-4 space-y-3">
-              <div>
-                <p className="text-xs font-medium">왜 먼저 보나요?</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  {item.whyText}
-                </p>
-              </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {item.summaryText}
+            </p>
 
-              <div>
-                <p className="text-xs font-medium">무엇을 확인하면 되나요?</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  {item.actionText}
-                </p>
+            {item.examples.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-medium">대표 질문</p>
+                {item.examples.map((example) => (
+                  <div
+                    key={example.questionText}
+                    className="rounded-md border bg-muted/30 px-3 py-2.5"
+                  >
+                    <div className="mb-1.5">
+                      <Badge variant="outline" className="text-[10px]">
+                        {example.intentLabel}
+                      </Badge>
+                    </div>
+                    <p className="text-sm leading-5">{example.questionText}</p>
+                  </div>
+                ))}
               </div>
+            )}
+
+            <div className="mt-4">
+              <p className="text-xs font-medium">다음에 확인할 내용</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {item.actionText}
+              </p>
             </div>
 
             <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
