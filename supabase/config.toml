@@ -9,7 +9,45 @@ verify_jwt = true
 [functions.visibility-diagnostic]
 verify_jwt = true
 
+# Browser-facing onboarding endpoint. Platform JWT verification is required,
+# and the function body also validates the user token before using service-role RPCs.
+[functions.create-organization-with-owner]
+verify_jwt = true
+
+# Browser-facing enqueue endpoint. The live runtime currently uses verify_jwt=false
+# but the function body validates the user bearer JWT and organization role itself.
+[functions.enqueue-run]
+verify_jwt = false
+
+# Internal worker endpoint. It authenticates with x-internal-secret instead of a user JWT.
+[functions.process-measurement-job]
+verify_jwt = false
+
+# Internal/controlled reparse endpoint. The body validates the supplied user JWT and org role.
+[functions.reparse-measurements]
+verify_jwt = false
+
+# Internal postprocess-only Edge Function. It authenticates with
+# x-visibility-postprocess-token instead of a user JWT.
+[functions.visibility-postprocess]
+verify_jwt = false
+
+# Internal citation synchronization endpoint. It authenticates with
+# x-visibility-postprocess-token instead of a user JWT.
+[functions.visibility-citation-sync]
+verify_jwt = false
+
 # Internal postprocess-only Edge Function. It authenticates with
 # x-visibility-postprocess-token instead of a user JWT.
 [functions.visibility-citation-attribution]
 verify_jwt = false
+
+# Internal Entity Facts v2 materialization worker. It authenticates with
+# x-visibility-postprocess-token and performs no paid provider call.
+[functions.entity-facts-v2-materialize-run]
+verify_jwt = false
+
+# Browser-facing benchmark endpoint. Platform JWT is required and the body also
+# validates the user and organization membership before service-role reads.
+[functions.visibility-benchmark]
+verify_jwt = true

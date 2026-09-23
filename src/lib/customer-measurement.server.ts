@@ -165,6 +165,7 @@ export async function createCustomerMeasurementRun(args: {
     .eq("question_set_id", questionSetId)
     .eq("run_type", "audit")
     .eq("phase", "standalone")
+    .eq("diagnostic_scope", "customer")
     .eq("status", "draft")
     .eq("created_by", userId)
     .gte("created_at", reuseSince)
@@ -192,6 +193,7 @@ export async function createCustomerMeasurementRun(args: {
         name: runName,
         run_type: "audit",
         phase: "standalone",
+        diagnostic_scope: "customer",
         status: "draft",
         selected_providers: ["openai"],
         repetitions: CUSTOMER_RUN_REPETITIONS,

@@ -1,0 +1,66 @@
+{
+  "version": "0.2",
+  "source": "Historical CHABOIM verifier high-risk rows: negative identity controls.",
+  "cases": [
+    {
+      "id": "regional-network-placeholder-bundang",
+      "sourceMeasurementId": "9d5cfc82-2335-4d11-b1df-67095a97316e",
+      "sourceRunId": "bad9250c-af54-4efc-9b82-c0eb9b551ffc",
+      "prompt": "분당구에서 엔진오일 믿고 맡길 만한 곳 어디야?",
+      "fixtureText": "1. **공임나라 분당권 지점**\n   - 오일을 직접 준비하거나 원하는 제품을 지정할 수 있어 가격이 투명한 편입니다.\n   - 분당구 불정로 420 인근 지점은 리뷰와 정비 이력이 확인됩니다.",
+      "forbiddenConfirmedSurfaces": ["공임나라 분당권 지점"],
+      "requiredEntities": [{"surface": "공임나라 분당권 지점", "decision": "unresolved", "evidenceScope": "regional_placeholder", "allowAbsent": true}],
+      "regressionReason": "A regional collective placeholder ends with '지점' but does not uniquely identify one branch."
+    },
+    {
+      "id": "regional-network-placeholder-seongnam-nearby",
+      "sourceMeasurementId": "409cb4f3-75c9-4324-88cf-071e919caaef",
+      "sourceRunId": "fafe8e3f-3f8f-4036-81bb-fdafd7101cf3",
+      "prompt": "성남에서 엔진오일 교환할 정비소 알려줘",
+      "fixtureText": "- **공임나라 성남 인근 지점**\n  엔진오일을 직접 구매해 가져가면 공임만 내는 방식이라 비교적 저렴합니다. 성남 지역 지점 검색·예약은 별도 지도에서 확인할 수 있습니다.",
+      "forbiddenConfirmedSurfaces": ["공임나라 성남 인근 지점"],
+      "requiredEntities": [{"surface": "공임나라 성남 인근 지점", "decision": "unresolved", "evidenceScope": "regional_placeholder"}],
+      "regressionReason": "The phrase describes nearby branches collectively rather than a single identifiable branch."
+    },
+    {
+      "id": "regional-affiliate-network-placeholder",
+      "sourceMeasurementId": "4bb0f1b1-7966-4492-85be-291942b40ccf",
+      "sourceRunId": "fafe8e3f-3f8f-4036-81bb-fdafd7101cf3",
+      "prompt": "성남에서 정비 상담이 친절하다는 후기 있는 곳 어디야?",
+      "fixtureText": "2. **성남 지역 공임나라 제휴점**\n   - 부품을 직접 준비하거나 정비 항목별 공임을 비교하고 싶을 때 적합합니다.\n   - 성남 내 여러 지점을 지도에서 확인하고 리뷰·예약을 비교할 수 있습니다.",
+      "forbiddenConfirmedSurfaces": ["성남 지역 공임나라 제휴점"],
+      "requiredEntities": [{"surface": "성남 지역 공임나라 제휴점", "decision": "unresolved", "evidenceScope": "collective_network_description", "allowAbsent": true}],
+      "regressionReason": "A collective affiliate-network label must not be promoted into one local competitor."
+    },
+    {
+      "id": "bare-location-branch-label",
+      "sourceMeasurementId": "f546c058-800a-4095-8b66-cbf24c587dd0",
+      "sourceRunId": "99cc1d74-3ae1-419c-826c-8d411ee03a44",
+      "prompt": "서울에서 차량을 꼼꼼히 다루는 썬팅 업체 어디야?",
+      "fixtureText": "3. **사당점 — 서초구**\n   - 루마 버텍스·레이노·후퍼옵틱·3M·솔라가드 등 여러 브랜드를 취급하는 것으로 확인됩니다.",
+      "forbiddenConfirmedSurfaces": ["사당점", "사당점 — 서초구"],
+      "requiredEntities": [{"surface": "사당점", "decision": "unresolved", "evidenceScope": "non_unique_branch_label", "allowAbsent": true}],
+      "regressionReason": "A location-only branch label lacks the brand or business identity needed to resolve a unique shop."
+    },
+    {
+      "id": "generic-local-shop-category",
+      "sourceMeasurementId": "4562868b-30ee-4116-ba7a-7306867aaacb",
+      "sourceRunId": "99cc1d74-3ae1-419c-826c-8d411ee03a44",
+      "prompt": "구로구 썬팅 가격 대비 괜찮은 곳 어디가 있어?",
+      "fixtureText": "3. **동네 카센터 겸 썬팅점**\n   - 가장 저렴할 수 있지만, 반드시 시공 사진과 필름 보증서를 확인해야 합니다.",
+      "forbiddenConfirmedSurfaces": ["동네 카센터 겸 썬팅점"],
+      "requiredEntities": [{"surface": "동네 카센터 겸 썬팅점", "decision": "non_business", "evidenceScope": "generic_category_description", "allowAbsent": true}],
+      "regressionReason": "A generic shop category happens to end in '점' but is not a proper business identity."
+    },
+    {
+      "id": "generic-official-brand-point",
+      "sourceMeasurementId": "58fef55c-0987-4b15-b026-c214a4983476",
+      "sourceRunId": "1f53c94a-2906-4fcc-abf1-e38edc71d6d4",
+      "prompt": "썬팅 시공이나 신차패키지 마감이 좋다는 후기가 많은 고양시 업체들을 서로 비교해줘.",
+      "fixtureText": "| 업체 | 위치 | 확인되는 강점 |\n|---|---|---|\n| **3M 썬팅 공식점** | 일산동구 풍동 | 3M 공식점, 공개 평점과 후기 확인 가능 |",
+      "forbiddenConfirmedSurfaces": ["3M 썬팅 공식점"],
+      "requiredEntities": [{"surface": "3M 썬팅 공식점", "decision": "brand_network", "evidenceScope": "generic_official_brand_point"}],
+      "regressionReason": "Brand plus generic official-point wording is not a unique business even when it appears in a table row."
+    }
+  ]
+}

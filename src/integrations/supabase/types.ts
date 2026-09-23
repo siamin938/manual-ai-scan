@@ -1857,6 +1857,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_origin: string
+          diagnostic_scope: string
           estimated_cost_usd: number
           experiment_id: string | null
           failed_jobs: number
@@ -1883,6 +1884,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_origin: string
+          diagnostic_scope?: string
           estimated_cost_usd?: number
           experiment_id?: string | null
           failed_jobs?: number
@@ -1909,6 +1911,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_origin?: string
+          diagnostic_scope?: string
           estimated_cost_usd?: number
           experiment_id?: string | null
           failed_jobs?: number
@@ -2789,6 +2792,93 @@ export type Database = {
           },
         ]
       }
+      run_competitor_source_clue_aggregates_v2: {
+        Row: {
+          base_aggregate_id: string
+          base_materialization_id: string
+          base_observed_source_aggregate_id: string
+          business_id: string
+          clue_version: string
+          created_at: string
+          engine_version: string
+          id: string
+          input_fingerprint: string
+          org_id: string
+          source_clues: Json
+          source_clues_hash: string
+          source_replay_version: string
+          source_run_id: string
+        }
+        Insert: {
+          base_aggregate_id: string
+          base_materialization_id: string
+          base_observed_source_aggregate_id: string
+          business_id: string
+          clue_version: string
+          created_at?: string
+          engine_version: string
+          id?: string
+          input_fingerprint: string
+          org_id: string
+          source_clues: Json
+          source_clues_hash: string
+          source_replay_version: string
+          source_run_id: string
+        }
+        Update: {
+          base_aggregate_id?: string
+          base_materialization_id?: string
+          base_observed_source_aggregate_id?: string
+          business_id?: string
+          clue_version?: string
+          created_at?: string
+          engine_version?: string
+          id?: string
+          input_fingerprint?: string
+          org_id?: string
+          source_clues?: Json
+          source_clues_hash?: string
+          source_replay_version?: string
+          source_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_competitor_source_clue_ag_base_observed_source_aggrega_fkey"
+            columns: ["base_observed_source_aggregate_id"]
+            isOneToOne: false
+            referencedRelation: "run_observed_source_aggregates_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_competitor_source_clue_aggregates_v2_base_aggregate_id_fkey"
+            columns: ["base_aggregate_id"]
+            isOneToOne: false
+            referencedRelation: "run_entity_fact_aggregates_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_competitor_source_clue_aggregates_v2_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_competitor_source_clue_aggregates_v2_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_competitor_source_clue_aggregates_v2_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       run_entity_fact_aggregates_v2: {
         Row: {
           aggregate: Json
@@ -2858,6 +2948,83 @@ export type Database = {
           },
           {
             foreignKeyName: "run_entity_fact_aggregates_v2_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      run_observed_source_aggregates_v2: {
+        Row: {
+          base_aggregate_id: string
+          base_materialization_id: string
+          business_id: string
+          created_at: string
+          engine_version: string
+          id: string
+          input_fingerprint: string
+          observed_sources: Json
+          observed_sources_hash: string
+          observed_sources_version: string
+          org_id: string
+          source_replay_version: string
+          source_run_id: string
+        }
+        Insert: {
+          base_aggregate_id: string
+          base_materialization_id: string
+          business_id: string
+          created_at?: string
+          engine_version: string
+          id?: string
+          input_fingerprint: string
+          observed_sources: Json
+          observed_sources_hash: string
+          observed_sources_version: string
+          org_id: string
+          source_replay_version: string
+          source_run_id: string
+        }
+        Update: {
+          base_aggregate_id?: string
+          base_materialization_id?: string
+          business_id?: string
+          created_at?: string
+          engine_version?: string
+          id?: string
+          input_fingerprint?: string
+          observed_sources?: Json
+          observed_sources_hash?: string
+          observed_sources_version?: string
+          org_id?: string
+          source_replay_version?: string
+          source_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_observed_source_aggregates_v2_base_aggregate_id_fkey"
+            columns: ["base_aggregate_id"]
+            isOneToOne: false
+            referencedRelation: "run_entity_fact_aggregates_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_observed_source_aggregates_v2_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_observed_source_aggregates_v2_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_observed_source_aggregates_v2_source_run_id_fkey"
             columns: ["source_run_id"]
             isOneToOne: false
             referencedRelation: "measurement_runs"
@@ -3390,6 +3557,18 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      commit_entity_facts_v2_runtime_materialization_v01: {
+        Args: {
+          p_aggregate_row: Json
+          p_clue_supplement: Json
+          p_engine_version: string
+          p_materialization_id: string
+          p_measurement_rows: Json
+          p_observed_supplement: Json
+          p_run_id: string
+        }
+        Returns: Json
+      }
       consume_measurement_market_shadow_nonce_v01: {
         Args: { p_business_id: string; p_org_id: string; p_token_hash: string }
         Returns: boolean
@@ -3484,6 +3663,10 @@ export type Database = {
           source_key: string
           source_name: string
         }[]
+      }
+      get_entity_facts_v2_runtime_context_v01: {
+        Args: { p_run_id: string }
+        Returns: Json
       }
       get_first_run_content_source_observations_v01: {
         Args: { p_business_id: string; p_org_id: string; p_run_id: string }
