@@ -14,7 +14,7 @@ const executableSql = sql
 
 const officialMigrationPath = resolve(
   process.cwd(),
-  "supabase/migrations/20260921083635_run_observed_source_aggregates_v2.sql",
+  "supabase/migrations/20260921084448_run_observed_source_aggregates_v2.sql",
 );
 const officialSql = readFileSync(officialMigrationPath, "utf8");
 const officialExecutableSql = officialSql
@@ -31,9 +31,8 @@ describe("Observed source aggregate storage candidate contract", () => {
     expect(sql).toContain("do not apply directly to Production");
   });
 
-  it("has a Supabase-CLI-generated official migration that is still unapplied", () => {
+  it("matches the Production-applied official migration executable SQL", () => {
     expect(officialSql).toContain("Generated with Supabase CLI");
-    expect(officialSql).toContain("NOT APPLIED TO PRODUCTION");
     expect(officialSql).not.toContain("CANDIDATE ONLY");
     expect(officialExecutableSql).toBe(executableSql);
   });
