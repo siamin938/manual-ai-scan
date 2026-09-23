@@ -146,19 +146,31 @@ describe("Entity Facts v2 priority View Model", () => {
     expect(sourceGap.whyText).not.toContain("함께 관찰된 업체,");
 
     const identity = vm.items[1];
-    expect(identity.evidenceText).toBe("6개 검색 상황 · 추가 확인 6건");
+    expect(identity.evidenceText).toBe("6개 검색 상황 · 업체 확인 필요 6건");
     expect(identity.intentTypes).toHaveLength(6);
     // 상위 최대 3개 라벨만 예시로 보여주고 나머지는 "등 여러 검색 상황"으로 묶는다.
     expect(identity.whyText).toBe(
-      "가격·가성비, 비교, 지역·접근성 등 여러 검색 상황에서 내 업체와 동일한지 추가 확인이 필요한 응답이 있습니다.",
+      "가격·가성비, 비교, 지역·접근성 등 여러 검색 상황에서 내 업체일 가능성은 있었지만, 같은 업체라고 확정할 근거가 부족한 응답이 있습니다.",
+    );
+    expect(identity.title).toBe(
+      "AI가 내 업체인지 확신하지 못한 답변을 확인해보세요",
+    );
+    expect(identity.actionText).toBe(
+      "홈페이지·네이버 플레이스·업체 프로필에서 업체명·지점명·대표 서비스명이 같은 방식으로 표시되는지 확인해보세요.",
     );
 
     const coverage = vm.items[2];
     expect(coverage.intentTypes.sort()).toEqual(["service", "trust"]);
     expect(coverage.whyText).toBe(
-      "서비스·작업, 전문성·신뢰 질문에서는 이번 측정에서 내 업체의 확정 노출이 확인되지 않았습니다.",
+      "서비스·작업, 전문성·신뢰 질문에서는 이번 측정에서는 내 업체가 한 번도 확정 노출되지 않았습니다.",
     );
-    expect(coverage.evidenceText).toBe("2개 검색 상황 · 총 6개 질문에서 확정 노출 없음");
+    expect(coverage.title).toBe(
+      "아직 한 번도 노출되지 않은 검색 주제를 확인해보세요",
+    );
+    expect(coverage.actionText).toBe(
+      "이 검색 주제에서 고객이 찾는 서비스·전문성 정보가 홈페이지나 업체 프로필에 실제로 적혀 있는지 확인해보세요.",
+    );
+    expect(coverage.evidenceText).toBe("2개 검색 상황 · 6개 질문 모두 노출 미확인");
   });
 
   it("does not treat a confirmed source with target connection as a source gap", () => {
