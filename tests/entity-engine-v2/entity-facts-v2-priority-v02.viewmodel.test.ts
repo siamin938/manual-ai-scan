@@ -335,13 +335,21 @@ describe("Entity Facts v2 Priority v0.2", () => {
     ).toBeUndefined();
   });
 
-  it("keeps v0.2 isolated from the live dashboard until dry-run approval", () => {
+  it("wires v0.2 into the preview dashboard without changing the data path", () => {
     const dashboard = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
       "utf8",
     );
-    expect(dashboard).not.toContain("entity-facts-v2-priority-v02");
-    expect(dashboard).not.toContain("buildEntityFactsV2PriorityV02ViewModel");
+    expect(dashboard).toContain("entity-facts-v2-priority-v02");
+    expect(dashboard).toContain("buildEntityFactsV2PriorityV02ViewModel");
+    expect(dashboard).toContain(
+      "const priorityModel = dto ? buildEntityFactsV2PriorityV02ViewModel(dto) : null;",
+    );
+    expect(dashboard).toContain("대표 질문");
+    expect(dashboard).toContain("다음에 확인할 내용");
+    expect(dashboard).toContain("priorityKindLabel");
+    expect(dashboard).not.toContain("getVisibilityDiagnostic");
+    expect(dashboard).not.toContain("ActionRecommendationsSection");
   });
 
   it("does not introduce legacy scoring or recommendation dependencies", () => {
