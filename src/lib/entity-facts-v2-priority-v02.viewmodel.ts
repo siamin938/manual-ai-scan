@@ -2,7 +2,7 @@
  * Entity Facts v2 Priority v0.2 — evidence-first customer guidance.
  *
  * This is a pure presentation ViewModel over EntityFactsV2ReadGatewayDTO.
- * It does not score, mutate, or reinterpret Entity Facts truth.
+ * It does not apply weighting, mutate, or reinterpret Entity Facts truth.
  */
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import type {
