@@ -4,20 +4,20 @@ import { describe, expect, it } from "vitest";
 
 const migrationPath = resolve(
   process.cwd(),
-  "supabase/migrations/20260919144500_entity_facts_v2_materialization.sql",
+  "supabase/migrations/20260919143831_entity_facts_v2_materialization.sql",
 );
 const sql = readFileSync(migrationPath, "utf8");
 const servicePrivilegeCorrection = readFileSync(
   resolve(
     process.cwd(),
-    "supabase/migrations/20260919145500_entity_facts_v2_restrict_service_mutation.sql",
+    "supabase/migrations/20260919143907_entity_facts_v2_restrict_service_mutation.sql",
   ),
   "utf8",
 );
 const serviceTruncateCorrection = readFileSync(
   resolve(
     process.cwd(),
-    "supabase/migrations/20260920154500_entity_facts_v2_revoke_service_truncate.sql",
+    "supabase/migrations/20260919155240_entity_facts_v2_revoke_service_truncate.sql",
   ),
   "utf8",
 );
