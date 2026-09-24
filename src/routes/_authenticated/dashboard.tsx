@@ -187,6 +187,7 @@ function SearchContextChart({
     label: intentLabel(group.intentType),
     confirmed: group.confirmedMentionCount,
     unresolved: group.unresolvedTargetCount,
+    validCount: group.validCount,
     missing: Math.max(
       0,
       group.validCount - group.confirmedMentionCount - group.unresolvedTargetCount,
@@ -264,6 +265,16 @@ function SearchContextChart({
           <span className="mr-1.5 inline-block size-2.5 bg-muted" />
           노출 미확인
         </span>
+      </div>
+      <div
+        className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+        aria-hidden="true"
+      >
+        {data.map((item) => (
+          <span key={item.label}>
+            · {item.label} 질문 {item.validCount}개 기준
+          </span>
+        ))}
       </div>
       <div className="sr-only">
         {data.map((item) => (
@@ -804,7 +815,7 @@ function DashboardPage() {
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
                 비슷한 검색 질문을 묶어 내 업체가 실제로 확인된 질문과 추가 확인이 필요한 질문을
-                보여드립니다.
+                보여드립니다. 각 검색 상황은 이번 측정의 해당 질문 수를 기준으로 비교합니다.
               </p>
               {model.questionGroups.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
@@ -1202,28 +1213,26 @@ function BenchmarkCard({
             </div>
             <div className="divide-y rounded-md border">
               {chartGroups.map((g) => (
-                <div key={g.key} className="p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{g.label}</p>
+                <div
+                  key={g.key}
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2"
+                >
+                  <p className="text-sm font-medium">{g.label}</p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {g.sites.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {g.sites
+                          .slice(0, 4)
+                          .map((site) => site.label)
+                          .join(" · ")}
+                      </p>
+                    )}
                     <Badge variant={g.targetConnected ? "default" : "secondary"}>
                       {g.targetConnected
                         ? "최근 측정에서 내 업체 직접 연결 확인"
                         : "최근 측정에서 내 업체 직접 연결 미확인"}
                     </Badge>
                   </div>
-                  {g.sites.length > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {g.sites
-                        .slice(0, 4)
-                        .map((site) => site.label)
-                        .join(" · ")}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    고노출 업체 {benchmark.highVisibilityEntityCount}곳 중 {g.highEntityCount}곳에서
-                    관찰
-                    {g.highEntitySharePct !== null ? ` (${g.highEntitySharePct.toFixed(1)}%)` : ""}
-                  </p>
                 </div>
               ))}
             </div>
