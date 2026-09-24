@@ -63,6 +63,106 @@ function pctRange(lower: number | null, upper: number | null): string {
     : `${format(lower)} ~ ${format(upper)}`;
 }
 
+function percentOf(part: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.max(0, Math.min(100, (100 * part) / total));
+}
+
+function MeasurementStatusBar({
+  confirmed,
+  unresolved,
+  total,
+}: {
+  confirmed: number;
+  unresolved: number;
+  total: number;
+}) {
+  const missing = Math.max(0, total - confirmed - unresolved);
+  const confirmedPct = percentOf(confirmed, total);
+  const unresolvedPct = percentOf(unresolved, total);
+  const missingPct = percentOf(missing, total);
+
+  return (
+    <div className="rounded-lg border bg-muted/15 p-4 lg:col-span-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold">이번 측정 한눈에 보기</p>
+        <p className="text-xs text-muted-foreground">유효 AI 답변 {total}건</p>
+      </div>
+      <div
+        className="mt-3 flex h-3 overflow-hidden rounded-full bg-muted"
+        aria-label={`확정 노출 ${confirmed}건, 추가 확인 ${unresolved}건, 노출 미확인 ${missing}건`}
+      >
+        {confirmedPct > 0 && (
+          <div className="h-full bg-primary" style={{ width: `${confirmedPct}%` }} />
+        )}
+        {unresolvedPct > 0 && (
+          <div
+            className="h-full bg-muted-foreground/55"
+            style={{ width: `${unresolvedPct}%` }}
+          />
+        )}
+        {missingPct > 0 && (
+          <div className="h-full bg-muted" style={{ width: `${missingPct}%` }} />
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+        <span>
+          <span className="font-semibold text-primary">확정 노출 {confirmed}건</span>
+          {" · "}
+          {confirmedPct.toFixed(1)}%
+        </span>
+        {unresolved > 0 && (
+          <span className="text-muted-foreground">
+            추가 확인 {unresolved}건 · {unresolvedPct.toFixed(1)}%
+          </span>
+        )}
+        <span className="text-muted-foreground">
+          노출 미확인 {missing}건 · {missingPct.toFixed(1)}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function QuestionGroupBar({ group }: { group: QuestionGroupCounts }) {
+  const missing = Math.max(
+    0,
+    group.validCount - group.confirmedMentionCount - group.unresolvedTargetCount,
+  );
+  const confirmedPct = percentOf(group.confirmedMentionCount, group.validCount);
+  const unresolvedPct = percentOf(group.unresolvedTargetCount, group.validCount);
+
+  return (
+    <div className="min-w-0">
+      <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+        {confirmedPct > 0 && (
+          <div className="h-full bg-primary" style={{ width: `${confirmedPct}%` }} />
+        )}
+        {unresolvedPct > 0 && (
+          <div
+            className="h-full bg-muted-foreground/55"
+            style={{ width: `${unresolvedPct}%` }}
+          />
+        )}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        확정 {group.confirmedMentionCount} · 추가 확인 {group.unresolvedTargetCount} · 미확인 {missing}
+      </p>
+    </div>
+  );
+}
+
+function BenchmarkPercentBar({ value }: { value: number | null }) {
+  const pct = value === null ? 0 : Math.max(0, Math.min(100, value));
+  return (
+    <div className="mt-3">
+      <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function weakQuestionBadgeVariant(
   tone: "positive" | "neutral" | "attention",
 ): "default" | "secondary" | "outline" {
@@ -343,6 +443,11 @@ function DashboardPage() {
               <CardTitle className="text-xl">최근 측정 결과</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 pt-5 text-base leading-7 lg:grid-cols-2 lg:gap-x-10">
+              <MeasurementStatusBar
+                confirmed={model.recentSummary.visibility.confirmedCount}
+                unresolved={model.recentSummary.visibility.unresolvedCount}
+                total={model.recentSummary.visibility.validCount}
+              />
               <p className="font-medium">
                 확정 AI 노출률{" "}
                 {pctRange(
@@ -644,33 +749,29 @@ function DashboardPage() {
                   질문군 요약이 아직 없습니다.
                 </p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>검색 상황</TableHead>
-                      <TableHead>결과</TableHead>
-                      <TableHead>확인 내용</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {model.questionGroups.map((g) => {
-                      const result = questionGroupResult(g);
-                      return (
-                        <TableRow key={g.intentType}>
-                          <TableCell className="text-sm">
-                            {intentLabel(g.intentType)}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <Badge variant={result.variant}>{result.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {questionGroupEvidenceText(g)}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <div className="space-y-2">
+                  {model.questionGroups.map((g) => {
+                    const result = questionGroupResult(g);
+                    return (
+                      <div
+                        key={g.intentType}
+                        className="grid items-center gap-3 rounded-md border p-3 md:grid-cols-[140px_120px_minmax(0,1fr)]"
+                      >
+                        <p className="text-sm font-medium">
+                          {intentLabel(g.intentType)}
+                        </p>
+                        <Badge className="w-fit" variant={result.variant}>
+                          {result.label}
+                        </Badge>
+                        <QuestionGroupBar group={g} />
+                      </div>
+                    );
+                  })}
+                  <p className="pt-1 text-xs text-muted-foreground">
+                    막대는 각 검색 상황의 유효 질문 안에서 확정 노출과 추가 확인이 필요한 비중을
+                    보여줍니다.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1080,6 +1181,7 @@ function BenchmarkCard({
                     ? ` (${g.highEntitySharePct.toFixed(1)}%)`
                     : ""}
                 </p>
+                <BenchmarkPercentBar value={g.highEntitySharePct} />
               </div>
             ))}
           </div>
