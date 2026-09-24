@@ -748,7 +748,8 @@ function ActionOpportunitySection({
                         })}
                       </div>
                       <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                        링크는 벤치마크에서 관찰된 채널 자체를 확인하기 위한 참고용입니다.
+                        링크는 관찰된 출처 채널을 확인하기 위한 참고용입니다. 특정 업체 사례나
+                        등록 페이지를 의미하지 않습니다.
                       </p>
                     </div>
                   )}
