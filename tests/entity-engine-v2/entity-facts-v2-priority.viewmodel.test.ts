@@ -276,24 +276,26 @@ describe("Entity Facts v2 priority View Model", () => {
     }
   });
 
-  it("wires only the v2-native priority ViewModel into the dashboard", () => {
+  it("keeps the legacy priority ViewModel isolated while the dashboard uses Action Opportunity v0.1", () => {
     const dashboardSource = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
       "utf8",
     );
     expect(dashboardSource).toContain(
+      'import { buildActionOpportunityEngineV01 } from "@/lib/action-opportunity-engine-v01";',
+    );
+    expect(dashboardSource).toContain(
+      'import { getVerifiedFirstPartySourceTypes } from "@/lib/first-party-source-registry.functions";',
+    );
+    expect(dashboardSource).toContain(
+      "<ActionOpportunitySection model={actionOpportunityModel} />",
+    );
+    expect(dashboardSource).toContain("왜 확인하나요?");
+    expect(dashboardSource).toContain("해볼 일");
+    expect(dashboardSource).not.toContain(
       'import { buildEntityFactsV2PriorityViewModel } from "@/lib/entity-facts-v2-priority.viewmodel";',
     );
-    expect(dashboardSource).toContain(
-      "const priorityModel = dto ? buildEntityFactsV2PriorityViewModel(dto) : null;",
-    );
-    expect(dashboardSource).toContain(
-      "<PrioritySection model={priorityModel} />",
-    );
-    expect(dashboardSource).toContain("model.heading");
-    expect(dashboardSource).toContain("왜 먼저 보나요?");
-    expect(dashboardSource).toContain("무엇을 확인하면 되나요?");
-    expect(dashboardSource).not.toContain("ActionRecommendationsSection");
+    expect(dashboardSource).not.toContain("<PrioritySection");
     expect(dashboardSource).not.toContain("getActionRecommendations");
     expect(dashboardSource).not.toContain("visibility-actions");
     expect(dashboardSource).not.toContain("was_client_mentioned");
