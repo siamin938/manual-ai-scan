@@ -175,7 +175,7 @@ describe("Action Opportunity Engine v0.1", () => {
     // customer should edit.
     expect(result.items[1].sites).toEqual([]);
     expect(result.items[1].actionText).toContain(
-      "경쟁업체 홈페이지에 등록하라는 의미가 아닙니다",
+      "실제 사례가 표시되면 연결된 페이지 자체를 열어",
     );
 
     // The vague "other" group is intentionally excluded from customer action.
@@ -316,11 +316,11 @@ describe("Action Opportunity Engine v0.1", () => {
       "auto_platform",
     ]);
     expect(result.items[0].signalStrength).toBe("strong");
-    expect(result.items[1].actionText).toContain(
-      "네이버 플레이스는 이미 확인되어 있습니다",
+    expect(result.items[1].title).toBe(
+      "업체 프로필·등록 채널에서 확인되는 차이",
     );
-    expect(result.items[1].actionText).not.toContain(
-      "네이버 플레이스를 새로 등록",
+    expect(result.items[1].actionText).toContain(
+      "실제 타업체 사례가 표시되면 링크를 열어",
     );
   });
 
@@ -416,6 +416,6 @@ describe("Action Opportunity Engine v0.1", () => {
     expect(text).not.toContain("노출이 오른");
     expect(text).not.toContain("상승합니다");
     expect(text).not.toContain("보장합니다");
-    expect(text).toContain("보장하지는 않습니다");
+    expect(text).toContain("원인임을 의미하지 않으며");
   });
 });
