@@ -187,6 +187,7 @@ function SearchContextChart({
     label: intentLabel(group.intentType),
     confirmed: group.confirmedMentionCount,
     unresolved: group.unresolvedTargetCount,
+    validCount: group.validCount,
     missing: Math.max(
       0,
       group.validCount - group.confirmedMentionCount - group.unresolvedTargetCount,
@@ -1202,28 +1203,26 @@ function BenchmarkCard({
             </div>
             <div className="divide-y rounded-md border">
               {chartGroups.map((g) => (
-                <div key={g.key} className="p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{g.label}</p>
+                <div
+                  key={g.key}
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2"
+                >
+                  <p className="text-sm font-medium">{g.label}</p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {g.sites.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {g.sites
+                          .slice(0, 4)
+                          .map((site) => site.label)
+                          .join(" · ")}
+                      </p>
+                    )}
                     <Badge variant={g.targetConnected ? "default" : "secondary"}>
                       {g.targetConnected
                         ? "최근 측정에서 내 업체 직접 연결 확인"
                         : "최근 측정에서 내 업체 직접 연결 미확인"}
                     </Badge>
                   </div>
-                  {g.sites.length > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {g.sites
-                        .slice(0, 4)
-                        .map((site) => site.label)
-                        .join(" · ")}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    고노출 업체 {benchmark.highVisibilityEntityCount}곳 중 {g.highEntityCount}곳에서
-                    관찰
-                    {g.highEntitySharePct !== null ? ` (${g.highEntitySharePct.toFixed(1)}%)` : ""}
-                  </p>
                 </div>
               ))}
             </div>
