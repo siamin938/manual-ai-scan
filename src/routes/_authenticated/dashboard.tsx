@@ -711,8 +711,8 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
-                  이번 측정의 AI 답변에서 내 업체 또는 함께 관찰된 업체와 연결된 출처입니다. 연결이
-                  아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로 표시합니다.
+                  이번 측정의 AI 답변에서 내 업체 또는 함께 관찰된 업체와 연결된 출처입니다.{" "}
+                  {"연결이 아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로 표시합니다."}
                 </p>
                 {!model.sources.available ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
