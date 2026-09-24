@@ -155,7 +155,7 @@ type ChartTooltipPayload = {
   name?: string;
   value?: number | string;
   color?: string;
-  payload?: { label?: string; connected?: boolean };
+  payload?: { label?: string; connected?: boolean; validCount?: number };
 };
 
 function MeasurementTooltip({
@@ -166,8 +166,12 @@ function MeasurementTooltip({
   payload?: ChartTooltipPayload[];
 }) {
   if (!active || !payload?.length) return null;
+  const validCount = payload[0]?.payload?.validCount;
   return (
     <div className="rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
+      {typeof validCount === "number" && (
+        <p className="mb-1 border-b pb-1 text-muted-foreground">총 {validCount}문항</p>
+      )}
       {payload.map((item) => (
         <p key={item.name} className="flex min-w-32 justify-between gap-4">
           <span>{item.name}</span>
@@ -184,7 +188,7 @@ function SearchContextChart({
   groups: Array<QuestionGroupCounts & { intentType: string }>;
 }) {
   const data = groups.map((group) => ({
-    label: `${intentLabel(group.intentType)} · ${group.validCount}문항`,
+    label: intentLabel(group.intentType),
     confirmed: group.confirmedMentionCount,
     unresolved: group.unresolvedTargetCount,
     validCount: group.validCount,
@@ -908,7 +912,10 @@ function ActionOpportunitySection({
                 <div className="mt-4 space-y-3">
                   <div>
                     <p className="text-xs font-medium">왜 확인하나요?</p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.whyText}</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      같은 유형의 출처가 고노출 업체에서 반복 관찰됐지만, 현재 내 업체에서는 같은
+                      연결이 확인되지 않았습니다.
+                    </p>
                   </div>
 
                   {item.sites.some((site) => {
