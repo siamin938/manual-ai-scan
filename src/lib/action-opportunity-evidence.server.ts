@@ -50,10 +50,29 @@ function safeHttpUrl(raw: unknown): string | null {
   }
 }
 
+function normalizeEntitySurface(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z가-힣]/giu, "");
+}
+
 export async function fetchActionOpportunityEvidence(args: {
   orgId: string;
   businessId: string;
 }): Promise<ActionOpportunityEvidenceExample[]> {
+  const { data: business } = await supabaseAdmin
+    .from("businesses")
+    .select("name")
+    .eq("org_id", args.orgId)
+    .eq("id", args.businessId)
+    .eq("is_client_business", true)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (!business?.name) return [];
+  const targetSurface = normalizeEntitySurface(business.name);
+
   const { data: run } = await supabaseAdmin
     .from("measurement_runs")
     .select("id")
@@ -95,6 +114,7 @@ export async function fetchActionOpportunityEvidence(args: {
       const attributionLevel =
         row.attribution_level === "direct" ? "direct" : "section";
       if (!entityName || !domain || !url || sourceGroupKey === "other") return null;
+      if (normalizeEntitySurface(entityName) === targetSurface) return null;
       return { sourceGroupKey, entityName, domain, url, attributionLevel };
     })
     .filter((row): row is ActionOpportunityEvidenceExample => row !== null)
@@ -111,7 +131,7 @@ export async function fetchActionOpportunityEvidence(args: {
 
   for (const row of normalized) {
     if ((perGroup.get(row.sourceGroupKey) ?? 0) >= 2) continue;
-    const key = `${row.sourceGroupKey}\u0000${row.entityName}\u0000${row.url}`;
+    const key = `${row.sourceGroupKey}\u0000${normalizeEntitySurface(row.entityName)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     perGroup.set(row.sourceGroupKey, (perGroup.get(row.sourceGroupKey) ?? 0) + 1);
