@@ -394,6 +394,7 @@ function DashboardPage() {
             <ActionOpportunitySection
               model={actionOpportunityModel}
               evidenceExamples={actionEvidenceExamples}
+              currentRunReferences={currentRunReferences}
             />
           )}
 
@@ -704,6 +705,7 @@ function DashboardPage() {
 function ActionOpportunitySection({
   model,
   evidenceExamples,
+  currentRunReferences,
 }: {
   model: ReturnType<typeof buildActionOpportunityEngineV01>;
   evidenceExamples: Array<{
@@ -712,6 +714,17 @@ function ActionOpportunitySection({
     domain: string;
     url: string;
     attributionLevel: "direct" | "section";
+  }>;
+  currentRunReferences: Array<{
+    sourceGroupKey: string;
+    domain: string;
+    responseCount: number;
+    entityCount: number;
+    entities: Array<{
+      entityName: string;
+      url: string;
+      attributionLevel: "direct" | "section";
+    }>;
   }>;
 }) {
   return (
@@ -756,17 +769,45 @@ function ActionOpportunitySection({
 
                   {item.sites.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium">반복 관찰된 채널</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {item.sites.map((site) => (
-                          <Badge
-                            key={`${site.label}:${site.domain ?? ""}`}
-                            variant="outline"
-                          >
-                            {site.label}
-                          </Badge>
-                        ))}
+                      <p className="text-xs font-medium">
+                        같은 업종 고노출 업체에서 관찰된 채널 예시
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        {item.sites.map((site) => {
+                          const normalizedDomain = site.domain
+                            ?.toLowerCase()
+                            .replace(/^www\./, "");
+                          const currentReference = currentRunReferences.find(
+                            (reference) =>
+                              normalizedDomain &&
+                              reference.domain === normalizedDomain,
+                          );
+                          return (
+                            <div
+                              key={`${site.label}:${site.domain ?? ""}`}
+                              className="flex flex-wrap items-center gap-2"
+                            >
+                              <Badge variant="outline">{site.label}</Badge>
+                              {currentReference?.entities[0] && (
+                                <a
+                                  href={currentReference.entities[0].url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+                                >
+                                  이번 측정 타업체 사례 ·{" "}
+                                  {currentReference.entities[0].entityName} ↗
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
+                      <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                        위 채널은 내 업체에서 확인된 출처가 아니라, 같은 업종 고노출 업체에서
+                        관찰된 채널 예시입니다. 현재 측정에서 타업체와 확정 연결된 동일 채널이
+                        있을 때만 실제 사례 링크를 함께 표시합니다.
+                      </p>
                     </div>
                   )}
 
