@@ -10,7 +10,6 @@ import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-r
 import { getEntityFactsV2Comparison } from "@/lib/entity-facts-v2-comparison.functions";
 import { buildEntityFactsV2ComparisonViewModel } from "@/lib/entity-facts-v2-comparison.viewmodel";
 import { buildActionOpportunityEngineV01 } from "@/lib/action-opportunity-engine-v01";
-import { getActionOpportunityEvidence } from "@/lib/action-opportunity-evidence.functions";
 import { getVerifiedFirstPartySourceTypes } from "@/lib/first-party-source-registry.functions";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import {
@@ -191,26 +190,6 @@ function DashboardPage() {
   const verifiedFirstPartySourceTypes =
     firstPartyResult && firstPartyResult.ok ? firstPartyResult.sourceTypes : [];
 
-  const fetchActionOpportunityEvidence = useServerFn(
-    getActionOpportunityEvidence,
-  );
-  const actionEvidenceQuery = useQuery({
-    queryKey: ["action-opportunity-evidence", activeOrgId, businessId],
-    enabled: !!activeOrgId && !!businessId,
-    queryFn: () =>
-      fetchActionOpportunityEvidence({
-        data: {
-          orgId: activeOrgId as string,
-          businessId: businessId as string,
-        },
-      }),
-  });
-  const actionEvidenceResult = actionEvidenceQuery.data;
-  const actionEvidenceExamples =
-    actionEvidenceResult && actionEvidenceResult.ok
-      ? actionEvidenceResult.examples
-      : [];
-
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
@@ -388,10 +367,7 @@ function DashboardPage() {
           </Card>
 
           {actionOpportunityModel && (
-            <ActionOpportunitySection
-              model={actionOpportunityModel}
-              evidenceExamples={actionEvidenceExamples}
-            />
+            <ActionOpportunitySection model={actionOpportunityModel} />
           )}
 
           {comparisonModel && <ComparisonCard model={comparisonModel} />}
@@ -696,15 +672,8 @@ function DashboardPage() {
 
 function ActionOpportunitySection({
   model,
-  evidenceExamples,
 }: {
   model: ReturnType<typeof buildActionOpportunityEngineV01>;
-  evidenceExamples: Array<{
-    sourceGroupKey: string;
-    entityName: string;
-    domain: string;
-    url: string;
-  }>;
 }) {
   return (
     <Card className="report-section border-t-2 border-t-primary">
@@ -780,44 +749,6 @@ function ActionOpportunitySection({
                       </div>
                       <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
                         링크는 벤치마크에서 관찰된 채널 자체를 확인하기 위한 참고용입니다.
-                      </p>
-                    </div>
-                  )}
-
-                  {evidenceExamples.some(
-                    (example) => example.sourceGroupKey === item.sourceGroupKey,
-                  ) && (
-                    <div>
-                      <p className="text-xs font-medium">
-                        이번 측정에서 확인된 실제 사례
-                      </p>
-                      <div className="mt-2 space-y-1.5">
-                        {evidenceExamples
-                          .filter(
-                            (example) =>
-                              example.sourceGroupKey === item.sourceGroupKey,
-                          )
-                          .slice(0, 2)
-                          .map((example) => (
-                            <a
-                              key={`${example.entityName}:${example.url}`}
-                              href={example.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
-                            >
-                              <span className="font-medium">
-                                {example.entityName}
-                              </span>
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                {example.domain} · 사례 보기 ↗
-                              </span>
-                            </a>
-                          ))}
-                      </div>
-                      <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                        위 사례는 다른 고객의 비공개 벤치마크가 아니라, 현재 선택한 업체의
-                        최근 AI 측정에서 함께 관찰된 업체와 출처 연결입니다.
                       </p>
                     </div>
                   )}
