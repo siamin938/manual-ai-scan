@@ -198,13 +198,21 @@ function DashboardPage() {
             highVisibilityThresholdPct: benchmark?.thresholdPct ?? 20,
           },
         });
-        return response && response.ok ? response.examples : [];
+        return response && response.ok
+          ? {
+              highVisibilityExamples: response.highVisibilityExamples,
+              currentRunReferences: response.currentRunReferences,
+            }
+          : { highVisibilityExamples: [], currentRunReferences: [] };
       } catch {
-        return [];
+        return { highVisibilityExamples: [], currentRunReferences: [] };
       }
     },
   });
-  const actionEvidenceExamples = actionEvidenceQuery.data ?? [];
+  const actionEvidenceExamples =
+    actionEvidenceQuery.data?.highVisibilityExamples ?? [];
+  const currentRunReferences =
+    actionEvidenceQuery.data?.currentRunReferences ?? [];
 
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
@@ -387,6 +395,10 @@ function DashboardPage() {
               model={actionOpportunityModel}
               evidenceExamples={actionEvidenceExamples}
             />
+          )}
+
+          {currentRunReferences.length > 0 && (
+            <CurrentRunReferenceSection references={currentRunReferences} />
           )}
 
           {comparisonModel && <ComparisonCard model={comparisonModel} />}
@@ -814,6 +826,68 @@ function ActionOpportunitySection({
         <p className="rounded-md bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
           {model.disclaimer}
         </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CurrentRunReferenceSection({
+  references,
+}: {
+  references: Array<{
+    sourceGroupKey: string;
+    domain: string;
+    responseCount: number;
+    entityCount: number;
+    entities: Array<{
+      entityName: string;
+      url: string;
+      attributionLevel: "direct" | "section";
+    }>;
+  }>;
+}) {
+  return (
+    <Card className="report-section">
+      <CardHeader className="border-b bg-muted/20">
+        <p className="report-kicker">CURRENT RUN REFERENCES</p>
+        <CardTitle className="text-xl">
+          이번 측정에서 참고할 수 있는 실제 타업체 출처 사례
+        </CardTitle>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          내 업체와의 연결은 확인되지 않았지만, 이번 측정에서 다른 업체와 확정 연결된 출처만
+          보여드립니다. 아래 사례는 현재 측정 참고용이며 고노출 비교 근거와는 별개입니다.
+        </p>
+      </CardHeader>
+      <CardContent className="grid gap-3 pt-5 lg:grid-cols-3">
+        {references.map((reference) => (
+          <div key={reference.domain} className="rounded-lg border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold">{reference.domain}</p>
+              <Badge variant="outline">
+                타업체 {reference.entityCount}곳
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              AI 답변 {reference.responseCount}건에서 확인
+            </p>
+            <div className="mt-3 space-y-2">
+              {reference.entities.map((entity) => (
+                <a
+                  key={`${reference.domain}:${entity.entityName}:${entity.url}`}
+                  href={entity.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+                >
+                  <span className="font-medium">{entity.entityName}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    실제 페이지 보기 ↗
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );
