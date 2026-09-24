@@ -1058,9 +1058,7 @@ function CurrentRunReferenceSection({
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-base font-semibold">{siteDisplayName(reference.domain)}</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {reference.domain}
-                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{reference.domain}</p>
               </div>
               <Badge variant="outline">타업체 {reference.entityCount}곳</Badge>
             </div>
