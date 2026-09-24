@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { fetchEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.server";
 
 export type ActionOpportunityEvidenceExample = {
   sourceGroupKey: string;
@@ -61,17 +62,18 @@ export async function fetchActionOpportunityEvidence(args: {
   orgId: string;
   businessId: string;
 }): Promise<ActionOpportunityEvidenceExample[]> {
-  const { data: business } = await supabaseAdmin
-    .from("businesses")
-    .select("name")
-    .eq("org_id", args.orgId)
-    .eq("id", args.businessId)
-    .eq("is_client_business", true)
-    .eq("active", true)
-    .maybeSingle();
+  const gateway = await fetchEntityFactsV2ReadGateway({
+    orgId: args.orgId,
+    businessId: args.businessId,
+  });
+  if (!gateway.ok) return [];
 
-  if (!business?.name) return [];
-  const targetSurface = normalizeEntitySurface(business.name);
+  const confirmedCompetitorSurfaces = new Set(
+    gateway.data.competitors.map((competitor) =>
+      normalizeEntitySurface(competitor.name),
+    ),
+  );
+  if (confirmedCompetitorSurfaces.size === 0) return [];
 
   const { data: run } = await supabaseAdmin
     .from("measurement_runs")
@@ -114,7 +116,9 @@ export async function fetchActionOpportunityEvidence(args: {
       const attributionLevel =
         row.attribution_level === "direct" ? "direct" : "section";
       if (!entityName || !domain || !url || sourceGroupKey === "other") return null;
-      if (normalizeEntitySurface(entityName) === targetSurface) return null;
+      if (!confirmedCompetitorSurfaces.has(normalizeEntitySurface(entityName))) {
+        return null;
+      }
       return { sourceGroupKey, entityName, domain, url, attributionLevel };
     })
     .filter((row): row is ActionOpportunityEvidenceExample => row !== null)
