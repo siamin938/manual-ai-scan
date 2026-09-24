@@ -62,6 +62,15 @@ function pctRange(lower: number | null, upper: number | null): string {
     : `${format(lower)} ~ ${format(upper)}`;
 }
 
+function benchmarkSiteHref(domain?: string): string | null {
+  if (!domain) return null;
+  const trimmed = domain.trim().toLowerCase();
+  if (!trimmed || !/^[a-z0-9.-]+$/.test(trimmed) || !trimmed.includes(".")) {
+    return null;
+  }
+  return `https://${trimmed}`;
+}
+
 function weakQuestionBadgeVariant(
   tone: "positive" | "neutral" | "attention",
 ): "default" | "secondary" | "outline" {
@@ -708,14 +717,40 @@ function ActionOpportunitySection({
 
                   {item.sites.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium">확인할 채널 예시</p>
+                      <p className="text-xs font-medium">실제 관찰된 채널 예시</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {item.sites.map((site) => (
-                          <Badge key={site.label} variant="outline">
-                            {site.label}
-                          </Badge>
-                        ))}
+                        {item.sites.map((site) => {
+                          const href = benchmarkSiteHref(site.domain);
+                          return href ? (
+                            <a
+                              key={`${site.label}:${site.domain ?? ""}`}
+                              href={href}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex"
+                              aria-label={`${site.label} 채널 열기`}
+                            >
+                              <Badge
+                                variant="outline"
+                                className="cursor-pointer transition-colors hover:bg-muted"
+                              >
+                                {site.label} ↗
+                              </Badge>
+                            </a>
+                          ) : (
+                            <Badge
+                              key={`${site.label}:${site.domain ?? ""}`}
+                              variant="outline"
+                            >
+                              {site.label}
+                            </Badge>
+                          );
+                        })}
                       </div>
+                      <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                        링크는 관찰된 출처 채널을 확인하기 위한 참고용입니다. 특정 업체 사례나
+                        등록 페이지를 의미하지 않습니다.
+                      </p>
                     </div>
                   )}
 
