@@ -10,6 +10,7 @@ import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-r
 import { getEntityFactsV2Comparison } from "@/lib/entity-facts-v2-comparison.functions";
 import { buildEntityFactsV2ComparisonViewModel } from "@/lib/entity-facts-v2-comparison.viewmodel";
 import { buildActionOpportunityEngineV01 } from "@/lib/action-opportunity-engine-v01";
+import { getActionOpportunityEvidence } from "@/lib/action-opportunity-evidence.functions";
 import { getVerifiedFirstPartySourceTypes } from "@/lib/first-party-source-registry.functions";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import {
@@ -190,6 +191,29 @@ function DashboardPage() {
   const verifiedFirstPartySourceTypes =
     firstPartyResult && firstPartyResult.ok ? firstPartyResult.sourceTypes : [];
 
+  const fetchActionOpportunityEvidence = useServerFn(
+    getActionOpportunityEvidence,
+  );
+  const actionEvidenceQuery = useQuery({
+    queryKey: ["action-opportunity-evidence", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    retry: false,
+    queryFn: async () => {
+      try {
+        const response = await fetchActionOpportunityEvidence({
+          data: {
+            orgId: activeOrgId as string,
+            businessId: businessId as string,
+          },
+        });
+        return response && response.ok ? response.examples : [];
+      } catch {
+        return [];
+      }
+    },
+  });
+  const actionEvidenceExamples = actionEvidenceQuery.data ?? [];
+
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
@@ -367,7 +391,10 @@ function DashboardPage() {
           </Card>
 
           {actionOpportunityModel && (
-            <ActionOpportunitySection model={actionOpportunityModel} />
+            <ActionOpportunitySection
+              model={actionOpportunityModel}
+              evidenceExamples={actionEvidenceExamples}
+            />
           )}
 
           {comparisonModel && <ComparisonCard model={comparisonModel} />}
@@ -672,8 +699,16 @@ function DashboardPage() {
 
 function ActionOpportunitySection({
   model,
+  evidenceExamples,
 }: {
   model: ReturnType<typeof buildActionOpportunityEngineV01>;
+  evidenceExamples: Array<{
+    sourceGroupKey: string;
+    entityName: string;
+    domain: string;
+    url: string;
+    attributionLevel: "direct" | "section";
+  }>;
 }) {
   return (
     <Card className="report-section border-t-2 border-t-primary">
@@ -717,39 +752,53 @@ function ActionOpportunitySection({
 
                   {item.sites.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium">실제 관찰된 채널 예시</p>
+                      <p className="text-xs font-medium">반복 관찰된 채널</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {item.sites.map((site) => {
-                          const href = benchmarkSiteHref(site.domain);
-                          return href ? (
+                        {item.sites.map((site) => (
+                          <Badge
+                            key={`${site.label}:${site.domain ?? ""}`}
+                            variant="outline"
+                          >
+                            {site.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {evidenceExamples.some(
+                    (example) => example.sourceGroupKey === item.sourceGroupKey,
+                  ) && (
+                    <div>
+                      <p className="text-xs font-medium">실제 비교해볼 업체 사례</p>
+                      <div className="mt-2 space-y-1.5">
+                        {evidenceExamples
+                          .filter(
+                            (example) =>
+                              example.sourceGroupKey === item.sourceGroupKey,
+                          )
+                          .slice(0, 2)
+                          .map((example) => (
                             <a
-                              key={`${site.label}:${site.domain ?? ""}`}
-                              href={href}
+                              key={`${example.entityName}:${example.url}`}
+                              href={example.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex"
-                              aria-label={`${site.label} 채널 열기`}
+                              className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
                             >
-                              <Badge
-                                variant="outline"
-                                className="cursor-pointer transition-colors hover:bg-muted"
-                              >
-                                {site.label} ↗
-                              </Badge>
+                              <span className="font-medium">
+                                {example.entityName}
+                              </span>
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {example.domain} · 실제 페이지 보기 ↗
+                              </span>
                             </a>
-                          ) : (
-                            <Badge
-                              key={`${site.label}:${site.domain ?? ""}`}
-                              variant="outline"
-                            >
-                              {site.label}
-                            </Badge>
-                          );
-                        })}
+                          ))}
                       </div>
                       <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                        링크는 관찰된 출처 채널을 확인하기 위한 참고용입니다. 특정 업체 사례나
-                        등록 페이지를 의미하지 않습니다.
+                        현재 선택한 업체의 최근 AI 측정에서 함께 관찰된 업체와 실제 출처 연결만
+                        보여줍니다. 직접 비교용 참고 사례이며, 해당 페이지가 노출의 원인임을
+                        의미하지 않습니다.
                       </p>
                     </div>
                   )}
