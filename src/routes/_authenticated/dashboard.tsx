@@ -2,6 +2,16 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
@@ -81,6 +91,7 @@ function MeasurementStatusBar({
   const confirmedPct = percentOf(confirmed, total);
   const unresolvedPct = percentOf(unresolved, total);
   const missingPct = percentOf(missing, total);
+  const chartData = [{ name: "최근 측정", confirmed, unresolved, missing }];
 
   return (
     <div className="rounded-lg border bg-muted/15 p-4 lg:col-span-2">
@@ -89,21 +100,20 @@ function MeasurementStatusBar({
         <p className="text-xs text-muted-foreground">유효 AI 답변 {total}건</p>
       </div>
       <div
-        className="mt-3 flex h-3 overflow-hidden rounded-full bg-muted"
+        className="mt-3 h-16 w-full"
+        role="img"
         aria-label={`확정 노출 ${confirmed}건, 추가 확인 ${unresolved}건, 노출 미확인 ${missing}건`}
       >
-        {confirmedPct > 0 && (
-          <div className="h-full bg-primary" style={{ width: `${confirmedPct}%` }} />
-        )}
-        {unresolvedPct > 0 && (
-          <div
-            className="h-full bg-muted-foreground/55"
-            style={{ width: `${unresolvedPct}%` }}
-          />
-        )}
-        {missingPct > 0 && (
-          <div className="h-full bg-muted" style={{ width: `${missingPct}%` }} />
-        )}
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 0, bottom: 8, left: 0 }}>
+            <XAxis type="number" domain={[0, Math.max(total, 1)]} hide />
+            <YAxis type="category" dataKey="name" hide />
+            <Tooltip content={<MeasurementTooltip />} cursor={{ fill: "var(--color-muted)" }} />
+            <Bar dataKey="confirmed" name="확정 노출" stackId="measurement" fill="var(--color-chart-1)" isAnimationActive={false} />
+            <Bar dataKey="unresolved" name="추가 확인" stackId="measurement" fill="var(--color-chart-2)" isAnimationActive={false} />
+            <Bar dataKey="missing" name="노출 미확인" stackId="measurement" fill="var(--color-muted)" isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
         <span>
@@ -124,40 +134,70 @@ function MeasurementStatusBar({
   );
 }
 
-function QuestionGroupBar({ group }: { group: QuestionGroupCounts }) {
-  const missing = Math.max(
-    0,
-    group.validCount - group.confirmedMentionCount - group.unresolvedTargetCount,
-  );
-  const confirmedPct = percentOf(group.confirmedMentionCount, group.validCount);
-  const unresolvedPct = percentOf(group.unresolvedTargetCount, group.validCount);
+type ChartTooltipPayload = {
+  name?: string;
+  value?: number | string;
+  color?: string;
+  payload?: { label?: string; connected?: boolean };
+};
 
+function MeasurementTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: ChartTooltipPayload[];
+}) {
+  if (!active || !payload?.length) return null;
   return (
-    <div className="min-w-0">
-      <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
-        {confirmedPct > 0 && (
-          <div className="h-full bg-primary" style={{ width: `${confirmedPct}%` }} />
-        )}
-        {unresolvedPct > 0 && (
-          <div
-            className="h-full bg-muted-foreground/55"
-            style={{ width: `${unresolvedPct}%` }}
-          />
-        )}
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        확정 {group.confirmedMentionCount} · 추가 확인 {group.unresolvedTargetCount} · 미확인 {missing}
-      </p>
+    <div className="rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
+      {payload.map((item) => (
+        <p key={item.name} className="flex min-w-32 justify-between gap-4">
+          <span>{item.name}</span>
+          <span className="font-semibold tabular-nums">{item.value}건</span>
+        </p>
+      ))}
     </div>
   );
 }
 
-function BenchmarkPercentBar({ value }: { value: number | null }) {
-  const pct = value === null ? 0 : Math.max(0, Math.min(100, value));
+function SearchContextChart({ groups }: { groups: Array<QuestionGroupCounts & { intentType: string }> }) {
+  const data = groups.map((group) => ({
+    label: intentLabel(group.intentType),
+    confirmed: group.confirmedMentionCount,
+    unresolved: group.unresolvedTargetCount,
+    missing: Math.max(0, group.validCount - group.confirmedMentionCount - group.unresolvedTargetCount),
+  }));
+  const maximum = Math.max(1, ...groups.map((group) => group.validCount));
+
   return (
-    <div className="mt-3">
-      <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-        <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+    <div>
+      <div
+        className="h-[26rem] w-full sm:h-[24rem]"
+        role="img"
+        aria-label="검색 상황별 확정 노출, 추가 확인, 노출 미확인 건수 비교"
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} layout="vertical" margin={{ top: 8, right: 12, bottom: 8, left: 8 }} barCategoryGap="28%">
+            <CartesianGrid horizontal={false} stroke="var(--color-border)" />
+            <XAxis type="number" domain={[0, maximum]} allowDecimals={false} tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} />
+            <YAxis type="category" dataKey="label" width={86} tick={{ fill: "var(--color-foreground)", fontSize: 12 }} axisLine={false} tickLine={false} />
+            <Tooltip content={<MeasurementTooltip />} cursor={{ fill: "var(--color-muted)" }} />
+            <Bar dataKey="confirmed" name="확정 노출" stackId="context" fill="var(--color-chart-1)" isAnimationActive={false} />
+            <Bar dataKey="unresolved" name="추가 확인" stackId="context" fill="var(--color-chart-2)" isAnimationActive={false} />
+            <Bar dataKey="missing" name="노출 미확인" stackId="context" fill="var(--color-muted)" isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-hidden="true">
+        <span><span className="mr-1.5 inline-block size-2.5 bg-chart-1" />확정 노출</span>
+        <span><span className="mr-1.5 inline-block size-2.5 bg-chart-2" />추가 확인</span>
+        <span><span className="mr-1.5 inline-block size-2.5 bg-muted" />노출 미확인</span>
+      </div>
+      <div className="sr-only">
+        {data.map((item) => (
+          <p key={item.label}>{item.label}: 확정 노출 {item.confirmed}건, 추가 확인 {item.unresolved}건, 노출 미확인 {item.missing}건</p>
+        ))}
       </div>
     </div>
   );
