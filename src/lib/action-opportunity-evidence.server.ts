@@ -61,6 +61,7 @@ function normalizeEntitySurface(value: string): string {
 export async function fetchActionOpportunityEvidence(args: {
   orgId: string;
   businessId: string;
+  highVisibilityThresholdPct: number;
 }): Promise<ActionOpportunityEvidenceExample[]> {
   const gateway = await fetchEntityFactsV2ReadGateway({
     orgId: args.orgId,
@@ -68,10 +69,20 @@ export async function fetchActionOpportunityEvidence(args: {
   });
   if (!gateway.ok) return [];
 
+  const validCount = gateway.data.overview.validCount;
+  if (validCount <= 0) return [];
+
+  const thresholdPct = Math.max(
+    0,
+    Math.min(100, args.highVisibilityThresholdPct),
+  );
   const confirmedCompetitorSurfaces = new Set(
-    gateway.data.competitors.map((competitor) =>
-      normalizeEntitySurface(competitor.name),
-    ),
+    gateway.data.competitors
+      .filter(
+        (competitor) =>
+          (100 * competitor.responseCount) / validCount >= thresholdPct,
+      )
+      .map((competitor) => normalizeEntitySurface(competitor.name)),
   );
   if (confirmedCompetitorSurfaces.size === 0) return [];
 
