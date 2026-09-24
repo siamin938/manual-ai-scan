@@ -187,7 +187,7 @@ function DashboardPage() {
   );
   const actionEvidenceQuery = useQuery({
     queryKey: ["action-opportunity-evidence", activeOrgId, businessId],
-    enabled: !!activeOrgId && !!businessId,
+    enabled: !!activeOrgId && !!businessId && !!benchmark,
     retry: false,
     queryFn: async () => {
       try {
@@ -195,6 +195,7 @@ function DashboardPage() {
           data: {
             orgId: activeOrgId as string,
             businessId: businessId as string,
+            highVisibilityThresholdPct: benchmark?.thresholdPct ?? 20,
           },
         });
         return response && response.ok ? response.examples : [];
