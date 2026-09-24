@@ -23,10 +23,7 @@ import { buildActionOpportunityEngineV01 } from "@/lib/action-opportunity-engine
 import { getActionOpportunityEvidence } from "@/lib/action-opportunity-evidence.functions";
 import { getVerifiedFirstPartySourceTypes } from "@/lib/first-party-source-registry.functions";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
-import {
-  BusinessSelector,
-  useClientBusinessSelection,
-} from "@/components/business-selector";
+import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,9 +65,7 @@ function intentLabel(intentType: string): string {
 function pctRange(lower: number | null, upper: number | null): string {
   if (lower === null || upper === null) return "–";
   const format = (value: number) => `${Math.round(value * 100) / 100}%`;
-  return lower === upper
-    ? format(lower)
-    : `${format(lower)} ~ ${format(upper)}`;
+  return lower === upper ? format(lower) : `${format(lower)} ~ ${format(upper)}`;
 }
 
 function percentOf(part: number, total: number): number {
@@ -105,13 +100,35 @@ function MeasurementStatusBar({
         aria-label={`확정 노출 ${confirmed}건, 추가 확인 ${unresolved}건, 노출 미확인 ${missing}건`}
       >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 0, bottom: 8, left: 0 }}>
+          <BarChart
+            data={chartData}
+            layout="vertical"
+            margin={{ top: 8, right: 0, bottom: 8, left: 0 }}
+          >
             <XAxis type="number" domain={[0, Math.max(total, 1)]} hide />
             <YAxis type="category" dataKey="name" hide />
             <Tooltip content={<MeasurementTooltip />} cursor={{ fill: "var(--color-muted)" }} />
-            <Bar dataKey="confirmed" name="확정 노출" stackId="measurement" fill="var(--color-chart-1)" isAnimationActive={false} />
-            <Bar dataKey="unresolved" name="추가 확인" stackId="measurement" fill="var(--color-chart-2)" isAnimationActive={false} />
-            <Bar dataKey="missing" name="노출 미확인" stackId="measurement" fill="var(--color-muted)" isAnimationActive={false} />
+            <Bar
+              dataKey="confirmed"
+              name="확정 노출"
+              stackId="measurement"
+              fill="var(--color-chart-1)"
+              isAnimationActive={false}
+            />
+            <Bar
+              dataKey="unresolved"
+              name="추가 확인"
+              stackId="measurement"
+              fill="var(--color-chart-2)"
+              isAnimationActive={false}
+            />
+            <Bar
+              dataKey="missing"
+              name="노출 미확인"
+              stackId="measurement"
+              fill="var(--color-muted)"
+              isAnimationActive={false}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -161,12 +178,19 @@ function MeasurementTooltip({
   );
 }
 
-function SearchContextChart({ groups }: { groups: Array<QuestionGroupCounts & { intentType: string }> }) {
+function SearchContextChart({
+  groups,
+}: {
+  groups: Array<QuestionGroupCounts & { intentType: string }>;
+}) {
   const data = groups.map((group) => ({
     label: intentLabel(group.intentType),
     confirmed: group.confirmedMentionCount,
     unresolved: group.unresolvedTargetCount,
-    missing: Math.max(0, group.validCount - group.confirmedMentionCount - group.unresolvedTargetCount),
+    missing: Math.max(
+      0,
+      group.validCount - group.confirmedMentionCount - group.unresolvedTargetCount,
+    ),
   }));
   const maximum = Math.max(1, ...groups.map((group) => group.validCount));
 
@@ -178,25 +202,75 @@ function SearchContextChart({ groups }: { groups: Array<QuestionGroupCounts & { 
         aria-label="검색 상황별 확정 노출, 추가 확인, 노출 미확인 건수 비교"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} layout="vertical" margin={{ top: 8, right: 12, bottom: 8, left: 8 }} barCategoryGap="28%">
+          <BarChart
+            data={data}
+            layout="vertical"
+            margin={{ top: 8, right: 12, bottom: 8, left: 8 }}
+            barCategoryGap="28%"
+          >
             <CartesianGrid horizontal={false} stroke="var(--color-border)" />
-            <XAxis type="number" domain={[0, maximum]} allowDecimals={false} tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }} />
-            <YAxis type="category" dataKey="label" width={86} tick={{ fill: "var(--color-foreground)", fontSize: 12 }} axisLine={false} tickLine={false} />
+            <XAxis
+              type="number"
+              domain={[0, maximum]}
+              allowDecimals={false}
+              tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+            />
+            <YAxis
+              type="category"
+              dataKey="label"
+              width={86}
+              tick={{ fill: "var(--color-foreground)", fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
             <Tooltip content={<MeasurementTooltip />} cursor={{ fill: "var(--color-muted)" }} />
-            <Bar dataKey="confirmed" name="확정 노출" stackId="context" fill="var(--color-chart-1)" isAnimationActive={false} />
-            <Bar dataKey="unresolved" name="추가 확인" stackId="context" fill="var(--color-chart-2)" isAnimationActive={false} />
-            <Bar dataKey="missing" name="노출 미확인" stackId="context" fill="var(--color-muted)" isAnimationActive={false} />
+            <Bar
+              dataKey="confirmed"
+              name="확정 노출"
+              stackId="context"
+              fill="var(--color-chart-1)"
+              isAnimationActive={false}
+            />
+            <Bar
+              dataKey="unresolved"
+              name="추가 확인"
+              stackId="context"
+              fill="var(--color-chart-2)"
+              isAnimationActive={false}
+            />
+            <Bar
+              dataKey="missing"
+              name="노출 미확인"
+              stackId="context"
+              fill="var(--color-muted)"
+              isAnimationActive={false}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-hidden="true">
-        <span><span className="mr-1.5 inline-block size-2.5 bg-chart-1" />확정 노출</span>
-        <span><span className="mr-1.5 inline-block size-2.5 bg-chart-2" />추가 확인</span>
-        <span><span className="mr-1.5 inline-block size-2.5 bg-muted" />노출 미확인</span>
+      <div
+        className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground"
+        aria-hidden="true"
+      >
+        <span>
+          <span className="mr-1.5 inline-block size-2.5 bg-chart-1" />
+          확정 노출
+        </span>
+        <span>
+          <span className="mr-1.5 inline-block size-2.5 bg-chart-2" />
+          추가 확인
+        </span>
+        <span>
+          <span className="mr-1.5 inline-block size-2.5 bg-muted" />
+          노출 미확인
+        </span>
       </div>
       <div className="sr-only">
         {data.map((item) => (
-          <p key={item.label}>{item.label}: 확정 노출 {item.confirmed}건, 추가 확인 {item.unresolved}건, 노출 미확인 {item.missing}건</p>
+          <p key={item.label}>
+            {item.label}: 확정 노출 {item.confirmed}건, 추가 확인 {item.unresolved}건, 노출 미확인{" "}
+            {item.missing}건
+          </p>
         ))}
       </div>
     </div>
@@ -221,10 +295,12 @@ function DashboardPage() {
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
   const businessId = businesses.selectedBusinessId;
-  const [expandedCompetitorBusinessId, setExpandedCompetitorBusinessId] =
-    useState<string | null>(null);
-  const [expandedWeakQuestionBusinessId, setExpandedWeakQuestionBusinessId] =
-    useState<string | null>(null);
+  const [expandedCompetitorBusinessId, setExpandedCompetitorBusinessId] = useState<string | null>(
+    null,
+  );
+  const [expandedWeakQuestionBusinessId, setExpandedWeakQuestionBusinessId] = useState<
+    string | null
+  >(null);
   const showAllCompetitors = expandedCompetitorBusinessId === businessId;
   const showAllWeakQuestions = expandedWeakQuestionBusinessId === businessId;
 
@@ -267,12 +343,9 @@ function DashboardPage() {
       }),
   });
   const benchmarkResult = benchmarkQuery.data;
-  const benchmark =
-    benchmarkResult && benchmarkResult.ok ? benchmarkResult.benchmark : null;
+  const benchmark = benchmarkResult && benchmarkResult.ok ? benchmarkResult.benchmark : null;
 
-  const fetchVerifiedFirstPartySourceTypes = useServerFn(
-    getVerifiedFirstPartySourceTypes,
-  );
+  const fetchVerifiedFirstPartySourceTypes = useServerFn(getVerifiedFirstPartySourceTypes);
   const firstPartyQuery = useQuery({
     queryKey: ["verified-first-party-source-types", activeOrgId, businessId],
     enabled: !!activeOrgId && !!businessId,
@@ -288,9 +361,7 @@ function DashboardPage() {
   const verifiedFirstPartySourceTypes =
     firstPartyResult && firstPartyResult.ok ? firstPartyResult.sourceTypes : [];
 
-  const fetchActionOpportunityEvidence = useServerFn(
-    getActionOpportunityEvidence,
-  );
+  const fetchActionOpportunityEvidence = useServerFn(getActionOpportunityEvidence);
   const actionEvidenceQuery = useQuery({
     queryKey: ["action-opportunity-evidence", activeOrgId, businessId],
     enabled: !!activeOrgId && !!businessId && !!benchmark,
@@ -315,10 +386,8 @@ function DashboardPage() {
       }
     },
   });
-  const actionEvidenceExamples =
-    actionEvidenceQuery.data?.highVisibilityExamples ?? [];
-  const currentRunReferences =
-    actionEvidenceQuery.data?.currentRunReferences ?? [];
+  const actionEvidenceExamples = actionEvidenceQuery.data?.highVisibilityExamples ?? [];
+  const currentRunReferences = actionEvidenceQuery.data?.currentRunReferences ?? [];
 
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
@@ -417,10 +486,7 @@ function DashboardPage() {
             />
             <MetricCard
               label="확정 상위 3곳 노출률"
-              value={pctRange(
-                model.metricCards.top3.lowerPct,
-                model.metricCards.top3.lowerPct,
-              )}
+              value={pctRange(model.metricCards.top3.lowerPct, model.metricCards.top3.lowerPct)}
               note={
                 model.metricCards.top3.unresolvedCount > 0
                   ? `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건 · 상위 3곳 여부 추가 확인 ${model.metricCards.top3.unresolvedCount}건`
@@ -435,9 +501,7 @@ function DashboardPage() {
             <MetricCard
               label="관찰된 주요 출처"
               value={
-                model.sources.available
-                  ? `${model.metricCards.observedSourceCount}곳`
-                  : "준비 중"
+                model.sources.available ? `${model.metricCards.observedSourceCount}곳` : "준비 중"
               }
               note="확인된 연결과 연결 단서를 포함한 출처"
             />
@@ -483,13 +547,10 @@ function DashboardPage() {
                   {model.recentSummary.uncertaintyNotice}
                 </p>
               )}
-              <p className="text-muted-foreground">
-                {model.recentSummary.questionSummaryText}
-              </p>
+              <p className="text-muted-foreground">{model.recentSummary.questionSummaryText}</p>
               {model.recentSummary.topCompetitor && (
                 <p>
-                  가장 자주 함께 관찰된 업체:{" "}
-                  {model.recentSummary.topCompetitor.name} ·{" "}
+                  가장 자주 함께 관찰된 업체: {model.recentSummary.topCompetitor.name} ·{" "}
                   {model.recentSummary.topCompetitor.responseCount}개 답변
                 </p>
               )}
@@ -514,8 +575,7 @@ function DashboardPage() {
           )}
 
           {comparisonModel && <ComparisonCard model={comparisonModel} />}
-          {(comparisonQuery.isError ||
-            (comparisonResult && !comparisonResult.ok)) && (
+          {(comparisonQuery.isError || (comparisonResult && !comparisonResult.ok)) && (
             <Card className="report-section">
               <CardContent className="py-5 text-sm text-muted-foreground">
                 이전 측정 비교 정보를 불러오지 못했습니다. 최근 측정 결과에는 영향이 없습니다.
@@ -538,8 +598,8 @@ function DashboardPage() {
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
-                이번 측정의 AI 답변에서 업체로 확인된 항목입니다. 같은 업체가 여러 답변에서
-                보인 횟수를 함께 표시합니다.
+                이번 측정의 AI 답변에서 업체로 확인된 항목입니다. 같은 업체가 여러 답변에서 보인
+                횟수를 함께 표시합니다.
               </p>
               {model.competitors.rows.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
@@ -557,21 +617,22 @@ function DashboardPage() {
                     {model.competitors.rows
                       .slice(0, showAllCompetitors ? model.competitors.rows.length : 6)
                       .map((c) => (
-                      <TableRow key={c.name}>
-                        <TableCell className="text-sm">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium">{c.name}</span>
-                            <Badge variant="outline">{c.label}</Badge>
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <span className="tabular-nums">{c.responseCount}건</span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            질문 {c.questionCount}개 · 상위 3곳 안에서 {c.top3ResponseCount}건 관찰
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                        <TableRow key={c.name}>
+                          <TableCell className="text-sm">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium">{c.name}</span>
+                              <Badge variant="outline">{c.label}</Badge>
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <span className="tabular-nums">{c.responseCount}건</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              질문 {c.questionCount}개 · 상위 3곳 안에서 {c.top3ResponseCount}건
+                              관찰
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               )}
@@ -581,14 +642,10 @@ function DashboardPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() =>
-                      setExpandedCompetitorBusinessId(
-                        showAllCompetitors ? null : businessId,
-                      )
+                      setExpandedCompetitorBusinessId(showAllCompetitors ? null : businessId)
                     }
                   >
-                    {showAllCompetitors
-                      ? "접기"
-                      : `전체 ${model.competitors.rows.length}곳 보기`}
+                    {showAllCompetitors ? "접기" : `전체 ${model.competitors.rows.length}곳 보기`}
                   </Button>
                 </div>
               )}
@@ -602,7 +659,8 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  노출이 확정되지 않았거나, 일부만 확인됐거나, 대상 동일성 확인이 더 필요한 질문입니다.
+                  노출이 확정되지 않았거나, 일부만 확인됐거나, 대상 동일성 확인이 더 필요한
+                  질문입니다.
                 </p>
                 {model.weakQuestions.rows.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
@@ -612,22 +670,22 @@ function DashboardPage() {
                   model.weakQuestions.rows
                     .slice(0, showAllWeakQuestions ? model.weakQuestions.rows.length : 6)
                     .map((q) => (
-                    <div key={q.questionId} className="rounded-md border p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-medium">{q.questionText}</p>
-                        <Badge variant={weakQuestionBadgeVariant(q.statusTone)}>
-                          {q.statusLabel}
-                        </Badge>
+                      <div key={q.questionId} className="rounded-md border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-medium">{q.questionText}</p>
+                          <Badge variant={weakQuestionBadgeVariant(q.statusTone)}>
+                            {q.statusLabel}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {intentLabel(q.intentType)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          확정 노출 {q.confirmedMentionCount}건 · 추가 확인 필요{" "}
+                          {q.unresolvedTargetCount}건
+                        </p>
                       </div>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {intentLabel(q.intentType)}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        확정 노출 {q.confirmedMentionCount}건 · 추가 확인 필요{" "}
-                        {q.unresolvedTargetCount}건
-                      </p>
-                    </div>
-                  ))
+                    ))
                 )}
                 {model.weakQuestions.rows.length > 6 && (
                   <div className="flex justify-center pt-1">
@@ -635,9 +693,7 @@ function DashboardPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() =>
-                        setExpandedWeakQuestionBusinessId(
-                          showAllWeakQuestions ? null : businessId,
-                        )
+                        setExpandedWeakQuestionBusinessId(showAllWeakQuestions ? null : businessId)
                       }
                     >
                       {showAllWeakQuestions
@@ -655,8 +711,8 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
-                  이번 측정의 AI 답변에서 내 업체 또는 함께 관찰된 업체와 연결된 출처입니다.
-                  연결이 아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로 표시합니다.
+                  이번 측정의 AI 답변에서 내 업체 또는 함께 관찰된 업체와 연결된 출처입니다. 연결이
+                  아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로 표시합니다.
                 </p>
                 {!model.sources.available ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
@@ -778,7 +834,6 @@ function DashboardPage() {
                 이전 측정 비교는 같은 질문과 측정 조건이 확인되는 경우에만 제공합니다. 충분한 동일
                 조건 측정이 쌓이기 전까지 시간 추세와 경쟁업체 상세 비교는 표시하지 않습니다.
               </p>
-
             </CardContent>
           </Card>
         </>
@@ -817,45 +872,35 @@ function ActionOpportunitySection({
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">ACTION OPPORTUNITIES</p>
         <CardTitle className="text-xl">{model.heading}</CardTitle>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          {model.description}
-        </p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{model.description}</p>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
         {model.items.length === 0 ? (
           <p className="rounded-md border bg-muted/30 px-4 py-5 text-sm text-muted-foreground">
-            현재 데이터에서는 근거가 충분한 출처 연결 차이를 찾지 못했습니다. 의미가 약한
-            차이는 억지로 보여주지 않습니다.
+            현재 데이터에서는 근거가 충분한 출처 연결 차이를 찾지 못했습니다. 의미가 약한 차이는
+            억지로 보여주지 않습니다.
           </p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-3">
             {model.items.map((item) => (
               <div key={item.sourceGroupKey} className="rounded-lg border p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={item.rank === 1 ? "default" : "outline"}>
-                    {item.rank}순위
-                  </Badge>
+                  <Badge variant={item.rank === 1 ? "default" : "outline"}>{item.rank}순위</Badge>
                   <Badge variant="secondary">
                     {item.signalStrength === "strong" ? "강한 신호" : "보통 신호"}
                   </Badge>
                 </div>
 
-                <p className="mt-3 text-base font-semibold leading-6">
-                  {item.title}
-                </p>
+                <p className="mt-3 text-base font-semibold leading-6">{item.title}</p>
 
                 <div className="mt-4 space-y-3">
                   <div>
                     <p className="text-xs font-medium">왜 확인하나요?</p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      {item.whyText}
-                    </p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.whyText}</p>
                   </div>
 
                   {item.sites.some((site) => {
-                    const normalizedDomain = site.domain
-                      ?.toLowerCase()
-                      .replace(/^www\./, "");
+                    const normalizedDomain = site.domain?.toLowerCase().replace(/^www\./, "");
                     return currentRunReferences.some(
                       (reference) =>
                         normalizedDomain &&
@@ -864,14 +909,10 @@ function ActionOpportunitySection({
                     );
                   }) && (
                     <div>
-                      <p className="text-xs font-medium">
-                        실제로 비교할 수 있는 같은 채널 사례
-                      </p>
+                      <p className="text-xs font-medium">실제로 비교할 수 있는 같은 채널 사례</p>
                       <div className="mt-2 space-y-2">
                         {item.sites.flatMap((site) => {
-                          const normalizedDomain = site.domain
-                            ?.toLowerCase()
-                            .replace(/^www\./, "");
+                          const normalizedDomain = site.domain?.toLowerCase().replace(/^www\./, "");
                           const currentReference = currentRunReferences.find(
                             (reference) =>
                               normalizedDomain &&
@@ -908,10 +949,7 @@ function ActionOpportunitySection({
                       <p className="text-xs font-medium">실제 비교해볼 업체 사례</p>
                       <div className="mt-2 space-y-1.5">
                         {evidenceExamples
-                          .filter(
-                            (example) =>
-                              example.sourceGroupKey === item.sourceGroupKey,
-                          )
+                          .filter((example) => example.sourceGroupKey === item.sourceGroupKey)
                           .slice(0, 2)
                           .map((example) => (
                             <a
@@ -921,9 +959,7 @@ function ActionOpportunitySection({
                               rel="noreferrer"
                               className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
                             >
-                              <span className="font-medium">
-                                {example.entityName}
-                              </span>
+                              <span className="font-medium">{example.entityName}</span>
                               <span className="ml-2 text-xs text-muted-foreground">
                                 {example.domain} · 실제 페이지 보기 ↗
                               </span>
@@ -981,12 +1017,10 @@ function CurrentRunReferenceSection({
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">CURRENT RUN REFERENCES</p>
-        <CardTitle className="text-xl">
-          이번 측정에서 확인된 타업체 출처 사례
-        </CardTitle>
+        <CardTitle className="text-xl">이번 측정에서 확인된 타업체 출처 사례</CardTitle>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          고노출 우선순위 근거와는 별도 참고 정보입니다. 내 업체와의 연결은 확인되지 않았지만,
-          이번 측정에서 다른 업체와 확정 연결된 출처만 보여드립니다.
+          고노출 우선순위 근거와는 별도 참고 정보입니다. 내 업체와의 연결은 확인되지 않았지만, 이번
+          측정에서 다른 업체와 확정 연결된 출처만 보여드립니다.
         </p>
       </CardHeader>
       <CardContent className="grid gap-3 pt-5 lg:grid-cols-3">
@@ -994,9 +1028,7 @@ function CurrentRunReferenceSection({
           <div key={reference.domain} className="rounded-lg border p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-semibold">{reference.domain}</p>
-              <Badge variant="outline">
-                타업체 {reference.entityCount}곳
-              </Badge>
+              <Badge variant="outline">타업체 {reference.entityCount}곳</Badge>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               AI 답변 {reference.responseCount}건에서 확인
@@ -1011,9 +1043,7 @@ function CurrentRunReferenceSection({
                   className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
                 >
                   <span className="font-medium">{entity.entityName}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    실제 페이지 보기 ↗
-                  </span>
+                  <span className="ml-2 text-xs text-muted-foreground">실제 페이지 보기 ↗</span>
                 </a>
               ))}
             </div>
@@ -1049,25 +1079,18 @@ function ComparisonCard({
         <CardTitle className="text-xl">{model.heading}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
-        <p className="text-sm leading-6 text-muted-foreground">
-          {model.description}
-        </p>
-
+        <p className="text-sm leading-6 text-muted-foreground">{model.description}</p>
 
         {model.comparisonAvailable && model.visibility && model.top3 && (
           <div className="grid gap-4 md:grid-cols-2">
             {[model.visibility, model.top3].map((metric) => (
               <div key={metric.label} className="rounded-md border p-4">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {metric.label}
-                </p>
+                <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
                 <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <span className="text-2xl font-semibold tabular-nums">
                     {metric.currentValueText}
                   </span>
-                  {metric.deltaText && (
-                    <Badge variant="outline">{metric.deltaText}</Badge>
-                  )}
+                  {metric.deltaText && <Badge variant="outline">{metric.deltaText}</Badge>}
                 </div>
                 {metric.previousValueText && (
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -1078,26 +1101,21 @@ function ComparisonCard({
                   <p className="mt-3 text-sm">{metric.comparisonSentence}</p>
                 )}
                 {metric.uncertaintyText && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {metric.uncertaintyText}
-                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">{metric.uncertaintyText}</p>
                 )}
                 {metric.maximumNotice && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {metric.maximumNotice}
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{metric.maximumNotice}</p>
                 )}
               </div>
             ))}
           </div>
         )}
 
-        {model.trendAvailable &&
-          model.compatibleMeasurementCount !== null && (
-            <p className="text-xs text-muted-foreground">
-              동일 조건 측정 {model.compatibleMeasurementCount}회가 확인되었습니다.
-            </p>
-          )}
+        {model.trendAvailable && model.compatibleMeasurementCount !== null && (
+          <p className="text-xs text-muted-foreground">
+            동일 조건 측정 {model.compatibleMeasurementCount}회가 확인되었습니다.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -1107,10 +1125,7 @@ function BenchmarkCard({
   benchmark,
 }: {
   benchmark: NonNullable<
-    Extract<
-      Awaited<ReturnType<typeof getVisibilityBenchmark>>,
-      { ok: true }
-    >["benchmark"]
+    Extract<Awaited<ReturnType<typeof getVisibilityBenchmark>>, { ok: true }>["benchmark"]
   >;
 }) {
   const chartGroups = benchmark.sourceGroups.slice(0, 6);
@@ -1137,9 +1152,7 @@ function BenchmarkCard({
           진단과는 독립된 참고 정보입니다.
         </p>
         {benchmark.dataStatus === "early" && (
-          <p className="text-xs text-muted-foreground">
-            현재는 초기 표본으로 참고용 집계입니다.
-          </p>
+          <p className="text-xs text-muted-foreground">현재는 초기 표본으로 참고용 집계입니다.</p>
         )}
         {benchmark.sourceGroups.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">
@@ -1153,51 +1166,79 @@ function BenchmarkCard({
               aria-label="시장 벤치마크 출처 그룹별 고노출 업체 관찰 비율"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 48, bottom: 8, left: 8 }} barCategoryGap="30%">
+                <BarChart
+                  data={chartData}
+                  layout="vertical"
+                  margin={{ top: 8, right: 48, bottom: 8, left: 8 }}
+                  barCategoryGap="30%"
+                >
                   <CartesianGrid horizontal={false} stroke="var(--color-border)" />
                   <XAxis type="number" domain={[0, 100]} hide />
-                  <YAxis type="category" dataKey="label" width={112} tick={{ fill: "var(--color-foreground)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={112}
+                    tick={{ fill: "var(--color-foreground)", fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip content={<BenchmarkTooltip />} cursor={{ fill: "var(--color-muted)" }} />
-                  <Bar dataKey="share" name="관찰 비율" fill="var(--color-chart-1)" radius={[0, 3, 3, 0]} isAnimationActive={false}>
-                    <LabelList dataKey="share" position="right" formatter={(value: number) => `${value.toFixed(1)}%`} className="fill-foreground text-[11px] font-semibold" />
+                  <Bar
+                    dataKey="share"
+                    name="관찰 비율"
+                    fill="var(--color-chart-1)"
+                    radius={[0, 3, 3, 0]}
+                    isAnimationActive={false}
+                  >
+                    <LabelList
+                      dataKey="share"
+                      position="right"
+                      formatter={(value: number) => `${value.toFixed(1)}%`}
+                      className="fill-foreground text-[11px] font-semibold"
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
             <div className="divide-y rounded-md border">
-            {chartGroups.map((g) => (
-              <div key={g.key} className="p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium">{g.label}</p>
-                  <Badge variant={g.targetConnected ? "default" : "secondary"}>
-                    {g.targetConnected
-                      ? "최근 측정에서 내 업체 직접 연결 확인"
-                      : "최근 측정에서 내 업체 직접 연결 미확인"}
-                  </Badge>
-                </div>
-                {g.sites.length > 0 && (
+              {chartGroups.map((g) => (
+                <div key={g.key} className="p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium">{g.label}</p>
+                    <Badge variant={g.targetConnected ? "default" : "secondary"}>
+                      {g.targetConnected
+                        ? "최근 측정에서 내 업체 직접 연결 확인"
+                        : "최근 측정에서 내 업체 직접 연결 미확인"}
+                    </Badge>
+                  </div>
+                  {g.sites.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {g.sites
+                        .slice(0, 4)
+                        .map((site) => site.label)
+                        .join(" · ")}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {g.sites
-                      .slice(0, 4)
-                      .map((site) => site.label)
-                      .join(" · ")}
+                    고노출 업체 {benchmark.highVisibilityEntityCount}곳 중 {g.highEntityCount}곳에서
+                    관찰
+                    {g.highEntitySharePct !== null ? ` (${g.highEntitySharePct.toFixed(1)}%)` : ""}
                   </p>
-                )}
-                <p className="mt-1 text-xs text-muted-foreground">
-                  고노출 업체 {benchmark.highVisibilityEntityCount}곳 중 {g.highEntityCount}곳에서
-                  관찰
-                  {g.highEntitySharePct !== null
-                    ? ` (${g.highEntitySharePct.toFixed(1)}%)`
-                    : ""}
-                </p>
-              </div>
-            ))}
+                </div>
+              ))}
             </div>
             <div className="sr-only">
               {chartGroups.map((group) => (
                 <p key={group.key}>
-                  {group.label}: 고노출 업체 {benchmark.highVisibilityEntityCount}곳 중 {group.highEntityCount}곳에서 관찰
-                  {group.highEntitySharePct !== null ? `, ${group.highEntitySharePct.toFixed(1)}%` : ""}. {group.targetConnected ? "최근 측정에서 내 업체 직접 연결 확인" : "최근 측정에서 내 업체 직접 연결 미확인"}
+                  {group.label}: 고노출 업체 {benchmark.highVisibilityEntityCount}곳 중{" "}
+                  {group.highEntityCount}곳에서 관찰
+                  {group.highEntitySharePct !== null
+                    ? `, ${group.highEntitySharePct.toFixed(1)}%`
+                    : ""}
+                  .{" "}
+                  {group.targetConnected
+                    ? "최근 측정에서 내 업체 직접 연결 확인"
+                    : "최근 측정에서 내 업체 직접 연결 미확인"}
                 </p>
               ))}
             </div>
@@ -1208,7 +1249,8 @@ function BenchmarkCard({
             <p className="text-sm font-medium">같은 업종에서 특히 자주 보인 출처</p>
             <p className="text-xs text-muted-foreground">
               {benchmark.categoryContext.category ?? "동일"} 업종의 비교 가능한 업체{" "}
-              {benchmark.categoryContext.eligibleTargetBusinessCount}곳에서 별도로 관찰된 참고 패턴입니다.
+              {benchmark.categoryContext.eligibleTargetBusinessCount}곳에서 별도로 관찰된 참고
+              패턴입니다.
             </p>
             <div className="space-y-1">
               {benchmark.categoryContext.sourceGroups.slice(0, 3).map((g) => {
@@ -1219,9 +1261,7 @@ function BenchmarkCard({
                 return (
                   <p key={g.key} className="text-xs">
                     <span className="font-medium">{g.label}</span>
-                    {labels && (
-                      <span className="text-muted-foreground"> · {labels}</span>
-                    )}
+                    {labels && <span className="text-muted-foreground"> · {labels}</span>}
                   </p>
                 );
               })}
@@ -1248,7 +1288,9 @@ function BenchmarkTooltip({
       <p className="font-semibold">{item.payload?.label}</p>
       <p className="mt-1 tabular-nums">관찰 비율 {Number(item.value ?? 0).toFixed(1)}%</p>
       <p className="mt-1 text-muted-foreground">
-        {item.payload?.connected ? "최근 측정에서 내 업체 직접 연결 확인" : "최근 측정에서 내 업체 직접 연결 미확인"}
+        {item.payload?.connected
+          ? "최근 측정에서 내 업체 직접 연결 확인"
+          : "최근 측정에서 내 업체 직접 연결 미확인"}
       </p>
     </div>
   );
@@ -1296,9 +1338,7 @@ function MetricCard({
         >
           {value}
         </p>
-        {note && (
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">{note}</p>
-        )}
+        {note && <p className="mt-3 text-sm leading-6 text-muted-foreground">{note}</p>}
       </CardContent>
     </Card>
   );
