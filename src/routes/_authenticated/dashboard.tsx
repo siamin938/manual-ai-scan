@@ -9,7 +9,8 @@ import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.
 import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-read-gateway.dashboard-cutover";
 import { getEntityFactsV2Comparison } from "@/lib/entity-facts-v2-comparison.functions";
 import { buildEntityFactsV2ComparisonViewModel } from "@/lib/entity-facts-v2-comparison.viewmodel";
-import { buildEntityFactsV2PriorityViewModel } from "@/lib/entity-facts-v2-priority.viewmodel";
+import { buildActionOpportunityEngineV01 } from "@/lib/action-opportunity-engine-v01";
+import { getVerifiedFirstPartySourceTypes } from "@/lib/first-party-source-registry.functions";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
 import {
   BusinessSelector,
@@ -162,10 +163,33 @@ function DashboardPage() {
   const benchmark =
     benchmarkResult && benchmarkResult.ok ? benchmarkResult.benchmark : null;
 
+  const fetchVerifiedFirstPartySourceTypes = useServerFn(
+    getVerifiedFirstPartySourceTypes,
+  );
+  const firstPartyQuery = useQuery({
+    queryKey: ["verified-first-party-source-types", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: () =>
+      fetchVerifiedFirstPartySourceTypes({
+        data: {
+          orgId: activeOrgId as string,
+          businessId: businessId as string,
+        },
+      }),
+  });
+  const firstPartyResult = firstPartyQuery.data;
+  const verifiedFirstPartySourceTypes =
+    firstPartyResult && firstPartyResult.ok ? firstPartyResult.sourceTypes : [];
+
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
-  const priorityModel = dto ? buildEntityFactsV2PriorityViewModel(dto) : null;
+  const actionOpportunityModel = benchmark
+    ? buildActionOpportunityEngineV01({
+        benchmark,
+        verifiedFirstPartySourceTypes,
+      })
+    : null;
   const comparisonResult = comparisonQuery.data;
   const comparisonModel =
     comparisonResult && comparisonResult.ok
@@ -333,8 +357,8 @@ function DashboardPage() {
             </CardContent>
           </Card>
 
-          {priorityModel && priorityModel.items.length > 0 && (
-            <PrioritySection model={priorityModel} />
+          {actionOpportunityModel && (
+            <ActionOpportunitySection model={actionOpportunityModel} />
           )}
 
           {comparisonModel && <ComparisonCard model={comparisonModel} />}
@@ -637,59 +661,83 @@ function DashboardPage() {
   );
 }
 
-function PrioritySection({
+function ActionOpportunitySection({
   model,
 }: {
-  model: ReturnType<typeof buildEntityFactsV2PriorityViewModel>;
+  model: ReturnType<typeof buildActionOpportunityEngineV01>;
 }) {
   return (
     <Card className="report-section border-t-2 border-t-primary">
       <CardHeader className="border-b bg-muted/20">
-        <p className="report-kicker">우선 확인</p>
+        <p className="report-kicker">ACTION OPPORTUNITIES</p>
         <CardTitle className="text-xl">{model.heading}</CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
           {model.description}
         </p>
       </CardHeader>
-      <CardContent className="grid gap-4 pt-5 lg:grid-cols-3">
-        {model.items.map((item) => (
-          <div key={item.kind} className="rounded-lg border p-4">
-            <div className="flex items-center gap-2">
-              <Badge variant={item.rank === 1 ? "default" : "outline"}>
-                {item.rank}순위
-              </Badge>
-              {item.sourceDomain && (
-                <span className="truncate text-xs text-muted-foreground">
-                  {item.sourceDomain}
-                </span>
-              )}
-            </div>
+      <CardContent className="space-y-4 pt-5">
+        {model.items.length === 0 ? (
+          <p className="rounded-md border bg-muted/30 px-4 py-5 text-sm text-muted-foreground">
+            현재 데이터에서는 근거가 충분한 추가 점검 채널을 찾지 못했습니다. 의미가 약한
+            후보를 억지로 추천하지 않습니다.
+          </p>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-3">
+            {model.items.map((item) => (
+              <div key={item.sourceGroupKey} className="rounded-lg border p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={item.rank === 1 ? "default" : "outline"}>
+                    {item.rank}순위
+                  </Badge>
+                  <Badge variant="secondary">
+                    {item.signalStrength === "strong" ? "강한 신호" : "보통 신호"}
+                  </Badge>
+                </div>
 
-            <p className="mt-3 text-base font-semibold leading-6">
-              {item.title}
-            </p>
+                <p className="mt-3 text-base font-semibold leading-6">
+                  {item.title}
+                </p>
 
-            <div className="mt-4 space-y-3">
-              <div>
-                <p className="text-xs font-medium">왜 먼저 보나요?</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  {item.whyText}
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <p className="text-xs font-medium">왜 확인하나요?</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {item.whyText}
+                    </p>
+                  </div>
+
+                  {item.sites.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium">확인할 채널 예시</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {item.sites.map((site) => (
+                          <Badge key={site.label} variant="outline">
+                            {site.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-xs font-medium">해볼 일</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {item.actionText}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
+                  근거 · {item.evidenceText}
                 </p>
               </div>
-
-              <div>
-                <p className="text-xs font-medium">무엇을 확인하면 되나요?</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  {item.actionText}
-                </p>
-              </div>
-            </div>
-
-            <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
-              근거 · {item.evidenceText}
-            </p>
+            ))}
           </div>
-        ))}
+        )}
+
+        <p className="rounded-md bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
+          {model.disclaimer}
+        </p>
       </CardContent>
     </Card>
   );
