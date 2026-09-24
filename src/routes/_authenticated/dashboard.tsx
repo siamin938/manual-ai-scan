@@ -739,8 +739,8 @@ function ActionOpportunitySection({
       <CardContent className="space-y-4 pt-5">
         {model.items.length === 0 ? (
           <p className="rounded-md border bg-muted/30 px-4 py-5 text-sm text-muted-foreground">
-            현재 데이터에서는 근거가 충분한 추가 점검 채널을 찾지 못했습니다. 의미가 약한
-            후보를 억지로 추천하지 않습니다.
+            현재 데이터에서는 근거가 충분한 출처 연결 차이를 찾지 못했습니다. 의미가 약한
+            차이는 억지로 보여주지 않습니다.
           </p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-3">
@@ -849,7 +849,7 @@ function ActionOpportunitySection({
                   )}
 
                   <div>
-                    <p className="text-xs font-medium">해볼 일</p>
+                    <p className="text-xs font-medium">확인해볼 차이</p>
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
                       {item.actionText}
                     </p>
