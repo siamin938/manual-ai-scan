@@ -50,7 +50,7 @@ export type ActionOpportunityEngineInput = {
 
 export type ActionOpportunityEngineResult = {
   version: typeof ACTION_OPPORTUNITY_ENGINE_VERSION;
-  heading: "지금 내가 해볼 만한 것";
+  heading: "우선 확인해볼 차이";
   description: string;
   disclaimer: string;
   items: ActionOpportunityItem[];
@@ -135,60 +135,55 @@ function customerCopy(args: {
   const siteExamples = siteText(args.sites);
 
   switch (args.kind) {
-    case "profile_directory": {
-      const naverPlaceKnown = args.verifiedFirstPartySourceTypes.has("naver_place");
+    case "profile_directory":
       return {
-        title: "업체 프로필·디렉터리 채널을 우선 점검해보세요",
-        actionText: naverPlaceKnown
-          ? `네이버 플레이스는 이미 확인되어 있습니다. 기존 프로필의 업체명·주소·대표 서비스·공식 링크를 최신 상태로 맞추고, ${siteExamples || "추가 디렉터리 채널"} 중 아직 활용하지 않는 채널이 있는지 확인해보세요.`
-          : `${siteExamples || "업체 프로필·디렉터리 채널"}에서 내 업체 등록·노출 여부를 확인하고, 등록돼 있다면 업체명·주소·대표 서비스·공식 링크가 최신인지 점검해보세요.`,
+        title: "업체 프로필·등록 채널에서 확인되는 차이",
+        actionText:
+          `같은 업종 고노출 업체에서는 ${siteExamples || "업체 프로필·등록 채널"} 같은 출처가 반복 관찰됐습니다. 실제 타업체 사례가 표시되면 링크를 열어 어떤 업체가 어떤 페이지로 연결되어 있는지 내 업체와 직접 비교해보세요.`,
         sites: args.sites.slice(0, 4),
       };
-    }
-    case "owned_web_presence": {
-      const ownedDomainKnown = args.verifiedFirstPartySourceTypes.has("owned_domain");
+    case "owned_web_presence":
       return {
-        title: "공식 홈페이지·자사 페이지의 정보 연결을 점검해보세요",
-        actionText: ownedDomainKnown
-          ? "이미 공식 도메인이 확인되어 있습니다. 업체명·지역·주요 서비스·연락처와 공식 프로필 링크가 페이지에서 명확하고 일관되게 표시되는지 점검해보세요."
-          : "경쟁업체 홈페이지에 등록하라는 의미가 아닙니다. 내 공식 홈페이지나 브랜드·가맹점 페이지가 있다면 업체명·지역·주요 서비스·연락처와 공식 프로필 링크가 명확하게 표시되는지 확인해보세요.",
+        title: "공식 홈페이지·브랜드 페이지 연결에서 확인되는 차이",
+        actionText:
+          "고노출 업체에서는 공식 홈페이지나 브랜드 페이지가 출처로 반복 관찰됐지만, 현재 내 업체에서는 같은 유형의 연결이 확인되지 않았습니다. 실제 사례가 표시되면 연결된 페이지 자체를 열어 어떤 정보가 AI 답변과 연결됐는지 비교해보세요.",
         // Benchmark examples here are often competitor-owned sites, so never
         // surface them as places the target business should edit.
         sites: [],
       };
-    }
     case "auto_platform":
       return {
-        title: "자동차 전문 플랫폼에서 내 업체 노출 경로를 확인해보세요",
-        actionText: `${siteExamples || "자동차 전문 플랫폼"}에서 업체 등록·프로필·시공점 정보 노출이 가능한지 확인하고, 가능하다면 현재 정보가 정확한지 점검해보세요.`,
+        title: "자동차 전문 플랫폼 연결에서 확인되는 차이",
+        actionText:
+          `같은 업종 고노출 업체에서는 ${siteExamples || "자동차 전문 플랫폼"} 같은 출처가 반복 관찰됐습니다. 실제 사례가 표시되면 해당 업체의 실제 페이지를 열어 내 업체와 어떤 연결 차이가 있는지 확인해보세요.`,
         sites: args.sites.slice(0, 4),
       };
-    case "blog_presence": {
-      const naverBlogKnown = args.verifiedFirstPartySourceTypes.has("naver_blog");
+    case "blog_presence":
       return {
-        title: "블로그에서 업체 정보가 반복적으로 확인될 기반을 점검해보세요",
-        actionText: naverBlogKnown
-          ? "이미 확인된 네이버 블로그가 있습니다. 업체명·지역·대표 서비스가 명확한 공개 콘텐츠와 프로필 정보가 유지되고 있는지 점검해보세요."
-          : `${siteExamples || "네이버 블로그·티스토리"} 등 공개 블로그 채널에서 업체명·지역·대표 서비스가 명확한 정보가 있는지 확인해보세요.`,
+        title: "블로그 출처 연결에서 확인되는 차이",
+        actionText:
+          `${siteExamples || "블로그 채널"}에서 다른 업체와의 연결이 반복 관찰됐습니다. 실제 사례가 표시되면 연결된 페이지를 열어 내 업체와 어떤 차이가 있는지 직접 비교해보세요.`,
         sites: args.sites.slice(0, 4),
       };
-    }
     case "news_presence":
       return {
-        title: "언론·뉴스 등 외부 신뢰 출처 확보 가능성을 검토해보세요",
-        actionText: `${siteExamples || "언론·뉴스 채널"}처럼 독립된 외부 출처에서 실제 취재·소개·전문 정보로 노출될 수 있는 소재가 있는지 검토해보세요. 유료 노출이나 보도자료만을 의미하지는 않습니다.`,
+        title: "언론·뉴스 출처 연결에서 확인되는 차이",
+        actionText:
+          `${siteExamples || "언론·뉴스 출처"}에서 다른 업체와의 연결이 반복 관찰됐습니다. 실제 사례가 표시되면 어떤 기사나 페이지가 어떤 업체와 연결됐는지 확인해보세요.`,
         sites: args.sites.slice(0, 4),
       };
     case "video_presence":
       return {
-        title: "영상 채널에서 업체·서비스 정보가 확인될 수 있는지 점검해보세요",
-        actionText: `${siteExamples || "영상 채널"}에서 작업 과정·서비스 설명·업체 정보를 공개적으로 확인할 수 있는 콘텐츠가 있는지 점검해보세요.`,
+        title: "영상 출처 연결에서 확인되는 차이",
+        actionText:
+          `${siteExamples || "영상 채널"}에서 다른 업체와의 연결이 반복 관찰됐습니다. 실제 사례가 표시되면 어떤 영상 페이지가 어떤 업체와 연결됐는지 확인해보세요.`,
         sites: args.sites.slice(0, 4),
       };
     case "community_presence":
       return {
-        title: "커뮤니티에서 업체 정보가 자연스럽게 확인되는지 살펴보세요",
-        actionText: `${siteExamples || "커뮤니티"}에서 실제 이용 정보나 업체 정보가 확인되는지 살펴보세요. 인위적인 후기·홍보 게시물 작성을 권하는 항목은 아닙니다.`,
+        title: "커뮤니티 출처 연결에서 확인되는 차이",
+        actionText:
+          `${siteExamples || "커뮤니티"}에서 다른 업체와의 연결이 반복 관찰됐습니다. 실제 사례가 표시되면 어떤 페이지가 어떤 업체와 연결됐는지 확인해보세요.`,
         sites: args.sites.slice(0, 4),
       };
   }
@@ -290,10 +285,10 @@ export function buildActionOpportunityEngineV01(
   if (!input.benchmark) {
     return {
       version: ACTION_OPPORTUNITY_ENGINE_VERSION,
-      heading: "지금 내가 해볼 만한 것",
-      description: "아직 반복 출처 패턴을 판단할 데이터가 충분하지 않습니다.",
+      heading: "우선 확인해볼 차이",
+      description: "아직 고노출 업체와 내 업체의 출처 연결 차이를 판단할 데이터가 충분하지 않습니다.",
       disclaimer:
-        "특정 채널 작업이 AI 노출 상승을 보장하지 않습니다. 반복 관찰 패턴이 충분할 때만 점검 후보를 제공합니다.",
+        "관찰된 출처 연결 차이만 보여주며, 해당 차이가 AI 노출의 원인임을 의미하지 않습니다.",
       items: [],
     };
   }
@@ -332,11 +327,11 @@ export function buildActionOpportunityEngineV01(
 
   return {
     version: ACTION_OPPORTUNITY_ENGINE_VERSION,
-    heading: "지금 내가 해볼 만한 것",
+    heading: "우선 확인해볼 차이",
     description:
-      "고노출 업체에서 반복 관찰되지만 현재 내 업체에서는 확인되지 않은, 실제로 점검 가능한 채널만 추렸습니다.",
+      "고노출 업체에서 반복 관찰됐지만 현재 내 업체에서는 같은 연결이 확인되지 않은 출처 차이만 보여드립니다.",
     disclaimer:
-      "반복 관찰 패턴을 바탕으로 한 점검 우선순위이며, 특정 채널의 등록·수정이 AI 노출 상승을 보장하지는 않습니다.",
+      "관찰된 출처 연결 차이를 바탕으로 한 확인 우선순위입니다. 이 차이가 AI 노출의 원인임을 의미하지 않으며, 등록·수정을 권하는 결과가 아닙니다.",
     items,
   };
 }
