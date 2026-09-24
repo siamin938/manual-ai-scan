@@ -288,13 +288,7 @@ describe("Entity Facts v2 priority View Model", () => {
       'import { getVerifiedFirstPartySourceTypes } from "@/lib/first-party-source-registry.functions";',
     );
     expect(dashboardSource).toContain(
-      "<ActionOpportunitySection",
-    );
-    expect(dashboardSource).toContain(
-      "model={actionOpportunityModel}",
-    );
-    expect(dashboardSource).toContain(
-      "evidenceExamples={actionEvidenceExamples}",
+      "<ActionOpportunitySection model={actionOpportunityModel} />",
     );
     expect(dashboardSource).toContain("왜 확인하나요?");
     expect(dashboardSource).toContain("해볼 일");
