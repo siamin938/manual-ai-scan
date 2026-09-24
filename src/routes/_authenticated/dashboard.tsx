@@ -767,46 +767,51 @@ function ActionOpportunitySection({
                     </p>
                   </div>
 
-                  {item.sites.length > 0 && (
+                  {item.sites.some((site) => {
+                    const normalizedDomain = site.domain
+                      ?.toLowerCase()
+                      .replace(/^www\./, "");
+                    return currentRunReferences.some(
+                      (reference) =>
+                        normalizedDomain &&
+                        reference.domain === normalizedDomain &&
+                        reference.entities.length > 0,
+                    );
+                  }) && (
                     <div>
                       <p className="text-xs font-medium">
-                        같은 업종 고노출 업체에서 자주 보인 채널
+                        실제로 비교할 수 있는 같은 채널 사례
                       </p>
                       <div className="mt-2 space-y-2">
-                        {item.sites.map((site) => {
+                        {item.sites.flatMap((site) => {
                           const normalizedDomain = site.domain
                             ?.toLowerCase()
                             .replace(/^www\./, "");
                           const currentReference = currentRunReferences.find(
                             (reference) =>
                               normalizedDomain &&
-                              reference.domain === normalizedDomain,
+                              reference.domain === normalizedDomain &&
+                              reference.entities.length > 0,
                           );
-                          return (
-                            <div
-                              key={`${site.label}:${site.domain ?? ""}`}
-                              className="flex flex-wrap items-center gap-2"
+                          if (!currentReference?.entities[0]) return [];
+                          return [
+                            <a
+                              key={`${site.label}:${currentReference.entities[0].entityName}:${currentReference.entities[0].url}`}
+                              href={currentReference.entities[0].url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
                             >
-                              <Badge variant="outline">{site.label}</Badge>
-                              {currentReference?.entities[0] && (
-                                <a
-                                  href={currentReference.entities[0].url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-xs font-medium text-primary underline-offset-2 hover:underline"
-                                >
-                                  이번 측정 타업체 사례 ·{" "}
-                                  {currentReference.entities[0].entityName} ↗
-                                </a>
-                              )}
-                            </div>
-                          );
+                              <span className="font-medium">{site.label}</span>
+                              <span className="ml-2 text-muted-foreground">
+                                {currentReference.entities[0].entityName} · 실제 페이지 보기 ↗
+                              </span>
+                            </a>,
+                          ];
                         })}
                       </div>
                       <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                        내 업체에서 확인된 출처가 아닙니다. 같은 업종 고노출 업체에서 반복
-                        관찰된 채널이며, 이번 측정에서 타업체와 확정 연결된 같은 채널이 있을
-                        때만 실제 사례 링크를 표시합니다.
+                        이번 측정에서 다른 업체와 확정 연결된 동일 채널만 표시합니다.
                       </p>
                     </div>
                   )}
