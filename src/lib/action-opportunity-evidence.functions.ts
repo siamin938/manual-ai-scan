@@ -3,12 +3,17 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   fetchActionOpportunityEvidence,
   type ActionOpportunityEvidenceExample,
+  type CurrentRunSourceReference,
 } from "@/lib/action-opportunity-evidence.server";
 
-export type { ActionOpportunityEvidenceExample };
+export type { ActionOpportunityEvidenceExample, CurrentRunSourceReference };
 
 export type ActionOpportunityEvidenceResponse =
-  | { ok: true; examples: ActionOpportunityEvidenceExample[] }
+  | {
+      ok: true;
+      highVisibilityExamples: ActionOpportunityEvidenceExample[];
+      currentRunReferences: CurrentRunSourceReference[];
+    }
   | { ok: false; error: "FORBIDDEN" | "INTERNAL_ERROR" };
 
 export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
@@ -47,12 +52,18 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
     if (!membership) return { ok: false, error: "FORBIDDEN" };
 
     try {
+      const result = await fetchActionOpportunityEvidence(data);
       return {
         ok: true,
-        examples: await fetchActionOpportunityEvidence(data),
+        highVisibilityExamples: result.highVisibilityExamples,
+        currentRunReferences: result.currentRunReferences,
       };
     } catch {
       // Optional evidence must never break the main dashboard.
-      return { ok: true, examples: [] };
+      return {
+        ok: true,
+        highVisibilityExamples: [],
+        currentRunReferences: [],
+      };
     }
   });
