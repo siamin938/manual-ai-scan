@@ -770,7 +770,7 @@ function ActionOpportunitySection({
                   {item.sites.length > 0 && (
                     <div>
                       <p className="text-xs font-medium">
-                        같은 업종 고노출 업체에서 관찰된 채널 예시
+                        같은 업종 고노출 업체에서 자주 보인 채널
                       </p>
                       <div className="mt-2 space-y-2">
                         {item.sites.map((site) => {
@@ -804,9 +804,9 @@ function ActionOpportunitySection({
                         })}
                       </div>
                       <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                        위 채널은 내 업체에서 확인된 출처가 아니라, 같은 업종 고노출 업체에서
-                        관찰된 채널 예시입니다. 현재 측정에서 타업체와 확정 연결된 동일 채널이
-                        있을 때만 실제 사례 링크를 함께 표시합니다.
+                        내 업체에서 확인된 출처가 아닙니다. 같은 업종 고노출 업체에서 반복
+                        관찰된 채널이며, 이번 측정에서 타업체와 확정 연결된 같은 채널이 있을
+                        때만 실제 사례 링크를 표시합니다.
                       </p>
                     </div>
                   )}
@@ -892,11 +892,11 @@ function CurrentRunReferenceSection({
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">CURRENT RUN REFERENCES</p>
         <CardTitle className="text-xl">
-          이번 측정에서 참고할 수 있는 실제 타업체 출처 사례
+          이번 측정에서 확인된 타업체 출처 사례
         </CardTitle>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          내 업체와의 연결은 확인되지 않았지만, 이번 측정에서 다른 업체와 확정 연결된 출처만
-          보여드립니다. 아래 사례는 현재 측정 참고용이며 고노출 비교 근거와는 별개입니다.
+          고노출 우선순위 근거와는 별도 참고 정보입니다. 내 업체와의 연결은 확인되지 않았지만,
+          이번 측정에서 다른 업체와 확정 연결된 출처만 보여드립니다.
         </p>
       </CardHeader>
       <CardContent className="grid gap-3 pt-5 lg:grid-cols-3">
