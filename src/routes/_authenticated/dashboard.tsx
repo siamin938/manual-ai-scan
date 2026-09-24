@@ -217,40 +217,6 @@ type QuestionGroupCounts = {
   unresolvedTargetCount: number;
 };
 
-function questionGroupResult(
-  group: QuestionGroupCounts,
-): { label: string; variant: "default" | "secondary" | "outline" } {
-  if (group.confirmedMentionCount > 0) {
-    if (
-      group.confirmedMentionCount === group.validCount &&
-      group.unresolvedTargetCount === 0
-    ) {
-      return { label: "노출 확인", variant: "default" };
-    }
-    return { label: "일부 노출 확인", variant: "outline" };
-  }
-  if (group.unresolvedTargetCount > 0) {
-    return { label: "추가 확인 필요", variant: "secondary" };
-  }
-  return { label: "노출 미확인", variant: "outline" };
-}
-
-function questionGroupEvidenceText(
-  group: QuestionGroupCounts,
-): string {
-  const total = `${group.validCount}개 질문`;
-  if (group.confirmedMentionCount > 0 && group.unresolvedTargetCount > 0) {
-    return `${total} 중 ${group.confirmedMentionCount}개 확정 · ${group.unresolvedTargetCount}개 추가 확인`;
-  }
-  if (group.confirmedMentionCount > 0) {
-    return `${total} 중 ${group.confirmedMentionCount}개 확정`;
-  }
-  if (group.unresolvedTargetCount > 0) {
-    return `${total} 중 ${group.unresolvedTargetCount}개 추가 확인`;
-  }
-  return `${total} 모두 노출 미확인`;
-}
-
 function DashboardPage() {
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
@@ -789,29 +755,7 @@ function DashboardPage() {
                   질문군 요약이 아직 없습니다.
                 </p>
               ) : (
-                <div className="space-y-2">
-                  {model.questionGroups.map((g) => {
-                    const result = questionGroupResult(g);
-                    return (
-                      <div
-                        key={g.intentType}
-                        className="grid items-center gap-3 rounded-md border p-3 md:grid-cols-[140px_120px_minmax(0,1fr)]"
-                      >
-                        <p className="text-sm font-medium">
-                          {intentLabel(g.intentType)}
-                        </p>
-                        <Badge className="w-fit" variant={result.variant}>
-                          {result.label}
-                        </Badge>
-                        <QuestionGroupBar group={g} />
-                      </div>
-                    );
-                  })}
-                  <p className="pt-1 text-xs text-muted-foreground">
-                    막대는 각 검색 상황의 유효 질문 안에서 확정 노출과 추가 확인이 필요한 비중을
-                    보여줍니다.
-                  </p>
-                </div>
+                <SearchContextChart groups={model.questionGroups} />
               )}
             </CardContent>
           </Card>
@@ -1169,6 +1113,13 @@ function BenchmarkCard({
     >["benchmark"]
   >;
 }) {
+  const chartGroups = benchmark.sourceGroups.slice(0, 6);
+  const chartData = chartGroups.map((group) => ({
+    label: group.label,
+    share: group.highEntitySharePct ?? 0,
+    connected: group.targetConnected,
+  }));
+
   return (
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
@@ -1195,9 +1146,27 @@ function BenchmarkCard({
             아직 공통 출처 패턴을 판단할 표본이 부족합니다.
           </p>
         ) : (
-          <div className="space-y-2">
-            {benchmark.sourceGroups.slice(0, 6).map((g) => (
-              <div key={g.key} className="rounded-md border p-3">
+          <div className="space-y-4">
+            <div
+              className="h-72 w-full sm:h-80"
+              role="img"
+              aria-label="시장 벤치마크 출처 그룹별 고노출 업체 관찰 비율"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 48, bottom: 8, left: 8 }} barCategoryGap="30%">
+                  <CartesianGrid horizontal={false} stroke="var(--color-border)" />
+                  <XAxis type="number" domain={[0, 100]} hide />
+                  <YAxis type="category" dataKey="label" width={112} tick={{ fill: "var(--color-foreground)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<BenchmarkTooltip />} cursor={{ fill: "var(--color-muted)" }} />
+                  <Bar dataKey="share" name="관찰 비율" fill="var(--color-chart-1)" radius={[0, 3, 3, 0]} isAnimationActive={false}>
+                    <LabelList dataKey="share" position="right" formatter={(value: number) => `${value.toFixed(1)}%`} className="fill-foreground text-[11px] font-semibold" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="divide-y rounded-md border">
+            {chartGroups.map((g) => (
+              <div key={g.key} className="p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium">{g.label}</p>
                   <Badge variant={g.targetConnected ? "default" : "secondary"}>
@@ -1221,9 +1190,17 @@ function BenchmarkCard({
                     ? ` (${g.highEntitySharePct.toFixed(1)}%)`
                     : ""}
                 </p>
-                <BenchmarkPercentBar value={g.highEntitySharePct} />
               </div>
             ))}
+            </div>
+            <div className="sr-only">
+              {chartGroups.map((group) => (
+                <p key={group.key}>
+                  {group.label}: 고노출 업체 {benchmark.highVisibilityEntityCount}곳 중 {group.highEntityCount}곳에서 관찰
+                  {group.highEntitySharePct !== null ? `, ${group.highEntitySharePct.toFixed(1)}%` : ""}. {group.targetConnected ? "최근 측정에서 내 업체 직접 연결 확인" : "최근 측정에서 내 업체 직접 연결 미확인"}
+                </p>
+              ))}
+            </div>
           </div>
         )}
         {benchmark.categoryContext?.available === true && (
@@ -1254,6 +1231,26 @@ function BenchmarkCard({
         <p className="text-xs text-muted-foreground">{benchmark.disclaimer}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function BenchmarkTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: ChartTooltipPayload[];
+}) {
+  const item = payload?.[0];
+  if (!active || !item) return null;
+  return (
+    <div className="rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
+      <p className="font-semibold">{item.payload?.label}</p>
+      <p className="mt-1 tabular-nums">관찰 비율 {Number(item.value ?? 0).toFixed(1)}%</p>
+      <p className="mt-1 text-muted-foreground">
+        {item.payload?.connected ? "최근 측정에서 내 업체 직접 연결 확인" : "최근 측정에서 내 업체 직접 연결 미확인"}
+      </p>
+    </div>
   );
 }
 
