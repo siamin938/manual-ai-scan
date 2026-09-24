@@ -299,6 +299,9 @@ describe("Entity Facts v2 priority View Model", () => {
     );
     expect(dashboardSource).toContain("실제 페이지 보기 ↗");
     expect(dashboardSource).toContain("확인해볼 차이");
+    expect(dashboardSource).toContain("MeasurementStatusBar");
+    expect(dashboardSource).toContain("QuestionGroupBar");
+    expect(dashboardSource).toContain("BenchmarkPercentBar");
     expect(dashboardSource).not.toContain(
       'import { buildEntityFactsV2PriorityViewModel } from "@/lib/entity-facts-v2-priority.viewmodel";',
     );
