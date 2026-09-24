@@ -63,15 +63,6 @@ function pctRange(lower: number | null, upper: number | null): string {
     : `${format(lower)} ~ ${format(upper)}`;
 }
 
-function benchmarkSiteHref(domain?: string): string | null {
-  if (!domain) return null;
-  const trimmed = domain.trim().toLowerCase();
-  if (!trimmed || !/^[a-z0-9.-]+$/.test(trimmed) || !trimmed.includes(".")) {
-    return null;
-  }
-  return `https://${trimmed}`;
-}
-
 function weakQuestionBadgeVariant(
   tone: "positive" | "neutral" | "attention",
 ): "default" | "secondary" | "outline" {
