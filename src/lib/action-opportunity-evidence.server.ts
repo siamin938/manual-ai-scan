@@ -9,6 +9,23 @@ export type ActionOpportunityEvidenceExample = {
   attributionLevel: "direct" | "section";
 };
 
+export type CurrentRunSourceReference = {
+  sourceGroupKey: string;
+  domain: string;
+  responseCount: number;
+  entityCount: number;
+  entities: Array<{
+    entityName: string;
+    url: string;
+    attributionLevel: "direct" | "section";
+  }>;
+};
+
+export type ActionOpportunityEvidenceResult = {
+  highVisibilityExamples: ActionOpportunityEvidenceExample[];
+  currentRunReferences: CurrentRunSourceReference[];
+};
+
 function sourceGroupForDomain(raw: string): string {
   const d = raw.trim().toLowerCase().replace(/^www\./, "");
   if (d === "blog.naver.com" || d.endsWith(".tistory.com")) return "blog";
@@ -62,21 +79,32 @@ export async function fetchActionOpportunityEvidence(args: {
   orgId: string;
   businessId: string;
   highVisibilityThresholdPct: number;
-}): Promise<ActionOpportunityEvidenceExample[]> {
+}): Promise<ActionOpportunityEvidenceResult> {
+  const empty: ActionOpportunityEvidenceResult = {
+    highVisibilityExamples: [],
+    currentRunReferences: [],
+  };
+
   const gateway = await fetchEntityFactsV2ReadGateway({
     orgId: args.orgId,
     businessId: args.businessId,
   });
-  if (!gateway.ok) return [];
+  if (!gateway.ok) return empty;
 
   const validCount = gateway.data.overview.validCount;
-  if (validCount <= 0) return [];
+  if (validCount <= 0) return empty;
+
+  const allCompetitorSurfaces = new Set(
+    gateway.data.competitors.map((competitor) =>
+      normalizeEntitySurface(competitor.name),
+    ),
+  );
 
   const thresholdPct = Math.max(
     0,
     Math.min(100, args.highVisibilityThresholdPct),
   );
-  const confirmedCompetitorSurfaces = new Set(
+  const highVisibilityCompetitorSurfaces = new Set(
     gateway.data.competitors
       .filter(
         (competitor) =>
@@ -84,7 +112,30 @@ export async function fetchActionOpportunityEvidence(args: {
       )
       .map((competitor) => normalizeEntitySurface(competitor.name)),
   );
-  if (confirmedCompetitorSurfaces.size === 0) return [];
+
+  const referenceSourceByDomain = new Map(
+    gateway.data.observedSources
+      .filter(
+        (source) =>
+          source.evidence !== "clue" &&
+          source.targetResponseCount === 0 &&
+          source.competitorResponseCount > 0,
+      )
+      .map((source) => [
+        source.domain.toLowerCase().replace(/^www\./, ""),
+        {
+          responseCount: source.responseCount,
+          competitorNames: new Set(
+            source.linkedEntities
+              .filter(
+                (entity) =>
+                  !entity.isTarget && entity.evidence === "confirmed",
+              )
+              .map((entity) => normalizeEntitySurface(entity.name)),
+          ),
+        },
+      ]),
+  );
 
   const { data: run } = await supabaseAdmin
     .from("measurement_runs")
@@ -100,7 +151,7 @@ export async function fetchActionOpportunityEvidence(args: {
     .limit(1)
     .maybeSingle();
 
-  if (!run) return [];
+  if (!run) return empty;
 
   const { data: rows, error } = await supabaseAdmin
     .from("measurement_citation_attributions_actionable_v2")
@@ -112,7 +163,7 @@ export async function fetchActionOpportunityEvidence(args: {
     .in("attribution_level", ["direct", "section"])
     .limit(300);
 
-  if (error) return [];
+  if (error) return empty;
 
   const normalized = (rows ?? [])
     .map((row) => {
@@ -121,18 +172,26 @@ export async function fetchActionOpportunityEvidence(args: {
           ? row.canonical_display_name.trim()
           : "";
       const domain =
-        typeof row.domain === "string" ? row.domain.trim().toLowerCase() : "";
+        typeof row.domain === "string"
+          ? row.domain.trim().toLowerCase().replace(/^www\./, "")
+          : "";
       const url = safeHttpUrl(row.citation_url);
       const sourceGroupKey = sourceGroupForDomain(domain);
       const attributionLevel =
         row.attribution_level === "direct" ? "direct" : "section";
-      if (!entityName || !domain || !url || sourceGroupKey === "other") return null;
-      if (!confirmedCompetitorSurfaces.has(normalizeEntitySurface(entityName))) {
-        return null;
-      }
-      return { sourceGroupKey, entityName, domain, url, attributionLevel };
+      if (!entityName || !domain || !url) return null;
+      const entitySurface = normalizeEntitySurface(entityName);
+      if (!allCompetitorSurfaces.has(entitySurface)) return null;
+      return {
+        sourceGroupKey,
+        entityName,
+        entitySurface,
+        domain,
+        url,
+        attributionLevel,
+      };
     })
-    .filter((row): row is ActionOpportunityEvidenceExample => row !== null)
+    .filter((row): row is NonNullable<typeof row> => row !== null)
     .sort((a, b) =>
       (a.attributionLevel === "direct" ? 0 : 1) -
         (b.attributionLevel === "direct" ? 0 : 1) ||
@@ -140,18 +199,100 @@ export async function fetchActionOpportunityEvidence(args: {
       a.domain.localeCompare(b.domain, "en")
     );
 
-  const out: ActionOpportunityEvidenceExample[] = [];
+  const highVisibilityExamples: ActionOpportunityEvidenceExample[] = [];
   const perGroup = new Map<string, number>();
-  const seen = new Set<string>();
+  const highSeen = new Set<string>();
 
   for (const row of normalized) {
+    if (row.sourceGroupKey === "other") continue;
+    if (!highVisibilityCompetitorSurfaces.has(row.entitySurface)) continue;
     if ((perGroup.get(row.sourceGroupKey) ?? 0) >= 2) continue;
-    const key = `${row.sourceGroupKey}\u0000${normalizeEntitySurface(row.entityName)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const key = `${row.sourceGroupKey}\u0000${row.entitySurface}`;
+    if (highSeen.has(key)) continue;
+    highSeen.add(key);
     perGroup.set(row.sourceGroupKey, (perGroup.get(row.sourceGroupKey) ?? 0) + 1);
-    out.push(row);
+    highVisibilityExamples.push({
+      sourceGroupKey: row.sourceGroupKey,
+      entityName: row.entityName,
+      domain: row.domain,
+      url: row.url,
+      attributionLevel: row.attributionLevel,
+    });
   }
 
-  return out;
+  const groupedReferences = new Map<
+    string,
+    {
+      sourceGroupKey: string;
+      domain: string;
+      responseCount: number;
+      entities: Map<
+        string,
+        {
+          entityName: string;
+          url: string;
+          attributionLevel: "direct" | "section";
+        }
+      >;
+    }
+  >();
+
+  for (const row of normalized) {
+    const referenceSource = referenceSourceByDomain.get(row.domain);
+    if (!referenceSource) continue;
+    if (!referenceSource.competitorNames.has(row.entitySurface)) continue;
+
+    let group = groupedReferences.get(row.domain);
+    if (!group) {
+      group = {
+        sourceGroupKey: row.sourceGroupKey,
+        domain: row.domain,
+        responseCount: referenceSource.responseCount,
+        entities: new Map(),
+      };
+      groupedReferences.set(row.domain, group);
+    }
+
+    const existing = group.entities.get(row.entitySurface);
+    if (
+      !existing ||
+      (existing.attributionLevel === "section" &&
+        row.attributionLevel === "direct")
+    ) {
+      group.entities.set(row.entitySurface, {
+        entityName: row.entityName,
+        url: row.url,
+        attributionLevel: row.attributionLevel,
+      });
+    }
+  }
+
+  const currentRunReferences = [...groupedReferences.values()]
+    .map((group) => ({
+      sourceGroupKey: group.sourceGroupKey,
+      domain: group.domain,
+      responseCount: group.responseCount,
+      entityCount: group.entities.size,
+      entities: [...group.entities.values()]
+        .sort(
+          (a, b) =>
+            (a.attributionLevel === "direct" ? 0 : 1) -
+              (b.attributionLevel === "direct" ? 0 : 1) ||
+            a.entityName.localeCompare(b.entityName, "ko"),
+        )
+        .slice(0, 3),
+    }))
+    .filter((group) => group.entityCount > 0)
+    .sort(
+      (a, b) =>
+        b.entityCount - a.entityCount ||
+        b.responseCount - a.responseCount ||
+        a.domain.localeCompare(b.domain, "en"),
+    )
+    .slice(0, 3);
+
+  return {
+    highVisibilityExamples,
+    currentRunReferences,
+  };
 }
