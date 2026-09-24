@@ -266,6 +266,14 @@ function SearchContextChart({
           노출 미확인
         </span>
       </div>
+      <div
+        className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+        aria-hidden="true"
+      >
+        {data.map((item) => (
+          <span key={item.label}>· {item.label} 질문 {item.validCount}개 기준</span>
+        ))}
+      </div>
       <div className="sr-only">
         {data.map((item) => (
           <p key={item.label}>
@@ -805,7 +813,7 @@ function DashboardPage() {
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
                 비슷한 검색 질문을 묶어 내 업체가 실제로 확인된 질문과 추가 확인이 필요한 질문을
-                보여드립니다.
+                보여드립니다. 각 검색 상황은 이번 측정의 해당 질문 수를 기준으로 비교합니다.
               </p>
               {model.questionGroups.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
