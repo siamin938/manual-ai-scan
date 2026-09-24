@@ -294,6 +294,9 @@ describe("Entity Facts v2 priority View Model", () => {
     );
     expect(dashboardSource).toContain("왜 확인하나요?");
     expect(dashboardSource).toContain("실제 비교해볼 업체 사례");
+    expect(dashboardSource).toContain(
+      "이번 측정에서 참고할 수 있는 실제 타업체 출처 사례",
+    );
     expect(dashboardSource).toContain("실제 페이지 보기 ↗");
     expect(dashboardSource).toContain("해볼 일");
     expect(dashboardSource).not.toContain(
