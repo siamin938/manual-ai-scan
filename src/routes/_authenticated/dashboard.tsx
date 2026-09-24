@@ -271,7 +271,9 @@ function SearchContextChart({
         aria-hidden="true"
       >
         {data.map((item) => (
-          <span key={item.label}>· {item.label} 질문 {item.validCount}개 기준</span>
+          <span key={item.label}>
+            · {item.label} 질문 {item.validCount}개 기준
+          </span>
         ))}
       </div>
       <div className="sr-only">
