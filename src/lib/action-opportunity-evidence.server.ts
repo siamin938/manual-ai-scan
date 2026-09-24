@@ -177,7 +177,7 @@ export async function fetchActionOpportunityEvidence(args: {
           : "";
       const url = safeHttpUrl(row.citation_url);
       const sourceGroupKey = sourceGroupForDomain(domain);
-      const attributionLevel =
+      const attributionLevel: "direct" | "section" =
         row.attribution_level === "direct" ? "direct" : "section";
       if (!entityName || !domain || !url) return null;
       const entitySurface = normalizeEntitySurface(entityName);
