@@ -184,7 +184,7 @@ function SearchContextChart({
   groups: Array<QuestionGroupCounts & { intentType: string }>;
 }) {
   const data = groups.map((group) => ({
-    label: intentLabel(group.intentType),
+    label: `${intentLabel(group.intentType)} · ${group.validCount}문항`,
     confirmed: group.confirmedMentionCount,
     unresolved: group.unresolvedTargetCount,
     validCount: group.validCount,
@@ -219,7 +219,7 @@ function SearchContextChart({
             <YAxis
               type="category"
               dataKey="label"
-              width={86}
+              width={118}
               tick={{ fill: "var(--color-foreground)", fontSize: 12 }}
               axisLine={false}
               tickLine={false}
@@ -265,16 +265,6 @@ function SearchContextChart({
           <span className="mr-1.5 inline-block size-2.5 bg-muted" />
           노출 미확인
         </span>
-      </div>
-      <div
-        className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
-        aria-hidden="true"
-      >
-        {data.map((item) => (
-          <span key={item.label}>
-            · {item.label} 질문 {item.validCount}개 기준
-          </span>
-        ))}
       </div>
       <div className="sr-only">
         {data.map((item) => (
@@ -904,6 +894,17 @@ function ActionOpportunitySection({
 
                 <p className="mt-3 text-base font-semibold leading-6">{item.title}</p>
 
+                <div className="mt-2 rounded-md bg-muted/40 px-3 py-2">
+                  <p className="text-sm font-semibold leading-6">
+                    고노출 업체 {item.highVisibilityEntityCount}곳 중 {item.highEntityCount}
+                    곳에서 관찰
+                    {item.highEntitySharePct !== null
+                      ? ` · ${item.highEntitySharePct.toFixed(1)}%`
+                      : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">내 업체 연결 미확인</p>
+                </div>
+
                 <div className="mt-4 space-y-3">
                   <div>
                     <p className="text-xs font-medium">왜 확인하나요?</p>
@@ -1009,6 +1010,23 @@ function ActionOpportunitySection({
   );
 }
 
+const SITE_DISPLAY_NAMES: Array<{ match: RegExp; name: string }> = [
+  { match: /(^|\.)mycle\.co\.kr$/, name: "마이클" },
+  { match: /(^|\.)seongnam\.go\.kr$/, name: "성남시" },
+  { match: /(^|\.)issuetale\.kr$/, name: "이슈테일" },
+  { match: /(^|\.)daangn\.com$/, name: "당근" },
+  { match: /(^|\.)pf\.kakao\.com$/, name: "카카오톡 채널" },
+  { match: /(^|\.)placeview\.co\.kr$/, name: "플레이스뷰" },
+  { match: /(^|\.)oh-car\.kr$/, name: "오늘의카" },
+  { match: /(^|\.)blog\.naver\.com$/, name: "네이버 블로그" },
+  { match: /(^|\.)cafe\.naver\.com$/, name: "네이버 카페" },
+];
+
+function siteDisplayName(domain: string): string {
+  const normalized = domain.toLowerCase().replace(/^www\./, "");
+  return SITE_DISPLAY_NAMES.find((entry) => entry.match.test(normalized))?.name ?? domain;
+}
+
 function CurrentRunReferenceSection({
   references,
 }: {
@@ -1037,8 +1055,13 @@ function CurrentRunReferenceSection({
       <CardContent className="grid gap-3 pt-5 lg:grid-cols-3">
         {references.map((reference) => (
           <div key={reference.domain} className="rounded-lg border p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-semibold">{reference.domain}</p>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-base font-semibold">{siteDisplayName(reference.domain)}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {reference.domain}
+                </p>
+              </div>
               <Badge variant="outline">타업체 {reference.entityCount}곳</Badge>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
