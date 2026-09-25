@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   choosePreferredRunQuestionSetId,
+  formatAutoRunName,
   getRunQuestionSetKind,
   isCustomRunQuestionSet,
 } from "../../src/routes/_authenticated/runs.index";
@@ -34,5 +35,32 @@ describe("run question set selection", () => {
     expect(getRunQuestionSetKind("맞춤 질문 · 업체", 8)).toBe("custom");
     expect(getRunQuestionSetKind("기본 질문", 24)).toBe("baseline");
     expect(getRunQuestionSetKind("Market 질문", 8)).toBe("other");
+  });
+
+  it("formats the auto run name by diagnostic kind", () => {
+    expect(formatAutoRunName("카스페이스 구로점", "custom", "2026-09-25")).toBe(
+      "카스페이스 구로점 맞춤 진단 2026-09-25",
+    );
+    expect(formatAutoRunName("카스페이스 구로점", "baseline", "2026-09-25")).toBe(
+      "카스페이스 구로점 기본 진단 2026-09-25",
+    );
+    expect(formatAutoRunName("카스페이스 구로점", "other", "2026-09-25")).toBe(
+      "카스페이스 구로점 측정 2026-09-25",
+    );
+  });
+
+  it("protects user-edited names via the nameTouched contract in the dialog source", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      new URL("../../src/routes/_authenticated/runs.index.tsx", import.meta.url),
+      "utf8",
+    );
+    // 자동 이름 effect는 nameTouched가 false일 때만 setName을 호출한다.
+    expect(source).toContain("if (nameTouched || !selectedBusinessName) return;");
+    // Input onChange에서 수동 수정을 기록한다.
+    expect(source).toContain("setNameTouched(true);");
+    // Dialog를 새로 열 때와 업체 변경 시 초기화한다.
+    expect(source).toContain("if (open) setNameTouched(false);");
+    expect(source).toMatch(/useEffect\(\(\) => \{\s*setNameTouched\(false\);\s*\}, \[businessId\]\)/);
   });
 });

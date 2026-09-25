@@ -95,6 +95,12 @@ export function getRunQuestionSetKind(name: string, activeCount: number): RunQue
   return "other";
 }
 
+/** 진단 유형별 자동 측정명 접미사. v0.1: custom=맞춤 진단, baseline=기본 진단, other=측정. */
+export function formatAutoRunName(businessName: string, kind: RunQuestionSetKind, date: string): string {
+  const label = kind === "custom" ? "맞춤 진단" : kind === "baseline" ? "기본 진단" : "측정";
+  return `${businessName} ${label} ${date}`;
+}
+
 type RunRow = {
   id: string;
   name: string;
@@ -224,6 +230,13 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const [businessId, setBusinessId] = useState("");
   const [questionSetId, setQuestionSetId] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  /** 사용자가 측정명을 직접 수정했는지 여부. true면 세트/업체 변경 시 자동 이름으로 덮어쓰지 않는다. */
+  const [nameTouched, setNameTouched] = useState(false);
+
+  /** Dialog를 새로 열 때 자동 이름 상태를 초기화한다. */
+  useEffect(() => {
+    if (open) setNameTouched(false);
+  }, [open]);
 
   const meta = useQuery({
     queryKey: ["run-form-meta", activeOrgId],
@@ -287,12 +300,10 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     );
   }, [open, businessId, sets]);
 
-  /** 측정명 기본값 제안: 업체명 + 날짜. 사용자가 직접 수정할 수 있다. */
+  /** 업체가 바뀌면 새 업체 기준 자동 이름으로 다시 제안할 수 있도록 수동 수정 상태를 초기화한다. */
   useEffect(() => {
-    if (!selectedBusinessName) return;
-    const suggestion = `${selectedBusinessName} 측정 ${new Date().toISOString().slice(0, 10)}`;
-    setName((prev) => (prev.trim() ? prev : suggestion));
-  }, [selectedBusinessName]);
+    setNameTouched(false);
+  }, [businessId]);
 
   const activeCount = questions.data?.length ?? 0;
   const selectedSet = sets.find((set) => set.id === questionSetId);
@@ -317,6 +328,12 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             description: "선택한 질문 세트로 측정합니다.",
             type: "선택 질문 세트",
           };
+
+  /** 자동 측정명 제안: 사용자가 직접 수정하기 전까지 선택한 진단 유형에 맞춰 갱신한다. */
+  useEffect(() => {
+    if (nameTouched || !selectedBusinessName) return;
+    setName(formatAutoRunName(selectedBusinessName, selectedSetKind, new Date().toISOString().slice(0, 10)));
+  }, [nameTouched, selectedBusinessName, selectedSetKind]);
 
   /** 측정권 잔여 조회. 로딩/조회 실패는 0회로 오인하지 않도록 null로 둔다. */
   const credit = useQuery({
@@ -394,7 +411,10 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             <Input
               id="run-name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setNameTouched(true);
+                setName(e.target.value);
+              }}
               placeholder="예: 판교 매장 8월 측정"
             />
           </div>
