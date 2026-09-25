@@ -63,4 +63,25 @@ describe("run question set selection", () => {
     expect(source).toContain("if (open) setNameTouched(false);");
     expect(source).toMatch(/useEffect\(\(\) => \{\s*setNameTouched\(false\);\s*\}, \[businessId\]\)/);
   });
+
+  it("keeps list and detail diagnostic labels in the source contract", async () => {
+    const { readFileSync } = await import("node:fs");
+    const listSource = readFileSync(
+      new URL("../../src/routes/_authenticated/runs.index.tsx", import.meta.url),
+      "utf8",
+    );
+    const detailSource = readFileSync(
+      new URL("../../src/routes/_authenticated/runs.$runId.tsx", import.meta.url),
+      "utf8",
+    );
+
+    for (const label of ["맞춤 진단", "기본 진단", "비교 기준", "질문 세트"]) {
+      expect(listSource).toContain(label);
+      expect(detailSource).toContain(label);
+    }
+    expect(detailSource).toContain(
+      "최신 완료 맞춤 측정이 대시보드 대표 진단으로 사용됩니다.",
+    );
+    expect(detailSource).toContain("getRunQuestionSetKind(data.questionSetName ?? \"\", totalJobs)");
+  });
 });

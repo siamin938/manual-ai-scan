@@ -76,7 +76,7 @@ export function runStatusVariant(status: string): "default" | "secondary" | "des
 }
 
 type RunQuestionSet = { id: string; name: string };
-type RunQuestionSetKind = "custom" | "baseline" | "other";
+export type RunQuestionSetKind = "custom" | "baseline" | "other";
 
 /** v0.1 naming convention: 이 접두사로 생성된 세트만 맞춤 질문으로 구분한다. */
 const CUSTOM_QUESTION_SET_PREFIX = "맞춤 질문 · ";
@@ -107,6 +107,7 @@ type RunRow = {
   run_type: string;
   phase: string;
   business_id: string;
+  question_set_id: string;
   status: string;
   total_jobs: number;
   completed_jobs: number;
@@ -121,11 +122,11 @@ function RunsPage() {
     queryKey: ["runs", activeOrgId],
     enabled: !!activeOrgId,
     queryFn: async () => {
-      const [runs, biz] = await Promise.all([
+      const [runs, biz, questionSets] = await Promise.all([
         supabase
           .from("measurement_runs")
           .select(
-            "id, name, business_id, status, run_type, phase, total_jobs, completed_jobs, failed_jobs, created_at",
+            "id, name, business_id, question_set_id, status, run_type, phase, total_jobs, completed_jobs, failed_jobs, created_at",
           )
           .eq("org_id", activeOrgId!)
           .eq("run_type", "audit")
@@ -133,11 +134,16 @@ function RunsPage() {
           .order("created_at", { ascending: false })
           .limit(100),
         supabase.from("businesses").select("id, name").eq("org_id", activeOrgId!),
+        supabase.from("question_sets").select("id, name").eq("org_id", activeOrgId!),
       ]);
       if (runs.error) throw runs.error;
       if (biz.error) throw biz.error;
+      if (questionSets.error) throw questionSets.error;
       const names = new Map((biz.data ?? []).map((b) => [b.id, b.name]));
-      return { runs: (runs.data ?? []) as unknown as RunRow[], names };
+      const questionSetNames = new Map(
+        (questionSets.data ?? []).map((set) => [set.id, set.name]),
+      );
+      return { runs: (runs.data ?? []) as unknown as RunRow[], names, questionSetNames };
     },
   });
 
@@ -185,7 +191,10 @@ function RunsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runsQuery.data!.runs.map((r) => (
+                  {runsQuery.data!.runs.map((r) => {
+                    const questionSetName = runsQuery.data!.questionSetNames.get(r.question_set_id);
+                    const kind = getRunQuestionSetKind(questionSetName ?? "", r.total_jobs);
+                    return (
                     <TableRow key={r.id}>
                       <TableCell>
                         <Link
@@ -195,6 +204,19 @@ function RunsPage() {
                         >
                           {r.name}
                         </Link>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <Badge
+                            variant={kind === "custom" ? "default" : kind === "baseline" ? "outline" : "secondary"}
+                          >
+                            {kind === "custom" ? "맞춤 진단" : kind === "baseline" ? "기본 진단" : "일반 측정"}
+                          </Badge>
+                          {kind === "baseline" ? (
+                            <span className="text-xs text-muted-foreground">비교 기준</span>
+                          ) : null}
+                        </div>
+                        {questionSetName ? (
+                          <p className="mt-1 text-xs text-muted-foreground">질문 세트 · {questionSetName}</p>
+                        ) : null}
                       </TableCell>
                       <TableCell>{runsQuery.data!.names.get(r.business_id) ?? "-"}</TableCell>
                       <TableCell>
@@ -202,14 +224,15 @@ function RunsPage() {
                           {RUN_STATUS_LABELS[r.status] ?? r.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{r.total_jobs}</TableCell>
+                      <TableCell className="text-right">{r.total_jobs}문항</TableCell>
                       <TableCell className="text-right">{r.completed_jobs}</TableCell>
                       <TableCell className="text-right">{r.failed_jobs}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatSeoul(r.created_at)}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
