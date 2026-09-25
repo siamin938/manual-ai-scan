@@ -127,6 +127,21 @@ export function validateCustomQuestionInput(
   };
 }
 
+export function parseBrandModelTargets(value: string | null | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of clean(value).split(/[,;\n·|]+/u)) {
+    const item = phrase(clean(raw));
+    if (!item) continue;
+    const key = normalizeQuestion(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+    if (out.length >= 4) break;
+  }
+  return out;
+}
+
 function subject(service: string, brandModel: string): string {
   return brandModel ? `${brandModel} ${service}` : service;
 }
@@ -163,45 +178,47 @@ export function buildCustomQuestionCandidates(
 
   const { location, service, brandModel, customerNeed } = validation.value;
   const locationSurface = naturalizeQuestionLocation(location);
-  const target = subject(service, brandModel);
+  const brandTargets = parseBrandModelTargets(brandModel);
+  const targetAt = (index: number) =>
+    subject(service, brandTargets.length > 0 ? brandTargets[index % brandTargets.length]! : "");
   const need = customerNeed ? `‘${customerNeed}’` : "";
 
   const rows: Array<{ intent: AllowedIntent; text: string }> = [
     {
       intent: "local",
-      text: `${locationSurface}에서 ${target} 맡길 수 있는 곳 어디야?`,
+      text: `${locationSurface}에서 ${targetAt(0)} 맡길 수 있는 곳 어디야?`,
     },
     {
       intent: "recommendation",
       text: customerNeed
-        ? `${locationSurface}에서 ${target} 업체 찾을 때 ${need}도 고려해서 추천해줘`
-        : `${locationSurface}에서 ${target} 맡길 만한 업체 추천해줘`,
+        ? `${locationSurface}에서 ${targetAt(1)} 업체 찾을 때 ${need}도 고려해서 추천해줘`
+        : `${locationSurface}에서 ${targetAt(1)} 맡길 만한 업체 추천해줘`,
     },
     {
       intent: "service",
-      text: `${locationSurface}에서 ${target} 전문으로 하는 곳 알려줘`,
+      text: `${locationSurface}에서 ${targetAt(2)} 전문으로 하는 곳 알려줘`,
     },
     {
       intent: "review_quality",
-      text: `${locationSurface} ${target} 실제 이용 후기 좋은 곳 알려줘`,
+      text: `${locationSurface} ${targetAt(3)} 실제 이용 후기 좋은 곳 알려줘`,
     },
     {
       intent: "trust",
-      text: `${target} 작업 경험 많은 ${locationSurface} 업체 어디야?`,
+      text: `${targetAt(4)} 작업 경험 많은 ${locationSurface} 업체 어디야?`,
     },
     {
       intent: "comparison",
-      text: `${locationSurface} ${target} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
+      text: `${locationSurface} ${targetAt(5)} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
     },
     {
       intent: "price_value",
-      text: `${locationSurface}에서 ${target} 비용 대비 괜찮은 곳 알려줘`,
+      text: `${locationSurface}에서 ${targetAt(6)} 비용 대비 괜찮은 곳 알려줘`,
     },
     {
       intent: "discovery",
       text: customerNeed
-        ? `${locationSurface}에서 ${target} 업체 중 ${need} 기준으로 볼 만한 곳 몇 곳 찾아줘`
-        : `${locationSurface}에서 ${target} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
+        ? `${locationSurface}에서 ${targetAt(7)} 업체 중 ${need} 기준으로 볼 만한 곳 몇 곳 찾아줘`
+        : `${locationSurface}에서 ${targetAt(7)} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
     },
   ];
 
