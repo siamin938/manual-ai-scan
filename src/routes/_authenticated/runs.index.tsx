@@ -230,6 +230,13 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const [businessId, setBusinessId] = useState("");
   const [questionSetId, setQuestionSetId] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  /** 사용자가 측정명을 직접 수정했는지 여부. true면 세트/업체 변경 시 자동 이름으로 덮어쓰지 않는다. */
+  const [nameTouched, setNameTouched] = useState(false);
+
+  /** Dialog를 새로 열 때 자동 이름 상태를 초기화한다. */
+  useEffect(() => {
+    if (open) setNameTouched(false);
+  }, [open]);
 
   const meta = useQuery({
     queryKey: ["run-form-meta", activeOrgId],
