@@ -363,7 +363,10 @@ function QuestionsPage() {
         orgId: activeOrgId!,
         questionSetId: destSetId,
         region: selectedBusiness?.region ?? null,
-        city: selectedBusiness?.city ?? null,
+        city:
+          customLocationMode === "region"
+            ? null
+            : selectedBusiness?.city ?? null,
       });
       const { error } = await supabase.from("questions").insert(payloads);
       if (error) throw error;
