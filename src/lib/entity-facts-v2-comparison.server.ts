@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
+import { CUSTOMER_STANDARD_QUESTION_COUNT } from "@/lib/customer-measurement.helpers";
 import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
@@ -298,6 +299,7 @@ export async function fetchEntityFactsV2Comparison(args: {
     .eq("phase", "standalone")
     .eq("diagnostic_scope", "customer")
     .eq("status", "completed")
+    .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
     .is("experiment_id", null)
     .order("completed_at", { ascending: false })
     .order("created_at", { ascending: false })
@@ -326,6 +328,7 @@ export async function fetchEntityFactsV2Comparison(args: {
     .eq("phase", "standalone")
     .eq("diagnostic_scope", "customer")
     .eq("status", "completed")
+    .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
     .is("experiment_id", null)
     .neq("id", currentRun.id)
     .order("completed_at", { ascending: false })
