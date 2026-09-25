@@ -597,22 +597,24 @@ function RunDetailPage() {
                     <TableBody>
                       {shareRows.map((s) => (
                         <TableRow key={s.key}>
-                        <TableCell className="text-sm">
-                          <span className="font-medium">{s.display_name}</span>
-                          {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
-                            <Badge className="ml-2">내 업체</Badge>
-                          ) : s.matched_business_id && data.competitorIds.has(s.matched_business_id) ? (
-                            <Badge variant="secondary" className="ml-2">
-                              등록 경쟁업체
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="ml-2">
-                              자동 발견
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">{s.response_count}</TableCell>
-                        <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
+                          <TableCell className="text-sm">
+                            <span className="font-medium">{s.display_name}</span>
+                            {s.matched_business_id &&
+                            s.matched_business_id === data.targetBusinessId ? (
+                              <Badge className="ml-2">내 업체</Badge>
+                            ) : s.matched_business_id &&
+                              data.competitorIds.has(s.matched_business_id) ? (
+                              <Badge variant="secondary" className="ml-2">
+                                등록 경쟁업체
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="ml-2">
+                                자동 발견
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">{s.response_count}</TableCell>
+                          <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
