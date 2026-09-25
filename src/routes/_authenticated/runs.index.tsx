@@ -329,6 +329,12 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             type: "선택 질문 세트",
           };
 
+  /** 자동 측정명 제안: 사용자가 직접 수정하기 전까지 선택한 진단 유형에 맞춰 갱신한다. */
+  useEffect(() => {
+    if (nameTouched || !selectedBusinessName) return;
+    setName(formatAutoRunName(selectedBusinessName, selectedSetKind, new Date().toISOString().slice(0, 10)));
+  }, [nameTouched, selectedBusinessName, selectedSetKind]);
+
   /** 측정권 잔여 조회. 로딩/조회 실패는 0회로 오인하지 않도록 null로 둔다. */
   const credit = useQuery({
     queryKey: ["measurement-credit-balance", activeOrgId],
