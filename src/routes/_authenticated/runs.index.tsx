@@ -300,12 +300,10 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     );
   }, [open, businessId, sets]);
 
-  /** 측정명 기본값 제안: 업체명 + 날짜. 사용자가 직접 수정할 수 있다. */
+  /** 업체가 바뀌면 새 업체 기준 자동 이름으로 다시 제안할 수 있도록 수동 수정 상태를 초기화한다. */
   useEffect(() => {
-    if (!selectedBusinessName) return;
-    const suggestion = `${selectedBusinessName} 측정 ${new Date().toISOString().slice(0, 10)}`;
-    setName((prev) => (prev.trim() ? prev : suggestion));
-  }, [selectedBusinessName]);
+    setNameTouched(false);
+  }, [businessId]);
 
   const activeCount = questions.data?.length ?? 0;
   const selectedSet = sets.find((set) => set.id === questionSetId);
