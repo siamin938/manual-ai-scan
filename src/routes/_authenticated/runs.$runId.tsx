@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { aggregateBusinessShare } from "@/lib/business-share.helpers";
-import { RESOLVER_VERSION } from "@/lib/entity-canonical-resolver";
+import {
+  CANONICALIZATION_VERSION_CONFLICT,
+  resolveCanonicalizationVersion,
+} from "@/lib/canonicalization-version.helpers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,6 +108,7 @@ type CanonicalRow = {
   canonical_key: string;
   canonical_display_name: string;
   resolution_status: string;
+  resolver_version: string;
 };
 
 type Source = {
@@ -200,6 +204,7 @@ function RunDetailPage() {
 
       let mentions: Mention[] = [];
       const canonicals = new Map<string, CanonicalRow>();
+      let canonicalizationVersionConflict = false;
       let sources: Source[] = [];
       if (mIds.length > 0) {
         const [mn, sr] = await Promise.all([
@@ -225,11 +230,16 @@ function RunDetailPage() {
           )
             .from("measurement_entity_canonicalizations")
             .select(
-              "measurement_mention_id, canonical_key, canonical_display_name, resolution_status",
+              "measurement_mention_id, canonical_key, canonical_display_name, resolution_status, resolver_version",
             )
-            .eq("resolver_version", RESOLVER_VERSION)
             .in("measurement_mention_id", mentionIds);
-          for (const c of cRows ?? []) canonicals.set(c.measurement_mention_id, c);
+          const canonicalRows = cRows ?? [];
+          const canonicalizationVersion = resolveCanonicalizationVersion(canonicalRows);
+          canonicalizationVersionConflict =
+            canonicalizationVersion === CANONICALIZATION_VERSION_CONFLICT;
+          if (canonicalizationVersion && !canonicalizationVersionConflict) {
+            for (const c of canonicalRows) canonicals.set(c.measurement_mention_id, c);
+          }
         }
       }
 
@@ -277,6 +287,7 @@ function RunDetailPage() {
         measurements: measurementList,
         mentions,
         canonicals,
+        canonicalizationVersionConflict,
         sources,
         overall: overall.data,
         byProvider: byProvider.data ?? [],
@@ -560,7 +571,11 @@ function RunDetailPage() {
             <CardTitle className="text-base">AI에서 함께 등장한 업체</CardTitle>
           </CardHeader>
           <CardContent>
-            {shareRows.length === 0 ? (
+            {data.canonicalizationVersionConflict ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                이 측정의 업체 정리 버전이 여러 개 확인되어 업체 목록을 표시하지 않습니다.
+              </p>
+            ) : shareRows.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 아직 함께 등장한 업체가 확인되지 않았습니다. 결과 정리가 끝나면 표시됩니다.
               </p>
