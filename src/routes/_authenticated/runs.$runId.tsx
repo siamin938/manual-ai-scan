@@ -595,8 +595,8 @@ function RunDetailPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {shareRows.map((s) => (
-                      <TableRow key={s.key}>
+                      {shareRows.map((s) => (
+                        <TableRow key={s.key}>
                         <TableCell className="text-sm">
                           <span className="font-medium">{s.display_name}</span>
                           {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
@@ -613,8 +613,8 @@ function RunDetailPage() {
                         </TableCell>
                         <TableCell className="text-right">{s.response_count}</TableCell>
                         <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
-                      </TableRow>
-                    ))}
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
