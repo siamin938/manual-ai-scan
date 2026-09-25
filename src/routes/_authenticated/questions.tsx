@@ -556,10 +556,7 @@ function QuestionsPage() {
             <CardTitle className="text-sm text-muted-foreground">현재 질문 세트</CardTitle>
           </CardHeader>
           <CardContent>
-            <p
-              className="truncate text-base font-semibold"
-              title={selectedSet?.name ?? undefined}
-            >
+            <p className="truncate text-base font-semibold" title={selectedSet?.name ?? undefined}>
               {selectedSet?.name ?? "선택된 세트 없음"}
             </p>
           </CardContent>
