@@ -41,7 +41,9 @@ export async function fetchCustomDiagnostic(args: {
 
   const { data: run, error: rErr } = await supabaseAdmin
     .from("measurement_runs")
-    .select("id, question_set_id, completed_at, created_at, total_jobs, completed_jobs, failed_jobs")
+    .select(
+      "id, question_set_id, completed_at, created_at, total_jobs, completed_jobs, failed_jobs",
+    )
     .eq("org_id", orgId)
     .eq("business_id", businessId)
     .eq("run_type", "audit")

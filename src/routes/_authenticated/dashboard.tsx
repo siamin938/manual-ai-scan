@@ -1421,3 +1421,143 @@ function MetricCard({
     </Card>
   );
 }
+
+function CustomQuestionRow({ q }: { q: CustomDiagnosticQuestionDTO }) {
+  return (
+    <li className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="min-w-0">
+        <p className="text-sm leading-6">{q.promptText}</p>
+        <p className="text-xs text-muted-foreground">{intentLabel(q.intentType)}</p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {q.status === "confirmed" && <Badge>확정 노출</Badge>}
+        {q.status === "unresolved" && <Badge variant="secondary">추가 확인</Badge>}
+        {q.status === "missing" && <Badge variant="outline">이번 측정에서 확인되지 않음</Badge>}
+        {q.position !== null && (
+          <span className="text-xs text-muted-foreground">{q.position}번째로 관찰</span>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function CustomDiagnosticSection({
+  isLoading,
+  isError,
+  loaded,
+  data,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  loaded: boolean;
+  data: CustomDiagnosticDTO | null;
+}) {
+  const [showAllMissing, setShowAllMissing] = useState(false);
+  const confirmed = data?.questions.filter((q) => q.status === "confirmed") ?? [];
+  const unresolved = data?.questions.filter((q) => q.status === "unresolved") ?? [];
+  const missing = data?.questions.filter((q) => q.status === "missing") ?? [];
+  const visibleMissing = showAllMissing ? missing : missing.slice(0, 3);
+
+  return (
+    <Card className="border-primary/50 shadow-sm">
+      <CardHeader className="space-y-2">
+        <p className="report-kicker">CUSTOM DIAGNOSTIC</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <CardTitle className="text-2xl">내 업체 맞춤 진단</CardTitle>
+          <Badge>대표 진단</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          내가 중요하게 설정한 검색 질문에서 AI가 내 업체를 얼마나 보여주는지 확인합니다.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {isLoading && <Skeleton className="h-32" />}
+        {!isLoading && isError && (
+          <p className="text-sm text-muted-foreground">
+            맞춤 진단을 불러오지 못했습니다. 기본 진단에는 영향이 없습니다.
+          </p>
+        )}
+        {!isLoading && !isError && loaded && !data && (
+          <div className="space-y-3 py-4 text-center">
+            <p className="font-medium">아직 완료된 맞춤 진단이 없습니다.</p>
+            <p className="text-sm text-muted-foreground">
+              내 업체에서 중요하게 보는 검색 질문을 먼저 설정해 보세요.
+            </p>
+            <Button asChild>
+              <Link to="/questions">내 업체 맞춤 진단 만들기</Link>
+            </Button>
+          </div>
+        )}
+        {data && (
+          <>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">확정 노출</p>
+                <p className="text-4xl font-bold tabular-nums">
+                  {data.confirmedCount} / {data.validCount}
+                  <span className="ml-3 text-2xl text-primary">
+                    {data.confirmedPct === null ? "-" : `${data.confirmedPct.toFixed(1)}%`}
+                  </span>
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  유효 질문 {data.validCount}개 중 확정 노출 {data.confirmedCount}개
+                  {data.unresolvedCount > 0 && ` · 추가 확인 ${data.unresolvedCount}개`}
+                  {data.missingCount > 0 && ` · 이번 측정에서 미확인 ${data.missingCount}개`}
+                </p>
+              </div>
+              <div className="min-w-0 text-xs text-muted-foreground sm:text-right">
+                <p>{formatSeoul(data.measuredAt)}</p>
+                <p className="truncate" title={data.questionSetName}>
+                  {data.questionSetName}
+                </p>
+              </div>
+            </div>
+
+            {confirmed.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold">확인된 질문</h3>
+                <ul className="divide-y">
+                  {confirmed.map((q) => (
+                    <CustomQuestionRow key={q.questionId} q={q} />
+                  ))}
+                </ul>
+              </div>
+            )}
+            {unresolved.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold">추가 확인이 필요한 질문</h3>
+                <ul className="divide-y">
+                  {unresolved.map((q) => (
+                    <CustomQuestionRow key={q.questionId} q={q} />
+                  ))}
+                </ul>
+              </div>
+            )}
+            {missing.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold">
+                  이번 측정에서 확인되지 않은 질문 {missing.length}개
+                </h3>
+                <ul className="divide-y">
+                  {visibleMissing.map((q) => (
+                    <CustomQuestionRow key={q.questionId} q={q} />
+                  ))}
+                </ul>
+                {missing.length > 3 && (
+                  <Button variant="ghost" size="sm" onClick={() => setShowAllMissing((v) => !v)}>
+                    {showAllMissing ? "접기" : `전체 ${missing.length}개 보기`}
+                  </Button>
+                )}
+              </div>
+            )}
+            {data.invalidCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                응답을 확인할 수 없었던 질문 {data.invalidCount}개는 집계에서 제외했습니다.
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
