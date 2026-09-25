@@ -416,7 +416,8 @@ function DashboardPage() {
           <p className="report-kicker mb-3">AI VISIBILITY REPORT</p>
           <h1 className="text-3xl font-bold leading-tight sm:text-4xl">내 AI 노출 진단</h1>
           <p className="mt-3 text-base leading-7 text-muted-foreground">
-            AI 답변에서 확인된 노출과 아직 동일성 확인이 필요한 응답을 구분해 보여드립니다.
+            내 업체에서 중요하게 보는 맞춤 검색 결과를 먼저 보여드리고, 기본 진단은 비교 기준으로
+            따로 제공합니다.
           </p>
         </div>
         <div className="mt-5 min-w-0 rounded-lg border border-border bg-card p-3 lg:mt-0">
@@ -439,6 +440,30 @@ function DashboardPage() {
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {businessId && (
+        <CustomDiagnosticSection
+          isLoading={customQuery.isLoading}
+          isError={customQuery.isError || (!!customQuery.data && !customQuery.data.ok)}
+          data={customQuery.data && customQuery.data.ok ? customQuery.data.data : null}
+          loaded={!!customQuery.data && customQuery.data.ok}
+        />
+      )}
+
+      {businessId && (
+        <section className="space-y-2 border-t border-border pt-8">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-2xl font-bold">기본 AI 노출 진단</h2>
+            <Badge variant="outline">비교 기준</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            같은 24개 질문으로 전체 노출 상태와 장기 변화를 보는 기준선입니다.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            맞춤 진단과 질문 구성이 다르므로 두 노출률을 상승·하락으로 직접 비교하지 않습니다.
+          </p>
+        </section>
       )}
 
       {query.isLoading && businessId && (
