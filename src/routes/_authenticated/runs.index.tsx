@@ -411,7 +411,10 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             <Input
               id="run-name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setNameTouched(true);
+                setName(e.target.value);
+              }}
               placeholder="예: 판교 매장 8월 측정"
             />
           </div>
