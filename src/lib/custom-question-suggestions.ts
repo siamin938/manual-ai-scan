@@ -99,9 +99,7 @@ export function buildCustomQuestionCandidates(
 
   const { location, service, brandModel, customerNeed } = validation.value;
   const target = subject(service, brandModel);
-  const need = customerNeed
-    ? `${customerNeed}을 중요하게 볼 때 `
-    : "";
+  const need = customerNeed ? `${customerNeed} 기준으로 ` : "";
 
   const rows: Array<{ intent: AllowedIntent; text: string }> = [
     {
