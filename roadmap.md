@@ -5,6 +5,6 @@
 - [x] 측정 목록에 질문 세트명과 진단 유형 표시
 - [x] 측정 상세 상단에 같은 진단 유형과 설명 표시
 - [x] 카스페이스 4개 실행 읽기 전용 분류 및 관련 검증
-- [ ] 측정 상세 canonicalization 단일 버전 읽기 및 혼합 버전 fail-closed 처리
-- [ ] canonicalization 버전 helper·상세 source 계약 테스트 추가
-- [ ] 최신 0.1.1·과거 0.1.0 읽기 전용 QA와 타입·테스트·빌드·Preview 검증
+- [x] 측정 상세 canonicalization 단일 버전 읽기 및 혼합 버전 fail-closed 처리
+- [x] canonicalization 버전 helper·상세 source 계약 테스트 추가
+- [x] 최신 0.1.1·과거 0.1.0 읽기 전용 QA와 타입·테스트·빌드·Preview 검증
