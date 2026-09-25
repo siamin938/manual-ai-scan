@@ -906,6 +906,17 @@ function DashboardPage() {
   );
 }
 
+function BaselineBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className="shrink-0 px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
+    >
+      기본 진단 기준
+    </Badge>
+  );
+}
+
 function ActionOpportunitySection({
   model,
   evidenceExamples,
@@ -935,7 +946,10 @@ function ActionOpportunitySection({
     <Card className="report-section border-t-2 border-t-primary">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">ACTION OPPORTUNITIES</p>
-        <CardTitle className="text-xl">{model.heading}</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+          {model.heading}
+          <BaselineBadge />
+        </CardTitle>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{model.description}</p>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
@@ -1112,7 +1126,10 @@ function CurrentRunReferenceSection({
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">CURRENT RUN REFERENCES</p>
-        <CardTitle className="text-xl">이번 측정에서 확인된 타업체 출처 사례</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+          이번 측정에서 확인된 타업체 출처 사례
+          <BaselineBadge />
+        </CardTitle>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           고노출 우선순위 근거와는 별도 참고 정보입니다. 내 업체와의 연결은 확인되지 않았지만, 이번
           측정에서 다른 업체와 확정 연결된 출처만 보여드립니다.
@@ -1174,7 +1191,10 @@ function ComparisonCard({
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">측정 비교</p>
-        <CardTitle className="text-xl">{model.heading}</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+          {model.heading}
+          <BaselineBadge />
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
         <p className="text-sm leading-6 text-muted-foreground">{model.description}</p>
@@ -1239,6 +1259,7 @@ function BenchmarkCard({
         <p className="report-kicker">MARKET BENCHMARK</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
           AI에 자주 추천되는 업체들은 어디에서 많이 보일까요?
+          <BaselineBadge />
           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
             데이터 축적 중
           </Badge>
