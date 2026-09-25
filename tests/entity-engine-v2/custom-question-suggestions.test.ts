@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCustomQuestionCandidates,
   naturalizeQuestionLocation,
+  parseBrandModelTargets,
   validateCustomQuestionInput,
 } from "../../src/lib/custom-question-suggestions";
 
@@ -79,6 +80,27 @@ describe("custom question suggestions v0.1", () => {
       "서울에서 테슬라 신차패키지 비용 대비 괜찮은 곳 알려줘",
       "서울에서 테슬라 신차패키지 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘",
     ]);
+  });
+
+  it("splits multiple brand/model targets and distributes them across questions", () => {
+    expect(
+      parseBrandModelTargets("테슬라, 테슬라 모델Y, 테슬라 모델3, 테슬라 모델Y"),
+    ).toEqual(["테슬라", "테슬라 모델Y", "테슬라 모델3"]);
+
+    const result = buildCustomQuestionCandidates(
+      {
+        location: "서울특별시",
+        service: "신차패키지",
+        brandModel: "테슬라, 테슬라 모델Y, 테슬라 모델3",
+      },
+      "카스페이스 구로점",
+    );
+
+    expect(result).toHaveLength(8);
+    expect(result[0]?.promptText).toContain("테슬라 신차패키지");
+    expect(result[1]?.promptText).toContain("테슬라 모델Y 신차패키지");
+    expect(result[2]?.promptText).toContain("테슬라 모델3 신차패키지");
+    expect(result.every((item) => !item.promptText.includes("테슬라, 테슬라"))).toBe(true);
   });
 
   it("rejects missing service", () => {
