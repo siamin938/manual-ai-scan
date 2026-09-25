@@ -95,6 +95,12 @@ export function getRunQuestionSetKind(name: string, activeCount: number): RunQue
   return "other";
 }
 
+/** 진단 유형별 자동 측정명 접미사. v0.1: custom=맞춤 진단, baseline=기본 진단, other=측정. */
+export function formatAutoRunName(businessName: string, kind: RunQuestionSetKind, date: string): string {
+  const label = kind === "custom" ? "맞춤 진단" : kind === "baseline" ? "기본 진단" : "측정";
+  return `${businessName} ${label} ${date}`;
+}
+
 type RunRow = {
   id: string;
   name: string;
