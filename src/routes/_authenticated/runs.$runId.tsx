@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RUN_STATUS_LABELS, runStatusVariant } from "./runs.index";
+import { getRunQuestionSetKind, RUN_STATUS_LABELS, runStatusVariant } from "./runs.index";
 
 
 export const Route = createFileRoute("/_authenticated/runs/$runId")({
@@ -241,13 +241,19 @@ function RunDetailPage() {
       }
 
       let businessName = "-";
+      let questionSetName: string | null = null;
       let questionCount = 0;
       let targetBusinessId: string | null = null;
       let competitorIds = new Set<string>();
       if (run.data) {
         targetBusinessId = run.data.business_id;
-        const [b, q, comp] = await Promise.all([
+        const [b, questionSet, q, comp] = await Promise.all([
           supabase.from("businesses").select("name").eq("id", run.data.business_id).maybeSingle(),
+          supabase
+            .from("question_sets")
+            .select("id, name")
+            .eq("id", run.data.question_set_id)
+            .maybeSingle(),
           supabase
             .from("questions")
             .select("id", { count: "exact", head: true })
@@ -260,6 +266,7 @@ function RunDetailPage() {
             .eq("active", true),
         ]);
         businessName = b.data?.name ?? "-";
+        questionSetName = questionSet.data?.name ?? null;
         questionCount = q.count ?? 0;
         competitorIds = new Set((comp.data ?? []).map((c) => c.competitor_business_id));
       }
@@ -277,6 +284,7 @@ function RunDetailPage() {
         latestEvent: latestEvent.data ?? null,
         prompts,
         businessName,
+        questionSetName,
         questionCount,
         targetBusinessId,
         competitorIds,
@@ -307,6 +315,7 @@ function RunDetailPage() {
   const inProgress = IN_PROGRESS.has(run.status);
   const showSummary = run.status === "completed" || run.status === "partial";
   const totalJobs = Number(run.total_jobs ?? 0);
+  const questionSetKind = getRunQuestionSetKind(data.questionSetName ?? "", totalJobs);
   const completedJobs = Number(run.completed_jobs ?? 0);
   const progressPct = totalJobs > 0 ? Math.min(100, (completedJobs / totalJobs) * 100) : 0;
 
@@ -338,8 +347,30 @@ function RunDetailPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{run.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            AI 노출 측정 · 내 업체 {data.businessName}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge
+              variant={questionSetKind === "custom" ? "default" : questionSetKind === "baseline" ? "outline" : "secondary"}
+            >
+              {questionSetKind === "custom" ? "맞춤 진단" : questionSetKind === "baseline" ? "기본 진단" : "일반 측정"}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {questionSetKind === "custom"
+                ? `내 업체 맞춤 진단 · 질문 ${totalJobs}개`
+                : questionSetKind === "baseline"
+                  ? `비교 기준 · 질문 ${totalJobs}개`
+                  : `질문 ${totalJobs}개`}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">내 업체 {data.businessName}</p>
+          {data.questionSetName ? (
+            <p className="mt-1 text-xs text-muted-foreground">질문 세트 · {data.questionSetName}</p>
+          ) : null}
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            {questionSetKind === "custom"
+              ? "내 업체에서 중요하게 설정한 맞춤 질문으로 진행한 측정입니다. 최신 완료 맞춤 측정이 대시보드 대표 진단으로 사용됩니다."
+              : questionSetKind === "baseline"
+                ? "같은 24개 질문으로 전체 노출 상태와 장기 변화를 보는 비교 기준 측정입니다."
+                : "선택한 질문 세트로 진행한 측정입니다."}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
