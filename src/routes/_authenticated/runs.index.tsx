@@ -75,6 +75,26 @@ export function runStatusVariant(status: string): "default" | "secondary" | "des
   return "secondary";
 }
 
+type RunQuestionSet = { id: string; name: string };
+type RunQuestionSetKind = "custom" | "baseline" | "other";
+
+/** v0.1 naming convention: 이 접두사로 생성된 세트만 맞춤 질문으로 구분한다. */
+const CUSTOM_QUESTION_SET_PREFIX = "맞춤 질문 · ";
+
+export function isCustomRunQuestionSet(name: string): boolean {
+  return name.startsWith(CUSTOM_QUESTION_SET_PREFIX);
+}
+
+export function choosePreferredRunQuestionSetId(sets: RunQuestionSet[]): string {
+  return sets.find((set) => isCustomRunQuestionSet(set.name))?.id ?? sets[0]?.id ?? "";
+}
+
+export function getRunQuestionSetKind(name: string, activeCount: number): RunQuestionSetKind {
+  if (isCustomRunQuestionSet(name)) return "custom";
+  if (activeCount === 24) return "baseline";
+  return "other";
+}
+
 type RunRow = {
   id: string;
   name: string;
@@ -253,8 +273,19 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     },
   });
 
-  const sets = (meta.data?.sets ?? []).filter((s) => s.business_id === businessId);
+  const sets = useMemo(
+    () => (meta.data?.sets ?? []).filter((s) => s.business_id === businessId),
+    [meta.data?.sets, businessId],
+  );
   const selectedBusinessName = (meta.data?.businesses ?? []).find((b) => b.id === businessId)?.name ?? "";
+
+  /** 조회 결과는 최신순이다. 같은 업체의 유효한 수동 선택은 유지하고, 새 업체만 맞춤 세트를 우선한다. */
+  useEffect(() => {
+    if (!open || !businessId || sets.length === 0) return;
+    setQuestionSetId((current) =>
+      sets.some((set) => set.id === current) ? current : choosePreferredRunQuestionSetId(sets),
+    );
+  }, [open, businessId, sets]);
 
   /** 측정명 기본값 제안: 업체명 + 날짜. 사용자가 직접 수정할 수 있다. */
   useEffect(() => {
@@ -264,6 +295,28 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   }, [selectedBusinessName]);
 
   const activeCount = questions.data?.length ?? 0;
+  const selectedSet = sets.find((set) => set.id === questionSetId);
+  const selectedSetKind = selectedSet
+    ? getRunQuestionSetKind(selectedSet.name, activeCount)
+    : "other";
+  const selectedSetPresentation =
+    selectedSetKind === "custom"
+      ? {
+          badge: "대표 진단",
+          description: "내 업체에서 중요하게 설정한 맞춤 검색 질문으로 측정합니다.",
+          type: "내 업체 맞춤 진단",
+        }
+      : selectedSetKind === "baseline"
+        ? {
+            badge: "비교 기준",
+            description: "같은 24개 질문으로 전체 노출 상태와 장기 변화를 확인합니다.",
+            type: "기본 AI 노출 진단",
+          }
+        : {
+            badge: "질문 세트",
+            description: "선택한 질문 세트로 측정합니다.",
+            type: "선택 질문 세트",
+          };
 
   /** 측정권 잔여 조회. 로딩/조회 실패는 0회로 오인하지 않도록 null로 둔다. */
   const credit = useQuery({
@@ -331,7 +384,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
         <DialogHeader>
           <DialogTitle>새 측정 시작</DialogTitle>
           <DialogDescription>
-            AI가 같은 질문으로 시장의 추천·경쟁업체·출처를 확인합니다.
+              선택한 질문 세트로 AI 노출을 측정합니다. 맞춤 진단은 대표 결과로, 기본 진단은 비교 기준으로 사용됩니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -378,13 +431,19 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               <SelectContent>
                 {sets.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.name}
+                    {s.name} {isCustomRunQuestionSet(s.name) ? "(대표 진단)" : "(기본/기타)"}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {questionSetId && (
-              <p className="text-xs text-muted-foreground">활성 질문 {activeCount}개</p>
+              <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+                <Badge variant={selectedSetKind === "custom" ? "default" : "outline"}>
+                  {selectedSetPresentation.badge}
+                </Badge>
+                <p className="text-sm text-foreground">{selectedSetPresentation.description}</p>
+                <p className="text-xs text-muted-foreground">활성 질문 {activeCount}개</p>
+              </div>
             )}
           </div>
 
@@ -394,8 +453,8 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               <span className="font-medium">{activeCount}개</span>
             </div>
             <div className="mt-1 flex justify-between">
-              <span className="text-muted-foreground">측정 방식</span>
-              <span className="font-medium">기본 측정</span>
+              <span className="text-muted-foreground">진단 유형</span>
+              <span className="font-medium">{selectedSetPresentation.type}</span>
             </div>
             <div className="mt-1 flex justify-between">
               <span className="text-muted-foreground">차감 예정 측정권</span>
