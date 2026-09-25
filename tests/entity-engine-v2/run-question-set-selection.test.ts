@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   choosePreferredRunQuestionSetId,
+  formatAutoRunName,
   getRunQuestionSetKind,
   isCustomRunQuestionSet,
 } from "../../src/routes/_authenticated/runs.index";
