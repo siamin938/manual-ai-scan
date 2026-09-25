@@ -5,6 +5,10 @@ import {
   getRunQuestionSetKind,
   isCustomRunQuestionSet,
 } from "../../src/routes/_authenticated/runs.index";
+import {
+  CANONICALIZATION_VERSION_CONFLICT,
+  resolveCanonicalizationVersion,
+} from "../../src/lib/canonicalization-version.helpers";
 
 describe("run question set selection", () => {
   it("recognizes only the v0.1 custom prefix", () => {
@@ -83,5 +87,52 @@ describe("run question set selection", () => {
       "최신 완료 맞춤 측정이 대시보드 대표 진단으로 사용됩니다.",
     );
     expect(detailSource).toContain("getRunQuestionSetKind(data.questionSetName ?? \"\", totalJobs)");
+  });
+});
+
+describe("run detail canonicalization version", () => {
+  it("returns null when no canonicalization rows exist", () => {
+    expect(resolveCanonicalizationVersion([])).toBeNull();
+  });
+
+  it("accepts a single stored resolver version", () => {
+    expect(
+      resolveCanonicalizationVersion([
+        { resolver_version: "0.1.0" },
+        { resolver_version: "0.1.0" },
+      ]),
+    ).toBe("0.1.0");
+    expect(
+      resolveCanonicalizationVersion([
+        { resolver_version: "0.1.1" },
+        { resolver_version: "0.1.1" },
+      ]),
+    ).toBe("0.1.1");
+  });
+
+  it("fails closed when resolver versions are mixed", () => {
+    expect(
+      resolveCanonicalizationVersion([
+        { resolver_version: "0.1.0" },
+        { resolver_version: "0.1.1" },
+      ]),
+    ).toBe(CANONICALIZATION_VERSION_CONFLICT);
+  });
+
+  it("removes the fixed resolver filter and keeps the conflict notice", async () => {
+    const { readFileSync } = await import("node:fs");
+    const detailSource = readFileSync(
+      new URL("../../src/routes/_authenticated/runs.$runId.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(detailSource).not.toContain(
+      'import { RESOLVER_VERSION } from "@/lib/entity-canonical-resolver"',
+    );
+    expect(detailSource).not.toContain('.eq("resolver_version", RESOLVER_VERSION)');
+    expect(detailSource).toContain("resolver_version");
+    expect(detailSource).toContain(
+      "이 측정의 업체 정리 버전이 여러 개 확인되어 업체 목록을 표시하지 않습니다.",
+    );
   });
 });
