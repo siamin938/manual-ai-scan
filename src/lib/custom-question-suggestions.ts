@@ -14,7 +14,15 @@ export type CustomQuestionInput = {
 };
 
 export type CustomQuestionValidation =
-  | { ok: true; value: Required<CustomQuestionInput> }
+  | {
+      ok: true;
+      value: {
+        location: string;
+        service: string;
+        brandModel: string;
+        customerNeed: string;
+      };
+    }
   | {
       ok: false;
       error:
