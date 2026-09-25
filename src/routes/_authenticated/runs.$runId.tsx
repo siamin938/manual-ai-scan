@@ -564,11 +564,15 @@ function RunDetailPage() {
         </CardContent>
       </Card>
 
-      {/* AI에서 함께 등장한 업체 */}
+      {/* AI 답변에서 관찰된 업체 */}
       {showSummary ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">AI에서 함께 등장한 업체</CardTitle>
+            <CardTitle className="text-base">AI 답변에서 관찰된 업체</CardTitle>
+            <p className="text-xs leading-5 text-muted-foreground">
+              이번 측정의 유효 질문에서 업체로 정리된 항목입니다. 내 업체와 자동 발견 업체를 함께
+              보여줍니다.
+            </p>
           </CardHeader>
           <CardContent>
             {data.canonicalizationVersionConflict ? (
@@ -577,19 +581,20 @@ function RunDetailPage() {
               </p>
             ) : shareRows.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                아직 함께 등장한 업체가 확인되지 않았습니다. 결과 정리가 끝나면 표시됩니다.
+                이번 측정에서 업체로 정리된 항목이 확인되지 않았습니다.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>업체명</TableHead>
-                      <TableHead className="text-right">등장한 질문 수</TableHead>
-                      <TableHead className="text-right">등장률</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>업체명</TableHead>
+                        <TableHead className="text-right">관찰된 질문 수</TableHead>
+                        <TableHead className="text-right">관찰률</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                     {shareRows.map((s) => (
                       <TableRow key={s.key}>
                         <TableCell className="text-sm">
@@ -610,9 +615,14 @@ function RunDetailPage() {
                         <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
                       </TableRow>
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                  관찰률은 유효 질문 중 해당 업체가 한 번 이상 확인된 질문의 비율입니다. 자동 발견은
+                  사전에 등록한 경쟁업체가 아니라 이번 AI 답변에서 관찰되어 업체로 정리된 항목입니다.
+                </p>
+              </>
             )}
           </CardContent>
         </Card>
