@@ -198,10 +198,7 @@ function fixture(): EntityFactsV2ReadGatewayDTO {
 describe("Entity Facts v2 dashboard cutover mapping", () => {
   it("classifies dashboard areas into direct, separate and deferred paths", () => {
     const bySection = new Map(
-      ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.map((rule) => [
-        rule.section,
-        rule.mode,
-      ]),
+      ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.map((rule) => [rule.section, rule.mode]),
     );
 
     expect(bySection.get("recent_summary")).toBe("direct_v2");
@@ -221,8 +218,9 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(bySection.get("competitor_detail")).toBe("defer");
     expect(bySection.get("reference_sources")).toBe("defer");
 
-    expect(new Set(ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.map((r) => r.section)).size)
-      .toBe(ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.length);
+    expect(new Set(ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.map((r) => r.section)).size).toBe(
+      ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP.length,
+    );
   });
 
   it("preserves the 4.17% to 29.17% current-run range in dashboard metrics", () => {
@@ -335,9 +333,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       visibilityUpperBoundPct: 100,
       visibilityDisplayText: null,
     });
-    expect(
-      model.weakQuestions.rows.some((row) => row.status === "covered"),
-    ).toBe(false);
+    expect(model.weakQuestions.rows.some((row) => row.status === "covered")).toBe(false);
   });
 
   it("keeps question-group lower and upper bounds instead of one legacy rate", () => {
@@ -368,13 +364,9 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       "utf8",
     );
 
-    expect(dashboardSource).toContain(
-      "entity-facts-v2-read-gateway.dashboard-cutover",
-    );
+    expect(dashboardSource).toContain("entity-facts-v2-read-gateway.dashboard-cutover");
     expect(dashboardSource).toContain("getEntityFactsV2ReadGateway");
-    expect(dashboardSource).toContain(
-      "buildEntityFactsV2DashboardCutoverModel",
-    );
+    expect(dashboardSource).toContain("buildEntityFactsV2DashboardCutoverModel");
 
     expect(dashboardSource).not.toContain("ActionRecommendationsSection");
     expect(dashboardSource).toContain("getVisibilityBenchmark");
@@ -383,44 +375,22 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain(
       "추가 확인이 필요한 응답까지 모두 같은 업체로 확인될 경우 최대",
     );
-    expect(dashboardSource).toContain(
-      "확인된 연결과 연결 단서를 포함한 출처",
-    );
-    expect(dashboardSource).toContain(
-      "상위 3곳 여부 추가 확인",
-    );
-    expect(dashboardSource).toContain(
-      'note="이번 측정에서 업체로 확인된 항목"',
-    );
-    expect(dashboardSource).toContain(
-      "같은 업체가 여러 답변에서",
-    );
+    expect(dashboardSource).toContain("확인된 연결과 연결 단서를 포함한 출처");
+    expect(dashboardSource).toContain("상위 3곳 여부 추가 확인");
+    expect(dashboardSource).toContain('note="이번 측정에서 업체로 확인된 항목"');
+    expect(dashboardSource).toContain("같은 업체가 여러 답변에서");
     expect(dashboardSource).toContain(
       "연결이 아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로 표시합니다.",
     );
     expect(dashboardSource).toContain("showAllCompetitors");
     expect(dashboardSource).toContain("showAllWeakQuestions");
-    expect(dashboardSource).toContain(
-      "model.competitors.rows.length > 6",
-    );
-    expect(dashboardSource).toContain(
-      "model.weakQuestions.rows.length > 6",
-    );
-    expect(dashboardSource).toContain(
-      '전체 ${model.competitors.rows.length}곳 보기',
-    );
-    expect(dashboardSource).toContain(
-      '전체 ${model.weakQuestions.rows.length}개 질문 보기',
-    );
-    expect(dashboardSource).not.toContain(
-      '노출 범위 ${q.visibilityDisplayText}',
-    );
-    expect(dashboardSource).toContain(
-      "AI 답변 {s.clueResponseCount}건에서 단서 확인",
-    );
-    expect(dashboardSource).toContain(
-      "최근 측정에서 내 업체 직접 연결 미확인",
-    );
+    expect(dashboardSource).toContain("model.competitors.rows.length > 6");
+    expect(dashboardSource).toContain("model.weakQuestions.rows.length > 6");
+    expect(dashboardSource).toContain("전체 ${model.competitors.rows.length}곳 보기");
+    expect(dashboardSource).toContain("전체 ${model.weakQuestions.rows.length}개 질문 보기");
+    expect(dashboardSource).not.toContain("노출 범위 ${q.visibilityDisplayText}");
+    expect(dashboardSource).toContain("AI 답변 {s.clueResponseCount}건에서 단서 확인");
+    expect(dashboardSource).toContain("최근 측정에서 내 업체 직접 연결 미확인");
     expect(dashboardSource).toContain("기본 진단 최근 측정 결과");
     expect(dashboardSource).toContain("기본 진단 기준");
     expect(dashboardSource).toContain(
