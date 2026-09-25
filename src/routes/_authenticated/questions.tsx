@@ -43,6 +43,10 @@ import {
   toCandidates,
   type SuggestionCandidate,
 } from "@/lib/question-suggestions";
+import {
+  buildCustomQuestionCandidates,
+  validateCustomQuestionInput,
+} from "@/lib/custom-question-suggestions";
 
 export const Route = createFileRoute("/_authenticated/questions")({
   head: () => ({
@@ -93,6 +97,18 @@ function QuestionsPage() {
   const [newSetName, setNewSetName] = useState("");
   const [genMode, setGenMode] = useState<"default" | "internal_remeasurement">("default");
 
+  // --- 맞춤 질문 v0.1: 사용자 확인 입력만 사용, LLM 추론 없음 ---
+  const [openCustom, setOpenCustom] = useState(false);
+  const [openCustomReview, setOpenCustomReview] = useState(false);
+  const [customLocationMode, setCustomLocationMode] = useState<"city" | "region">("city");
+  const [customForm, setCustomForm] = useState({
+    service: "",
+    brandModel: "",
+    customerNeed: "",
+  });
+  const [customCandidates, setCustomCandidates] = useState<SuggestionCandidate[]>([]);
+  const [customSetName, setCustomSetName] = useState("");
+
   const checkInternalAccess = useServerFn(canViewDataAssetAdmin);
   const { data: internalAccess } = useQuery({
     queryKey: ["questions-internal-access"],
@@ -121,6 +137,66 @@ function QuestionsPage() {
       return data;
     },
   });
+
+  const customLocation =
+    customLocationMode === "city"
+      ? selectedBusiness?.city ?? selectedBusiness?.region ?? ""
+      : selectedBusiness?.region ?? selectedBusiness?.city ?? "";
+
+  const openCustomBuilder = () => {
+    if (!selectedBusiness) {
+      toast.error("업체 정보를 먼저 불러와 주세요.");
+      return;
+    }
+    const hasCity = !!selectedBusiness.city?.trim();
+    const hasRegion = !!selectedBusiness.region?.trim();
+    if (!hasCity && !hasRegion) {
+      toast.error("등록된 지역 정보가 없어 맞춤 질문을 만들 수 없습니다.");
+      return;
+    }
+    setCustomLocationMode(hasCity ? "city" : "region");
+    setCustomForm({ service: "", brandModel: "", customerNeed: "" });
+    setCustomCandidates([]);
+    setOpenCustom(true);
+  };
+
+  const createCustomCandidates = () => {
+    const businessName = selectedBusiness?.name ?? "";
+    const validation = validateCustomQuestionInput(
+      {
+        location: customLocation,
+        service: customForm.service,
+        brandModel: customForm.brandModel,
+        customerNeed: customForm.customerNeed,
+      },
+      businessName,
+    );
+
+    if (!validation.ok) {
+      const message =
+        validation.error === "SERVICE_REQUIRED"
+          ? "주력 서비스를 입력해 주세요."
+          : validation.error === "LOCATION_REQUIRED"
+            ? "측정 지역을 확인해 주세요."
+            : validation.error === "BUSINESS_NAME_INCLUDED"
+              ? "맞춤 입력에는 내 업체명을 넣지 말아 주세요."
+              : "입력값이 너무 깁니다. 각 항목은 80자 이내로 입력해 주세요.";
+      toast.error(message);
+      return;
+    }
+
+    const list = buildCustomQuestionCandidates(validation.value, businessName);
+    if (list.length !== 8) {
+      toast.error("맞춤 질문 8개를 완성하지 못했습니다. 입력값을 확인해 주세요.");
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    setCustomCandidates(list);
+    setCustomSetName(`맞춤 질문 · ${businessName || "업체"} · ${today}`);
+    setOpenCustom(false);
+    setOpenCustomReview(true);
+  };
 
   const { data: sets = [] } = useQuery({
     queryKey: ["question-sets", activeOrgId, businessId],
@@ -315,6 +391,64 @@ function QuestionsPage() {
     },
   });
 
+  const saveCustomSuggestions = useMutation({
+    mutationFn: async () => {
+      const selected = customCandidates.filter((candidate) => candidate.selected);
+      if (selected.length === 0) throw new Error("NO_SELECTION");
+      if (!customSetName.trim()) throw new Error("NO_SET_NAME");
+
+      const { data, error: setErr } = await supabase
+        .from("question_sets")
+        .insert({
+          org_id: activeOrgId!,
+          business_id: businessId,
+          name: customSetName.trim(),
+        })
+        .select("id")
+        .single();
+      if (setErr) throw setErr;
+      const destSetId = data.id as string;
+
+      const { kept } = dedupeForSave(selected, []);
+      if (kept.length === 0) throw new Error("ALL_DUPLICATE");
+
+      const payloads = buildInsertPayloads(kept, {
+        orgId: activeOrgId!,
+        questionSetId: destSetId,
+        region: selectedBusiness?.region ?? null,
+        city: selectedBusiness?.city ?? null,
+      });
+      const { error } = await supabase.from("questions").insert(payloads);
+      if (error) throw error;
+
+      return { destSetId, inserted: kept.length };
+    },
+    onSuccess: (res) => {
+      toast.success(`맞춤 질문 ${res.inserted}개를 별도 세트로 저장했습니다.`);
+      setOpenCustomReview(false);
+      setCustomCandidates([]);
+      setSetId(res.destSetId);
+      qc.invalidateQueries({ queryKey: ["question-sets", activeOrgId, businessId] });
+      qc.invalidateQueries({ queryKey: ["questions-inventory", activeOrgId, businessId] });
+      qc.invalidateQueries({ queryKey: ["questions", activeOrgId, res.destSetId] });
+    },
+    onError: (e: Error) => {
+      if (e.message === "NO_SELECTION") {
+        toast.error("저장할 맞춤 질문을 한 개 이상 선택해 주세요.");
+        return;
+      }
+      if (e.message === "NO_SET_NAME") {
+        toast.error("질문 세트 이름을 입력해 주세요.");
+        return;
+      }
+      if (e.message === "ALL_DUPLICATE") {
+        toast.error("저장할 맞춤 질문이 없습니다.");
+        return;
+      }
+      toast.error(`맞춤 질문 저장 실패: ${e.message}`);
+    },
+  });
+
   const candidateIntentCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of candidates) map.set(c.intentType, (map.get(c.intentType) ?? 0) + 1);
@@ -351,6 +485,13 @@ function QuestionsPage() {
                 >
                   추천 검색 질문 만들기
                 </Button>
+                <Button
+                  variant="outline"
+                  disabled={!businessId}
+                  onClick={openCustomBuilder}
+                >
+                  맞춤 질문 만들기
+                </Button>
                 {isInternalOperator && (
                   <Button
                     variant="outline"
@@ -369,9 +510,14 @@ function QuestionsPage() {
             )}
           </div>
 
-          <p className="w-full text-xs text-muted-foreground">
-            지역·추천·서비스·후기·신뢰·비교·가격·탐색 등 다양한 상황의 검색 질문 24개를 자동으로 만듭니다.
-          </p>
+          <div className="w-full space-y-1 text-xs text-muted-foreground">
+            <p>
+              추천 검색 질문은 지역·추천·서비스·후기·신뢰·비교·가격·탐색 등 24개 표준 질문을 만듭니다.
+            </p>
+            <p>
+              맞춤 질문은 사장님이 직접 확인한 지역·서비스·브랜드/차종만 사용해 별도 질문 세트로 만듭니다.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -530,6 +676,169 @@ function QuestionsPage() {
           <DialogFooter>
             <Button type="submit" form="q-form" disabled={saveQuestion.isPending || isSetLocked}>
               저장
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={openCustom} onOpenChange={setOpenCustom}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>맞춤 질문 만들기</DialogTitle>
+            <DialogDescription>
+              AI가 업체 특징을 추측하지 않습니다. 사장님이 확인한 정보만 조합해 8개 질문 후보를 만듭니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>측정 지역 범위</Label>
+              <Select
+                value={customLocationMode}
+                onValueChange={(value) => setCustomLocationMode(value as "city" | "region")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedBusiness?.city && (
+                    <SelectItem value="city">상세 지역 · {selectedBusiness.city}</SelectItem>
+                  )}
+                  {selectedBusiness?.region && (
+                    <SelectItem value="region">광역 지역 · {selectedBusiness.region}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                등록된 지역만 사용해 질문 문구와 측정 위치가 어긋나지 않게 합니다.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom-service">주력 서비스</Label>
+              <Input
+                id="custom-service"
+                placeholder="예: 신차패키지, 타이어 교체, 엔진오일"
+                value={customForm.service}
+                onChange={(e) => setCustomForm({ ...customForm, service: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                실제로 제공하고 있고 이번에 확인하고 싶은 서비스만 입력해 주세요.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom-brand">중요 브랜드·차종 (선택)</Label>
+              <Input
+                id="custom-brand"
+                placeholder="예: 테슬라 모델Y"
+                value={customForm.brandModel}
+                onChange={(e) => setCustomForm({ ...customForm, brandModel: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom-need">중요 고객 니즈 (선택)</Label>
+              <Input
+                id="custom-need"
+                placeholder="예: 출고 후 한 번에 시공, 주말 상담"
+                value={customForm.customerNeed}
+                onChange={(e) => setCustomForm({ ...customForm, customerNeed: e.target.value })}
+              />
+            </div>
+
+            <div className="rounded-md border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
+              기본 24문항은 변경하지 않습니다. 맞춤 질문은 별도 질문 세트로 저장되며,
+              내 업체명이 포함된 입력은 차단합니다.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenCustom(false)}>
+              취소
+            </Button>
+            <Button onClick={createCustomCandidates}>8개 질문 후보 보기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openCustomReview}
+        onOpenChange={(value) => !saveCustomSuggestions.isPending && setOpenCustomReview(value)}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              맞춤 질문 검토 ({customCandidates.filter((candidate) => candidate.selected).length}/
+              {customCandidates.length}개 선택)
+            </DialogTitle>
+            <DialogDescription>
+              실제로 중요하게 보는 질문만 체크해 별도 세트로 저장하세요. 기본 24문항과 섞지 않습니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+            <p>지역: {customLocation}</p>
+            <p>서비스: {customForm.service || "-"}</p>
+            {customForm.brandModel && <p>브랜드·차종: {customForm.brandModel}</p>}
+            {customForm.customerNeed && <p>고객 니즈: {customForm.customerNeed}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="custom-set-name">질문 세트 이름</Label>
+            <Input
+              id="custom-set-name"
+              value={customSetName}
+              onChange={(e) => setCustomSetName(e.target.value)}
+            />
+          </div>
+
+          <div className="divide-y rounded-md border">
+            {customCandidates.map((candidate) => (
+              <label
+                key={candidate.id}
+                className="flex cursor-pointer items-start gap-3 p-3 hover:bg-muted/30"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4"
+                  checked={candidate.selected}
+                  onChange={(e) =>
+                    setCustomCandidates((current) =>
+                      current.map((item) =>
+                        item.id === candidate.id
+                          ? { ...item, selected: e.target.checked }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm">{candidate.promptText}</p>
+                  <span className="text-xs text-muted-foreground">
+                    {intentLabel(candidate.intentType)}
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <p className="text-xs leading-5 text-muted-foreground">
+            맞춤 세트는 별도 측정용입니다. 첫 측정을 시작하면 기존 질문 세트와 동일하게 질문 문구가 고정됩니다.
+          </p>
+
+          <DialogFooter>
+            <Button
+              onClick={() => saveCustomSuggestions.mutate()}
+              disabled={
+                saveCustomSuggestions.isPending ||
+                !customSetName.trim() ||
+                customCandidates.every((candidate) => !candidate.selected)
+              }
+            >
+              {saveCustomSuggestions.isPending
+                ? "저장 중…"
+                : `선택한 ${customCandidates.filter((candidate) => candidate.selected).length}개 저장`}
             </Button>
           </DialogFooter>
         </DialogContent>
