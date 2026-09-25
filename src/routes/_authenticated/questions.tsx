@@ -734,10 +734,13 @@ function QuestionsPage() {
               <Label htmlFor="custom-brand">중요 브랜드·차종 (선택)</Label>
               <Input
                 id="custom-brand"
-                placeholder="예: 테슬라 모델Y"
+                placeholder="예: 테슬라, 테슬라 모델Y, 테슬라 모델3"
                 value={customForm.brandModel}
                 onChange={(e) => setCustomForm({ ...customForm, brandModel: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground">
+                여러 개라면 쉼표로 구분해 주세요. 최대 4개까지 질문에 나눠 반영합니다.
+              </p>
             </div>
 
             <div className="space-y-2">
