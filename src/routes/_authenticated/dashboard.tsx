@@ -23,6 +23,11 @@ import { buildActionOpportunityEngineV01 } from "@/lib/action-opportunity-engine
 import { getActionOpportunityEvidence } from "@/lib/action-opportunity-evidence.functions";
 import { getVerifiedFirstPartySourceTypes } from "@/lib/first-party-source-registry.functions";
 import { getVisibilityBenchmark } from "@/lib/visibility-benchmark.functions";
+import { getCustomDiagnostic } from "@/lib/custom-diagnostic.functions";
+import type {
+  CustomDiagnosticDTO,
+  CustomDiagnosticQuestionDTO,
+} from "@/lib/custom-diagnostic.helpers";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -393,6 +398,17 @@ function DashboardPage() {
   });
   const actionEvidenceExamples = actionEvidenceQuery.data?.highVisibilityExamples ?? [];
   const currentRunReferences = actionEvidenceQuery.data?.currentRunReferences ?? [];
+
+  const fetchCustom = useServerFn(getCustomDiagnostic);
+  const customQuery = useQuery({
+    queryKey: ["custom-diagnostic", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    retry: false,
+    queryFn: () =>
+      fetchCustom({
+        data: { orgId: activeOrgId as string, businessId: businessId as string },
+      }),
+  });
 
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
