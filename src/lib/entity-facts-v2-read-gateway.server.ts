@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, Json } from "@/integrations/supabase/types";
+import { CUSTOMER_STANDARD_QUESTION_COUNT } from "@/lib/customer-measurement.helpers";
 import { buildEntityFactsV2ReadGatewayFromSnapshot } from "./entity-facts-v2-read-gateway.build";
 import {
   ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION,
@@ -163,6 +164,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     .eq("phase", "standalone")
     .eq("diagnostic_scope", "customer")
     .eq("status", "completed")
+    .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
     .is("experiment_id", null)
     .order("completed_at", { ascending: false })
     .limit(1)
