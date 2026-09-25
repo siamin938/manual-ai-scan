@@ -223,20 +223,6 @@ function QuestionsPage() {
 
   const setIds = useMemo(() => sets.map((s) => s.id), [sets]);
 
-  /** 선택 업체의 전체 질문 현황(인벤토리 요약용). */
-  const { data: allQuestions = [] } = useQuery({
-    queryKey: ["questions-inventory", activeOrgId, businessId, setIds.join(",")],
-    enabled: !!activeOrgId && setIds.length > 0,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("questions")
-        .select("id, intent_type, active, data_class, question_set_id")
-        .in("question_set_id", setIds);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
   /** 첫 측정이 시작된 질문 세트(UI 잠금 판단용, 읽기 전용). */
   const { data: lockedSetIds = [] } = useQuery({
     queryKey: ["question-set-locks", activeOrgId, businessId, setIds.join(",")],
@@ -273,10 +259,11 @@ function QuestionsPage() {
   });
 
   useEffect(() => {
-    if (setId && !setIds.includes(setId)) setSetId("");
+    if (!setIds.includes(setId)) setSetId(setIds[0] ?? "");
   }, [setId, setIds]);
 
-  const activeQuestions = allQuestions.filter((q) => q.active);
+  const selectedSet = sets.find((set) => set.id === setId) ?? null;
+  const activeQuestions = questions.filter((q) => q.active);
   const intentCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const q of activeQuestions) {
@@ -504,7 +491,8 @@ function QuestionsPage() {
                 만듭니다.
               </p>
               <p className="text-xs text-muted-foreground">
-                사장님이 직접 확인한 정보만 사용하며, 기본 24문항과 별도 세트로 저장됩니다.
+                사장님이 직접 확인한 정보만 사용하며, 맞춤 진단 결과는 기본 진단과 구분해서 확인할
+                수 있습니다.
               </p>
             </CardHeader>
             <CardContent>
@@ -546,7 +534,8 @@ function QuestionsPage() {
       )}
 
       {isInternalOperator && (
-        <div className="flex items-center justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-4 py-3">
+          <p className="text-xs font-medium text-muted-foreground">운영자 도구</p>
           <Button
             variant="outline"
             size="sm"
@@ -564,13 +553,20 @@ function QuestionsPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">질문 세트</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">현재 질문 세트</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold tabular-nums">{sets.length}</CardContent>
+          <CardContent>
+            <p
+              className="truncate text-base font-semibold"
+              title={selectedSet?.name ?? undefined}
+            >
+              {selectedSet?.name ?? "선택된 세트 없음"}
+            </p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">활성 질문</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">질문 수</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold tabular-nums">
             {activeQuestions.length}
@@ -578,7 +574,7 @@ function QuestionsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">질문군</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">검색 상황</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold tabular-nums">
             {intentCounts.length}
@@ -593,7 +589,7 @@ function QuestionsPage() {
         <CardContent className="flex flex-wrap gap-2">
           {intentCounts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              아직 질문이 없습니다. 내 업체 맞춤 진단 또는 기본 진단 24문항을 만들어 시작하세요.
+              질문 세트를 선택하면 검색 상황별 질문 수가 표시됩니다.
             </p>
           ) : (
             intentCounts.map(([intent, count]) => (
