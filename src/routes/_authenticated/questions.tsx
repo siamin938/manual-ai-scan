@@ -463,7 +463,7 @@ function QuestionsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">검색 질문</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          고객이 AI에 실제로 물어볼 만한 질문을 만들고, 측정에 사용할 질문을 확인합니다.
+          내 업체에서 실제로 중요하게 보는 AI 검색을 먼저 설정하고, 기본 진단 질문은 비교 기준으로 함께 관리합니다.
         </p>
       </div>
 
@@ -476,53 +476,82 @@ function QuestionsPage() {
             isLoading={businessSelection.isLoading}
             isError={businessSelection.isError}
           />
-          <div className="ml-auto flex items-center gap-3">
-            {canWrite ? (
-              <>
-                <Button
-                  disabled={!businessId}
-                  onClick={() => {
-                    setGenMode("default");
-                    setOpenConfirmAi(true);
-                  }}
-                >
-                  추천 검색 질문 만들기
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={!businessId}
-                  onClick={openCustomBuilder}
-                >
-                  맞춤 질문 만들기
-                </Button>
-                {isInternalOperator && (
-                  <Button
-                    variant="outline"
-                    disabled={!businessId}
-                    onClick={() => {
-                      setGenMode("internal_remeasurement");
-                      setOpenConfirmAi(true);
-                    }}
-                  >
-                    최신 Market 질문 새 세트 만들기
-                  </Button>
-                )}
-              </>
-            ) : (
+          {!canWrite && (
+            <div className="ml-auto">
               <Badge variant="secondary">조회 전용 권한</Badge>
-            )}
-          </div>
-
-          <div className="w-full space-y-1 text-xs text-muted-foreground">
-            <p>
-              추천 검색 질문은 지역·추천·서비스·후기·신뢰·비교·가격·탐색 등 24개 표준 질문을 만듭니다.
-            </p>
-            <p>
-              맞춤 질문은 사장님이 직접 확인한 지역·서비스·브랜드/차종만 사용해 별도 질문 세트로 만듭니다.
-            </p>
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {canWrite && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* A. 메인 — 내 업체 맞춤 진단 */}
+          <Card className="border-primary/50 shadow-sm">
+            <CardHeader className="space-y-1.5 pb-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-base">내 업체 맞춤 진단</CardTitle>
+                <Badge>추천</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                지역 · 주력 서비스 · 중요 브랜드/차종을 기준으로 내 업체에 중요한 검색 질문을 만듭니다.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                사장님이 직접 확인한 정보만 사용하며, 기본 24문항과 별도 세트로 저장됩니다.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <Button disabled={!businessId} onClick={openCustomBuilder}>
+                내 업체 맞춤 진단 만들기
+              </Button>
+              {!businessId && (
+                <p className="mt-2 text-xs text-muted-foreground">먼저 업체를 선택해 주세요.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* B. 보조 — 기본 AI 노출 진단 */}
+          <Card>
+            <CardHeader className="space-y-1.5 pb-3">
+              <CardTitle className="text-base">기본 AI 노출 진단</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                업종과 지역을 기준으로 동일한 24개 질문을 사용해 전체 노출 상태와 장기 변화를 확인합니다.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                업체 간/기간 비교를 위한 기준선입니다.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                disabled={!businessId}
+                onClick={() => {
+                  setGenMode("default");
+                  setOpenConfirmAi(true);
+                }}
+              >
+                기본 진단 24문항 만들기
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isInternalOperator && (
+        <div className="flex items-center justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!businessId}
+            onClick={() => {
+              setGenMode("internal_remeasurement");
+              setOpenConfirmAi(true);
+            }}
+          >
+            최신 Market 질문 새 세트 만들기
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
@@ -552,7 +581,7 @@ function QuestionsPage() {
         <CardContent className="flex flex-wrap gap-2">
           {intentCounts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              아직 질문이 없습니다. 추천 검색 질문 만들기로 시작하세요.
+              아직 질문이 없습니다. 내 업체 맞춤 진단 또는 기본 진단 24문항을 만들어 시작하세요.
             </p>
           ) : (
             intentCounts.map(([intent, count]) => (
@@ -687,7 +716,7 @@ function QuestionsPage() {
       <Dialog open={openCustom} onOpenChange={setOpenCustom}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>맞춤 질문 만들기</DialogTitle>
+            <DialogTitle>내 업체 맞춤 진단 만들기</DialogTitle>
             <DialogDescription>
               AI가 업체 특징을 추측하지 않습니다. 사장님이 확인한 정보만 조합해 8개 질문 후보를 만듭니다.
             </DialogDescription>
