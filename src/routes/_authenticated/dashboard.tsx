@@ -479,6 +479,9 @@ function DashboardPage() {
           <p className="text-xs text-muted-foreground">
             맞춤 진단과 질문 구성이 다르므로 두 노출률을 상승·하락으로 직접 비교하지 않습니다.
           </p>
+          <p className="text-xs text-muted-foreground">
+            아래 상세 분석과 벤치마크는 기본 24문항 측정을 기준으로 합니다.
+          </p>
         </section>
       )}
 
@@ -556,7 +559,7 @@ function DashboardPage() {
           <Card className="report-section border-t-2 border-t-primary">
             <CardHeader className="border-b bg-muted/25 pb-4">
               <p className="report-kicker">EXECUTIVE SUMMARY</p>
-              <CardTitle className="text-xl">최근 측정 결과</CardTitle>
+              <CardTitle className="text-xl">기본 진단 최근 측정 결과</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 pt-5 text-base leading-7 lg:grid-cols-2 lg:gap-x-10">
               <MeasurementStatusBar
@@ -640,7 +643,10 @@ function DashboardPage() {
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">OBSERVED BUSINESSES</p>
-              <CardTitle className="text-xl">{model.competitors.heading}</CardTitle>
+              <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+                {model.competitors.heading}
+                <BaselineBadge />
+              </CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
@@ -701,7 +707,10 @@ function DashboardPage() {
           <div className="grid items-start gap-6 lg:grid-cols-2">
             <Card className="report-section">
               <CardHeader className="border-b bg-muted/20">
-                <CardTitle className="text-xl">{model.weakQuestions.heading}</CardTitle>
+                <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+                  {model.weakQuestions.heading}
+                  <BaselineBadge />
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
@@ -753,7 +762,10 @@ function DashboardPage() {
 
             <Card className="report-section">
               <CardHeader className="border-b bg-muted/20">
-                <CardTitle className="text-xl">{model.sources.heading}</CardTitle>
+                <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+                  {model.sources.heading}
+                  <BaselineBadge />
+                </CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
@@ -845,7 +857,10 @@ function DashboardPage() {
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">SEARCH CONTEXT</p>
-              <CardTitle className="text-xl">어떤 검색 상황에서 보였나요?</CardTitle>
+              <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+                어떤 검색 상황에서 보였나요?
+                <BaselineBadge />
+              </CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
@@ -865,7 +880,10 @@ function DashboardPage() {
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">METHODOLOGY</p>
-              <CardTitle className="text-xl">분석 방법과 신뢰도</CardTitle>
+              <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+                분석 방법과 신뢰도
+                <BaselineBadge />
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-xs text-muted-foreground">
               <p>
@@ -885,6 +903,17 @@ function DashboardPage() {
         </>
       )}
     </div>
+  );
+}
+
+function BaselineBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className="shrink-0 px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
+    >
+      기본 진단 기준
+    </Badge>
   );
 }
 
@@ -917,7 +946,10 @@ function ActionOpportunitySection({
     <Card className="report-section border-t-2 border-t-primary">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">ACTION OPPORTUNITIES</p>
-        <CardTitle className="text-xl">{model.heading}</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+          {model.heading}
+          <BaselineBadge />
+        </CardTitle>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{model.description}</p>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
@@ -1094,7 +1126,10 @@ function CurrentRunReferenceSection({
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">CURRENT RUN REFERENCES</p>
-        <CardTitle className="text-xl">이번 측정에서 확인된 타업체 출처 사례</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+          이번 측정에서 확인된 타업체 출처 사례
+          <BaselineBadge />
+        </CardTitle>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           고노출 우선순위 근거와는 별도 참고 정보입니다. 내 업체와의 연결은 확인되지 않았지만, 이번
           측정에서 다른 업체와 확정 연결된 출처만 보여드립니다.
@@ -1156,7 +1191,10 @@ function ComparisonCard({
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">측정 비교</p>
-        <CardTitle className="text-xl">{model.heading}</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+          {model.heading}
+          <BaselineBadge />
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
         <p className="text-sm leading-6 text-muted-foreground">{model.description}</p>
@@ -1221,6 +1259,7 @@ function BenchmarkCard({
         <p className="report-kicker">MARKET BENCHMARK</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
           AI에 자주 추천되는 업체들은 어디에서 많이 보일까요?
+          <BaselineBadge />
           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
             데이터 축적 중
           </Badge>
