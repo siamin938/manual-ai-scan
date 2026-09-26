@@ -93,8 +93,8 @@ export type EntityFactsV2ReadScopeDTO = {
   runId: string;
   runName: string;
   /** Optional metadata for legacy snapshot compatibility. */
-  questionSetId?: string;
-  questionSetName?: string;
+  questionSetId?: string | undefined;
+  questionSetName?: string | undefined;
   measuredAt: string;
   providers: string[];
   repetitions: number;
