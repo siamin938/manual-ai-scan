@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import {
   CUSTOMER_RUN_REPETITIONS,
+  CUSTOMER_STANDARD_QUESTION_COUNT,
   calcEstimatedCostUsd,
   calcInternalMaxCostUsd,
   calcPlannedJobs,
@@ -18,6 +19,10 @@ import {
   type CreateCustomerMeasurementResult,
   type CustomerMeasurementErrorCode,
 } from "./customer-measurement.helpers";
+import {
+  hasUnifiedDiagnosticIntentShape,
+  isUnifiedDiagnosticSetName,
+} from "./custom-question-suggestions";
 
 type UserClient = SupabaseClient<Database>;
 
@@ -57,21 +62,31 @@ export async function createCustomerMeasurementRun(args: {
     .maybeSingle();
   if (bizErr || !business) return fail("INVALID_BUSINESS");
 
-  // C) question set scope
-  const { data: questionSet, error: setErr } = await supabase
+  // C) question set scope.
+  // 통합 AI 진단 세트가 하나라도 생긴 업체는 서버에서도 legacy 세트로 새 고객 측정을 만들지 않는다.
+  // UI 선택 제한만 믿지 않고 direct call도 같은 계약으로 fail-closed 한다.
+  const { data: activeQuestionSets, error: setErr } = await supabase
     .from("question_sets")
-    .select("id")
-    .eq("id", questionSetId)
+    .select("id, name")
     .eq("org_id", orgId)
     .eq("business_id", businessId)
-    .eq("active", true)
-    .maybeSingle();
-  if (setErr || !questionSet) return fail("INVALID_QUESTION_SET");
+    .eq("active", true);
+  if (setErr) return fail("INTERNAL_ERROR");
 
-  // D) active questions, fail-closed on non-public data_class
+  const questionSet = (activeQuestionSets ?? []).find((set) => set.id === questionSetId);
+  if (!questionSet) return fail("INVALID_QUESTION_SET");
+
+  const hasUnifiedSet = (activeQuestionSets ?? []).some((set) =>
+    isUnifiedDiagnosticSetName(set.name),
+  );
+  if (hasUnifiedSet && !isUnifiedDiagnosticSetName(questionSet.name)) {
+    return fail("INVALID_QUESTION_SET");
+  }
+
+  // D) active questions, fail-closed on non-public data_class.
   const { data: questions, error: qErr } = await supabase
     .from("questions")
-    .select("id, data_class")
+    .select("id, data_class, intent_type")
     .eq("org_id", orgId)
     .eq("question_set_id", questionSetId)
     .eq("active", true);
@@ -79,6 +94,15 @@ export async function createCustomerMeasurementRun(args: {
   const activeQuestions = questions ?? [];
   if (activeQuestions.length === 0) return fail("NO_ACTIVE_QUESTIONS");
   if (activeQuestions.some((q) => q.data_class !== "public")) return fail("RESTRICTED_QUESTIONS");
+
+  if (isUnifiedDiagnosticSetName(questionSet.name)) {
+    if (
+      activeQuestions.length !== CUSTOMER_STANDARD_QUESTION_COUNT ||
+      !hasUnifiedDiagnosticIntentShape(activeQuestions.map((q) => q.intent_type))
+    ) {
+      return fail("INVALID_QUESTION_SET");
+    }
+  }
 
   // E) provider readiness (내부 설정명은 고객에게 노출하지 않음)
   const { data: providerSettings, error: psErr } = await supabase
