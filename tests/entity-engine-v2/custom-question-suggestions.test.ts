@@ -170,7 +170,11 @@ describe("custom question suggestions v0.1", () => {
       'const city = customLocationMode === "region" ? null : (selectedBusiness?.city ?? null);',
     );
     expect(source).toContain('buildCustomQuestionSetSignature(');
-    expect(source).toContain('같은 맞춤 질문 세트가 이미 있어 기존 세트를 선택했습니다.');
+    expect(source).toContain('같은 AI 진단 질문 세트가 이미 있어 기존 세트를 선택했습니다.');
+    expect(source).toContain("내 업체 AI 진단 24문항 만들기");
+    expect(source).toContain("AI 진단 질문 검토");
+    expect(source).toContain("24개 질문 저장");
+    expect(source).not.toContain("기본 진단 24문항 만들기");
   });
 
   it("keeps baseline question metadata independent from custom location mode", async () => {
