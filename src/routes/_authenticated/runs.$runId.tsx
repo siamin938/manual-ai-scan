@@ -360,16 +360,30 @@ function RunDetailPage() {
           <h1 className="text-xl font-semibold tracking-tight">{run.name}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Badge
-              variant={questionSetKind === "custom" ? "default" : questionSetKind === "baseline" ? "outline" : "secondary"}
+              variant={
+                questionSetKind === "unified"
+                  ? "default"
+                  : questionSetKind === "baseline"
+                    ? "outline"
+                    : "secondary"
+              }
             >
-              {questionSetKind === "custom" ? "맞춤 진단" : questionSetKind === "baseline" ? "기본 진단" : "일반 측정"}
+              {questionSetKind === "unified"
+                ? "AI 진단"
+                : questionSetKind === "custom"
+                  ? "이전 맞춤 진단"
+                  : questionSetKind === "baseline"
+                    ? "이전 기본 진단"
+                    : "일반 측정"}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              {questionSetKind === "custom"
-                ? `내 업체 맞춤 진단 · 질문 ${totalJobs}개`
-                : questionSetKind === "baseline"
-                  ? `비교 기준 · 질문 ${totalJobs}개`
-                  : `질문 ${totalJobs}개`}
+              {questionSetKind === "unified"
+                ? `대표 진단 · 질문 ${totalJobs}개`
+                : questionSetKind === "custom"
+                  ? `이전 맞춤 진단 · 질문 ${totalJobs}개`
+                  : questionSetKind === "baseline"
+                    ? `이전 비교 기준 · 질문 ${totalJobs}개`
+                    : `질문 ${totalJobs}개`}
             </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">내 업체 {data.businessName}</p>
@@ -377,11 +391,13 @@ function RunDetailPage() {
             <p className="mt-1 text-xs text-muted-foreground">질문 세트 · {data.questionSetName}</p>
           ) : null}
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            {questionSetKind === "custom"
-              ? "내 업체에서 중요하게 설정한 맞춤 질문으로 진행한 측정입니다. 최신 완료 맞춤 측정이 대시보드 대표 진단으로 사용됩니다."
-              : questionSetKind === "baseline"
-                ? "같은 24개 질문으로 전체 노출 상태와 장기 변화를 보는 비교 기준 측정입니다."
-                : "선택한 질문 세트로 진행한 측정입니다."}
+            {questionSetKind === "unified"
+              ? "내 업체에 맞춘 24개 질문으로 진행한 통합 AI 진단입니다. 이 측정은 대표 노출·관찰 업체·출처·기간 비교의 기준으로 사용됩니다."
+              : questionSetKind === "custom"
+                ? "이전 방식의 맞춤 질문으로 진행한 측정입니다. 과거 이력 확인용으로 보존됩니다."
+                : questionSetKind === "baseline"
+                  ? "이전 방식의 기본 24문항 측정입니다. 과거 비교 기준 이력으로 보존됩니다."
+                  : "선택한 질문 세트로 진행한 측정입니다."}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
