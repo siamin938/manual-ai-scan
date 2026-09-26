@@ -37,8 +37,8 @@ describe("unified diagnostic layer summary", () => {
     );
     const questionAreas = [...core, ...custom];
     const questionLocations = [
-      ...core.map((item) => ({ id: item.questionId, city: null })),
-      ...custom.map((item) => ({ id: item.questionId, city: "구로구" })),
+      ...core.map((item) => ({ questionId: item.questionId, city: null })),
+      ...custom.map((item) => ({ questionId: item.questionId, city: "구로구" })),
     ];
 
     const summary = buildUnifiedDiagnosticLayerSummary({
@@ -80,7 +80,7 @@ describe("unified diagnostic layer summary", () => {
       area(`q-${index + 1}`, index < 16 ? 1 : 0),
     );
     const questionLocations = questionAreas.map((item, index) => ({
-      id: item.questionId,
+      questionId: item.questionId,
       city: index < 17 ? "구로구" : null,
     }));
 
@@ -102,7 +102,7 @@ describe("unified diagnostic layer summary", () => {
       area(`q-${index + 1}`, index >= 8 ? 1 : 0),
     );
     const validLocations = questionAreas.map((item, index) => ({
-      id: item.questionId,
+      questionId: item.questionId,
       city: index < 8 ? null : "구로구",
     }));
 
