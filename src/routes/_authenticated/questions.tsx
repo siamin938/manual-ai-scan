@@ -47,8 +47,9 @@ import {
   type SuggestionCandidate,
 } from "@/lib/question-suggestions";
 import {
-  buildCustomQuestionCandidates,
+  UNIFIED_DIAGNOSTIC_SET_PREFIX,
   buildCustomQuestionSetSignature,
+  buildUnifiedDiagnosticQuestionCandidates,
   validateCustomQuestionInput,
 } from "@/lib/custom-question-suggestions";
 
@@ -58,12 +59,12 @@ export const Route = createFileRoute("/_authenticated/questions")({
       { title: "검색 질문 · 차보임 CHABOIM" },
       {
         name: "description",
-        content: "AI 측정에 사용할 표준 검색 질문을 만들고 확인합니다.",
+        content: "내 업체 AI 진단에 사용할 24개 검색 질문을 만들고 확인합니다.",
       },
       { property: "og:title", content: "검색 질문 · 차보임 CHABOIM" },
       {
         property: "og:description",
-        content: "AI 측정에 사용할 표준 검색 질문을 만들고 확인합니다.",
+        content: "내 업체 AI 진단에 사용할 24개 검색 질문을 만들고 확인합니다.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -107,7 +108,7 @@ function QuestionsPage() {
   const [newSetName, setNewSetName] = useState("");
   const [genMode, setGenMode] = useState<"default" | "internal_remeasurement">("default");
 
-  // --- 맞춤 질문 v0.1: 사용자 확인 입력만 사용, LLM 추론 없음 ---
+  // --- 통합 AI 진단 질문 v0.2: 사용자 확인 입력만 사용, LLM 추론 없음 ---
   const [openCustom, setOpenCustom] = useState(false);
   const [openCustomReview, setOpenCustomReview] = useState(false);
   const [customLocationMode, setCustomLocationMode] = useState<"city" | "region">("city");
@@ -194,15 +195,15 @@ function QuestionsPage() {
       return;
     }
 
-    const list = buildCustomQuestionCandidates(validation.value, businessName);
-    if (list.length !== 8) {
-      toast.error("맞춤 질문 8개를 완성하지 못했습니다. 입력값을 확인해 주세요.");
+    const list = buildUnifiedDiagnosticQuestionCandidates(validation.value, businessName);
+    if (list.length !== 24) {
+      toast.error("AI 진단 질문 24개를 완성하지 못했습니다. 입력값을 확인해 주세요.");
       return;
     }
 
     const today = new Date().toISOString().slice(0, 10);
     setCustomCandidates(list);
-    setCustomSetName(`맞춤 질문 · ${businessName || "업체"} · ${today}`);
+    setCustomSetName(`${UNIFIED_DIAGNOSTIC_SET_PREFIX}${businessName || "업체"} · ${today}`);
     setOpenCustom(false);
     setOpenCustomReview(true);
   };
@@ -391,11 +392,13 @@ function QuestionsPage() {
   const saveCustomSuggestions = useMutation({
     mutationFn: async () => {
       const selected = customCandidates.filter((candidate) => candidate.selected);
-      if (selected.length === 0) throw new Error("NO_SELECTION");
+      if (customCandidates.length !== 24 || selected.length !== 24) {
+        throw new Error("INCOMPLETE_DIAGNOSTIC_SET");
+      }
       if (!customSetName.trim()) throw new Error("NO_SET_NAME");
 
       const { kept } = dedupeForSave(selected, []);
-      if (kept.length === 0) throw new Error("ALL_DUPLICATE");
+      if (kept.length !== 24) throw new Error("INCOMPLETE_DIAGNOSTIC_SET");
 
       const region = selectedBusiness?.region ?? null;
       const city = customLocationMode === "region" ? null : (selectedBusiness?.city ?? null);
@@ -414,7 +417,7 @@ function QuestionsPage() {
         .eq("org_id", activeOrgId!)
         .eq("business_id", businessId)
         .eq("active", true)
-        .like("name", "맞춤 질문 · %");
+        .like("name", `${UNIFIED_DIAGNOSTIC_SET_PREFIX}%`);
       if (existingSetsError) throw existingSetsError;
 
       const existingSetIds = (existingSets ?? []).map((set) => set.id);
@@ -483,9 +486,9 @@ function QuestionsPage() {
     },
     onSuccess: (res) => {
       if (res.reused) {
-        toast.success("같은 맞춤 질문 세트가 이미 있어 기존 세트를 선택했습니다.");
+        toast.success("같은 AI 진단 질문 세트가 이미 있어 기존 세트를 선택했습니다.");
       } else {
-        toast.success(`맞춤 질문 ${res.inserted}개를 별도 세트로 저장했습니다.`);
+        toast.success(`AI 진단 질문 ${res.inserted}개를 저장했습니다.`);
       }
       setOpenCustomReview(false);
       setCustomCandidates([]);
@@ -495,19 +498,15 @@ function QuestionsPage() {
       qc.invalidateQueries({ queryKey: ["questions", activeOrgId, res.destSetId] });
     },
     onError: (e: Error) => {
-      if (e.message === "NO_SELECTION") {
-        toast.error("저장할 맞춤 질문을 한 개 이상 선택해 주세요.");
+      if (e.message === "INCOMPLETE_DIAGNOSTIC_SET") {
+        toast.error("AI 진단은 24개 질문 전체가 한 세트로 저장되어야 합니다.");
         return;
       }
       if (e.message === "NO_SET_NAME") {
         toast.error("질문 세트 이름을 입력해 주세요.");
         return;
       }
-      if (e.message === "ALL_DUPLICATE") {
-        toast.error("저장할 맞춤 질문이 없습니다.");
-        return;
-      }
-      toast.error(`맞춤 질문 저장 실패: ${e.message}`);
+      toast.error(`AI 진단 질문 저장 실패: ${e.message}`);
     },
   });
 
@@ -522,8 +521,8 @@ function QuestionsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">검색 질문</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          내 업체에서 실제로 중요하게 보는 AI 검색을 먼저 설정하고, 기본 진단 질문은 비교 기준으로
-          함께 관리합니다.
+          내 업체에서 중요하게 보는 AI 검색을 24개 질문으로 구성하고, 같은 질문 세트로 진단과
+          변화를 확인합니다.
         </p>
       </div>
 
@@ -545,75 +544,59 @@ function QuestionsPage() {
       </Card>
 
       {canWrite && (
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* A. 메인 — 내 업체 맞춤 진단 */}
-          <Card className="border-primary/50 shadow-sm">
-            <CardHeader className="space-y-1.5 pb-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base">내 업체 맞춤 진단</CardTitle>
-                <Badge>추천</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                지역 · 주력 서비스 · 중요 브랜드/차종을 기준으로 내 업체에 중요한 검색 질문을
-                만듭니다.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                사장님이 직접 확인한 정보만 사용하며, 맞춤 진단 결과는 기본 진단과 구분해서 확인할
-                수 있습니다.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <Button disabled={!businessId} onClick={openCustomBuilder}>
-                내 업체 맞춤 진단 만들기
-              </Button>
-              {!businessId && (
-                <p className="mt-2 text-xs text-muted-foreground">먼저 업체를 선택해 주세요.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* B. 보조 — 기본 AI 노출 진단 */}
-          <Card>
-            <CardHeader className="space-y-1.5 pb-3">
-              <CardTitle className="text-base">기본 AI 노출 진단</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                업종과 지역을 기준으로 동일한 24개 질문을 사용해 전체 노출 상태와 장기 변화를
-                확인합니다.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                업체 간/기간 비교를 위한 기준선입니다.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <Button
-                variant="outline"
-                disabled={!businessId}
-                onClick={() => {
-                  setGenMode("default");
-                  setOpenConfirmAi(true);
-                }}
-              >
-                기본 진단 24문항 만들기
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="border-primary/50 shadow-sm">
+          <CardHeader className="space-y-1.5 pb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">내 업체 AI 진단</CardTitle>
+              <Badge>추천</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              지역 · 주력 서비스 · 중요 브랜드/차종을 반영해 8개 검색 상황별 3개씩 총 24개
+              질문을 만듭니다.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              사장님이 직접 확인한 정보만 사용하며, 이 한 세트로 대표 노출·관찰 업체·출처·기간
+              비교를 확인합니다.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Button disabled={!businessId} onClick={openCustomBuilder}>
+              내 업체 AI 진단 24문항 만들기
+            </Button>
+            {!businessId && (
+              <p className="mt-2 text-xs text-muted-foreground">먼저 업체를 선택해 주세요.</p>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {isInternalOperator && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-4 py-3">
           <p className="text-xs font-medium text-muted-foreground">운영자 도구</p>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!businessId}
-            onClick={() => {
-              setGenMode("internal_remeasurement");
-              setOpenConfirmAi(true);
-            }}
-          >
-            최신 Market 질문 새 세트 만들기
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!businessId}
+              onClick={() => {
+                setGenMode("default");
+                setOpenConfirmAi(true);
+              }}
+            >
+              이전 기본 24문항 만들기
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!businessId}
+              onClick={() => {
+                setGenMode("internal_remeasurement");
+                setOpenConfirmAi(true);
+              }}
+            >
+              최신 Market 질문 새 세트 만들기
+            </Button>
+          </div>
         </div>
       )}
 
@@ -791,9 +774,9 @@ function QuestionsPage() {
       <Dialog open={openCustom} onOpenChange={setOpenCustom}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>내 업체 맞춤 진단 만들기</DialogTitle>
+            <DialogTitle>내 업체 AI 진단 24문항 만들기</DialogTitle>
             <DialogDescription>
-              AI가 업체 특징을 추측하지 않습니다. 사장님이 확인한 정보만 조합해 8개 질문 후보를
+              AI가 업체 특징을 추측하지 않습니다. 사장님이 확인한 정보만 조합해 24개 진단 질문을
               만듭니다.
             </DialogDescription>
           </DialogHeader>
@@ -859,8 +842,8 @@ function QuestionsPage() {
             </div>
 
             <div className="rounded-md border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
-              기본 24문항은 변경하지 않습니다. 맞춤 질문은 별도 질문 세트로 저장되며, 내 업체명이
-              포함된 입력은 차단합니다.
+              8개 검색 상황마다 3개씩 총 24문항으로 구성합니다. 별도의 기본 질문 세트를 만들
+              필요가 없으며, 내 업체명이 포함된 입력은 차단합니다.
             </div>
           </div>
 
@@ -868,7 +851,7 @@ function QuestionsPage() {
             <Button variant="outline" onClick={() => setOpenCustom(false)}>
               취소
             </Button>
-            <Button onClick={createCustomCandidates}>8개 질문 후보 보기</Button>
+            <Button onClick={createCustomCandidates}>24개 질문 검토하기</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -879,13 +862,9 @@ function QuestionsPage() {
       >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
-              맞춤 질문 검토 ({customCandidates.filter((candidate) => candidate.selected).length}/
-              {customCandidates.length}개 선택)
-            </DialogTitle>
+            <DialogTitle>AI 진단 질문 검토 ({customCandidates.length}개)</DialogTitle>
             <DialogDescription>
-              실제로 중요하게 보는 질문만 체크해 별도 세트로 저장하세요. 기본 24문항과 섞지
-              않습니다.
+              24개 전체가 하나의 진단 세트로 저장됩니다. 질문 문구를 확인한 뒤 저장하세요.
             </DialogDescription>
           </DialogHeader>
 
@@ -896,46 +875,30 @@ function QuestionsPage() {
             {customForm.customerNeed && <p>고객 니즈: {customForm.customerNeed}</p>}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="custom-set-name">질문 세트 이름</Label>
-            <Input
-              id="custom-set-name"
-              value={customSetName}
-              onChange={(e) => setCustomSetName(e.target.value)}
-            />
+          <div className="space-y-1 rounded-md border bg-muted/20 p-3">
+            <p className="text-xs font-medium text-muted-foreground">질문 세트</p>
+            <p className="text-sm font-medium">{customSetName}</p>
           </div>
 
           <div className="divide-y rounded-md border">
-            {customCandidates.map((candidate) => (
-              <label
-                key={candidate.id}
-                className="flex cursor-pointer items-start gap-3 p-3 hover:bg-muted/30"
-              >
-                <input
-                  type="checkbox"
-                  className="mt-1 size-4"
-                  checked={candidate.selected}
-                  onChange={(e) =>
-                    setCustomCandidates((current) =>
-                      current.map((item) =>
-                        item.id === candidate.id ? { ...item, selected: e.target.checked } : item,
-                      ),
-                    )
-                  }
-                />
+            {customCandidates.map((candidate, index) => (
+              <div key={candidate.id} className="flex items-start gap-3 p-3">
+                <span className="mt-0.5 w-6 shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {index + 1}
+                </span>
                 <div className="flex-1 space-y-1">
                   <p className="text-sm">{candidate.promptText}</p>
                   <span className="text-xs text-muted-foreground">
                     {intentLabel(candidate.intentType)}
                   </span>
                 </div>
-              </label>
+              </div>
             ))}
           </div>
 
           <p className="text-xs leading-5 text-muted-foreground">
-            맞춤 세트는 별도 측정용입니다. 첫 측정을 시작하면 기존 질문 세트와 동일하게 질문 문구가
-            고정됩니다.
+            이 24문항이 하나의 AI 진단 기준이 됩니다. 첫 측정을 시작하면 정확한 반복 비교를 위해
+            질문 문구가 고정됩니다.
           </p>
 
           <DialogFooter>
@@ -944,12 +907,10 @@ function QuestionsPage() {
               disabled={
                 saveCustomSuggestions.isPending ||
                 !customSetName.trim() ||
-                customCandidates.every((candidate) => !candidate.selected)
+                customCandidates.length !== 24
               }
             >
-              {saveCustomSuggestions.isPending
-                ? "저장 중…"
-                : `선택한 ${customCandidates.filter((candidate) => candidate.selected).length}개 저장`}
+              {saveCustomSuggestions.isPending ? "저장 중…" : "24개 질문 저장"}
             </Button>
           </DialogFooter>
         </DialogContent>
