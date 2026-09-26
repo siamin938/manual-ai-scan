@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCustomQuestionCandidates,
+  buildCustomQuestionSetSignature,
   naturalizeQuestionLocation,
   parseBrandModelTargets,
   validateCustomQuestionInput,
@@ -101,6 +102,74 @@ describe("custom question suggestions v0.1", () => {
     expect(result[1]?.promptText).toContain("테슬라 모델Y 신차패키지");
     expect(result[2]?.promptText).toContain("테슬라 모델3 신차패키지");
     expect(result.every((item) => !item.promptText.includes("테슬라, 테슬라"))).toBe(true);
+  });
+
+  it("builds a stable signature for identical custom sets regardless of row order", () => {
+    const a = buildCustomQuestionSetSignature([
+      {
+        promptText: "서울에서 테슬라 신차패키지 맡길 수 있는 곳 어디야?",
+        intentType: "local",
+        region: "서울특별시",
+        city: null,
+      },
+      {
+        promptText: "서울에서 테슬라 모델Y 신차패키지 맡길 만한 업체 추천해줘",
+        intentType: "recommendation",
+        region: "서울특별시",
+        city: null,
+      },
+    ]);
+    const b = buildCustomQuestionSetSignature([
+      {
+        promptText: "서울에서 테슬라 모델Y 신차패키지 맡길 만한 업체 추천해줘",
+        intentType: "recommendation",
+        region: "서울특별시",
+        city: null,
+      },
+      {
+        promptText: "  서울에서  테슬라 신차패키지 맡길 수 있는 곳 어디야? ",
+        intentType: "local",
+        region: "서울특별시",
+        city: null,
+      },
+    ]);
+
+    expect(a).toBe(b);
+  });
+
+  it("keeps location metadata in the custom set signature", () => {
+    const regionOnly = buildCustomQuestionSetSignature([
+      {
+        promptText: "서울에서 신차패키지 추천해줘",
+        intentType: "recommendation",
+        region: "서울특별시",
+        city: null,
+      },
+    ]);
+    const cityScoped = buildCustomQuestionSetSignature([
+      {
+        promptText: "서울에서 신차패키지 추천해줘",
+        intentType: "recommendation",
+        region: "서울특별시",
+        city: "구로구",
+      },
+    ]);
+
+    expect(regionOnly).not.toBe(cityScoped);
+  });
+
+  it("locks region-mode custom saves to city=null in the questions screen", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      new URL("../../src/routes/_authenticated/questions.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain(
+      'const city = customLocationMode === "region" ? null : (selectedBusiness?.city ?? null);',
+    );
+    expect(source).toContain('buildCustomQuestionSetSignature(');
+    expect(source).toContain('같은 맞춤 질문 세트가 이미 있어 기존 세트를 선택했습니다.');
   });
 
   it("rejects missing service", () => {
