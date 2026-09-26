@@ -4,6 +4,7 @@ import {
   formatAutoRunName,
   getRunQuestionSetKind,
   isCustomRunQuestionSet,
+  selectCustomerRunQuestionSets,
 } from "../../src/routes/_authenticated/runs.index";
 import {
   CANONICALIZATION_VERSION_CONFLICT,
@@ -43,6 +44,24 @@ describe("run question set selection", () => {
         { id: "older", name: "기본 질문" },
       ]),
     ).toBe("newest");
+  });
+
+  it("shows only unified sets to customers once a unified set exists", () => {
+    expect(
+      selectCustomerRunQuestionSets([
+        { id: "legacy-custom", name: "맞춤 질문 · 이전 세트" },
+        { id: "unified-new", name: "AI 진단 질문 · 업체 · 2026-09-26" },
+        { id: "legacy-base", name: "기본 질문" },
+      ]),
+    ).toEqual([{ id: "unified-new", name: "AI 진단 질문 · 업체 · 2026-09-26" }]);
+  });
+
+  it("keeps legacy choices available before the first unified set exists", () => {
+    const legacy = [
+      { id: "legacy-custom", name: "맞춤 질문 · 이전 세트" },
+      { id: "legacy-base", name: "기본 질문" },
+    ];
+    expect(selectCustomerRunQuestionSets(legacy)).toEqual(legacy);
   });
 
   it("distinguishes unified, legacy custom, baseline, and other sets", () => {
