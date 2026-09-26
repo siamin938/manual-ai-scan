@@ -342,7 +342,9 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
       "buildEntityFactsV2ComparisonViewModel",
     );
     expect(dashboardSource).toContain("getEntityFactsV2Comparison");
-    expect(dashboardSource).toContain("<ComparisonCard model={comparisonModel} />");
+    expect(dashboardSource).toContain("<ComparisonCard");
+    expect(dashboardSource).toContain("model={comparisonModel}");
+    expect(dashboardSource).toContain("basisLabel={detailBasisLabel}");
     expect(dashboardSource).toContain("model.comparisonAvailable");
     expect(dashboardSource).toContain("metric.comparisonSentence");
     expect(dashboardSource).not.toContain("comparisonResult.data.status");
