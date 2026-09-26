@@ -619,36 +619,11 @@ function DashboardPage() {
     hasCompletedUnifiedRun ||
     (!!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName));
   const detailBasisLabel = isUnifiedDiagnostic ? "AI 진단 기준" : "기본 진단 기준";
-  const unifiedQuestionIds = dto?.questionAreas.map((item) => item.questionId) ?? [];
-  const unifiedQuestionLayerQuery = useQuery({
-    queryKey: [
-      "unified-diagnostic-question-layers",
-      activeOrgId,
-      businessId,
-      dto?.scope.runId,
-      dto?.scope.questionSetId,
-    ],
-    enabled:
-      isUnifiedDiagnostic &&
-      !!activeOrgId &&
-      !!dto?.scope.questionSetId &&
-      unifiedQuestionIds.length === 24,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("questions")
-        .select("id, city")
-        .eq("org_id", activeOrgId as string)
-        .eq("question_set_id", dto!.scope.questionSetId as string)
-        .in("id", unifiedQuestionIds);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
   const unifiedLayerSummary =
-    dto && isUnifiedDiagnostic && unifiedQuestionLayerQuery.data
+    dto && isUnifiedDiagnostic && dto.questionLocations
       ? buildUnifiedDiagnosticLayerSummary({
           questionAreas: dto.questionAreas,
-          questionLocations: unifiedQuestionLayerQuery.data,
+          questionLocations: dto.questionLocations,
           overview: dto.overview,
         })
       : null;
