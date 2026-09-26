@@ -160,25 +160,28 @@ describe("custom question suggestions v0.1", () => {
     expect(regionOnly).not.toBe(cityScoped);
   });
 
-  it("locks region-mode custom saves to city=null in the questions screen", async () => {
+  it("automates broad Core and local Focus/Specific regions in the questions screen", async () => {
     const { readFileSync } = await import("node:fs");
     const source = readFileSync(
       new URL("../../src/routes/_authenticated/questions.tsx", import.meta.url),
       "utf8",
     );
 
-    expect(source).toContain(
-      'const city = customLocationMode === "region" ? null : (selectedBusiness?.city ?? null);',
-    );
-    expect(source).toContain('buildCustomQuestionSetSignature(');
-    expect(source).toContain('같은 AI 진단 질문 세트가 이미 있어 기존 세트를 선택했습니다.');
+    expect(source).toContain("const diagnosticCoreLocation =");
+    expect(source).toContain("const diagnosticDetailLocation =");
+    expect(source).toContain("기준 검색 8문항");
+    expect(source).toContain("맞춤 검색 16문항");
+    expect(source).toContain("resolveQuestionLocation(candidate.promptText, region, city)");
+    expect(source).not.toContain("customLocationMode");
+    expect(source).toContain("buildCustomQuestionSetSignature(");
+    expect(source).toContain("같은 AI 진단 질문 세트가 이미 있어 기존 세트를 선택했습니다.");
     expect(source).toContain("내 업체 AI 진단 24문항 만들기");
     expect(source).toContain("AI 진단 질문 검토");
     expect(source).toContain("24개 질문 저장");
     expect(source).not.toContain("기본 진단 24문항 만들기");
   });
 
-  it("keeps baseline question metadata independent from custom location mode", async () => {
+  it("keeps baseline question metadata independent from unified diagnostic location routing", async () => {
     const { readFileSync } = await import("node:fs");
     const source = readFileSync(
       new URL("../../src/routes/_authenticated/questions.tsx", import.meta.url),
@@ -189,7 +192,8 @@ describe("custom question suggestions v0.1", () => {
     const standardBlock = source.slice(standardStart, customStart);
 
     expect(standardBlock).toContain("city: selectedBusiness?.city ?? null,");
-    expect(standardBlock).not.toContain("customLocationMode");
+    expect(standardBlock).not.toContain("diagnosticCoreLocation");
+    expect(standardBlock).not.toContain("diagnosticDetailLocation");
   });
 
 
@@ -288,15 +292,16 @@ describe("custom question suggestions v0.1", () => {
     expect(result.every((item) => item.promptText.includes("타이어 교체"))).toBe(true);
   });
 
-  it("keeps a two-model tuning diagnostic balanced and uses the registered automotive category for Core", () => {
+  it("uses Seoul for Core and Jungnang for the 16 local model questions", () => {
     const result = buildUnifiedDiagnosticQuestionCandidates(
       {
-        location: "중랑구",
+        location: "서울특별시",
         service: "튜닝",
         brandModel: "필랑트, 그랑콜레오스",
       },
       "아우토모토스",
       "자동차 튜닝",
+      "중랑구",
     );
 
     expect(result).toHaveLength(24);
@@ -305,9 +310,13 @@ describe("custom question suggestions v0.1", () => {
       const core = result[i]!;
       const focus = result[i + 1]!;
       const specific = result[i + 2]!;
+      expect(core.promptText).toContain("서울");
       expect(core.promptText).toContain("자동차 튜닝");
+      expect(core.promptText).not.toContain("중랑");
       expect(core.promptText).not.toContain("필랑트");
       expect(core.promptText).not.toContain("그랑콜레오스");
+      expect(focus.promptText).toContain("중랑");
+      expect(specific.promptText).toContain("중랑");
       expect(focus.promptText.includes("필랑트")).not.toBe(
         specific.promptText.includes("필랑트"),
       );
@@ -316,6 +325,8 @@ describe("custom question suggestions v0.1", () => {
       );
     }
 
+    expect(result.filter((item) => item.promptText.includes("서울")).length).toBe(8);
+    expect(result.filter((item) => item.promptText.includes("중랑")).length).toBe(16);
     expect(result.filter((item) => item.promptText.includes("필랑트")).length).toBe(8);
     expect(result.filter((item) => item.promptText.includes("그랑콜레오스")).length).toBe(8);
     expect(result.some((item) => item.promptText.includes("오래 작업한"))).toBe(false);
