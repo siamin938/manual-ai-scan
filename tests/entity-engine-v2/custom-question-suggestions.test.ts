@@ -288,6 +288,39 @@ describe("custom question suggestions v0.1", () => {
     expect(result.every((item) => item.promptText.includes("타이어 교체"))).toBe(true);
   });
 
+  it("keeps a two-model tuning diagnostic balanced and uses the registered automotive category for Core", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "중랑구",
+        service: "튜닝",
+        brandModel: "필랑트, 그랑콜레오스",
+      },
+      "아우토모토스",
+      "자동차 튜닝",
+    );
+
+    expect(result).toHaveLength(24);
+
+    for (let i = 0; i < result.length; i += 3) {
+      const core = result[i]!;
+      const focus = result[i + 1]!;
+      const specific = result[i + 2]!;
+      expect(core.promptText).toContain("자동차 튜닝");
+      expect(core.promptText).not.toContain("필랑트");
+      expect(core.promptText).not.toContain("그랑콜레오스");
+      expect(focus.promptText.includes("필랑트")).not.toBe(
+        specific.promptText.includes("필랑트"),
+      );
+      expect(focus.promptText.includes("그랑콜레오스")).not.toBe(
+        specific.promptText.includes("그랑콜레오스"),
+      );
+    }
+
+    expect(result.filter((item) => item.promptText.includes("필랑트")).length).toBe(8);
+    expect(result.filter((item) => item.promptText.includes("그랑콜레오스")).length).toBe(8);
+    expect(result.some((item) => item.promptText.includes("오래 작업한"))).toBe(false);
+  });
+
   it("uses owner-confirmed customer need only in the specific layer", () => {
     const result = buildUnifiedDiagnosticQuestionCandidates(
       {
