@@ -416,8 +416,8 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       "AI에 자주 관찰되는 업체들은 어떤 출처와 함께 보일까요?",
     );
     expect(dashboardSource).toContain("buildUnifiedDiagnosticLayerSummary");
-    expect(dashboardSource).toContain("unified-diagnostic-question-layers");
-    expect(dashboardSource).toContain('.select("id, city")');
+    expect(dashboardSource).toContain("dto.questionLocations");
+    expect(dashboardSource).not.toContain("unified-diagnostic-question-layers");
     expect(dashboardSource).toContain("검색 범위별 확정 노출");
     expect(dashboardSource).toContain("전체 AI 노출");
     expect(dashboardSource).toContain("맞춤 검색");
