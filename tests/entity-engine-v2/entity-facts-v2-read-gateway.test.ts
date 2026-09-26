@@ -210,6 +210,8 @@ describe("Entity Facts v2 Read Gateway", () => {
       scope: {
         runId: "33333333-3333-4333-8333-333333333333",
         runName: "최근 측정",
+        questionSetId: "44444444-4444-4444-8444-444444444444",
+        questionSetName: "AI 진단 질문 · 테스트 업체 · 2026-09-19",
         measuredAt: "2026-09-19T00:00:00.000Z",
         providers: ["openai"],
         repetitions: 1,
@@ -253,6 +255,12 @@ describe("Entity Facts v2 Read Gateway", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    expect(result.data.scope.questionSetId).toBe(
+      "44444444-4444-4444-8444-444444444444",
+    );
+    expect(result.data.scope.questionSetName).toBe(
+      "AI 진단 질문 · 테스트 업체 · 2026-09-19",
+    );
     expect(result.data.overview.visibilityLowerBoundPct).toBe(4.17);
     expect(result.data.overview.visibilityUpperBoundPct).toBe(29.17);
     expect(result.data.competitors).toEqual([
@@ -449,6 +457,8 @@ describe("Entity Facts v2 Read Gateway", () => {
 
   it("reads only the exact latest standalone audit run aggregate", () => {
     expect(serverSource).toContain('.from("measurement_runs")');
+    expect(serverSource).toContain("question_set_id");
+    expect(serverSource).toContain('.from("question_sets")');
     expect(serverSource).toContain('.eq("run_type", "audit")');
     expect(serverSource).toContain('.eq("phase", "standalone")');
     expect(serverSource).toContain('.eq("status", "completed")');
