@@ -303,8 +303,9 @@ describe("Entity Facts v2 Read Gateway", () => {
       },
     ]);
     expect(serverSource).toContain(
-      "return buildEntityFactsV2ReadGatewayFromSnapshot({",
+      "const gatewayResponse = buildEntityFactsV2ReadGatewayFromSnapshot({",
     );
+    expect(serverSource).toContain("return gatewayResponse;");
   });
 
   it("projects observed source supplement into customer-safe rows", () => {
@@ -568,8 +569,9 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).toContain("registeredCompetitorNames");
     expect(serverSource).toContain("autoCompetitorEvidence");
     expect(serverSource).toContain(
-      "return buildEntityFactsV2ReadGatewayFromSnapshot({",
+      "const gatewayResponse = buildEntityFactsV2ReadGatewayFromSnapshot({",
     );
+    expect(serverSource).toContain("return gatewayResponse;");
     expect(serverSource).toContain(
       '.from("measurement_entity_canonicalizations")',
     );
