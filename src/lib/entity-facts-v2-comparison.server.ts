@@ -289,7 +289,7 @@ export async function fetchEntityFactsV2Comparison(args: {
   const businessDTO = asBusinessDTO(business);
 
   // Keep current-run selection exactly aligned with the v2 customer dashboard.
-  // If a unified set exists, only that newest active set can be the current contract.
+  // A prepared unified set becomes representative only after its first completed run.
   const { data: currentUnifiedSet, error: unifiedSetError } = await supabaseAdmin
     .from("question_sets")
     .select("id")
@@ -302,31 +302,43 @@ export async function fetchEntityFactsV2Comparison(args: {
     .maybeSingle();
   if (unifiedSetError) return { ok: false, error: "INTERNAL_ERROR" };
 
-  let currentRunQuery = supabaseAdmin
-    .from("measurement_runs")
-    .select(
-      "id, question_set_id, selected_providers, repetitions, data_origin, total_jobs, completed_jobs, failed_jobs, completed_at, created_at",
-    )
-    .eq("org_id", orgId)
-    .eq("business_id", businessId)
-    .eq("run_type", "audit")
-    .eq("phase", "standalone")
-    .eq("diagnostic_scope", "customer")
-    .eq("status", "completed")
-    .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
-    .is("experiment_id", null);
+  const baseCurrentRunQuery = () =>
+    supabaseAdmin
+      .from("measurement_runs")
+      .select(
+        "id, question_set_id, selected_providers, repetitions, data_origin, total_jobs, completed_jobs, failed_jobs, completed_at, created_at",
+      )
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("run_type", "audit")
+      .eq("phase", "standalone")
+      .eq("diagnostic_scope", "customer")
+      .eq("status", "completed")
+      .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
+      .is("experiment_id", null);
 
+  let currentRun = null;
   if (currentUnifiedSet) {
-    currentRunQuery = currentRunQuery.eq("question_set_id", currentUnifiedSet.id);
+    const { data: unifiedRun, error: unifiedRunError } = await baseCurrentRunQuery()
+      .eq("question_set_id", currentUnifiedSet.id)
+      .order("completed_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (unifiedRunError) return { ok: false, error: "INTERNAL_ERROR" };
+    currentRun = unifiedRun;
   }
 
-  const { data: currentRun, error: currentRunError } = await currentRunQuery
-    .order("completed_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (currentRunError) return { ok: false, error: "INTERNAL_ERROR" };
+  if (!currentRun) {
+    const { data: previousRepresentativeRun, error: previousRunError } =
+      await baseCurrentRunQuery()
+        .order("completed_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    if (previousRunError) return { ok: false, error: "INTERNAL_ERROR" };
+    currentRun = previousRepresentativeRun;
+  }
   if (!currentRun) {
     return {
       ok: true,
