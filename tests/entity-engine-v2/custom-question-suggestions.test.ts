@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildInsertPayloads } from "../../src/lib/question-suggestions";
 import {
   buildCustomQuestionCandidates,
   buildCustomQuestionSetSignature,
@@ -330,6 +331,35 @@ describe("custom question suggestions v0.1", () => {
     expect(result.filter((item) => item.promptText.includes("필랑트")).length).toBe(8);
     expect(result.filter((item) => item.promptText.includes("그랑콜레오스")).length).toBe(8);
     expect(result.some((item) => item.promptText.includes("오래 작업한"))).toBe(false);
+  });
+
+  it("stores Core questions at region scope and local questions at city scope", () => {
+    const candidates = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "서울특별시",
+        service: "튜닝",
+        brandModel: "필랑트, 그랑콜레오스",
+      },
+      "아우토모토스",
+      "자동차 튜닝",
+      "중랑구",
+    );
+    const payloads = buildInsertPayloads(candidates, {
+      orgId: "org",
+      questionSetId: "set",
+      region: "서울특별시",
+      city: "중랑구",
+    });
+
+    expect(payloads).toHaveLength(24);
+    payloads.forEach((row, index) => {
+      expect(row.region).toBe("서울특별시");
+      if (index % 3 === 0) {
+        expect(row.city).toBeNull();
+      } else {
+        expect(row.city).toBe("중랑구");
+      }
+    });
   });
 
   it("uses owner-confirmed customer need only in the specific layer", () => {
