@@ -96,8 +96,8 @@ export function choosePreferredRunQuestionSetId(sets: RunQuestionSet[]): string 
 }
 
 export function selectCustomerRunQuestionSets<T extends RunQuestionSet>(sets: readonly T[]): T[] {
-  const unifiedSets = sets.filter((set) => isUnifiedDiagnosticSetName(set.name));
-  return unifiedSets.length > 0 ? unifiedSets : [...sets];
+  const newestUnifiedSet = sets.find((set) => isUnifiedDiagnosticSetName(set.name));
+  return newestUnifiedSet ? [newestUnifiedSet] : [...sets];
 }
 
 export function getRunQuestionSetKind(name: string, activeCount: number): RunQuestionSetKind {
