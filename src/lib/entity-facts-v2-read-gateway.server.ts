@@ -156,7 +156,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   const { data: run, error: runError } = await supabaseAdmin
     .from("measurement_runs")
     .select(
-      "id, name, completed_at, created_at, repetitions, selected_providers, total_jobs, completed_jobs, failed_jobs",
+      "id, name, question_set_id, completed_at, created_at, repetitions, selected_providers, total_jobs, completed_jobs, failed_jobs",
     )
     .eq("org_id", orgId)
     .eq("business_id", businessId)
@@ -172,6 +172,17 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
   if (runError) return { ok: false, error: "INTERNAL_ERROR", business: businessDTO };
   if (!run) return { ok: false, error: "NO_V2_DATA", business: businessDTO };
+
+  const { data: questionSet, error: questionSetError } = await supabaseAdmin
+    .from("question_sets")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .eq("business_id", businessId)
+    .eq("id", run.question_set_id)
+    .maybeSingle();
+  if (questionSetError) {
+    return { ok: false, error: "INTERNAL_ERROR", business: businessDTO, runId: run.id };
+  }
 
   const v2Admin =
     supabaseAdmin as unknown as SupabaseClient<EntityFactsV2Database>;
@@ -449,6 +460,8 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     scope: {
       runId: run.id,
       runName: run.name,
+      questionSetId: run.question_set_id,
+      questionSetName: questionSet?.name ?? undefined,
       measuredAt: run.completed_at ?? run.created_at,
       providers: Array.isArray(run.selected_providers)
         ? run.selected_providers.map(String)
