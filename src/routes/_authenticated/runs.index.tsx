@@ -341,10 +341,18 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     },
   });
 
-  const sets = useMemo(
+  const businessSets = useMemo(
     () => (meta.data?.sets ?? []).filter((s) => s.business_id === businessId),
     [meta.data?.sets, businessId],
   );
+  /**
+   * 통합 24문항 세트가 생긴 업체는 고객 측정 경로를 그 세트 하나로 수렴시킨다.
+   * 과거 맞춤/기본 세트는 측정 이력에서만 보존한다.
+   */
+  const sets = useMemo(() => {
+    const unifiedSets = businessSets.filter((set) => isUnifiedDiagnosticSetName(set.name));
+    return unifiedSets.length > 0 ? unifiedSets : businessSets;
+  }, [businessSets]);
   const selectedBusinessName = (meta.data?.businesses ?? []).find((b) => b.id === businessId)?.name ?? "";
 
   /** 조회 결과는 최신순이다. 같은 업체의 수동 선택은 유지하고, 새 업체는 통합 AI 진단 세트를 최우선한다. */
