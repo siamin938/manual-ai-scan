@@ -485,10 +485,18 @@ describe("Entity Facts v2 Read Gateway", () => {
     );
   });
 
-  it("reads only the exact latest standalone audit run aggregate", () => {
+  it("keeps the last representative result until the prepared unified set completes", () => {
     expect(serverSource).toContain('.from("measurement_runs")');
     expect(serverSource).toContain("question_set_id");
     expect(serverSource).toContain('.from("question_sets")');
+    expect(serverSource).toContain("UNIFIED_DIAGNOSTIC_SET_PREFIX");
+    expect(serverSource).toContain("baseRunQuery");
+    expect(serverSource).toContain("currentUnifiedSet");
+    expect(serverSource).toContain('.eq("question_set_id", currentUnifiedSet.id)');
+    expect(serverSource).toContain("previousRepresentativeRun");
+    expect(serverSource).toContain(
+      "A newly created unified set does not erase the last representative result.",
+    );
     expect(serverSource).toContain('.eq("run_type", "audit")');
     expect(serverSource).toContain('.eq("phase", "standalone")');
     expect(serverSource).toContain('.eq("status", "completed")');
@@ -513,9 +521,6 @@ describe("Entity Facts v2 Read Gateway", () => {
       '.eq("engine_version", ENTITY_FACTS_V2_READ_ENGINE_VERSION)',
     );
     expect(serverSource).toContain('.eq("contract_ok", true)');
-    expect(serverSource).toContain(
-      "It never falls back to an older materialized run.",
-    );
   });
 
   it("never reads legacy raw measurement truth in the v2 gateway", () => {
