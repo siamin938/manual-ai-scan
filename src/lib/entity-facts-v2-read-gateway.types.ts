@@ -140,6 +140,16 @@ function normalizeCompetitorDisplaySurface(value: string): string {
     .replace(/[^0-9a-z가-힣]/giu, "");
 }
 
+function normalizeCompetitorDisplaySurfaceWithoutCorporateMarker(
+  value: string,
+): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/(?:\(주\)|주식회사)/gu, "")
+    .replace(/[^0-9a-z가-힣]/giu, "");
+}
+
 function autoCanonicalSurface(value: string): string | null {
   const key = value.trim();
   if (!key.startsWith("auto:")) return null;
@@ -162,11 +172,16 @@ export function pickEntityFactsV2AutoCompetitorDisplayName(
   const counts = new Map<string, { label: string; priority: number; count: number }>();
   for (const item of evidence) {
     const label = typeof item.label === "string" ? item.label.trim() : "";
+    const normalizedLabel = normalizeCompetitorDisplaySurface(label);
+    const normalizedWithoutCorporateMarker =
+      normalizeCompetitorDisplaySurfaceWithoutCorporateMarker(label);
+
     if (
       !label ||
       !Number.isInteger(item.priority) ||
       item.priority < 1 ||
-      normalizeCompetitorDisplaySurface(label) !== expectedSurface
+      (normalizedLabel !== expectedSurface &&
+        normalizedWithoutCorporateMarker !== expectedSurface)
     ) {
       continue;
     }
