@@ -1,7 +1,7 @@
 import type { EntityFactsV2ReadQuestionAreaDTO } from "./entity-facts-v2-read-gateway.types";
 
 export type UnifiedDiagnosticQuestionLocation = {
-  id: string;
+  questionId: string;
   city: string | null;
 };
 
@@ -61,8 +61,8 @@ export function buildUnifiedDiagnosticLayerSummary(args: {
 
   const locationById = new Map<string, UnifiedDiagnosticQuestionLocation>();
   for (const row of questionLocations) {
-    if (!row.id || locationById.has(row.id)) return null;
-    locationById.set(row.id, row);
+    if (!row.questionId || locationById.has(row.questionId)) return null;
+    locationById.set(row.questionId, row);
   }
 
   const coreRows: EntityFactsV2ReadQuestionAreaDTO[] = [];
