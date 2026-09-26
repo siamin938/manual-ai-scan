@@ -148,6 +148,36 @@ describe("Entity Facts v2 Read Gateway", () => {
     ).toBe("솔라가드 프리미엄 THE LX 일산동구점");
   });
 
+  it("allows only standard Korean corporate markers around an exact auto competitor name", () => {
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:중랑자동차공업",
+        [{ label: "중랑자동차공업㈜", priority: 1 }],
+      ),
+    ).toBe("중랑자동차공업㈜");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:중랑자동차공업",
+        [{ label: "(주)중랑자동차공업", priority: 1 }],
+      ),
+    ).toBe("(주)중랑자동차공업");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:중랑자동차공업",
+        [{ label: "주식회사 중랑자동차공업", priority: 1 }],
+      ),
+    ).toBe("주식회사 중랑자동차공업");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:중랑자동차공업",
+        [{ label: "중랑자동차공업 주유소", priority: 1 }],
+      ),
+    ).toBeNull();
+  });
+
   it("never uses the auto key suffix itself as a customer-visible fallback", () => {
     expect(
       pickEntityFactsV2AutoCompetitorDisplayName(
