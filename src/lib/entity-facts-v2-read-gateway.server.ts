@@ -510,7 +510,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     }
   }
 
-  return buildEntityFactsV2ReadGatewayFromSnapshot({
+  const gatewayResponse = buildEntityFactsV2ReadGatewayFromSnapshot({
     generatedAt: new Date().toISOString(),
     business: businessDTO,
     scope: {
@@ -567,4 +567,28 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     registeredCompetitorNames,
     autoCompetitorEvidence,
   });
+
+  if (!gatewayResponse.ok) return gatewayResponse;
+
+  // Supplemental question-location metadata powers Core/Custom presentation only.
+  // It must never make an otherwise valid diagnosis unavailable.
+  const questionIds = gatewayResponse.data.questionAreas.map((item) => item.questionId);
+  if (questionIds.length > 0) {
+    const { data: questionLocations, error: questionLocationError } =
+      await supabaseAdmin
+        .from("questions")
+        .select("id, city")
+        .eq("org_id", orgId)
+        .eq("question_set_id", run.question_set_id)
+        .in("id", questionIds);
+
+    if (!questionLocationError && (questionLocations ?? []).length === questionIds.length) {
+      gatewayResponse.data.questionLocations = (questionLocations ?? []).map((row) => ({
+        questionId: row.id,
+        city: row.city ?? null,
+      }));
+    }
+  }
+
+  return gatewayResponse;
 }
