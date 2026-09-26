@@ -34,6 +34,12 @@ import {
   isUnifiedDiagnosticSetName,
   naturalizeQuestionLocation,
 } from "@/lib/custom-question-suggestions";
+import {
+  buildUnifiedDiagnosticLayerSummary,
+  confirmedRatePct,
+  type UnifiedDiagnosticLayerMetric,
+  type UnifiedDiagnosticLayerSummary,
+} from "@/lib/unified-diagnostic-layer-summary";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +105,88 @@ function unifiedWeakQuestionPriority(
   detailLocation: string | null | undefined,
 ): number {
   return questionUsesDetailedLocation(questionText, detailLocation) ? 0 : 1;
+}
+
+function layerMetricText(metric: UnifiedDiagnosticLayerMetric): string {
+  const rate = confirmedRatePct(metric);
+  const rateText = rate === null ? "–" : pctRange(rate, rate);
+  return `${metric.confirmedCount}/${metric.validCount} · ${rateText}`;
+}
+
+function unifiedLayerSummarySentence(summary: UnifiedDiagnosticLayerSummary): string {
+  const customConfirmed = summary.custom.confirmedCount;
+  const coreConfirmed = summary.core.confirmedCount;
+
+  if (customConfirmed > 0 && coreConfirmed === 0) {
+    return "상세 지역·브랜드/차종 검색에서는 확인됐지만, 더 넓은 기준 검색에서는 확인되지 않았습니다.";
+  }
+  if (customConfirmed === 0 && coreConfirmed > 0) {
+    return "더 넓은 기준 검색에서는 확인됐지만, 상세 지역·브랜드/차종 검색에서는 확인되지 않았습니다.";
+  }
+  if (customConfirmed > 0 && coreConfirmed > 0) {
+    return "상세 지역·브랜드/차종 검색과 더 넓은 기준 검색 모두에서 확정 노출이 확인됐습니다.";
+  }
+  return "이번 측정에서는 맞춤 검색과 기준 검색 모두에서 확정 노출이 확인되지 않았습니다.";
+}
+
+function UnifiedDiagnosticLayerSummaryCard({
+  summary,
+}: {
+  summary: UnifiedDiagnosticLayerSummary;
+}) {
+  const hasUnresolved =
+    summary.overall.unresolvedCount > 0 ||
+    summary.custom.unresolvedCount > 0 ||
+    summary.core.unresolvedCount > 0;
+
+  return (
+    <Card className="report-section">
+      <CardHeader className="border-b bg-muted/20 pb-4">
+        <p className="report-kicker">SEARCH SCOPE</p>
+        <CardTitle className="text-xl">검색 범위별 확정 노출</CardTitle>
+        <p className="text-sm leading-6 text-muted-foreground">
+          같은 24문항 안에서 넓은 기준 검색과 상세 지역·브랜드/차종 검색을 나눠 보여드립니다.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-5">
+        <div className="grid overflow-hidden rounded-lg border bg-border sm:grid-cols-3 sm:gap-px">
+          {[
+            {
+              label: "전체 AI 노출",
+              metric: summary.overall,
+              note: "통합 24문항 전체",
+            },
+            {
+              label: "맞춤 검색",
+              metric: summary.custom,
+              note: "상세 지역 · 브랜드/차종",
+            },
+            {
+              label: "기준 검색",
+              metric: summary.core,
+              note: "넓은 지역 · 주력 서비스",
+            },
+          ].map((item) => (
+            <div key={item.label} className="bg-card px-4 py-4">
+              <p className="text-xs font-medium text-muted-foreground">{item.label}</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">
+                {layerMetricText(item.metric)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{item.note}</p>
+            </div>
+          ))}
+        </div>
+        <p className="rounded-md bg-muted/40 px-3 py-2 text-sm leading-6">
+          {unifiedLayerSummarySentence(summary)}
+        </p>
+        {hasUnresolved && (
+          <p className="text-xs text-muted-foreground">
+            추가 확인이 필요한 응답은 위 확정 노출 수치에 포함하지 않았습니다.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 const UNIFIED_V2_RETRY_DELAYS_MS = [1500, 2500, 4000] as const;
@@ -531,6 +619,40 @@ function DashboardPage() {
     hasCompletedUnifiedRun ||
     (!!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName));
   const detailBasisLabel = isUnifiedDiagnostic ? "AI 진단 기준" : "기본 진단 기준";
+  const unifiedQuestionIds = dto?.questionAreas.map((item) => item.questionId) ?? [];
+  const unifiedQuestionLayerQuery = useQuery({
+    queryKey: [
+      "unified-diagnostic-question-layers",
+      activeOrgId,
+      businessId,
+      dto?.scope.runId,
+      dto?.scope.questionSetId,
+    ],
+    enabled:
+      isUnifiedDiagnostic &&
+      !!activeOrgId &&
+      !!dto?.scope.questionSetId &&
+      unifiedQuestionIds.length === 24,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("questions")
+        .select("id, city")
+        .eq("org_id", activeOrgId as string)
+        .eq("question_set_id", dto!.scope.questionSetId as string)
+        .in("id", unifiedQuestionIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const unifiedLayerSummary =
+    dto && isUnifiedDiagnostic && unifiedQuestionLayerQuery.data
+      ? buildUnifiedDiagnosticLayerSummary({
+          questionAreas: dto.questionAreas,
+          questionLocations: unifiedQuestionLayerQuery.data,
+          overview: dto.overview,
+        })
+      : null;
+
   const topObservedCompetitorResponseCount =
     model && model.competitors.rows.length > 0
       ? Math.max(...model.competitors.rows.map((item) => item.responseCount))
@@ -726,6 +848,10 @@ function DashboardPage() {
               note="확인된 연결과 연결 단서를 포함한 출처"
             />
           </div>
+
+          {unifiedLayerSummary && (
+            <UnifiedDiagnosticLayerSummaryCard summary={unifiedLayerSummary} />
+          )}
 
           <Card className="report-section border-t-2 border-t-primary">
             <CardHeader className="border-b bg-muted/25 pb-4">
