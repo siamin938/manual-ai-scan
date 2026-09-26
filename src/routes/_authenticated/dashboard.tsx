@@ -15,7 +15,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
-import { INTENT_LABELS } from "@/lib/question-suggestions";
+import { INTENT_LABELS, normalizeQuestion } from "@/lib/question-suggestions";
 import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
 import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-read-gateway.dashboard-cutover";
 import { getEntityFactsV2Comparison } from "@/lib/entity-facts-v2-comparison.functions";
@@ -32,6 +32,7 @@ import type {
 import {
   UNIFIED_DIAGNOSTIC_SET_PREFIX,
   isUnifiedDiagnosticSetName,
+  naturalizeQuestionLocation,
 } from "@/lib/custom-question-suggestions";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,6 +82,23 @@ function pctRange(lower: number | null, upper: number | null): string {
 function percentOf(part: number, total: number): number {
   if (total <= 0) return 0;
   return Math.max(0, Math.min(100, (100 * part) / total));
+}
+
+function questionUsesDetailedLocation(
+  questionText: string,
+  detailLocation: string | null | undefined,
+): boolean {
+  const detailSurface = naturalizeQuestionLocation(detailLocation ?? "");
+  const detailKey = normalizeQuestion(detailSurface);
+  if (detailKey.length < 2) return false;
+  return normalizeQuestion(questionText).includes(detailKey);
+}
+
+function unifiedWeakQuestionPriority(
+  questionText: string,
+  detailLocation: string | null | undefined,
+): number {
+  return questionUsesDetailedLocation(questionText, detailLocation) ? 0 : 1;
 }
 
 const UNIFIED_V2_RETRY_DELAYS_MS = [1500, 2500, 4000] as const;
@@ -223,6 +241,7 @@ function SearchContextChart({
       0,
       group.validCount - group.confirmedMentionCount - group.unresolvedTargetCount,
     ),
+    confirmedRatio: `${group.confirmedMentionCount}/${group.validCount}`,
   }));
   const maximum = Math.max(1, ...groups.map((group) => group.validCount));
 
@@ -237,7 +256,7 @@ function SearchContextChart({
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 8, right: 12, bottom: 8, left: 8 }}
+            margin={{ top: 8, right: 48, bottom: 8, left: 8 }}
             barCategoryGap="28%"
           >
             <CartesianGrid horizontal={false} stroke="var(--color-border)" />
@@ -276,7 +295,13 @@ function SearchContextChart({
               stackId="context"
               fill="var(--color-muted)"
               isAnimationActive={false}
-            />
+            >
+              <LabelList
+                dataKey="confirmedRatio"
+                position="right"
+                className="fill-foreground text-[11px] font-semibold"
+              />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -484,6 +509,24 @@ function DashboardPage() {
     hasUnifiedDiagnosticSet ||
     (!!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName));
   const detailBasisLabel = isUnifiedDiagnostic ? "AI 진단 기준" : "기본 진단 기준";
+  const topObservedCompetitors =
+    model && model.competitors.rows.length > 0
+      ? model.competitors.rows.filter(
+          (item) => item.responseCount === model.competitors.rows[0]!.responseCount,
+        )
+      : [];
+  const weakQuestionRows =
+    model && isUnifiedDiagnostic
+      ? model.weakQuestions.rows
+          .map((item, index) => ({ item, index }))
+          .sort(
+            (a, b) =>
+              unifiedWeakQuestionPriority(a.item.questionText, dto?.business.city) -
+                unifiedWeakQuestionPriority(b.item.questionText, dto?.business.city) ||
+              a.index - b.index,
+          )
+          .map(({ item }) => item)
+      : (model?.weakQuestions.rows ?? []);
   const actionOpportunityModel = benchmark
     ? buildActionOpportunityEngineV01({
         benchmark,
@@ -681,10 +724,19 @@ function DashboardPage() {
                 </p>
               )}
               <p className="text-muted-foreground">{model.recentSummary.questionSummaryText}</p>
-              {model.recentSummary.topCompetitor && (
+              {topObservedCompetitors.length > 0 && (
                 <p>
-                  가장 자주 함께 관찰된 업체: {model.recentSummary.topCompetitor.name} ·{" "}
-                  {model.recentSummary.topCompetitor.responseCount}개 답변
+                  가장 자주 함께 관찰된 업체
+                  {topObservedCompetitors.length > 1 ? " (공동)" : ""}:{" "}
+                  {topObservedCompetitors
+                    .slice(0, 3)
+                    .map((item) => item.name)
+                    .join(" · ")}
+                  {topObservedCompetitors.length > 3
+                    ? ` 외 ${topObservedCompetitors.length - 3}곳`
+                    : ""}{" "}
+                  · {topObservedCompetitors.length > 1 ? "각 " : ""}
+                  {topObservedCompetitors[0]!.responseCount}개 답변
                 </p>
               )}
               {model.recentSummary.sourceQualityNotice && (
@@ -804,16 +856,17 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  노출이 확정되지 않았거나, 일부만 확인됐거나, 대상 동일성 확인이 더 필요한
-                  질문입니다.
+                  {isUnifiedDiagnostic
+                    ? "내 업체의 상세 지역·차종을 반영한 맞춤 검색을 먼저 보여드리고, 넓은 기준 검색은 그다음에 표시합니다."
+                    : "노출이 확정되지 않았거나, 일부만 확인됐거나, 대상 동일성 확인이 더 필요한 질문입니다."}
                 </p>
-                {model.weakQuestions.rows.length === 0 ? (
+                {weakQuestionRows.length === 0 ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     현재 우선 확인할 질문이 없습니다.
                   </p>
                 ) : (
-                  model.weakQuestions.rows
-                    .slice(0, showAllWeakQuestions ? model.weakQuestions.rows.length : 6)
+                  weakQuestionRows
+                    .slice(0, showAllWeakQuestions ? weakQuestionRows.length : 6)
                     .map((q) => (
                       <div key={q.questionId} className="rounded-md border p-3">
                         <div className="flex items-start justify-between gap-3">
@@ -822,9 +875,16 @@ function DashboardPage() {
                             {q.statusLabel}
                           </Badge>
                         </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {intentLabel(q.intentType)}
-                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>{intentLabel(q.intentType)}</span>
+                          {isUnifiedDiagnostic && (
+                            <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+                              {questionUsesDetailedLocation(q.questionText, dto.business.city)
+                                ? "맞춤 검색"
+                                : "기준 검색"}
+                            </Badge>
+                          )}
+                        </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           확정 노출 {q.confirmedMentionCount}건 · 추가 확인 필요{" "}
                           {q.unresolvedTargetCount}건
@@ -832,7 +892,7 @@ function DashboardPage() {
                       </div>
                     ))
                 )}
-                {model.weakQuestions.rows.length > 6 && (
+                {weakQuestionRows.length > 6 && (
                   <div className="flex justify-center pt-1">
                     <Button
                       variant="ghost"
@@ -843,7 +903,7 @@ function DashboardPage() {
                     >
                       {showAllWeakQuestions
                         ? "접기"
-                        : `전체 ${model.weakQuestions.rows.length}개 질문 보기`}
+                        : `전체 ${weakQuestionRows.length}개 질문 보기`}
                     </Button>
                   </div>
                 )}
@@ -1356,7 +1416,7 @@ function BenchmarkCard({
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">MARKET BENCHMARK</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
-          AI에 자주 추천되는 업체들은 어디에서 많이 보일까요?
+          AI에 자주 관찰되는 업체들은 어떤 출처와 함께 보일까요?
           <BaselineBadge label={basisLabel} />
           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
             데이터 축적 중
