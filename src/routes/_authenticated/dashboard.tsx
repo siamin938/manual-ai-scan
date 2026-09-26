@@ -365,7 +365,7 @@ function DashboardPage() {
     queryKey: ["active-unified-diagnostic-set", activeOrgId, businessId],
     enabled: !!activeOrgId && !!businessId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: set, error: setError } = await supabase
         .from("question_sets")
         .select("id, name")
         .eq("org_id", activeOrgId as string)
@@ -375,11 +375,32 @@ function DashboardPage() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (error) throw error;
-      return data ?? null;
+      if (setError) throw setError;
+      if (!set) return { set: null, completedRunId: null };
+
+      const { data: completedRun, error: runError } = await supabase
+        .from("measurement_runs")
+        .select("id")
+        .eq("org_id", activeOrgId as string)
+        .eq("business_id", businessId as string)
+        .eq("question_set_id", set.id)
+        .eq("run_type", "audit")
+        .eq("phase", "standalone")
+        .eq("diagnostic_scope", "customer")
+        .eq("status", "completed")
+        .is("experiment_id", null)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (runError) throw runError;
+
+      return { set, completedRunId: completedRun?.id ?? null };
     },
   });
-  const hasUnifiedDiagnosticSet = !!unifiedSetQuery.data;
+  const hasUnifiedDiagnosticSet = !!unifiedSetQuery.data?.set;
+  const hasCompletedUnifiedRun = !!unifiedSetQuery.data?.completedRunId;
+  const unifiedTransitionPending =
+    hasUnifiedDiagnosticSet && !hasCompletedUnifiedRun;
 
   const fetchV2 = useServerFn(getEntityFactsV2ReadGateway);
   const query = useQuery({
@@ -388,6 +409,7 @@ function DashboardPage() {
       activeOrgId,
       businessId,
       hasUnifiedDiagnosticSet,
+      hasCompletedUnifiedRun,
     ],
     enabled:
       !!activeOrgId &&
@@ -404,7 +426,7 @@ function DashboardPage() {
         });
 
       let response = await request();
-      if (!hasUnifiedDiagnosticSet) return response;
+      if (!hasCompletedUnifiedRun) return response;
 
       for (const delayMs of UNIFIED_V2_RETRY_DELAYS_MS) {
         if (!isTransientV2ReadError(response)) break;
@@ -494,7 +516,7 @@ function DashboardPage() {
       !!activeOrgId &&
       !!businessId &&
       !unifiedSetQuery.isLoading &&
-      !hasUnifiedDiagnosticSet,
+      !hasCompletedUnifiedRun,
     retry: false,
     queryFn: () =>
       fetchCustom({
@@ -506,7 +528,7 @@ function DashboardPage() {
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
   const isUnifiedDiagnostic =
-    hasUnifiedDiagnosticSet ||
+    hasCompletedUnifiedRun ||
     (!!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName));
   const detailBasisLabel = isUnifiedDiagnostic ? "AI 진단 기준" : "기본 진단 기준";
   const topObservedCompetitorResponseCount =
@@ -572,6 +594,26 @@ function DashboardPage() {
             <p>진단할 대상 업체가 없습니다. 내 업체를 먼저 등록하세요.</p>
             <Button asChild>
               <Link to="/businesses">내 업체 등록하기</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {businessId && unifiedTransitionPending && (
+        <Card className="border-primary/40 bg-primary/[0.03]">
+          <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold">새 통합 AI 진단 질문이 준비되었습니다.</p>
+                <Badge variant="outline">첫 측정 필요</Badge>
+              </div>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                첫 통합 24문항 측정을 완료하기 전까지는 기존 대표 진단 결과를 계속 보여드립니다.
+                측정이 완료되면 새 통합 진단으로 자동 전환됩니다.
+              </p>
+            </div>
+            <Button asChild className="shrink-0">
+              <Link to="/runs">첫 통합 진단 측정하기</Link>
             </Button>
           </CardContent>
         </Card>
