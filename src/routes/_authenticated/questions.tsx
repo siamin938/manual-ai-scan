@@ -140,7 +140,7 @@ function QuestionsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("businesses")
-        .select("id, name, region, city")
+        .select("id, name, category, region, city")
         .eq("id", businessId)
         .maybeSingle();
       if (error) throw error;
@@ -195,7 +195,11 @@ function QuestionsPage() {
       return;
     }
 
-    const list = buildUnifiedDiagnosticQuestionCandidates(validation.value, businessName);
+    const list = buildUnifiedDiagnosticQuestionCandidates(
+      validation.value,
+      businessName,
+      selectedBusiness?.category ?? null,
+    );
     if (list.length !== 24) {
       toast.error("AI 진단 질문 24개를 완성하지 못했습니다. 입력값을 확인해 주세요.");
       return;
