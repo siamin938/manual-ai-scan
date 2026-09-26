@@ -317,7 +317,7 @@ export async function fetchEntityFactsV2Comparison(args: {
       .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
       .is("experiment_id", null);
 
-  let currentRun = null;
+  let currentRun: RunRow | null = null;
   if (currentUnifiedSet) {
     const { data: unifiedRun, error: unifiedRunError } = await baseCurrentRunQuery()
       .eq("question_set_id", currentUnifiedSet.id)
