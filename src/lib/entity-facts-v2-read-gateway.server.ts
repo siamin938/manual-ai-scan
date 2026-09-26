@@ -78,6 +78,20 @@ type EntityFactsV2CompetitorSourceClueStorageRow = {
   created_at: string;
 };
 
+type ReadGatewayRunRow = Pick<
+  Database["public"]["Tables"]["measurement_runs"]["Row"],
+  | "id"
+  | "name"
+  | "question_set_id"
+  | "completed_at"
+  | "created_at"
+  | "repetitions"
+  | "selected_providers"
+  | "total_jobs"
+  | "completed_jobs"
+  | "failed_jobs"
+>;
+
 type EntityFactsV2Database = Omit<Database, "public"> & {
   public: Omit<Database["public"], "Tables"> & {
     Tables: Database["public"]["Tables"] & {
@@ -186,7 +200,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
   // A newly created unified set does not erase the last representative result.
   // Switch only after that exact unified set has a completed customer run.
-  let run = null;
+  let run: ReadGatewayRunRow | null = null;
   if (currentUnifiedSet) {
     const { data: unifiedRun, error: unifiedRunError } = await baseRunQuery()
       .eq("question_set_id", currentUnifiedSet.id)
