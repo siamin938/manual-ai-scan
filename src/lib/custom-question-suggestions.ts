@@ -196,6 +196,157 @@ function makeCandidate(
  * - 업체명은 질문에 넣지 않는다.
  * - 표준 24문항과 별도 세트로 저장하는 용도다.
  */
+
+type UnifiedQuestionSlot = "core" | "focus" | "specific";
+
+function makeUnifiedCandidate(
+  index: number,
+  slot: UnifiedQuestionSlot,
+  promptText: string,
+  intentType: AllowedIntent,
+  businessName: string,
+): SuggestionCandidate {
+  const candidate = makeCandidate(index, promptText, intentType, businessName);
+  return { ...candidate, id: `unified-${intentType}-${slot}` };
+}
+
+/**
+ * 통합 AI 진단 질문 v0.2
+ * - 고객이 만드는 질문 세트는 하나만 사용한다.
+ * - 8개 intent마다 Core 1 + Focus 1 + Specific 1 = 정확히 24문항을 생성한다.
+ * - Core는 지역 + 주력 서비스 중심의 넓은 기준 질문이다.
+ * - Focus/Specific은 사용자가 확인한 브랜드·차종/니즈를 조합한다.
+ * - LLM/웹 추론 없이 사용자 확인 입력만 사용한다.
+ * - 업체명은 질문에 넣지 않는다.
+ *
+ * 현재 24문항 측정 파이프라인과의 호환을 위해 별도 DB role 컬럼은 사용하지 않는다.
+ * 문항 순서 계약은 intent 순서 × [core, focus, specific]이다.
+ */
+export function buildUnifiedDiagnosticQuestionCandidates(
+  input: CustomQuestionInput,
+  businessName: string,
+): SuggestionCandidate[] {
+  const validation = validateCustomQuestionInput(input, businessName);
+  if (!validation.ok) return [];
+
+  const { location, service, brandModel, customerNeed } = validation.value;
+  const locationSurface = naturalizeQuestionLocation(location);
+  const brandTargets = parseBrandModelTargets(brandModel);
+  const targeted = (index: number) =>
+    subject(service, brandTargets.length > 0 ? brandTargets[index % brandTargets.length]! : "");
+  const need = customerNeed ? `‘${customerNeed}’` : "";
+
+  const rows: Array<{
+    intent: AllowedIntent;
+    slots: Record<UnifiedQuestionSlot, string>;
+  }> = [
+    {
+      intent: "local",
+      slots: {
+        core: `${locationSurface}에서 ${service} 맡길 수 있는 곳 어디야?`,
+        focus: `${locationSurface}에서 ${targeted(0)} 맡기기 편한 업체 몇 곳 알려줘`,
+        specific: customerNeed
+          ? `${locationSurface}에서 ${targeted(1)} 맡길 때 ${need}도 고려할 수 있는 업체 알려줘`
+          : `${locationSurface}에서 ${targeted(1)} 맡길 곳을 위치와 접근성 기준으로 몇 곳 알려줘`,
+      },
+    },
+    {
+      intent: "recommendation",
+      slots: {
+        core: `${locationSurface}에서 ${service} 잘하는 업체 추천해줘`,
+        focus: `${locationSurface}에서 ${targeted(1)} 맡길 만한 업체 추천해줘`,
+        specific: customerNeed
+          ? `${locationSurface}에서 ${targeted(2)} 업체 찾을 때 ${need}도 고려해서 추천해줘`
+          : `${locationSurface}에서 ${targeted(2)} 업체 중 작업 경험과 후기를 함께 보고 추천해줘`,
+      },
+    },
+    {
+      intent: "service",
+      slots: {
+        core: `${locationSurface}에서 ${service} 전문으로 하는 곳 알려줘`,
+        focus: `${locationSurface}에서 ${targeted(2)} 전문으로 하는 업체 알려줘`,
+        specific: customerNeed
+          ? `${locationSurface}에서 ${targeted(0)} 중 ${need}에 맞는 작업을 제공하는 업체 알려줘`
+          : `${locationSurface}에서 ${targeted(0)} 작업 범위를 다양하게 제공하는 업체 알려줘`,
+      },
+    },
+    {
+      intent: "review_quality",
+      slots: {
+        core: `${locationSurface} ${service} 실제 이용 후기 좋은 곳 알려줘`,
+        focus: `${locationSurface} ${targeted(0)} 실제 이용 후기 좋은 곳 알려줘`,
+        specific: customerNeed
+          ? `${locationSurface} ${targeted(1)} ${need} 관련 실제 이용 후기 좋은 업체 알려줘`
+          : `${locationSurface} ${targeted(1)} 후기에서 작업 만족도가 좋은 업체 알려줘`,
+      },
+    },
+    {
+      intent: "trust",
+      slots: {
+        core: `${service} 작업 경험 많은 ${locationSurface} 업체 어디야?`,
+        focus: `${targeted(1)} 작업 경험 많은 ${locationSurface} 업체 어디야?`,
+        specific: customerNeed
+          ? `${locationSurface} ${targeted(2)} ${need}까지 맡길 경험이 있는 업체 알려줘`
+          : `${locationSurface} ${targeted(2)} 전문성과 작업 경험을 확인할 수 있는 업체 알려줘`,
+      },
+    },
+    {
+      intent: "comparison",
+      slots: {
+        core: `${locationSurface} ${service} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
+        focus: `${locationSurface} ${targeted(2)} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
+        specific: customerNeed
+          ? `${locationSurface} ${targeted(0)} 업체를 ${need}, 후기, 전문성 기준으로 비교해줘`
+          : `${locationSurface} ${targeted(0)} 업체를 작업 범위, 후기, 전문성 기준으로 비교해줘`,
+      },
+    },
+    {
+      intent: "price_value",
+      slots: {
+        core: `${locationSurface}에서 ${service} 비용 대비 괜찮은 곳 알려줘`,
+        focus: `${locationSurface}에서 ${targeted(0)} 비용 대비 괜찮은 곳 알려줘`,
+        specific: customerNeed
+          ? `${locationSurface} ${targeted(1)} 업체 중 ${need} 포함 비용과 작업 구성을 함께 비교해줘`
+          : `${locationSurface} ${targeted(1)} 업체 중 가격과 작업 구성을 함께 비교해줘`,
+      },
+    },
+    {
+      intent: "discovery",
+      slots: {
+        core: `${locationSurface}에서 ${service} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
+        focus: `${locationSurface}에서 ${targeted(1)} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
+        specific: customerNeed
+          ? `${locationSurface}에서 ${targeted(2)} 업체 중 ${need} 기준으로 볼 만한 후보 몇 곳 찾아줘`
+          : `${locationSurface}에서 ${targeted(2)} 업체 중 후기와 전문성을 함께 볼 만한 후보 몇 곳 알려줘`,
+      },
+    },
+  ];
+
+  const slotOrder: UnifiedQuestionSlot[] = ["core", "focus", "specific"];
+  const out: SuggestionCandidate[] = [];
+  const seen = new Set<string>();
+  let index = 0;
+
+  for (const row of rows) {
+    for (const slot of slotOrder) {
+      const candidate = makeUnifiedCandidate(
+        index,
+        slot,
+        row.slots[slot],
+        row.intent,
+        businessName,
+      );
+      index += 1;
+      const key = normalizeQuestion(candidate.promptText);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(candidate);
+    }
+  }
+
+  return out.filter((candidate) => ALLOWED_INTENTS.includes(candidate.intentType));
+}
+
 export function buildCustomQuestionCandidates(
   input: CustomQuestionInput,
   businessName: string,
