@@ -264,7 +264,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
       intent: "service",
       slots: {
         core: `${locationSurface}에서 ${service} 전문으로 하는 곳 알려줘`,
-        focus: `${locationSurface}에서 ${targeted(2)} 전문으로 하는 업체 알려줘`,
+        focus: `${locationSurface}에서 ${targeted(2)} 작업을 주력으로 하는 업체 알려줘`,
         specific: customerNeed
           ? `${locationSurface}에서 ${targeted(0)} 중 ${need}에 맞는 작업을 제공하는 업체 알려줘`
           : `${locationSurface}에서 ${targeted(0)} 작업 범위를 다양하게 제공하는 업체 알려줘`,
@@ -274,7 +274,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
       intent: "review_quality",
       slots: {
         core: `${locationSurface} ${service} 실제 이용 후기 좋은 곳 알려줘`,
-        focus: `${locationSurface} ${targeted(0)} 실제 이용 후기 좋은 곳 알려줘`,
+        focus: `${locationSurface} ${targeted(0)} 이용 후기와 작업 사례를 함께 볼 수 있는 업체 알려줘`,
         specific: customerNeed
           ? `${locationSurface} ${targeted(1)} ${need} 관련 실제 이용 후기 좋은 업체 알려줘`
           : `${locationSurface} ${targeted(1)} 후기에서 작업 만족도가 좋은 업체 알려줘`,
@@ -284,7 +284,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
       intent: "trust",
       slots: {
         core: `${service} 작업 경험 많은 ${locationSurface} 업체 어디야?`,
-        focus: `${targeted(1)} 작업 경험 많은 ${locationSurface} 업체 어디야?`,
+        focus: `${locationSurface}에서 ${targeted(1)} 전문으로 오래 작업한 업체 몇 곳 알려줘`,
         specific: customerNeed
           ? `${locationSurface} ${targeted(2)} ${need}까지 맡길 경험이 있는 업체 알려줘`
           : `${locationSurface} ${targeted(2)} 전문성과 작업 경험을 확인할 수 있는 업체 알려줘`,
@@ -294,7 +294,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
       intent: "comparison",
       slots: {
         core: `${locationSurface} ${service} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
-        focus: `${locationSurface} ${targeted(2)} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
+        focus: `${locationSurface}에서 ${targeted(2)} 업체 몇 곳을 작업 범위와 후기 기준으로 비교해줘`,
         specific: customerNeed
           ? `${locationSurface} ${targeted(0)} 업체를 ${need}, 후기, 전문성 기준으로 비교해줘`
           : `${locationSurface} ${targeted(0)} 업체를 작업 범위, 후기, 전문성 기준으로 비교해줘`,
@@ -304,7 +304,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
       intent: "price_value",
       slots: {
         core: `${locationSurface}에서 ${service} 비용 대비 괜찮은 곳 알려줘`,
-        focus: `${locationSurface}에서 ${targeted(0)} 비용 대비 괜찮은 곳 알려줘`,
+        focus: `${locationSurface}에서 ${targeted(0)} 가격대와 작업 구성을 함께 볼 수 있는 업체 알려줘`,
         specific: customerNeed
           ? `${locationSurface} ${targeted(1)} 업체 중 ${need} 포함 비용과 작업 구성을 함께 비교해줘`
           : `${locationSurface} ${targeted(1)} 업체 중 가격과 작업 구성을 함께 비교해줘`,
@@ -314,7 +314,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
       intent: "discovery",
       slots: {
         core: `${locationSurface}에서 ${service} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
-        focus: `${locationSurface}에서 ${targeted(1)} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
+        focus: `${locationSurface}에서 ${targeted(1)} 업체 후보를 몇 곳 먼저 추려줘`,
         specific: customerNeed
           ? `${locationSurface}에서 ${targeted(2)} 업체 중 ${need} 기준으로 볼 만한 후보 몇 곳 찾아줘`
           : `${locationSurface}에서 ${targeted(2)} 업체 중 후기와 전문성을 함께 볼 만한 후보 몇 곳 알려줘`,
