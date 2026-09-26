@@ -41,6 +41,7 @@ import {
   INTENT_LABELS,
   buildInsertPayloads,
   dedupeForSave,
+  resolveQuestionLocation,
   isAllowedIntent,
   mapSuggestError,
   toCandidates,
@@ -50,6 +51,7 @@ import {
   UNIFIED_DIAGNOSTIC_SET_PREFIX,
   buildCustomQuestionSetSignature,
   buildUnifiedDiagnosticQuestionCandidates,
+  naturalizeQuestionLocation,
   validateCustomQuestionInput,
 } from "@/lib/custom-question-suggestions";
 
@@ -111,7 +113,6 @@ function QuestionsPage() {
   // --- 통합 AI 진단 질문 v0.2: 사용자 확인 입력만 사용, LLM 추론 없음 ---
   const [openCustom, setOpenCustom] = useState(false);
   const [openCustomReview, setOpenCustomReview] = useState(false);
-  const [customLocationMode, setCustomLocationMode] = useState<"city" | "region">("city");
   const [customForm, setCustomForm] = useState({
     service: "",
     brandModel: "",
@@ -148,10 +149,16 @@ function QuestionsPage() {
     },
   });
 
-  const customLocation =
-    customLocationMode === "city"
-      ? (selectedBusiness?.city ?? selectedBusiness?.region ?? "")
-      : (selectedBusiness?.region ?? selectedBusiness?.city ?? "");
+  const diagnosticCoreLocation =
+    selectedBusiness?.region ?? selectedBusiness?.city ?? "";
+  const diagnosticDetailLocation =
+    selectedBusiness?.city ?? selectedBusiness?.region ?? "";
+  const diagnosticCoreLabel = naturalizeQuestionLocation(diagnosticCoreLocation);
+  const diagnosticDetailLabel = naturalizeQuestionLocation(diagnosticDetailLocation);
+  const hasDistinctDiagnosticLocations =
+    !!diagnosticCoreLabel &&
+    !!diagnosticDetailLabel &&
+    diagnosticCoreLabel !== diagnosticDetailLabel;
 
   const openCustomBuilder = () => {
     if (!selectedBusiness) {
@@ -164,7 +171,6 @@ function QuestionsPage() {
       toast.error("등록된 지역 정보가 없어 맞춤 질문을 만들 수 없습니다.");
       return;
     }
-    setCustomLocationMode(hasCity ? "city" : "region");
     setCustomForm({ service: "", brandModel: "", customerNeed: "" });
     setCustomCandidates([]);
     setOpenCustom(true);
@@ -174,7 +180,7 @@ function QuestionsPage() {
     const businessName = selectedBusiness?.name ?? "";
     const validation = validateCustomQuestionInput(
       {
-        location: customLocation,
+        location: diagnosticCoreLocation,
         service: customForm.service,
         brandModel: customForm.brandModel,
         customerNeed: customForm.customerNeed,
@@ -199,6 +205,7 @@ function QuestionsPage() {
       validation.value,
       businessName,
       selectedBusiness?.category ?? null,
+      diagnosticDetailLocation,
     );
     if (list.length !== 24) {
       toast.error("AI 진단 질문 24개를 완성하지 못했습니다. 입력값을 확인해 주세요.");
@@ -405,14 +412,17 @@ function QuestionsPage() {
       if (kept.length !== 24) throw new Error("INCOMPLETE_DIAGNOSTIC_SET");
 
       const region = selectedBusiness?.region ?? null;
-      const city = customLocationMode === "region" ? null : (selectedBusiness?.city ?? null);
+      const city = selectedBusiness?.city ?? null;
       const selectedSignature = buildCustomQuestionSetSignature(
-        kept.map((candidate) => ({
-          promptText: candidate.promptText,
-          intentType: candidate.intentType,
-          region,
-          city,
-        })),
+        kept.map((candidate) => {
+          const location = resolveQuestionLocation(candidate.promptText, region, city);
+          return {
+            promptText: candidate.promptText,
+            intentType: candidate.intentType,
+            region: location.region,
+            city: location.city,
+          };
+        }),
       );
 
       const { data: existingSets, error: existingSetsError } = await supabase
@@ -786,27 +796,29 @@ function QuestionsPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>측정 지역 범위</Label>
-              <Select
-                value={customLocationMode}
-                onValueChange={(value) => setCustomLocationMode(value as "city" | "region")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedBusiness?.city && (
-                    <SelectItem value="city">상세 지역 · {selectedBusiness.city}</SelectItem>
-                  )}
-                  {selectedBusiness?.region && (
-                    <SelectItem value="region">광역 지역 · {selectedBusiness.region}</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                등록된 지역만 사용해 질문 문구와 측정 위치가 어긋나지 않게 합니다.
-              </p>
+            <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+              <Label>진단 지역</Label>
+              {hasDistinctDiagnosticLocations ? (
+                <>
+                  <p className="text-sm">
+                    기준 검색 8문항 · <span className="font-medium">{diagnosticCoreLabel}</span>
+                  </p>
+                  <p className="text-sm">
+                    맞춤 검색 16문항 · <span className="font-medium">{diagnosticDetailLabel}</span>
+                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    넓은 시장에서의 노출과 실제 영업 지역에서의 노출을 한 번의 진단으로 함께
+                    확인합니다.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">{diagnosticCoreLabel || diagnosticDetailLabel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    등록된 지역을 24개 질문 전체에 사용합니다.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -873,7 +885,14 @@ function QuestionsPage() {
           </DialogHeader>
 
           <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
-            <p>지역: {customLocation}</p>
+            {hasDistinctDiagnosticLocations ? (
+              <>
+                <p>기준 검색 지역: {diagnosticCoreLabel}</p>
+                <p>맞춤 검색 지역: {diagnosticDetailLabel}</p>
+              </>
+            ) : (
+              <p>지역: {diagnosticCoreLabel || diagnosticDetailLabel}</p>
+            )}
             <p>서비스: {customForm.service || "-"}</p>
             {customForm.brandModel && <p>브랜드·차종: {customForm.brandModel}</p>}
             {customForm.customerNeed && <p>고객 니즈: {customForm.customerNeed}</p>}
