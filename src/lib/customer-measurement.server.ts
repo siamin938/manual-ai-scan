@@ -20,6 +20,7 @@ import {
   type CustomerMeasurementErrorCode,
 } from "./customer-measurement.helpers";
 import {
+  UNIFIED_DIAGNOSTIC_SET_PREFIX,
   hasUnifiedDiagnosticIntentShape,
   isUnifiedDiagnosticSetName,
 } from "./custom-question-suggestions";
@@ -67,19 +68,20 @@ export async function createCustomerMeasurementRun(args: {
   // UI 선택 제한만 믿지 않고 direct call도 같은 계약으로 fail-closed 한다.
   const { data: activeQuestionSets, error: setErr } = await supabase
     .from("question_sets")
-    .select("id, name")
+    .select("id, name, created_at")
     .eq("org_id", orgId)
     .eq("business_id", businessId)
-    .eq("active", true);
+    .eq("active", true)
+    .order("created_at", { ascending: false });
   if (setErr) return fail("INTERNAL_ERROR");
 
   const questionSet = (activeQuestionSets ?? []).find((set) => set.id === questionSetId);
   if (!questionSet) return fail("INVALID_QUESTION_SET");
 
-  const hasUnifiedSet = (activeQuestionSets ?? []).some((set) =>
-    isUnifiedDiagnosticSetName(set.name),
+  const newestUnifiedSet = (activeQuestionSets ?? []).find((set) =>
+    set.name.startsWith(UNIFIED_DIAGNOSTIC_SET_PREFIX),
   );
-  if (hasUnifiedSet && !isUnifiedDiagnosticSetName(questionSet.name)) {
+  if (newestUnifiedSet && questionSet.id !== newestUnifiedSet.id) {
     return fail("INVALID_QUESTION_SET");
   }
 
