@@ -189,6 +189,14 @@ function subject(service: string, brandModel: string): string {
   return brandModel ? `${brandModel} ${service}` : service;
 }
 
+function coreServicePhrase(service: string, businessCategory: string | null | undefined): string {
+  const category = phrase(clean(businessCategory));
+  if (!category) return service;
+  const serviceKey = normalizeQuestion(service);
+  const categoryKey = normalizeQuestion(category);
+  return serviceKey && categoryKey.includes(serviceKey) ? category : service;
+}
+
 function makeCandidate(
   index: number,
   promptText: string,
@@ -241,6 +249,7 @@ function makeUnifiedCandidate(
 export function buildUnifiedDiagnosticQuestionCandidates(
   input: CustomQuestionInput,
   businessName: string,
+  businessCategory?: string | null,
 ): SuggestionCandidate[] {
   const validation = validateCustomQuestionInput(input, businessName);
   if (!validation.ok) return [];
@@ -248,8 +257,13 @@ export function buildUnifiedDiagnosticQuestionCandidates(
   const { location, service, brandModel, customerNeed } = validation.value;
   const locationSurface = naturalizeQuestionLocation(location);
   const brandTargets = parseBrandModelTargets(brandModel);
-  const targeted = (index: number) =>
-    subject(service, brandTargets.length > 0 ? brandTargets[index % brandTargets.length]! : "");
+  const coreService = coreServicePhrase(service, businessCategory);
+  const targetedForIntent = (intentIndex: number, layer: "focus" | "specific") => {
+    if (brandTargets.length === 0) return service;
+    if (brandTargets.length === 1) return subject(service, brandTargets[0]!);
+    const offset = layer === "focus" ? 0 : 1;
+    return subject(service, brandTargets[(intentIndex + offset) % brandTargets.length]!);
+  };
   const need = customerNeed ? `‘${customerNeed}’` : "";
 
   const rows: Array<{
@@ -259,81 +273,81 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "local",
       slots: {
-        core: `${locationSurface}에서 ${service} 맡길 수 있는 곳 어디야?`,
-        focus: `${locationSurface}에서 ${targeted(0)} 맡기기 편한 업체 몇 곳 알려줘`,
+        core: `${locationSurface}에서 ${coreService} 맡길 수 있는 곳 어디야?`,
+        focus: `${locationSurface}에서 ${targetedForIntent(0, "focus")} 맡기기 편한 업체 몇 곳 알려줘`,
         specific: customerNeed
-          ? `${locationSurface}에서 ${targeted(1)} 맡길 때 ${need}도 고려할 수 있는 업체 알려줘`
-          : `${locationSurface}에서 ${targeted(1)} 맡길 곳을 위치와 접근성 기준으로 몇 곳 알려줘`,
+          ? `${locationSurface}에서 ${targetedForIntent(0, "specific")} 맡길 때 ${need}도 고려할 수 있는 업체 알려줘`
+          : `${locationSurface}에서 ${targetedForIntent(0, "specific")} 맡길 곳을 위치와 접근성 기준으로 몇 곳 알려줘`,
       },
     },
     {
       intent: "recommendation",
       slots: {
-        core: `${locationSurface}에서 ${service} 잘하는 업체 추천해줘`,
-        focus: `${locationSurface}에서 ${targeted(1)} 맡길 만한 업체 추천해줘`,
+        core: `${locationSurface}에서 ${coreService} 잘하는 업체 추천해줘`,
+        focus: `${locationSurface}에서 ${targetedForIntent(1, "focus")} 맡길 만한 업체 추천해줘`,
         specific: customerNeed
-          ? `${locationSurface}에서 ${targeted(2)} 업체 찾을 때 ${need}도 고려해서 추천해줘`
-          : `${locationSurface}에서 ${targeted(2)} 업체 중 작업 경험과 후기를 함께 보고 추천해줘`,
+          ? `${locationSurface}에서 ${targetedForIntent(1, "specific")} 업체 찾을 때 ${need}도 고려해서 추천해줘`
+          : `${locationSurface}에서 ${targetedForIntent(1, "specific")} 업체 중 작업 경험과 후기를 함께 보고 추천해줘`,
       },
     },
     {
       intent: "service",
       slots: {
-        core: `${locationSurface}에서 ${service} 전문으로 하는 곳 알려줘`,
-        focus: `${locationSurface}에서 ${targeted(2)} 작업을 주력으로 하는 업체 알려줘`,
+        core: `${locationSurface}에서 ${coreService} 전문으로 하는 곳 알려줘`,
+        focus: `${locationSurface}에서 ${targetedForIntent(2, "focus")} 작업을 주력으로 하는 업체 알려줘`,
         specific: customerNeed
-          ? `${locationSurface}에서 ${targeted(0)} 중 ${need}에 맞는 작업을 제공하는 업체 알려줘`
-          : `${locationSurface}에서 ${targeted(0)} 작업 범위를 다양하게 제공하는 업체 알려줘`,
+          ? `${locationSurface}에서 ${targetedForIntent(2, "specific")} 중 ${need}에 맞는 작업을 제공하는 업체 알려줘`
+          : `${locationSurface}에서 ${targetedForIntent(2, "specific")} 작업 범위를 다양하게 제공하는 업체 알려줘`,
       },
     },
     {
       intent: "review_quality",
       slots: {
-        core: `${locationSurface} ${service} 실제 이용 후기 좋은 곳 알려줘`,
-        focus: `${locationSurface} ${targeted(0)} 이용 후기와 작업 사례를 함께 볼 수 있는 업체 알려줘`,
+        core: `${locationSurface} ${coreService} 실제 이용 후기 좋은 곳 알려줘`,
+        focus: `${locationSurface} ${targetedForIntent(3, "focus")} 이용 후기와 작업 사례를 함께 볼 수 있는 업체 알려줘`,
         specific: customerNeed
-          ? `${locationSurface} ${targeted(1)} ${need} 관련 실제 이용 후기 좋은 업체 알려줘`
-          : `${locationSurface} ${targeted(1)} 후기에서 작업 만족도가 좋은 업체 알려줘`,
+          ? `${locationSurface} ${targetedForIntent(3, "specific")} ${need} 관련 실제 이용 후기 좋은 업체 알려줘`
+          : `${locationSurface} ${targetedForIntent(3, "specific")} 후기에서 작업 만족도가 좋은 업체 알려줘`,
       },
     },
     {
       intent: "trust",
       slots: {
-        core: `${service} 작업 경험 많은 ${locationSurface} 업체 어디야?`,
-        focus: `${locationSurface}에서 ${targeted(1)} 전문으로 오래 작업한 업체 몇 곳 알려줘`,
+        core: `${coreService} 작업 경험 많은 ${locationSurface} 업체 어디야?`,
+        focus: `${locationSurface}에서 ${targetedForIntent(4, "focus")} 작업 경험이 많은 업체 몇 곳 알려줘`,
         specific: customerNeed
-          ? `${locationSurface} ${targeted(2)} ${need}까지 맡길 경험이 있는 업체 알려줘`
-          : `${locationSurface} ${targeted(2)} 전문성과 작업 경험을 확인할 수 있는 업체 알려줘`,
+          ? `${locationSurface} ${targetedForIntent(4, "specific")} ${need}까지 맡길 경험이 있는 업체 알려줘`
+          : `${locationSurface} ${targetedForIntent(4, "specific")} 전문성과 작업 경험을 확인할 수 있는 업체 알려줘`,
       },
     },
     {
       intent: "comparison",
       slots: {
-        core: `${locationSurface} ${service} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
-        focus: `${locationSurface}에서 ${targeted(2)} 업체 몇 곳을 작업 범위와 후기 기준으로 비교해줘`,
+        core: `${locationSurface} ${coreService} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
+        focus: `${locationSurface}에서 ${targetedForIntent(5, "focus")} 업체 몇 곳을 작업 범위와 후기 기준으로 비교해줘`,
         specific: customerNeed
-          ? `${locationSurface} ${targeted(0)} 업체를 ${need}, 후기, 전문성 기준으로 비교해줘`
-          : `${locationSurface} ${targeted(0)} 업체를 작업 범위, 후기, 전문성 기준으로 비교해줘`,
+          ? `${locationSurface} ${targetedForIntent(5, "specific")} 업체를 ${need}, 후기, 전문성 기준으로 비교해줘`
+          : `${locationSurface} ${targetedForIntent(5, "specific")} 업체를 작업 범위, 후기, 전문성 기준으로 비교해줘`,
       },
     },
     {
       intent: "price_value",
       slots: {
-        core: `${locationSurface}에서 ${service} 비용 대비 괜찮은 곳 알려줘`,
-        focus: `${locationSurface}에서 ${targeted(0)} 가격대와 작업 구성을 함께 볼 수 있는 업체 알려줘`,
+        core: `${locationSurface}에서 ${coreService} 비용 대비 괜찮은 곳 알려줘`,
+        focus: `${locationSurface}에서 ${targetedForIntent(6, "focus")} 가격대와 작업 구성을 함께 볼 수 있는 업체 알려줘`,
         specific: customerNeed
-          ? `${locationSurface} ${targeted(1)} 업체 중 ${need} 포함 비용과 작업 구성을 함께 비교해줘`
-          : `${locationSurface} ${targeted(1)} 업체 중 가격과 작업 구성을 함께 비교해줘`,
+          ? `${locationSurface} ${targetedForIntent(6, "specific")} 업체 중 ${need} 포함 비용과 작업 구성을 함께 비교해줘`
+          : `${locationSurface} ${targetedForIntent(6, "specific")} 업체 중 가격과 작업 구성을 함께 비교해줘`,
       },
     },
     {
       intent: "discovery",
       slots: {
-        core: `${locationSurface}에서 ${service} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
-        focus: `${locationSurface}에서 ${targeted(1)} 업체 후보를 몇 곳 먼저 추려줘`,
+        core: `${locationSurface}에서 ${coreService} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
+        focus: `${locationSurface}에서 ${targetedForIntent(7, "focus")} 업체 후보를 몇 곳 먼저 추려줘`,
         specific: customerNeed
-          ? `${locationSurface}에서 ${targeted(2)} 업체 중 ${need} 기준으로 볼 만한 후보 몇 곳 찾아줘`
-          : `${locationSurface}에서 ${targeted(2)} 업체 중 후기와 전문성을 함께 볼 만한 후보 몇 곳 알려줘`,
+          ? `${locationSurface}에서 ${targetedForIntent(7, "specific")} 업체 중 ${need} 기준으로 볼 만한 후보 몇 곳 찾아줘`
+          : `${locationSurface}에서 ${targetedForIntent(7, "specific")} 업체 중 후기와 전문성을 함께 볼 만한 후보 몇 곳 알려줘`,
       },
     },
   ];
