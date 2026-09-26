@@ -12,6 +12,16 @@ export function isUnifiedDiagnosticSetName(name: string): boolean {
   return name.startsWith(UNIFIED_DIAGNOSTIC_SET_PREFIX);
 }
 
+export function hasUnifiedDiagnosticIntentShape(intentTypes: readonly string[]): boolean {
+  if (intentTypes.length !== 24) return false;
+  const counts = new Map<string, number>();
+  for (const intent of intentTypes) {
+    if (!(ALLOWED_INTENTS as readonly string[]).includes(intent)) return false;
+    counts.set(intent, (counts.get(intent) ?? 0) + 1);
+  }
+  return ALLOWED_INTENTS.every((intent) => counts.get(intent) === 3);
+}
+
 export type CustomQuestionInput = {
   location: string;
   service: string;
