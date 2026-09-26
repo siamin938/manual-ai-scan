@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
@@ -51,6 +51,7 @@ import {
   UNIFIED_DIAGNOSTIC_SET_PREFIX,
   buildCustomQuestionSetSignature,
   buildUnifiedDiagnosticQuestionCandidates,
+  isUnifiedDiagnosticSetName,
   naturalizeQuestionLocation,
   validateCustomQuestionInput,
 } from "@/lib/custom-question-suggestions";
@@ -235,7 +236,40 @@ function QuestionsPage() {
     },
   });
 
-  const setIds = useMemo(() => sets.map((s) => s.id), [sets]);
+  const currentUnifiedSet =
+    sets.find((set) => isUnifiedDiagnosticSetName(set.name)) ?? null;
+  const legacySets = useMemo(
+    () => sets.filter((set) => !isUnifiedDiagnosticSetName(set.name)),
+    [sets],
+  );
+  const primarySets = useMemo(
+    () => (currentUnifiedSet ? [currentUnifiedSet] : sets),
+    [currentUnifiedSet, sets],
+  );
+  const setIds = useMemo(() => primarySets.map((s) => s.id), [primarySets]);
+
+  const { data: currentUnifiedRun = null } = useQuery({
+    queryKey: ["current-unified-run", activeOrgId, businessId, currentUnifiedSet?.id],
+    enabled: !!activeOrgId && !!businessId && !!currentUnifiedSet?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("measurement_runs")
+        .select("id, status, completed_at")
+        .eq("org_id", activeOrgId!)
+        .eq("business_id", businessId)
+        .eq("question_set_id", currentUnifiedSet!.id)
+        .eq("run_type", "audit")
+        .eq("phase", "standalone")
+        .eq("diagnostic_scope", "customer")
+        .is("experiment_id", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
+    },
+  });
+  const hasCompletedUnifiedRun = currentUnifiedRun?.status === "completed";
 
   /** 첫 측정이 시작된 질문 세트(UI 잠금 판단용, 읽기 전용). */
   const { data: lockedSetIds = [] } = useQuery({
@@ -276,7 +310,7 @@ function QuestionsPage() {
     if (!setIds.includes(setId)) setSetId(setIds[0] ?? "");
   }, [setId, setIds]);
 
-  const selectedSet = sets.find((set) => set.id === setId) ?? null;
+  const selectedSet = primarySets.find((set) => set.id === setId) ?? null;
   const activeQuestions = questions.filter((q) => q.active);
   const intentCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -386,6 +420,7 @@ function QuestionsPage() {
       qc.invalidateQueries({ queryKey: ["question-sets", activeOrgId, businessId] });
       qc.invalidateQueries({ queryKey: ["questions-inventory", activeOrgId, businessId] });
       qc.invalidateQueries({ queryKey: ["questions", activeOrgId, res.destSetId] });
+      qc.invalidateQueries({ queryKey: ["current-unified-run", activeOrgId, businessId] });
     },
     onError: (e: Error) => {
       if (e.message === "ALL_DUPLICATE") {
@@ -562,21 +597,45 @@ function QuestionsPage() {
           <CardHeader className="space-y-1.5 pb-3">
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-base">내 업체 AI 진단</CardTitle>
-              <Badge>추천</Badge>
+              <Badge>
+                {currentUnifiedSet
+                  ? hasCompletedUnifiedRun
+                    ? "대표 진단 사용 중"
+                    : "첫 측정 필요"
+                  : legacySets.length > 0
+                    ? "새 방식으로 전환"
+                    : "추천"}
+              </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              지역 · 주력 서비스 · 중요 브랜드/차종을 반영해 8개 검색 상황별 3개씩 총 24개
-              질문을 만듭니다.
+              {currentUnifiedSet
+                ? "현재 통합 24문항이 이 업체의 새 진단 기준으로 설정되어 있습니다."
+                : "지역 · 주력 서비스 · 중요 브랜드/차종을 반영해 8개 검색 상황별 3개씩 총 24개 질문을 만듭니다."}
             </p>
-            <p className="text-xs text-muted-foreground">
-              사장님이 직접 확인한 정보만 사용하며, 이 한 세트로 대표 노출·관찰 업체·출처·기간
-              비교를 확인합니다.
+            <p className="text-xs leading-5 text-muted-foreground">
+              {currentUnifiedSet
+                ? hasCompletedUnifiedRun
+                  ? "새 통합 진단 결과가 대표 진단으로 사용되고 있습니다. 이전 맞춤·기본 진단 기록은 측정 이력에 그대로 보존됩니다."
+                  : "질문 준비는 완료됐습니다. 첫 통합 측정을 완료하면 새 결과가 대표 진단으로 전환됩니다. 이전 진단 기록은 그대로 보존됩니다."
+                : legacySets.length > 0
+                  ? "기존 맞춤·기본 진단 기록은 삭제되지 않습니다. 통합 24문항을 만들면 이후 새 측정은 이 질문 세트로 진행됩니다."
+                  : "사장님이 직접 확인한 정보만 사용하며, 이 한 세트로 대표 노출·관찰 업체·출처·기간 비교를 확인합니다."}
             </p>
           </CardHeader>
-          <CardContent>
-            <Button disabled={!businessId} onClick={openCustomBuilder}>
-              내 업체 AI 진단 24문항 만들기
-            </Button>
+          <CardContent className="flex flex-wrap gap-2">
+            {currentUnifiedSet ? (
+              <Button asChild>
+                <Link to={hasCompletedUnifiedRun ? "/dashboard" : "/runs"}>
+                  {hasCompletedUnifiedRun ? "AI 노출 진단 보기" : "첫 통합 진단 측정하기"}
+                </Link>
+              </Button>
+            ) : (
+              <Button disabled={!businessId} onClick={openCustomBuilder}>
+                {legacySets.length > 0
+                  ? "통합 AI 진단으로 전환하기"
+                  : "내 업체 AI 진단 24문항 만들기"}
+              </Button>
+            )}
             {!businessId && (
               <p className="mt-2 text-xs text-muted-foreground">먼저 업체를 선택해 주세요.</p>
             )}
@@ -675,7 +734,7 @@ function QuestionsPage() {
                   <SelectValue placeholder="질문 세트 선택" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sets.map((s) => (
+                  {primarySets.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>
@@ -685,6 +744,11 @@ function QuestionsPage() {
             </div>
             {setId && isSetLocked && <Badge variant="outline">측정 기준 고정</Badge>}
           </div>
+          {currentUnifiedSet && legacySets.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              이전 질문 세트 {legacySets.length}개는 과거 측정 이력과 함께 보존되며 새 측정에는 사용되지 않습니다.
+            </p>
+          )}
 
           {setId && (
             <p className="text-xs text-muted-foreground">
