@@ -8,6 +8,7 @@ import { useActiveTargetBusiness } from "@/lib/active-business";
 import { formatSeoul } from "@/lib/format";
 import { startCustomerMeasurement } from "@/lib/customer-measurement.functions";
 import { customerErrorMessage } from "@/lib/customer-measurement.helpers";
+import { isUnifiedDiagnosticSetName } from "@/lib/custom-question-suggestions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,7 +77,7 @@ export function runStatusVariant(status: string): "default" | "secondary" | "des
 }
 
 type RunQuestionSet = { id: string; name: string };
-export type RunQuestionSetKind = "custom" | "baseline" | "other";
+export type RunQuestionSetKind = "unified" | "custom" | "baseline" | "other";
 
 /** v0.1 naming convention: 이 접두사로 생성된 세트만 맞춤 질문으로 구분한다. */
 const CUSTOM_QUESTION_SET_PREFIX = "맞춤 질문 · ";
@@ -86,18 +87,35 @@ export function isCustomRunQuestionSet(name: string): boolean {
 }
 
 export function choosePreferredRunQuestionSetId(sets: RunQuestionSet[]): string {
-  return sets.find((set) => isCustomRunQuestionSet(set.name))?.id ?? sets[0]?.id ?? "";
+  return (
+    sets.find((set) => isUnifiedDiagnosticSetName(set.name))?.id ??
+    sets.find((set) => isCustomRunQuestionSet(set.name))?.id ??
+    sets[0]?.id ??
+    ""
+  );
 }
 
 export function getRunQuestionSetKind(name: string, activeCount: number): RunQuestionSetKind {
+  if (isUnifiedDiagnosticSetName(name) && activeCount === 24) return "unified";
   if (isCustomRunQuestionSet(name)) return "custom";
   if (activeCount === 24) return "baseline";
   return "other";
 }
 
-/** 진단 유형별 자동 측정명 접미사. v0.1: custom=맞춤 진단, baseline=기본 진단, other=측정. */
-export function formatAutoRunName(businessName: string, kind: RunQuestionSetKind, date: string): string {
-  const label = kind === "custom" ? "맞춤 진단" : kind === "baseline" ? "기본 진단" : "측정";
+/** 진단 유형별 자동 측정명 접미사. 신규 unified가 기본 고객 경로다. */
+export function formatAutoRunName(
+  businessName: string,
+  kind: RunQuestionSetKind,
+  date: string,
+): string {
+  const label =
+    kind === "unified"
+      ? "AI 진단"
+      : kind === "custom"
+        ? "맞춤 진단"
+        : kind === "baseline"
+          ? "기본 진단"
+          : "측정";
   return `${businessName} ${label} ${date}`;
 }
 
@@ -206,12 +224,26 @@ function RunsPage() {
                         </Link>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
                           <Badge
-                            variant={kind === "custom" ? "default" : kind === "baseline" ? "outline" : "secondary"}
+                            variant={
+                              kind === "unified"
+                                ? "default"
+                                : kind === "baseline"
+                                  ? "outline"
+                                  : "secondary"
+                            }
                           >
-                            {kind === "custom" ? "맞춤 진단" : kind === "baseline" ? "기본 진단" : "일반 측정"}
+                            {kind === "unified"
+                              ? "AI 진단"
+                              : kind === "custom"
+                                ? "이전 맞춤 진단"
+                                : kind === "baseline"
+                                  ? "이전 기본 진단"
+                                  : "일반 측정"}
                           </Badge>
-                          {kind === "baseline" ? (
-                            <span className="text-xs text-muted-foreground">비교 기준</span>
+                          {kind === "unified" ? (
+                            <span className="text-xs text-muted-foreground">대표 진단</span>
+                          ) : kind === "baseline" ? (
+                            <span className="text-xs text-muted-foreground">이전 비교 기준</span>
                           ) : null}
                         </div>
                         {questionSetName ? (
@@ -315,7 +347,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   );
   const selectedBusinessName = (meta.data?.businesses ?? []).find((b) => b.id === businessId)?.name ?? "";
 
-  /** 조회 결과는 최신순이다. 같은 업체의 유효한 수동 선택은 유지하고, 새 업체만 맞춤 세트를 우선한다. */
+  /** 조회 결과는 최신순이다. 같은 업체의 수동 선택은 유지하고, 새 업체는 통합 AI 진단 세트를 최우선한다. */
   useEffect(() => {
     if (!open || !businessId || sets.length === 0) return;
     setQuestionSetId((current) =>
@@ -334,23 +366,29 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     ? getRunQuestionSetKind(selectedSet.name, activeCount)
     : "other";
   const selectedSetPresentation =
-    selectedSetKind === "custom"
+    selectedSetKind === "unified"
       ? {
           badge: "대표 진단",
-          description: "내 업체에서 중요하게 설정한 맞춤 검색 질문으로 측정합니다.",
-          type: "내 업체 맞춤 진단",
+          description: "내 업체에 맞춘 24개 AI 진단 질문으로 측정합니다.",
+          type: "내 업체 AI 진단",
         }
-      : selectedSetKind === "baseline"
+      : selectedSetKind === "custom"
         ? {
-            badge: "비교 기준",
-            description: "같은 24개 질문으로 전체 노출 상태와 장기 변화를 확인합니다.",
-            type: "기본 AI 노출 진단",
+            badge: "이전 방식",
+            description: "이전에 만든 맞춤 8문항 세트로 측정합니다.",
+            type: "이전 맞춤 진단",
           }
-        : {
-            badge: "질문 세트",
-            description: "선택한 질문 세트로 측정합니다.",
-            type: "선택 질문 세트",
-          };
+        : selectedSetKind === "baseline"
+          ? {
+              badge: "이전 방식",
+              description: "이전에 만든 기본 24문항 세트로 측정합니다.",
+              type: "이전 기본 진단",
+            }
+          : {
+              badge: "질문 세트",
+              description: "선택한 질문 세트로 측정합니다.",
+              type: "선택 질문 세트",
+            };
 
   /** 자동 측정명 제안: 사용자가 직접 수정하기 전까지 선택한 진단 유형에 맞춰 갱신한다. */
   useEffect(() => {
@@ -424,7 +462,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
         <DialogHeader>
           <DialogTitle>새 측정 시작</DialogTitle>
           <DialogDescription>
-              선택한 질문 세트로 AI 노출을 측정합니다. 맞춤 진단은 대표 결과로, 기본 진단은 비교 기준으로 사용됩니다.
+            선택한 질문 세트로 AI 노출을 측정합니다. 새 통합 24문항 세트가 대표 진단 기준입니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -474,14 +512,19 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               <SelectContent>
                 {sets.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.name} {isCustomRunQuestionSet(s.name) ? "(대표 진단)" : "(기본/기타)"}
+                    {s.name}{" "}
+                    {isUnifiedDiagnosticSetName(s.name)
+                      ? "(대표 진단)"
+                      : isCustomRunQuestionSet(s.name)
+                        ? "(이전 맞춤)"
+                        : "(이전 기본/기타)"}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {questionSetId && (
               <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
-                <Badge variant={selectedSetKind === "custom" ? "default" : "outline"}>
+                <Badge variant={selectedSetKind === "unified" ? "default" : "outline"}>
                   {selectedSetPresentation.badge}
                 </Badge>
                 <p className="text-sm text-foreground">{selectedSetPresentation.description}</p>
