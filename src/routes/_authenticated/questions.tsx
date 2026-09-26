@@ -248,28 +248,29 @@ function QuestionsPage() {
   );
   const setIds = useMemo(() => primarySets.map((s) => s.id), [primarySets]);
 
-  const { data: currentUnifiedRun = null } = useQuery({
-    queryKey: ["current-unified-run", activeOrgId, businessId, currentUnifiedSet?.id],
+  const { data: completedUnifiedRun = null } = useQuery({
+    queryKey: ["completed-unified-run", activeOrgId, businessId, currentUnifiedSet?.id],
     enabled: !!activeOrgId && !!businessId && !!currentUnifiedSet?.id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("measurement_runs")
-        .select("id, status, completed_at")
+        .select("id, completed_at")
         .eq("org_id", activeOrgId!)
         .eq("business_id", businessId)
         .eq("question_set_id", currentUnifiedSet!.id)
         .eq("run_type", "audit")
         .eq("phase", "standalone")
         .eq("diagnostic_scope", "customer")
+        .eq("status", "completed")
         .is("experiment_id", null)
-        .order("created_at", { ascending: false })
+        .order("completed_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) throw error;
       return data ?? null;
     },
   });
-  const hasCompletedUnifiedRun = currentUnifiedRun?.status === "completed";
+  const hasCompletedUnifiedRun = !!completedUnifiedRun;
 
   /** 첫 측정이 시작된 질문 세트(UI 잠금 판단용, 읽기 전용). */
   const { data: lockedSetIds = [] } = useQuery({
