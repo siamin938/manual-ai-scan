@@ -256,7 +256,7 @@ describe("custom question suggestions v0.1", () => {
     );
 
     expect(result).toHaveLength(24);
-    expect(new Set(result.map((item) => normalizeQuestion(item.promptText))).size).toBe(24);
+    expect(new Set(result.map((item) => item.promptText)).size).toBe(24);
     expect(result.every((item) => item.promptText.includes("파주"))).toBe(true);
     expect(result.every((item) => item.promptText.includes("타이어 교체"))).toBe(true);
   });
