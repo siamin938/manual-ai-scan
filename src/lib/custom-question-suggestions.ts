@@ -142,6 +142,33 @@ export function parseBrandModelTargets(value: string | null | undefined): string
   return out;
 }
 
+export type CustomQuestionSignatureRow = {
+  promptText: string;
+  intentType: string;
+  region?: string | null;
+  city?: string | null;
+};
+
+/**
+ * 같은 업체에 동일한 맞춤 질문 세트를 중복 저장하지 않기 위한 안정적인 서명.
+ * 질문 문구/intent/측정 지역 메타데이터가 모두 같을 때만 동일 세트로 본다.
+ */
+export function buildCustomQuestionSetSignature(
+  rows: readonly CustomQuestionSignatureRow[],
+): string {
+  return rows
+    .map((row) =>
+      [
+        row.intentType.trim(),
+        normalizeQuestion(row.promptText),
+        clean(row.region),
+        clean(row.city),
+      ].join("|"),
+    )
+    .sort((a, b) => a.localeCompare(b, "ko-KR"))
+    .join("\n");
+}
+
 function subject(service: string, brandModel: string): string {
   return brandModel ? `${brandModel} ${service}` : service;
 }
