@@ -393,6 +393,11 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("최근 측정에서 내 업체 직접 연결 미확인");
     expect(dashboardSource).toContain("기본 진단 최근 측정 결과");
     expect(dashboardSource).toContain("기본 진단 기준");
+    expect(dashboardSource).toContain("AI 진단 기준");
+    expect(dashboardSource).toContain("isUnifiedDiagnosticSetName");
+    expect(dashboardSource).toContain("내 업체 AI 진단");
+    expect(dashboardSource).toContain("AI 진단 최근 측정 결과");
+    expect(dashboardSource).toContain("!isUnifiedDiagnostic");
     expect(dashboardSource).toContain(
       "아래 상세 분석과 벤치마크는 기본 24문항 측정을 기준으로 합니다.",
     );
