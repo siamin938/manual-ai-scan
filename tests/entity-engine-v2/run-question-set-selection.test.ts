@@ -16,7 +16,17 @@ describe("run question set selection", () => {
     expect(isCustomRunQuestionSet("Market 맞춤 질문")).toBe(false);
   });
 
-  it("prefers the newest custom set in the existing newest-first order", () => {
+  it("prefers a unified diagnostic set over legacy custom and baseline sets", () => {
+    expect(
+      choosePreferredRunQuestionSetId([
+        { id: "new-custom", name: "맞춤 질문 · 새 세트" },
+        { id: "unified", name: "AI 진단 질문 · 업체 · 2026-09-26" },
+        { id: "baseline", name: "기본 질문" },
+      ]),
+    ).toBe("unified");
+  });
+
+  it("falls back to the newest legacy custom set when no unified set exists", () => {
     expect(
       choosePreferredRunQuestionSetId([
         { id: "new-baseline", name: "기본 질문" },
@@ -35,13 +45,17 @@ describe("run question set selection", () => {
     ).toBe("newest");
   });
 
-  it("uses question count only to distinguish a selected baseline from other sets", () => {
+  it("distinguishes unified, legacy custom, baseline, and other sets", () => {
+    expect(getRunQuestionSetKind("AI 진단 질문 · 업체 · 2026-09-26", 24)).toBe("unified");
     expect(getRunQuestionSetKind("맞춤 질문 · 업체", 8)).toBe("custom");
     expect(getRunQuestionSetKind("기본 질문", 24)).toBe("baseline");
     expect(getRunQuestionSetKind("Market 질문", 8)).toBe("other");
   });
 
   it("formats the auto run name by diagnostic kind", () => {
+    expect(formatAutoRunName("카스페이스 구로점", "unified", "2026-09-26")).toBe(
+      "카스페이스 구로점 AI 진단 2026-09-26",
+    );
     expect(formatAutoRunName("카스페이스 구로점", "custom", "2026-09-25")).toBe(
       "카스페이스 구로점 맞춤 진단 2026-09-25",
     );
