@@ -10,7 +10,9 @@ describe("unified diagnostic server contract", () => {
 
     expect(source).toContain("hasUnifiedDiagnosticIntentShape");
     expect(source).toContain("isUnifiedDiagnosticSetName");
-    expect(source).toContain("hasUnifiedSet && !isUnifiedDiagnosticSetName(questionSet.name)");
+    expect(source).toContain("const newestUnifiedSet =");
+    expect(source).toContain("set.name.startsWith(UNIFIED_DIAGNOSTIC_SET_PREFIX)");
+    expect(source).toContain("newestUnifiedSet && questionSet.id !== newestUnifiedSet.id");
     expect(source).toContain("activeQuestions.length !== CUSTOMER_STANDARD_QUESTION_COUNT");
     expect(source).toContain("activeQuestions.map((q) => q.intent_type)");
   });
