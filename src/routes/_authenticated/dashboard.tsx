@@ -28,6 +28,7 @@ import type {
   CustomDiagnosticDTO,
   CustomDiagnosticQuestionDTO,
 } from "@/lib/custom-diagnostic.helpers";
+import { isUnifiedDiagnosticSetName } from "@/lib/custom-question-suggestions";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -413,6 +414,9 @@ function DashboardPage() {
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
+  const isUnifiedDiagnostic =
+    !!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName);
+  const detailBasisLabel = isUnifiedDiagnostic ? "AI 진단 기준" : "기본 진단 기준";
   const actionOpportunityModel = benchmark
     ? buildActionOpportunityEngineV01({
         benchmark,
@@ -432,8 +436,9 @@ function DashboardPage() {
           <p className="report-kicker mb-3">AI VISIBILITY REPORT</p>
           <h1 className="text-3xl font-bold leading-tight sm:text-4xl">내 AI 노출 진단</h1>
           <p className="mt-3 text-base leading-7 text-muted-foreground">
-            내 업체에서 중요하게 보는 맞춤 검색 결과를 먼저 보여드리고, 기본 진단은 비교 기준으로
-            따로 제공합니다.
+            {isUnifiedDiagnostic
+              ? "내 업체에 맞춘 24개 질문으로 대표 노출·관찰 업체·출처·기간 변화를 한 번에 확인합니다."
+              : "내 업체에서 중요하게 보는 맞춤 검색 결과를 먼저 보여드리고, 기본 진단은 비교 기준으로 따로 제공합니다."}
           </p>
         </div>
         <div className="mt-5 min-w-0 rounded-lg border border-border bg-card p-3 lg:mt-0">
@@ -458,7 +463,7 @@ function DashboardPage() {
         </Card>
       )}
 
-      {businessId && (
+      {businessId && !isUnifiedDiagnostic && (
         <CustomDiagnosticSection
           isLoading={customQuery.isLoading}
           isError={customQuery.isError || (!!customQuery.data && !customQuery.data.ok)}
@@ -470,18 +475,28 @@ function DashboardPage() {
       {businessId && (
         <section className="space-y-2 border-t border-border pt-8">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-2xl font-bold">기본 AI 노출 진단</h2>
-            <Badge variant="outline">비교 기준</Badge>
+            <h2 className="text-2xl font-bold">
+              {isUnifiedDiagnostic ? "내 업체 AI 진단" : "기본 AI 노출 진단"}
+            </h2>
+            <Badge variant={isUnifiedDiagnostic ? "default" : "outline"}>
+              {isUnifiedDiagnostic ? "대표 진단" : "비교 기준"}
+            </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            같은 24개 질문으로 전체 노출 상태와 장기 변화를 보는 기준선입니다.
+            {isUnifiedDiagnostic
+              ? "지역·주력 서비스·중요 브랜드/차종을 반영한 24개 질문으로 내 업체의 AI 노출을 진단합니다."
+              : "같은 24개 질문으로 전체 노출 상태와 장기 변화를 보는 기준선입니다."}
           </p>
           <p className="text-xs text-muted-foreground">
-            맞춤 진단과 질문 구성이 다르므로 두 노출률을 상승·하락으로 직접 비교하지 않습니다.
+            {isUnifiedDiagnostic
+              ? "아래 상세 분석·관찰 업체·출처·검색 상황·기간 비교는 모두 이 24문항 측정을 기준으로 합니다."
+              : "맞춤 진단과 질문 구성이 다르므로 두 노출률을 상승·하락으로 직접 비교하지 않습니다."}
           </p>
-          <p className="text-xs text-muted-foreground">
-            아래 상세 분석과 벤치마크는 기본 24문항 측정을 기준으로 합니다.
-          </p>
+          {!isUnifiedDiagnostic && (
+            <p className="text-xs text-muted-foreground">
+              아래 상세 분석과 벤치마크는 기본 24문항 측정을 기준으로 합니다.
+            </p>
+          )}
         </section>
       )}
 
@@ -559,7 +574,9 @@ function DashboardPage() {
           <Card className="report-section border-t-2 border-t-primary">
             <CardHeader className="border-b bg-muted/25 pb-4">
               <p className="report-kicker">EXECUTIVE SUMMARY</p>
-              <CardTitle className="text-xl">기본 진단 최근 측정 결과</CardTitle>
+              <CardTitle className="text-xl">
+                {isUnifiedDiagnostic ? "AI 진단 최근 측정 결과" : "기본 진단 최근 측정 결과"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 pt-5 text-base leading-7 lg:grid-cols-2 lg:gap-x-10">
               <MeasurementStatusBar
@@ -616,14 +633,20 @@ function DashboardPage() {
               model={actionOpportunityModel}
               evidenceExamples={actionEvidenceExamples}
               currentRunReferences={currentRunReferences}
+              basisLabel={detailBasisLabel}
             />
           )}
 
           {currentRunReferences.length > 0 && (
-            <CurrentRunReferenceSection references={currentRunReferences} />
+            <CurrentRunReferenceSection
+              references={currentRunReferences}
+              basisLabel={detailBasisLabel}
+            />
           )}
 
-          {comparisonModel && <ComparisonCard model={comparisonModel} />}
+          {comparisonModel && (
+            <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />
+          )}
           {(comparisonQuery.isError || (comparisonResult && !comparisonResult.ok)) && (
             <Card className="report-section">
               <CardContent className="py-5 text-sm text-muted-foreground">
@@ -645,7 +668,7 @@ function DashboardPage() {
               <p className="report-kicker">OBSERVED BUSINESSES</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
                 {model.competitors.heading}
-                <BaselineBadge />
+                <BaselineBadge label={detailBasisLabel} />
               </CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
@@ -709,7 +732,7 @@ function DashboardPage() {
               <CardHeader className="border-b bg-muted/20">
                 <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
                   {model.weakQuestions.heading}
-                  <BaselineBadge />
+                  <BaselineBadge label={detailBasisLabel} />
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -764,7 +787,7 @@ function DashboardPage() {
               <CardHeader className="border-b bg-muted/20">
                 <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
                   {model.sources.heading}
-                  <BaselineBadge />
+                  <BaselineBadge label={detailBasisLabel} />
                 </CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
@@ -852,14 +875,14 @@ function DashboardPage() {
             </Card>
           </div>
 
-          {benchmark && <BenchmarkCard benchmark={benchmark} />}
+          {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} />}
 
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">SEARCH CONTEXT</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
                 어떤 검색 상황에서 보였나요?
-                <BaselineBadge />
+                <BaselineBadge label={detailBasisLabel} />
               </CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
@@ -882,7 +905,7 @@ function DashboardPage() {
               <p className="report-kicker">METHODOLOGY</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
                 분석 방법과 신뢰도
-                <BaselineBadge />
+                <BaselineBadge label={detailBasisLabel} />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-xs text-muted-foreground">
@@ -906,13 +929,13 @@ function DashboardPage() {
   );
 }
 
-function BaselineBadge() {
+function BaselineBadge({ label = "기본 진단 기준" }: { label?: string }) {
   return (
     <Badge
       variant="outline"
       className="shrink-0 px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
     >
-      기본 진단 기준
+      {label}
     </Badge>
   );
 }
@@ -921,8 +944,10 @@ function ActionOpportunitySection({
   model,
   evidenceExamples,
   currentRunReferences,
+  basisLabel,
 }: {
   model: ReturnType<typeof buildActionOpportunityEngineV01>;
+  basisLabel: string;
   evidenceExamples: Array<{
     sourceGroupKey: string;
     entityName: string;
@@ -948,7 +973,7 @@ function ActionOpportunitySection({
         <p className="report-kicker">ACTION OPPORTUNITIES</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
           {model.heading}
-          <BaselineBadge />
+          <BaselineBadge label={basisLabel} />
         </CardTitle>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">{model.description}</p>
       </CardHeader>
@@ -1109,7 +1134,9 @@ function siteDisplayName(domain: string): string {
 
 function CurrentRunReferenceSection({
   references,
+  basisLabel,
 }: {
+  basisLabel: string;
   references: Array<{
     sourceGroupKey: string;
     domain: string;
@@ -1128,7 +1155,7 @@ function CurrentRunReferenceSection({
         <p className="report-kicker">CURRENT RUN REFERENCES</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
           이번 측정에서 확인된 타업체 출처 사례
-          <BaselineBadge />
+          <BaselineBadge label={basisLabel} />
         </CardTitle>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
           고노출 우선순위 근거와는 별도 참고 정보입니다. 내 업체와의 연결은 확인되지 않았지만, 이번
@@ -1171,8 +1198,10 @@ function CurrentRunReferenceSection({
 
 function ComparisonCard({
   model,
+  basisLabel,
 }: {
   model: ReturnType<typeof buildEntityFactsV2ComparisonViewModel>;
+  basisLabel: string;
 }) {
   if (!model.comparisonAvailable) {
     return (
@@ -1193,7 +1222,7 @@ function ComparisonCard({
         <p className="report-kicker">측정 비교</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
           {model.heading}
-          <BaselineBadge />
+          <BaselineBadge label={basisLabel} />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
@@ -1241,7 +1270,9 @@ function ComparisonCard({
 
 function BenchmarkCard({
   benchmark,
+  basisLabel,
 }: {
+  basisLabel: string;
   benchmark: NonNullable<
     Extract<Awaited<ReturnType<typeof getVisibilityBenchmark>>, { ok: true }>["benchmark"]
   >;
@@ -1259,7 +1290,7 @@ function BenchmarkCard({
         <p className="report-kicker">MARKET BENCHMARK</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
           AI에 자주 추천되는 업체들은 어디에서 많이 보일까요?
-          <BaselineBadge />
+          <BaselineBadge label={basisLabel} />
           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
             데이터 축적 중
           </Badge>
