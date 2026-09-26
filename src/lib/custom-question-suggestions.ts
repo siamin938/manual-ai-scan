@@ -6,6 +6,12 @@ import {
   type SuggestionCandidate,
 } from "@/lib/question-suggestions";
 
+export const UNIFIED_DIAGNOSTIC_SET_PREFIX = "AI 진단 질문 · ";
+
+export function isUnifiedDiagnosticSetName(name: string): boolean {
+  return name.startsWith(UNIFIED_DIAGNOSTIC_SET_PREFIX);
+}
+
 export type CustomQuestionInput = {
   location: string;
   service: string;
