@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCustomQuestionCandidates,
   buildCustomQuestionSetSignature,
+  buildUnifiedDiagnosticQuestionCandidates,
   naturalizeQuestionLocation,
   parseBrandModelTargets,
   validateCustomQuestionInput,
@@ -184,6 +185,96 @@ describe("custom question suggestions v0.1", () => {
 
     expect(standardBlock).toContain("city: selectedBusiness?.city ?? null,");
     expect(standardBlock).not.toContain("customLocationMode");
+  });
+
+
+  it("builds one unified 24-question set as 8 intents x 3 questions", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "서울특별시",
+        service: "신차패키지",
+        brandModel: "테슬라, 테슬라 모델Y, 테슬라 모델3",
+      },
+      "카스페이스 구로점",
+    );
+
+    expect(result).toHaveLength(24);
+    expect(new Set(result.map((item) => item.promptText)).size).toBe(24);
+    expect(result.every((item) => item.selected)).toBe(true);
+    expect(result.every((item) => !item.promptText.includes("카스페이스 구로점"))).toBe(true);
+
+    const counts = new Map<string, number>();
+    for (const item of result) {
+      counts.set(item.intentType, (counts.get(item.intentType) ?? 0) + 1);
+    }
+    expect(Object.fromEntries(counts)).toEqual({
+      local: 3,
+      recommendation: 3,
+      service: 3,
+      review_quality: 3,
+      trust: 3,
+      comparison: 3,
+      price_value: 3,
+      discovery: 3,
+    });
+  });
+
+  it("uses the locked Core + Focus + Specific wording for the Seoul Tesla example", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "서울특별시",
+        service: "신차패키지",
+        brandModel: "테슬라, 테슬라 모델Y, 테슬라 모델3",
+      },
+      "카스페이스 구로점",
+    );
+
+    expect(result.slice(0, 3).map((item) => item.promptText)).toEqual([
+      "서울에서 신차패키지 맡길 수 있는 곳 어디야?",
+      "서울에서 테슬라 신차패키지 맡기기 편한 업체 몇 곳 알려줘",
+      "서울에서 테슬라 모델Y 신차패키지 맡길 곳을 위치와 접근성 기준으로 몇 곳 알려줘",
+    ]);
+    expect(result.slice(3, 6).map((item) => item.promptText)).toEqual([
+      "서울에서 신차패키지 잘하는 업체 추천해줘",
+      "서울에서 테슬라 모델Y 신차패키지 맡길 만한 업체 추천해줘",
+      "서울에서 테슬라 모델3 신차패키지 업체 중 작업 경험과 후기를 함께 보고 추천해줘",
+    ]);
+    expect(result.slice(15, 18).map((item) => item.promptText)).toEqual([
+      "서울 신차패키지 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘",
+      "서울 테슬라 모델3 신차패키지 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘",
+      "서울 테슬라 신차패키지 업체를 작업 범위, 후기, 전문성 기준으로 비교해줘",
+    ]);
+  });
+
+  it("still produces 24 distinct questions without brand/model or customer need", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "파주시",
+        service: "타이어 교체",
+      },
+      "타이어프로 봉일천점",
+    );
+
+    expect(result).toHaveLength(24);
+    expect(new Set(result.map((item) => normalizeQuestion(item.promptText))).size).toBe(24);
+    expect(result.every((item) => item.promptText.includes("파주"))).toBe(true);
+    expect(result.every((item) => item.promptText.includes("타이어 교체"))).toBe(true);
+  });
+
+  it("uses owner-confirmed customer need only in the specific layer", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "서울특별시",
+        service: "신차패키지",
+        brandModel: "테슬라, 테슬라 모델Y",
+        customerNeed: "출고 후 한 번에 시공",
+      },
+      "카스페이스 구로점",
+    );
+
+    const needQuestions = result.filter((item) => item.promptText.includes("출고 후 한 번에 시공"));
+    expect(needQuestions).toHaveLength(8);
+    expect(needQuestions.map((item) => item.id).every((id) => id.endsWith("-specific"))).toBe(true);
   });
 
   it("rejects missing service", () => {
