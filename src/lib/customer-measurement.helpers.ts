@@ -12,7 +12,7 @@ export const CUSTOMER_RUN_REPETITIONS = 1;
 /** standalone 고객 측정은 엔진 1개 고정. */
 export const CUSTOMER_RUN_ENGINE_COUNT = 1;
 
-/** 메인 AI 노출 진단의 표준 질문 수. 맞춤 질문 세트는 이 대표 진단과 분리한다. */
+/** 고객 대표 AI 진단의 질문 수. 통합 진단 v0.2는 8개 검색 상황 × 3문항 = 24문항이다. */
 export const CUSTOMER_STANDARD_QUESTION_COUNT = 24;
 
 /** 실제 비용 오차를 흡수하기 위한 내부 headroom (서버 전용). */
