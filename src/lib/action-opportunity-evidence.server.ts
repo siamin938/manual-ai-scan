@@ -137,28 +137,16 @@ export async function fetchActionOpportunityEvidence(args: {
       ]),
   );
 
-  const { data: run } = await supabaseAdmin
-    .from("measurement_runs")
-    .select("id")
-    .eq("org_id", args.orgId)
-    .eq("business_id", args.businessId)
-    .eq("run_type", "audit")
-    .eq("phase", "standalone")
-    .eq("diagnostic_scope", "customer")
-    .eq("status", "completed")
-    .is("experiment_id", null)
-    .order("completed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!run) return empty;
+  // Evidence must use the exact representative run already validated by the
+  // dashboard read gateway. Do not independently pick another "latest" run.
+  const sourceRunId = gateway.data.scope.runId;
 
   const { data: rows, error } = await supabaseAdmin
     .from("measurement_citation_attributions_actionable_v2")
     .select("canonical_key, canonical_display_name, citation_url, domain, attribution_level")
     .eq("org_id", args.orgId)
     .eq("business_id", args.businessId)
-    .eq("source_run_id", run.id)
+    .eq("source_run_id", sourceRunId)
     .neq("canonical_key", `business:${args.businessId}`)
     .in("attribution_level", ["direct", "section"])
     .limit(300);
