@@ -98,7 +98,7 @@ describe("run question set selection", () => {
       expect(detailSource).toContain(label);
     }
     expect(detailSource).toContain(
-      "최신 완료 맞춤 측정이 대시보드 대표 진단으로 사용됩니다.",
+      "내 업체에 맞춘 24개 질문으로 진행한 통합 AI 진단입니다.",
     );
     expect(detailSource).toContain("getRunQuestionSetKind(data.questionSetName ?? \"\", totalJobs)");
   });
