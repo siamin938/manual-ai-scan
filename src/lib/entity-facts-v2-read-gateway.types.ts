@@ -103,11 +103,18 @@ export type EntityFactsV2ReadScopeDTO = {
   failedJobs: number;
 };
 
+export type EntityFactsV2ReadQuestionLocationDTO = {
+  questionId: string;
+  city: string | null;
+};
+
 export type EntityFactsV2ReadGatewayDTO = {
   gatewayVersion: typeof ENTITY_FACTS_V2_READ_GATEWAY_VERSION;
   generatedAt: string;
   business: EntityFactsV2ReadBusinessDTO;
   scope: EntityFactsV2ReadScopeDTO;
+  /** Optional supplemental metadata. Missing data must never block the core dashboard. */
+  questionLocations?: EntityFactsV2ReadQuestionLocationDTO[];
   overview: EntityFactsV2ReadOverviewDTO;
   questionGroups: EntityFactsV2ReadQuestionGroupDTO[];
   questionAreas: EntityFactsV2ReadQuestionAreaDTO[];
