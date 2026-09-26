@@ -509,10 +509,14 @@ function DashboardPage() {
     hasUnifiedDiagnosticSet ||
     (!!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName));
   const detailBasisLabel = isUnifiedDiagnostic ? "AI 진단 기준" : "기본 진단 기준";
-  const topObservedCompetitors =
+  const topObservedCompetitorResponseCount =
     model && model.competitors.rows.length > 0
+      ? Math.max(...model.competitors.rows.map((item) => item.responseCount))
+      : null;
+  const topObservedCompetitors =
+    model && topObservedCompetitorResponseCount !== null
       ? model.competitors.rows.filter(
-          (item) => item.responseCount === model.competitors.rows[0]!.responseCount,
+          (item) => item.responseCount === topObservedCompetitorResponseCount,
         )
       : [];
   const weakQuestionRows =
