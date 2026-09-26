@@ -3,6 +3,7 @@ import {
   buildCustomQuestionCandidates,
   buildCustomQuestionSetSignature,
   buildUnifiedDiagnosticQuestionCandidates,
+  hasUnifiedDiagnosticIntentShape,
   naturalizeQuestionLocation,
   parseBrandModelTargets,
   validateCustomQuestionInput,
@@ -191,6 +192,28 @@ describe("custom question suggestions v0.1", () => {
     expect(standardBlock).not.toContain("customLocationMode");
   });
 
+
+  it("accepts only the exact unified 8 intents x 3 server shape", () => {
+    const valid = [
+      "local", "local", "local",
+      "recommendation", "recommendation", "recommendation",
+      "service", "service", "service",
+      "review_quality", "review_quality", "review_quality",
+      "trust", "trust", "trust",
+      "comparison", "comparison", "comparison",
+      "price_value", "price_value", "price_value",
+      "discovery", "discovery", "discovery",
+    ];
+    expect(hasUnifiedDiagnosticIntentShape(valid)).toBe(true);
+    expect(hasUnifiedDiagnosticIntentShape(valid.slice(0, 23))).toBe(false);
+    expect(hasUnifiedDiagnosticIntentShape([...valid.slice(0, 23), "unknown"])).toBe(false);
+    expect(
+      hasUnifiedDiagnosticIntentShape([
+        ...valid.filter((intent) => intent !== "local"),
+        "recommendation", "recommendation", "recommendation",
+      ]),
+    ).toBe(false);
+  });
 
   it("builds one unified 24-question set as 8 intents x 3 questions", () => {
     const result = buildUnifiedDiagnosticQuestionCandidates(
