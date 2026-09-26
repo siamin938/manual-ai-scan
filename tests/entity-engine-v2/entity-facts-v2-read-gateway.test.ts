@@ -523,6 +523,15 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).toContain('.eq("contract_ok", true)');
   });
 
+  it("keeps supplemental question location metadata non-blocking", () => {
+    expect(serverSource).toContain("Supplemental question-location metadata");
+    expect(serverSource).toContain('.from("questions")');
+    expect(serverSource).toContain('.select("id, city")');
+    expect(serverSource).toContain("questionLocationError");
+    expect(serverSource).toContain("gatewayResponse.data.questionLocations");
+    expect(serverSource).toContain("return gatewayResponse;");
+  });
+
   it("never reads legacy raw measurement truth in the v2 gateway", () => {
     expect(serverSource).not.toContain('.from("measurements")');
     expect(serverSource).not.toContain("was_client_mentioned");
