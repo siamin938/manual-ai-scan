@@ -1,17 +1,25 @@
-# 측정 상세 canonicalization 버전 회귀 수정
+# /dashboard "진단 요청이 실패했습니다" 원인 진단 (코드 변경 0건)
 
-## 변경 범위
-- `runs.$runId.tsx`의 고정 `0.1.0` 읽기 계약을 제거합니다.
-- 해당 측정의 mention 범위에서 `resolver_version`을 포함해 읽고, 저장된 버전이 정확히 하나일 때만 기존 canonical map과 업체 집계를 구성합니다.
-- 버전이 없으면 기존 빈 결과를 유지하고, 둘 이상이면 목록을 비운 채 안전 안내문을 표시합니다.
-- 버전 문자열의 우선순위 비교나 최신 버전 선택은 하지 않습니다.
+## 실제 예외
+`Error: Missing Supabase environment variable(s): SUPABASE_SERVICE_ROLE_KEY. Connect Supabase in Lovable Cloud.`
 
-## 테스트와 확인
-- 작은 순수 helper를 추가해 0건, 단일 `0.1.0`, 단일 `0.1.1`, 혼합 버전을 검증합니다.
-- 상세 화면에서 오래된 상수와 고정 필터가 제거됐고 충돌 안내가 존재하는지 계약 테스트로 확인합니다.
-- 기존 질문 세트·고객 측정 테스트, 타입 검사, 빌드, Preview `/runs` 응답을 확인합니다.
-- 운영 DB는 읽기 전용으로 최신 `0.1.1` run과 과거 `0.1.0` run의 집계 가능 업체를 확인하며 측정·재분석은 실행하지 않습니다.
+## Stack trace
+- createSupabaseAdminClient — src/integrations/supabase/client.server.ts:43
+- ← proxy get — client.server.ts:66
+- ← fetchEntityFactsV2ReadGateway — src/lib/entity-facts-v2-read-gateway.server.ts:156 (진단)
+- ← getEntityFactsV2ReadGateway — entity-facts-v2-read-gateway.functions.ts:46
+- 동일 오류: fetchEntityFactsV2Comparison — entity-facts-v2-comparison.server.ts:279 ← comparison.functions.ts:44 (이전 측정 비교)
 
-## 변경하지 않는 부분
-- DB, Edge, v2 Dashboard/read gateway, 측정 생성·비용·측정권, 결과·노출률·출처 계산은 변경하지 않습니다.
-- Publish/Deploy는 진행하지 않습니다.
+## 원인
+- 미리보기 서버 프로세스(PID 144, 14:17 UTC 시작) 환경에 서비스 키가 없음(0건). 명령 실행 환경에는 키가 있음.
+- 로그인 확인은 통과한 뒤, 관리자 연결을 만드는 단계에서 실패. 코드 로직 오류 아님.
+- questionLocations enrichment, UnifiedDiagnosticLayerSummaryCard 관련 예외는 서버 로그·runtime-errors에 없음. 빌드는 최신(43cfaf7) 기준 OK.
+- "The app encountered an error"는 같은 서버 함수 실패가 화면까지 전달된 결과로 보이나, runtime-errors.log가 비어 있어 브라우저 측 스택은 확보되지 않음(외부 인증이라 직접 클릭 재현 불가).
+
+## 재현 조건
+- 미리보기 /dashboard → 카스페이스 구로점 선택 → 진단/비교 서버 함수 호출 시 매번 발생. 업체와 무관하게 서비스 키가 필요한 모든 호출에서 발생.
+
+## 승인 시 복구 절차 (소스·DB 변경 없음, 지난번과 동일)
+1. 미리보기 런타임에 서비스 키 재주입
+2. 미리보기 서버만 재시작 후 새 프로세스에 키 존재 확인(값 미출력)
+3. 구로점으로 두 서버 함수 읽기 전용 호출 → 오류 0건 확인
