@@ -172,6 +172,20 @@ describe("custom question suggestions v0.1", () => {
     expect(source).toContain('같은 맞춤 질문 세트가 이미 있어 기존 세트를 선택했습니다.');
   });
 
+  it("keeps baseline question metadata independent from custom location mode", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(
+      new URL("../../src/routes/_authenticated/questions.tsx", import.meta.url),
+      "utf8",
+    );
+    const standardStart = source.indexOf("const saveSuggestions = useMutation");
+    const customStart = source.indexOf("const saveCustomSuggestions = useMutation");
+    const standardBlock = source.slice(standardStart, customStart);
+
+    expect(standardBlock).toContain("city: selectedBusiness?.city ?? null,");
+    expect(standardBlock).not.toContain("customLocationMode");
+  });
+
   it("rejects missing service", () => {
     expect(
       validateCustomQuestionInput(
