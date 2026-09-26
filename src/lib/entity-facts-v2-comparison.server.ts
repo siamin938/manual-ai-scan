@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
 import { CUSTOMER_STANDARD_QUESTION_COUNT } from "@/lib/customer-measurement.helpers";
+import { UNIFIED_DIAGNOSTIC_SET_PREFIX } from "@/lib/custom-question-suggestions";
 import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
@@ -288,7 +289,20 @@ export async function fetchEntityFactsV2Comparison(args: {
   const businessDTO = asBusinessDTO(business);
 
   // Keep current-run selection exactly aligned with the v2 customer dashboard.
-  const { data: currentRun, error: currentRunError } = await supabaseAdmin
+  // If a unified set exists, only that newest active set can be the current contract.
+  const { data: currentUnifiedSet, error: unifiedSetError } = await supabaseAdmin
+    .from("question_sets")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("business_id", businessId)
+    .eq("active", true)
+    .like("name", `${UNIFIED_DIAGNOSTIC_SET_PREFIX}%`)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (unifiedSetError) return { ok: false, error: "INTERNAL_ERROR" };
+
+  let currentRunQuery = supabaseAdmin
     .from("measurement_runs")
     .select(
       "id, question_set_id, selected_providers, repetitions, data_origin, total_jobs, completed_jobs, failed_jobs, completed_at, created_at",
@@ -300,7 +314,13 @@ export async function fetchEntityFactsV2Comparison(args: {
     .eq("diagnostic_scope", "customer")
     .eq("status", "completed")
     .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
-    .is("experiment_id", null)
+    .is("experiment_id", null);
+
+  if (currentUnifiedSet) {
+    currentRunQuery = currentRunQuery.eq("question_set_id", currentUnifiedSet.id);
+  }
+
+  const { data: currentRun, error: currentRunError } = await currentRunQuery
     .order("completed_at", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(1)
@@ -324,6 +344,7 @@ export async function fetchEntityFactsV2Comparison(args: {
     )
     .eq("org_id", orgId)
     .eq("business_id", businessId)
+    .eq("question_set_id", currentRun.question_set_id)
     .eq("run_type", "audit")
     .eq("phase", "standalone")
     .eq("diagnostic_scope", "customer")
