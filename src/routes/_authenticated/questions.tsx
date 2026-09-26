@@ -48,6 +48,7 @@ import {
 } from "@/lib/question-suggestions";
 import {
   buildCustomQuestionCandidates,
+  buildCustomQuestionSetSignature,
   validateCustomQuestionInput,
 } from "@/lib/custom-question-suggestions";
 
@@ -215,6 +216,7 @@ function QuestionsPage() {
         .select("id, name, active")
         .eq("org_id", activeOrgId!)
         .eq("business_id", businessId)
+        .eq("active", true)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -392,6 +394,70 @@ function QuestionsPage() {
       if (selected.length === 0) throw new Error("NO_SELECTION");
       if (!customSetName.trim()) throw new Error("NO_SET_NAME");
 
+      const { kept } = dedupeForSave(selected, []);
+      if (kept.length === 0) throw new Error("ALL_DUPLICATE");
+
+      const region = selectedBusiness?.region ?? null;
+      const city = customLocationMode === "region" ? null : (selectedBusiness?.city ?? null);
+      const selectedSignature = buildCustomQuestionSetSignature(
+        kept.map((candidate) => ({
+          promptText: candidate.promptText,
+          intentType: candidate.intentType,
+          region,
+          city,
+        })),
+      );
+
+      const { data: existingSets, error: existingSetsError } = await supabase
+        .from("question_sets")
+        .select("id, name")
+        .eq("org_id", activeOrgId!)
+        .eq("business_id", businessId)
+        .eq("active", true)
+        .like("name", "맞춤 질문 · %");
+      if (existingSetsError) throw existingSetsError;
+
+      const existingSetIds = (existingSets ?? []).map((set) => set.id);
+      if (existingSetIds.length > 0) {
+        const { data: existingQuestions, error: existingQuestionsError } = await supabase
+          .from("questions")
+          .select("question_set_id, prompt_text, intent_type, region, city")
+          .in("question_set_id", existingSetIds)
+          .eq("active", true);
+        if (existingQuestionsError) throw existingQuestionsError;
+
+        const rowsBySet = new Map<
+          string,
+          Array<{
+            promptText: string;
+            intentType: string;
+            region: string | null;
+            city: string | null;
+          }>
+        >();
+        for (const row of existingQuestions ?? []) {
+          const rows = rowsBySet.get(row.question_set_id) ?? [];
+          rows.push({
+            promptText: row.prompt_text,
+            intentType: row.intent_type,
+            region: row.region,
+            city: row.city,
+          });
+          rowsBySet.set(row.question_set_id, rows);
+        }
+
+        const duplicateSet = (existingSets ?? []).find((set) => {
+          const rows = rowsBySet.get(set.id) ?? [];
+          return (
+            rows.length === kept.length &&
+            buildCustomQuestionSetSignature(rows) === selectedSignature
+          );
+        });
+        if (duplicateSet) {
+          return { destSetId: duplicateSet.id as string, inserted: kept.length, reused: true };
+        }
+      }
+
       const { data, error: setErr } = await supabase
         .from("question_sets")
         .insert({
@@ -404,22 +470,23 @@ function QuestionsPage() {
       if (setErr) throw setErr;
       const destSetId = data.id as string;
 
-      const { kept } = dedupeForSave(selected, []);
-      if (kept.length === 0) throw new Error("ALL_DUPLICATE");
-
       const payloads = buildInsertPayloads(kept, {
         orgId: activeOrgId!,
         questionSetId: destSetId,
-        region: selectedBusiness?.region ?? null,
-        city: selectedBusiness?.city ?? null,
+        region,
+        city,
       });
       const { error } = await supabase.from("questions").insert(payloads);
       if (error) throw error;
 
-      return { destSetId, inserted: kept.length };
+      return { destSetId, inserted: kept.length, reused: false };
     },
     onSuccess: (res) => {
-      toast.success(`맞춤 질문 ${res.inserted}개를 별도 세트로 저장했습니다.`);
+      if (res.reused) {
+        toast.success("같은 맞춤 질문 세트가 이미 있어 기존 세트를 선택했습니다.");
+      } else {
+        toast.success(`맞춤 질문 ${res.inserted}개를 별도 세트로 저장했습니다.`);
+      }
       setOpenCustomReview(false);
       setCustomCandidates([]);
       setSetId(res.destSetId);
