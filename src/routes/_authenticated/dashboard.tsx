@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
@@ -28,7 +29,10 @@ import type {
   CustomDiagnosticDTO,
   CustomDiagnosticQuestionDTO,
 } from "@/lib/custom-diagnostic.helpers";
-import { isUnifiedDiagnosticSetName } from "@/lib/custom-question-suggestions";
+import {
+  UNIFIED_DIAGNOSTIC_SET_PREFIX,
+  isUnifiedDiagnosticSetName,
+} from "@/lib/custom-question-suggestions";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +81,23 @@ function pctRange(lower: number | null, upper: number | null): string {
 function percentOf(part: number, total: number): number {
   if (total <= 0) return 0;
   return Math.max(0, Math.min(100, (100 * part) / total));
+}
+
+const UNIFIED_V2_RETRY_DELAYS_MS = [1500, 2500, 4000] as const;
+
+function isTransientV2ReadError(result: {
+  ok: boolean;
+  error?: string;
+} | null | undefined): boolean {
+  return (
+    !!result &&
+    !result.ok &&
+    (result.error === "NO_V2_DATA" || result.error === "INVALID_V2_DATA")
+  );
+}
+
+function waitForDashboardRetry(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function MeasurementStatusBar({
@@ -315,17 +336,58 @@ function DashboardPage() {
   const showAllCompetitors = expandedCompetitorBusinessId === businessId;
   const showAllWeakQuestions = expandedWeakQuestionBusinessId === businessId;
 
+  const unifiedSetQuery = useQuery({
+    queryKey: ["active-unified-diagnostic-set", activeOrgId, businessId],
+    enabled: !!activeOrgId && !!businessId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("question_sets")
+        .select("id, name")
+        .eq("org_id", activeOrgId as string)
+        .eq("business_id", businessId as string)
+        .eq("active", true)
+        .like("name", `${UNIFIED_DIAGNOSTIC_SET_PREFIX}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data ?? null;
+    },
+  });
+  const hasUnifiedDiagnosticSet = !!unifiedSetQuery.data;
+
   const fetchV2 = useServerFn(getEntityFactsV2ReadGateway);
   const query = useQuery({
-    queryKey: ["entity-facts-v2-dashboard", activeOrgId, businessId],
-    enabled: !!activeOrgId && !!businessId,
-    queryFn: () =>
-      fetchV2({
-        data: {
-          orgId: activeOrgId as string,
-          businessId: businessId as string,
-        },
-      }),
+    queryKey: [
+      "entity-facts-v2-dashboard",
+      activeOrgId,
+      businessId,
+      hasUnifiedDiagnosticSet,
+    ],
+    enabled:
+      !!activeOrgId &&
+      !!businessId &&
+      !unifiedSetQuery.isLoading &&
+      !unifiedSetQuery.isError,
+    queryFn: async () => {
+      const request = () =>
+        fetchV2({
+          data: {
+            orgId: activeOrgId as string,
+            businessId: businessId as string,
+          },
+        });
+
+      let response = await request();
+      if (!hasUnifiedDiagnosticSet) return response;
+
+      for (const delayMs of UNIFIED_V2_RETRY_DELAYS_MS) {
+        if (!isTransientV2ReadError(response)) break;
+        await waitForDashboardRetry(delayMs);
+        response = await request();
+      }
+      return response;
+    },
   });
 
   const fetchComparison = useServerFn(getEntityFactsV2Comparison);
@@ -403,7 +465,11 @@ function DashboardPage() {
   const fetchCustom = useServerFn(getCustomDiagnostic);
   const customQuery = useQuery({
     queryKey: ["custom-diagnostic", activeOrgId, businessId],
-    enabled: !!activeOrgId && !!businessId,
+    enabled:
+      !!activeOrgId &&
+      !!businessId &&
+      !unifiedSetQuery.isLoading &&
+      !hasUnifiedDiagnosticSet,
     retry: false,
     queryFn: () =>
       fetchCustom({
@@ -415,7 +481,8 @@ function DashboardPage() {
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
   const isUnifiedDiagnostic =
-    !!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName);
+    hasUnifiedDiagnosticSet ||
+    (!!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName));
   const detailBasisLabel = isUnifiedDiagnostic ? "AI 진단 기준" : "기본 진단 기준";
   const actionOpportunityModel = benchmark
     ? buildActionOpportunityEngineV01({
