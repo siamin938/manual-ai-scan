@@ -385,9 +385,9 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("showAllCompetitors");
     expect(dashboardSource).toContain("showAllWeakQuestions");
     expect(dashboardSource).toContain("model.competitors.rows.length > 6");
-    expect(dashboardSource).toContain("model.weakQuestions.rows.length > 6");
+    expect(dashboardSource).toContain("weakQuestionRows.length > 6");
     expect(dashboardSource).toContain("전체 ${model.competitors.rows.length}곳 보기");
-    expect(dashboardSource).toContain("전체 ${model.weakQuestions.rows.length}개 질문 보기");
+    expect(dashboardSource).toContain("전체 ${weakQuestionRows.length}개 질문 보기");
     expect(dashboardSource).not.toContain("노출 범위 ${q.visibilityDisplayText}");
     expect(dashboardSource).toContain("AI 답변 {s.clueResponseCount}건에서 단서 확인");
     expect(dashboardSource).toContain("최근 측정에서 내 업체 직접 연결 미확인");
@@ -405,6 +405,16 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain('"NO_V2_DATA"');
     expect(dashboardSource).toContain('"INVALID_V2_DATA"');
     expect(dashboardSource).toContain("waitForDashboardRetry");
+    expect(dashboardSource).toContain("questionUsesDetailedLocation");
+    expect(dashboardSource).toContain("unifiedWeakQuestionPriority");
+    expect(dashboardSource).toContain("맞춤 검색");
+    expect(dashboardSource).toContain("기준 검색");
+    expect(dashboardSource).toContain("가장 자주 함께 관찰된 업체");
+    expect(dashboardSource).toContain("(공동)");
+    expect(dashboardSource).toContain("confirmedRatio");
+    expect(dashboardSource).toContain(
+      "AI에 자주 관찰되는 업체들은 어떤 출처와 함께 보일까요?",
+    );
     expect(dashboardSource).toContain("!isUnifiedDiagnostic");
     expect(dashboardSource).toContain(
       "아래 상세 분석과 벤치마크는 기본 24문항 측정을 기준으로 합니다.",
