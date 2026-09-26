@@ -152,9 +152,9 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
   const businessDTO = asBusinessDTO(business);
 
-  // The newest active unified set becomes the current customer diagnostic contract.
-  // Until that exact set has a completed run, never relabel an older legacy 24-question
-  // run as the new representative diagnostic.
+  // The newest active unified set is the next customer diagnostic contract.
+  // Until that exact set has a completed run, keep the last completed 24-question
+  // representative visible without relabeling it as unified.
   const { data: currentUnifiedSet, error: unifiedSetError } = await supabaseAdmin
     .from("question_sets")
     .select("id, name")
@@ -169,30 +169,50 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     return { ok: false, error: "INTERNAL_ERROR", business: businessDTO };
   }
 
-  let runQuery = supabaseAdmin
-    .from("measurement_runs")
-    .select(
-      "id, name, question_set_id, completed_at, created_at, repetitions, selected_providers, total_jobs, completed_jobs, failed_jobs",
-    )
-    .eq("org_id", orgId)
-    .eq("business_id", businessId)
-    .eq("run_type", "audit")
-    .eq("phase", "standalone")
-    .eq("diagnostic_scope", "customer")
-    .eq("status", "completed")
-    .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
-    .is("experiment_id", null);
+  const baseRunQuery = () =>
+    supabaseAdmin
+      .from("measurement_runs")
+      .select(
+        "id, name, question_set_id, completed_at, created_at, repetitions, selected_providers, total_jobs, completed_jobs, failed_jobs",
+      )
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("run_type", "audit")
+      .eq("phase", "standalone")
+      .eq("diagnostic_scope", "customer")
+      .eq("status", "completed")
+      .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
+      .is("experiment_id", null);
 
+  // A newly created unified set does not erase the last representative result.
+  // Switch only after that exact unified set has a completed customer run.
+  let run = null;
   if (currentUnifiedSet) {
-    runQuery = runQuery.eq("question_set_id", currentUnifiedSet.id);
+    const { data: unifiedRun, error: unifiedRunError } = await baseRunQuery()
+      .eq("question_set_id", currentUnifiedSet.id)
+      .order("completed_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (unifiedRunError) {
+      return { ok: false, error: "INTERNAL_ERROR", business: businessDTO };
+    }
+    run = unifiedRun;
   }
 
-  const { data: run, error: runError } = await runQuery
-    .order("completed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  if (!run) {
+    const { data: previousRepresentativeRun, error: previousRunError } =
+      await baseRunQuery()
+        .order("completed_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    if (previousRunError) {
+      return { ok: false, error: "INTERNAL_ERROR", business: businessDTO };
+    }
+    run = previousRepresentativeRun;
+  }
 
-  if (runError) return { ok: false, error: "INTERNAL_ERROR", business: businessDTO };
   if (!run) return { ok: false, error: "NO_V2_DATA", business: businessDTO };
 
   const { data: questionSet, error: questionSetError } = await supabaseAdmin
