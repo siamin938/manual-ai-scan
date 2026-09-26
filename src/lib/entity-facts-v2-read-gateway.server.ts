@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { CUSTOMER_STANDARD_QUESTION_COUNT } from "@/lib/customer-measurement.helpers";
+import { UNIFIED_DIAGNOSTIC_SET_PREFIX } from "@/lib/custom-question-suggestions";
 import { buildEntityFactsV2ReadGatewayFromSnapshot } from "./entity-facts-v2-read-gateway.build";
 import {
   ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION,
@@ -151,9 +152,24 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
   const businessDTO = asBusinessDTO(business);
 
-  // Keep representative-run semantics aligned with the current diagnostic:
-  // newest completed standalone audit, excluding experiment runs.
-  const { data: run, error: runError } = await supabaseAdmin
+  // The newest active unified set becomes the current customer diagnostic contract.
+  // Until that exact set has a completed run, never relabel an older legacy 24-question
+  // run as the new representative diagnostic.
+  const { data: currentUnifiedSet, error: unifiedSetError } = await supabaseAdmin
+    .from("question_sets")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .eq("business_id", businessId)
+    .eq("active", true)
+    .like("name", `${UNIFIED_DIAGNOSTIC_SET_PREFIX}%`)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (unifiedSetError) {
+    return { ok: false, error: "INTERNAL_ERROR", business: businessDTO };
+  }
+
+  let runQuery = supabaseAdmin
     .from("measurement_runs")
     .select(
       "id, name, question_set_id, completed_at, created_at, repetitions, selected_providers, total_jobs, completed_jobs, failed_jobs",
@@ -165,7 +181,13 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     .eq("diagnostic_scope", "customer")
     .eq("status", "completed")
     .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
-    .is("experiment_id", null)
+    .is("experiment_id", null);
+
+  if (currentUnifiedSet) {
+    runQuery = runQuery.eq("question_set_id", currentUnifiedSet.id);
+  }
+
+  const { data: run, error: runError } = await runQuery
     .order("completed_at", { ascending: false })
     .limit(1)
     .maybeSingle();
