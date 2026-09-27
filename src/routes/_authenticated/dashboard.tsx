@@ -1535,6 +1535,53 @@ function ComparisonCard({
           </div>
         )}
 
+        {model.searchScope && (
+          <div className="space-y-3 rounded-lg border bg-muted/15 p-4">
+            <div>
+              <p className="text-sm font-semibold">검색 범위별 변화</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                같은 통합 24문항에서 맞춤 검색과 기준 검색의 확정 노출만 따로 비교합니다.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {[model.searchScope.custom, model.searchScope.core].map((metric) => (
+                <div key={metric.label} className="rounded-md border bg-card p-3">
+                  <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
+                  <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-xl font-semibold tabular-nums">
+                      {metric.currentValueText}
+                    </span>
+                    {metric.deltaText && <Badge variant="outline">{metric.deltaText}</Badge>}
+                  </div>
+                  {metric.previousValueText && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      이전 동일 조건 측정 {metric.previousValueText}
+                    </p>
+                  )}
+                  {metric.comparisonSentence && (
+                    <p className="mt-2 text-sm leading-6">{metric.comparisonSentence}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-sm">
+              새로 확정된 질문{" "}
+              <span className="font-semibold tabular-nums">
+                {model.searchScope.newlyConfirmedQuestionCount}개
+              </span>
+              {" · "}
+              이전에는 확정됐지만 이번 측정에서 확정되지 않은 질문{" "}
+              <span className="font-semibold tabular-nums">
+                {model.searchScope.noLongerConfirmedQuestionCount}개
+              </span>
+            </p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              동일한 질문 세트와 측정 조건이 확인된 두 측정의 확정 여부만 비교합니다. 변화의 원인을
+              의미하지 않습니다.
+            </p>
+          </div>
+        )}
+
         {model.trendAvailable && model.compatibleMeasurementCount !== null && (
           <p className="text-xs text-muted-foreground">
             동일 조건 측정 {model.compatibleMeasurementCount}회가 확인되었습니다.
