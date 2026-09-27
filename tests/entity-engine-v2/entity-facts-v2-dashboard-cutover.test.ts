@@ -419,9 +419,12 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("dto.questionLocations");
     expect(dashboardSource).not.toContain("unified-diagnostic-question-layers");
     expect(dashboardSource).toContain("검색 범위별 확정 노출");
-    expect(dashboardSource).toContain("전체 AI 노출");
-    expect(dashboardSource).toContain("맞춤 검색");
-    expect(dashboardSource).toContain("기준 검색");
+    expect(dashboardSource).toContain("전체 확정 노출");
+    expect(dashboardSource).toContain("맞춤 검색 확정 노출");
+    expect(dashboardSource).toContain("기준 검색 확정 노출");
+    expect(dashboardSource).toContain(
+      "이번 통합 24문항 측정에서 확정된 응답 기준입니다.",
+    );
     expect(dashboardSource).toContain(
       "상세 지역·브랜드/차종 검색에서는 확인됐지만, 더 넓은 기준 검색에서는 확인되지 않았습니다.",
     );
