@@ -91,7 +91,8 @@ function globalSignalStrength(args: {
   if (
     (args.patternStrength === "established" ||
       args.patternStrength === "emerging") &&
-    args.highEntityCount >= 3
+    args.highEntityCount >= 3 &&
+    share >= 20
   ) {
     return "moderate";
   }
