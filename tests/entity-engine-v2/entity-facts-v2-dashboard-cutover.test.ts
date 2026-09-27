@@ -278,7 +278,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
   it("uses observed source supplement without overstating source trust", () => {
     const model = buildEntityFactsV2DashboardCutoverModel(fixture());
 
-    expect(model.citationSources.heading).toBe("AI 답변에서 실제 인용된 주요 출처");
+    expect(model.citationSources.heading).toBe("AI 답변에서 실제 인용된 출처");
     expect(model.citationSources.rows).toEqual([
       {
         domain: "oh-car.kr",
@@ -294,7 +294,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       },
     ]);
     expect(model.metricCards.citationSourceCount).toBe(2);
-    expect(model.sources.heading).toBe("업체와 연결이 확인된 출처");
+    expect(model.sources.heading).toBe("업체 연결까지 확인된 출처");
     expect(model.sources.available).toBe(true);
     expect(model.sources.referenceSourcesAvailable).toBe(false);
     expect(model.metricCards.targetSourceCount).toBe(1);
@@ -409,8 +409,13 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("model.citationSources.heading");
     expect(dashboardSource).toContain("model.sources.heading");
     expect(dashboardSource).toContain("전체 ${model.citationSources.rows.length}개 출처 보기");
-    expect(dashboardSource).toContain("인용 페이지 보기 ↗");
+    expect(dashboardSource).toContain("인용 페이지 예시 보기 ↗");
     expect(dashboardSource).toContain("검색 과정에서만 참고된 후보 출처는 포함하지 않습니다.");
+    expect(dashboardSource).toContain("인용된 답변 수");
+    expect(dashboardSource).toContain("전체 인용 횟수");
+    expect(dashboardSource).toContain("내 업체 직접 연결");
+    expect(dashboardSource).toContain("다른 업체 확정 연결");
+    expect(dashboardSource).toContain("연결 단서");
     expect(dashboardSource).toContain("상위 3곳 여부 추가 확인");
     expect(dashboardSource).toContain('note="이번 측정에서 업체로 확인된 항목"');
     expect(dashboardSource).toContain("같은 업체가 여러 답변에서");
@@ -441,7 +446,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("waitForDashboardRetry");
     expect(dashboardSource).toContain("questionUsesDetailedLocation");
     expect(dashboardSource).toContain("unifiedWeakQuestionPriority");
-    expect(dashboardSource).toContain("맞춤 검색");
+    expect(dashboardSource).toContain("상세 검색");
     expect(dashboardSource).toContain("기준 검색");
     expect(dashboardSource).toContain("가장 자주 함께 관찰된 업체");
     expect(dashboardSource).toContain("(공동)");
@@ -454,13 +459,13 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).not.toContain("unified-diagnostic-question-layers");
     expect(dashboardSource).toContain("검색 범위별 확정 노출");
     expect(dashboardSource).toContain("전체 확정 노출");
-    expect(dashboardSource).toContain("맞춤 검색 확정 노출");
+    expect(dashboardSource).toContain("상세 검색 확정 노출");
     expect(dashboardSource).toContain("기준 검색 확정 노출");
     expect(dashboardSource).toContain(
       "이번 통합 24문항 측정에서 확정된 응답 기준입니다.",
     );
     expect(dashboardSource).toContain(
-      "상세 지역·브랜드/차종 검색에서는 확인됐지만, 더 넓은 기준 검색에서는 확인되지 않았습니다.",
+      "상세 검색에서는 확인됐지만, 더 넓은 기준 검색에서는 확인되지 않았습니다.",
     );
     expect(dashboardSource).toContain("!isUnifiedDiagnostic");
     expect(dashboardSource).toContain(
