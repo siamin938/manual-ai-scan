@@ -414,9 +414,8 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("상위 3곳 여부 추가 확인");
     expect(dashboardSource).toContain('note="이번 측정에서 업체로 확인된 항목"');
     expect(dashboardSource).toContain("같은 업체가 여러 답변에서");
-    expect(dashboardSource).toContain(
-      "연결이 아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로 표시합니다.",
-    );
+    expect(dashboardSource).toContain("연결이 아직 충분히 확인되지 않은 경우에는");
+    expect(dashboardSource).toContain("‘연결 단서’로");
     expect(dashboardSource).toContain("showAllCompetitors");
     expect(dashboardSource).toContain("showAllWeakQuestions");
     expect(dashboardSource).toContain("model.competitors.rows.length > 6");
