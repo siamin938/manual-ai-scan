@@ -449,8 +449,12 @@ function DashboardPage() {
   const [expandedWeakQuestionBusinessId, setExpandedWeakQuestionBusinessId] = useState<
     string | null
   >(null);
+  const [expandedCitationSourceBusinessId, setExpandedCitationSourceBusinessId] = useState<
+    string | null
+  >(null);
   const showAllCompetitors = expandedCompetitorBusinessId === businessId;
   const showAllWeakQuestions = expandedWeakQuestionBusinessId === businessId;
+  const showAllCitationSources = expandedCitationSourceBusinessId === businessId;
 
   const unifiedSetQuery = useQuery({
     queryKey: ["active-unified-diagnostic-set", activeOrgId, businessId],
@@ -819,11 +823,11 @@ function DashboardPage() {
               note="이번 측정에서 업체로 확인된 항목"
             />
             <MetricCard
-              label="관찰된 주요 출처"
+              label="실제 인용 출처"
               value={
-                model.sources.available ? `${model.metricCards.observedSourceCount}곳` : "준비 중"
+                dto.citationSources ? `${model.metricCards.citationSourceCount}곳` : "준비 중"
               }
-              note="확인된 연결과 연결 단서를 포함한 출처"
+              note="이번 측정의 최종 AI 답변에 실제 인용된 도메인"
             />
           </div>
 
@@ -996,6 +1000,88 @@ function DashboardPage() {
             </CardContent>
           </Card>
 
+          <Card className="report-section">
+            <CardHeader className="border-b bg-muted/20">
+              <p className="report-kicker">CITED SOURCES</p>
+              <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+                {model.citationSources.heading}
+                <BaselineBadge label={detailBasisLabel} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <p className="mb-3 text-xs leading-5 text-muted-foreground">
+                이번 측정의 최종 AI 답변에 실제 citation으로 남은 출처를 도메인별로 묶었습니다.
+                검색 과정에서만 참고된 후보 출처는 포함하지 않습니다. 특정 업체와 연결됐다는 뜻은
+                아니며, 아래 ‘업체와 연결이 확인된 출처’에서 별도로 확인합니다.
+              </p>
+              {model.citationSources.rows.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  이번 측정의 최종 AI 답변에서 인용된 출처가 확인되지 않았습니다.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>출처</TableHead>
+                      <TableHead>AI 답변에서 인용</TableHead>
+                      <TableHead>인용 횟수</TableHead>
+                      <TableHead className="text-right">예시</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {model.citationSources.rows
+                      .slice(0, showAllCitationSources ? model.citationSources.rows.length : 8)
+                      .map((source) => (
+                        <TableRow key={source.domain}>
+                          <TableCell className="text-sm font-medium">
+                            {siteDisplayName(source.domain)}
+                            {siteDisplayName(source.domain) !== source.domain && (
+                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                {source.domain}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {source.responseCount}개 답변
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {source.citationCount}회
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <a
+                              href={source.sampleUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sm text-primary underline-offset-4 hover:underline"
+                            >
+                              인용 페이지 보기 ↗
+                            </a>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              )}
+              {model.citationSources.rows.length > 8 && (
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setExpandedCitationSourceBusinessId(
+                        showAllCitationSources ? null : businessId,
+                      )
+                    }
+                  >
+                    {showAllCitationSources
+                      ? "접기"
+                      : `전체 ${model.citationSources.rows.length}개 출처 보기`}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid items-start gap-6 lg:grid-cols-2">
             <Card className="report-section">
               <CardHeader className="border-b bg-muted/20">
@@ -1069,8 +1155,9 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <p className="mb-3 text-xs text-muted-foreground">
-                  이번 측정의 AI 답변에서 내 업체 또는 함께 관찰된 업체와 연결된 출처입니다.{" "}
-                  {"연결이 아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로 표시합니다."}
+                  위의 실제 인용 출처 중에서 내 업체 또는 함께 관찰된 업체와의 연결까지
+                  확인된 출처입니다. 연결이 아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로
+                  표시합니다.
                 </p>
                 {!model.sources.available ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
