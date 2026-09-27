@@ -36,6 +36,13 @@ export type EntityFactsV2ComparisonRunPointDTO = {
   top3: EntityFactsV2ComparisonMetricSnapshot;
 };
 
+export type EntityFactsV2ComparisonSearchScopeDTO = {
+  custom: EntityFactsV2ComparisonMetricDTO;
+  core: EntityFactsV2ComparisonMetricDTO;
+  newlyConfirmedQuestionCount: number;
+  noLongerConfirmedQuestionCount: number;
+};
+
 export type EntityFactsV2ComparisonDTO = {
   version: typeof ENTITY_FACTS_V2_COMPARISON_VERSION;
   generatedAt: string;
@@ -50,6 +57,8 @@ export type EntityFactsV2ComparisonDTO = {
   series: EntityFactsV2ComparisonRunPointDTO[];
   visibility: EntityFactsV2ComparisonMetricDTO | null;
   top3: EntityFactsV2ComparisonMetricDTO | null;
+  /** Optional additive detail for unified 24-question comparisons only. */
+  searchScope?: EntityFactsV2ComparisonSearchScopeDTO | null;
 };
 
 export type EntityFactsV2ComparisonError =
