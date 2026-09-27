@@ -185,6 +185,97 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
     expect(vm.trendSeries).toEqual([]);
   });
 
+  it("shows verified custom/core changes and question transitions for unified runs", () => {
+    const previousRun = point(
+      PREVIOUS_RUN,
+      "2026-09-15T00:00:00.000Z",
+      50,
+      50,
+    );
+    const currentRun = point(
+      CURRENT_RUN,
+      "2026-09-22T00:00:00.000Z",
+      66.67,
+      66.67,
+    );
+    const customPrevious = {
+      validCount: 16,
+      confirmedCount: 12,
+      unresolvedCount: 0,
+      confirmedPct: 75,
+      maxPct: 75,
+    };
+    const customCurrent = {
+      validCount: 16,
+      confirmedCount: 16,
+      unresolvedCount: 0,
+      confirmedPct: 100,
+      maxPct: 100,
+    };
+    const corePrevious = {
+      validCount: 8,
+      confirmedCount: 2,
+      unresolvedCount: 0,
+      confirmedPct: 25,
+      maxPct: 25,
+    };
+    const coreCurrent = {
+      validCount: 8,
+      confirmedCount: 0,
+      unresolvedCount: 0,
+      confirmedPct: 0,
+      maxPct: 0,
+    };
+
+    const vm = buildEntityFactsV2ComparisonViewModel(
+      baseDto({
+        status: "verified",
+        reason: "VERIFIED",
+        compatibleRunCount: 2,
+        currentRun,
+        previousRun,
+        series: [previousRun, currentRun],
+        visibility: {
+          current: currentRun.visibility,
+          previous: previousRun.visibility,
+          confirmedDeltaPctPoints: 16.67,
+        },
+        top3: {
+          current: currentRun.top3,
+          previous: previousRun.top3,
+          confirmedDeltaPctPoints: 16.67,
+        },
+        searchScope: {
+          custom: {
+            current: customCurrent,
+            previous: customPrevious,
+            confirmedDeltaPctPoints: 25,
+          },
+          core: {
+            current: coreCurrent,
+            previous: corePrevious,
+            confirmedDeltaPctPoints: -25,
+          },
+          newlyConfirmedQuestionCount: 4,
+          noLongerConfirmedQuestionCount: 2,
+        },
+      }),
+    );
+
+    expect(vm.searchScope?.custom.label).toBe("맞춤 검색 확정 노출");
+    expect(vm.searchScope?.custom.currentValueText).toBe("100%");
+    expect(vm.searchScope?.custom.previousValueText).toBe("75%");
+    expect(vm.searchScope?.custom.deltaText).toBe("+25%p");
+    expect(vm.searchScope?.core.label).toBe("기준 검색 확정 노출");
+    expect(vm.searchScope?.core.currentValueText).toBe("0%");
+    expect(vm.searchScope?.core.previousValueText).toBe("25%");
+    expect(vm.searchScope?.core.deltaText).toBe("-25%p");
+    expect(vm.searchScope?.newlyConfirmedQuestionCount).toBe(4);
+    expect(vm.searchScope?.noLongerConfirmedQuestionCount).toBe(2);
+    expect(JSON.stringify(vm.searchScope)).not.toContain("개선");
+    expect(JSON.stringify(vm.searchScope)).not.toContain("악화");
+  });
+
   it("uses cautious wording for higher and unchanged observations", () => {
     const previousRun = point(
       PREVIOUS_RUN,
