@@ -317,7 +317,8 @@ describe("custom question suggestions v0.1", () => {
       const focus = result[i + 1]!;
       const specific = result[i + 2]!;
       expect(core.promptText).toContain("서울");
-      expect(core.promptText).toContain("자동차 튜닝");
+      expect(core.promptText).toContain("튜닝");
+      expect(core.promptText).not.toContain("르노");
       expect(core.promptText).not.toContain("중랑");
       expect(core.promptText).not.toContain("필랑트");
       expect(core.promptText).not.toContain("그랑콜레오스");
@@ -388,6 +389,28 @@ describe("custom question suggestions v0.1", () => {
     ]);
     expect(result.some((item) => item.promptText.includes("작업 범위를 다양하게"))).toBe(false);
     expect(result.some((item) => item.promptText.includes("전문성과 작업 경험을 확인"))).toBe(false);
+  });
+
+  it("does not narrow a broad tuning service from registered category metadata", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "경기도",
+        service: "튜닝",
+        brandModel: "필랑트, 그랑콜레오스, 아르카나",
+      },
+      "커스텀개러지",
+      "르노 자동차 튜닝",
+      "남양주시",
+    );
+
+    expect(result).toHaveLength(24);
+    const coreQuestions = result.filter((_, index) => index % 3 === 0);
+    expect(coreQuestions).toHaveLength(8);
+    expect(coreQuestions.every((item) => item.promptText.includes("튜닝"))).toBe(true);
+    expect(coreQuestions.every((item) => !item.promptText.includes("르노"))).toBe(true);
+    expect(coreQuestions.every((item) => !item.promptText.includes("필랑트"))).toBe(true);
+    expect(coreQuestions.every((item) => !item.promptText.includes("그랑콜레오스"))).toBe(true);
+    expect(coreQuestions.every((item) => !item.promptText.includes("아르카나"))).toBe(true);
   });
 
   it("does not narrow a broad engine-oil service to premium from category metadata", () => {
