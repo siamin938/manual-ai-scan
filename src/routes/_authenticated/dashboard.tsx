@@ -118,15 +118,15 @@ function unifiedLayerSummarySentence(summary: UnifiedDiagnosticLayerSummary): st
   const coreConfirmed = summary.core.confirmedCount;
 
   if (customConfirmed > 0 && coreConfirmed === 0) {
-    return "상세 지역·브랜드/차종 검색에서는 확인됐지만, 더 넓은 기준 검색에서는 확인되지 않았습니다.";
+    return "상세 검색에서는 확인됐지만, 더 넓은 기준 검색에서는 확인되지 않았습니다.";
   }
   if (customConfirmed === 0 && coreConfirmed > 0) {
-    return "더 넓은 기준 검색에서는 확인됐지만, 상세 지역·브랜드/차종 검색에서는 확인되지 않았습니다.";
+    return "더 넓은 기준 검색에서는 확인됐지만, 상세 검색에서는 확인되지 않았습니다.";
   }
   if (customConfirmed > 0 && coreConfirmed > 0) {
-    return "상세 지역·브랜드/차종 검색과 더 넓은 기준 검색 모두에서 확정 노출이 확인됐습니다.";
+    return "상세 검색과 더 넓은 기준 검색 모두에서 확정 노출이 확인됐습니다.";
   }
-  return "이번 측정에서는 맞춤 검색과 기준 검색 모두에서 확정 노출이 확인되지 않았습니다.";
+  return "이번 측정에서는 상세 검색과 기준 검색 모두에서 확정 노출이 확인되지 않았습니다.";
 }
 
 function UnifiedDiagnosticLayerSummaryCard({
@@ -145,7 +145,7 @@ function UnifiedDiagnosticLayerSummaryCard({
         <p className="report-kicker">SEARCH SCOPE</p>
         <CardTitle className="text-xl">검색 범위별 확정 노출</CardTitle>
         <p className="text-sm leading-6 text-muted-foreground">
-          같은 24문항 안에서 넓은 기준 검색과 상세 지역·브랜드/차종 검색을 나눠 보여드립니다.
+          같은 24문항 안에서 넓은 기준 검색과 상세 검색을 나눠 보여드립니다.
         </p>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
@@ -157,9 +157,9 @@ function UnifiedDiagnosticLayerSummaryCard({
               note: "통합 24문항 전체",
             },
             {
-              label: "맞춤 검색 확정 노출",
+              label: "상세 검색 확정 노출",
               metric: summary.custom,
-              note: "상세 지역 · 브랜드/차종",
+              note: "상세 지역 · 선택 조건",
             },
             {
               label: "기준 검색 확정 노출",
@@ -645,6 +645,12 @@ function DashboardPage() {
           (item) => item.responseCount === topObservedCompetitorResponseCount,
         )
       : [];
+  const linkedTargetSourceCount =
+    model?.sources.rows.filter((source) => source.targetResponseCount > 0).length ?? 0;
+  const linkedCompetitorSourceCount =
+    model?.sources.rows.filter((source) => source.competitorResponseCount > 0).length ?? 0;
+  const linkedClueSourceCount =
+    model?.sources.rows.filter((source) => source.clueResponseCount > 0).length ?? 0;
   const weakQuestionRows =
     model && isUnifiedDiagnostic
       ? model.weakQuestions.rows
@@ -825,7 +831,7 @@ function DashboardPage() {
             <MetricCard
               label="실제 인용 출처"
               value={
-                dto.citationSources ? `${model.metricCards.citationSourceCount}곳` : "준비 중"
+                dto.citationSources ? `${model.metricCards.citationSourceCount}개` : "준비 중"
               }
               note="이번 측정의 최종 AI 답변에 실제 인용된 도메인"
             />
@@ -1011,8 +1017,13 @@ function DashboardPage() {
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs leading-5 text-muted-foreground">
                 이번 측정의 최종 AI 답변에 실제 citation으로 남은 출처를 도메인별로 묶었습니다.
-                검색 과정에서만 참고된 후보 출처는 포함하지 않습니다. 특정 업체와 연결됐다는 뜻은
-                아니며, 아래 ‘업체와 연결이 확인된 출처’에서 별도로 확인합니다.
+                검색 과정에서만 참고된 후보 출처는 포함하지 않습니다. 위쪽일수록 더 많은 서로 다른
+                AI 답변에서 반복 인용된 출처입니다. 특정 업체와 연결됐다는 뜻은 아니며, 아래
+                ‘업체 연결까지 확인된 출처’에서 별도로 확인합니다.
+              </p>
+              <p className="mb-3 rounded-md bg-muted/35 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                ‘인용된 답변 수’는 이 출처가 한 번 이상 인용된 AI 답변 수이고, ‘전체 인용 횟수’는
+                답변 안에서 확인된 citation의 합계입니다.
               </p>
               {model.citationSources.rows.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
@@ -1023,8 +1034,8 @@ function DashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>출처</TableHead>
-                      <TableHead>AI 답변에서 인용</TableHead>
-                      <TableHead>인용 횟수</TableHead>
+                      <TableHead>인용된 답변 수</TableHead>
+                      <TableHead>전체 인용 횟수</TableHead>
                       <TableHead className="text-right">예시</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1054,7 +1065,7 @@ function DashboardPage() {
                               rel="noreferrer"
                               className="text-sm text-primary underline-offset-4 hover:underline"
                             >
-                              인용 페이지 보기 ↗
+                              인용 페이지 예시 보기 ↗
                             </a>
                           </TableCell>
                         </TableRow>
@@ -1154,11 +1165,20 @@ function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
-                <p className="mb-3 text-xs text-muted-foreground">
-                  위의 실제 인용 출처 중에서 내 업체 또는 함께 관찰된 업체와의 연결까지
-                  확인된 출처입니다. 연결이 아직 충분히 확인되지 않은 경우에는 ‘연결 단서’로
-                  표시합니다.
+                <p className="mb-3 text-xs leading-5 text-muted-foreground">
+                  위의 실제 인용 출처 중에서 특정 업체와의 연결까지 확인된 출처만 보여드립니다.
+                  답변 안에서 업체명과 citation이 같은 문장·줄·표 행 또는 같은 업체 섹션에 있는
+                  경우를 보수적으로 확인하며, 애매한 경우에는 확정 연결로 표시하지 않습니다.
                 </p>
+                <div className="mb-4 flex flex-wrap gap-2 text-xs">
+                  <Badge variant={linkedTargetSourceCount > 0 ? "default" : "outline"}>
+                    내 업체 직접 연결 {linkedTargetSourceCount}개
+                  </Badge>
+                  <Badge variant="outline">
+                    다른 업체 확정 연결 {linkedCompetitorSourceCount}개
+                  </Badge>
+                  <Badge variant="secondary">연결 단서 {linkedClueSourceCount}개</Badge>
+                </div>
                 {!model.sources.available ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     이번 측정의 출처 진단 데이터가 아직 준비되지 않았습니다.
@@ -1172,7 +1192,7 @@ function DashboardPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>출처</TableHead>
-                        <TableHead>관찰된 답변</TableHead>
+                        <TableHead>연결이 확인된 답변</TableHead>
                         <TableHead>연결된 업체</TableHead>
                       </TableRow>
                     </TableHeader>
