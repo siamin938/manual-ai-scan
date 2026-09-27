@@ -554,10 +554,6 @@ function DashboardPage() {
         })
       : null;
 
-  const topObservedCompetitorResponseCount =
-    model && model.competitors.rows.length > 0
-      ? Math.max(...model.competitors.rows.map((item) => item.responseCount))
-      : null;
   const linkedTargetSourceCount =
     model?.sources.rows.filter((source) => source.targetResponseCount > 0).length ?? 0;
   const linkedCompetitorSourceCount =
