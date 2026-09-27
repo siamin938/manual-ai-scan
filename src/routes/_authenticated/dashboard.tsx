@@ -833,7 +833,7 @@ function DashboardPage() {
               value={
                 dto.citationSources ? `${model.metricCards.citationSourceCount}개` : "준비 중"
               }
-              note="이번 측정의 최종 AI 답변에 실제 인용된 도메인"
+              note="이번 24개 AI 답변 전체의 인용 출처 수 · 내 업체 성과 점수는 아닙니다"
             />
           </div>
 
@@ -912,13 +912,6 @@ function DashboardPage() {
               model={actionOpportunityModel}
               evidenceExamples={actionEvidenceExamples}
               currentRunReferences={currentRunReferences}
-              basisLabel={detailBasisLabel}
-            />
-          )}
-
-          {currentRunReferences.length > 0 && (
-            <CurrentRunReferenceSection
-              references={currentRunReferences}
               basisLabel={detailBasisLabel}
             />
           )}
@@ -1259,8 +1252,6 @@ function DashboardPage() {
             </Card>
           </div>
 
-          {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} />}
-
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">SEARCH CONTEXT</p>
@@ -1283,6 +1274,8 @@ function DashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} />}
 
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
@@ -1389,7 +1382,7 @@ function ActionOpportunitySection({
 
                 <div className="mt-2 rounded-md bg-muted/40 px-3 py-2">
                   <p className="text-sm font-semibold leading-6">
-                    고노출 업체 {item.highVisibilityEntityCount}곳 중 {item.highEntityCount}
+                    AI에 자주 관찰된 업체 {item.highVisibilityEntityCount}곳 중 {item.highEntityCount}
                     곳에서 관찰
                     {item.highEntitySharePct !== null
                       ? ` · ${item.highEntitySharePct.toFixed(1)}%`
@@ -1399,14 +1392,6 @@ function ActionOpportunitySection({
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  <div>
-                    <p className="text-xs font-medium">왜 확인하나요?</p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      같은 유형의 출처가 고노출 업체에서 반복 관찰됐지만, 현재 내 업체에서는 같은
-                      연결이 확인되지 않았습니다.
-                    </p>
-                  </div>
-
                   {item.sites.some((site) => {
                     const normalizedDomain = site.domain?.toLowerCase().replace(/^www\./, "");
                     return currentRunReferences.some(
