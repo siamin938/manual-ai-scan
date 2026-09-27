@@ -7,6 +7,7 @@ import {
 } from "@/lib/question-suggestions";
 
 export const UNIFIED_DIAGNOSTIC_SET_PREFIX = "AI 진단 질문 · ";
+export const UNIFIED_DIAGNOSTIC_CONTRACT_VERSION = "0.2" as const;
 
 export function isUnifiedDiagnosticSetName(name: string): boolean {
   return name.startsWith(UNIFIED_DIAGNOSTIC_SET_PREFIX);
