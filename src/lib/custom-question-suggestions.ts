@@ -232,6 +232,7 @@ function makeUnifiedCandidate(
  * - 고객이 만드는 질문 세트는 하나만 사용한다.
  * - 8개 intent마다 Core 1 + Focus 1 + Specific 1 = 정확히 24문항을 생성한다.
  * - Core는 등록 광역 지역 + 사용자가 확인한 주력 서비스 중심의 넓은 기준 질문이다.
+ * - 브랜드·차종을 입력한 경우에도 Core 전체를 좁히지 않고 일부 검색 상황에만 분산 반영한다.
  * - 등록 업종명은 Core 질문을 더 좁히는 용도로 사용하지 않는다.
  * - Focus/Specific은 등록 상세 지역 + 사용자가 확인한 브랜드·차종/니즈를 조합한다.
  * - 상세 지역이 없으면 Core와 동일 지역을 사용한다.
@@ -256,8 +257,16 @@ export function buildUnifiedDiagnosticQuestionCandidates(
   const detailLocationSurface = naturalizeQuestionLocation(clean(detailLocation) || location);
   const brandTargets = parseBrandModelTargets(brandModel);
   // 등록 카테고리는 질문 범위를 자동으로 좁히지 않는다.
-  // 사용자가 확인한 주력 서비스 표현을 Core에서도 그대로 사용한다.
-  const coreService = service;
+  // Core는 대부분 넓은 서비스 질문으로 유지하되, 사용자가 브랜드·차종을 직접 입력한 경우
+  // 일부 검색 상황에만 순환 반영해 광역 질문도 한 가지 패턴으로 고정되지 않게 한다.
+  const CORE_TARGETED_INTENT_INDEXES = [2, 3, 6] as const; // 서비스·후기·가격
+  const coreForIntent = (intentIndex: number) => {
+    const targetedSlot = CORE_TARGETED_INTENT_INDEXES.indexOf(
+      intentIndex as (typeof CORE_TARGETED_INTENT_INDEXES)[number],
+    );
+    if (targetedSlot < 0 || targetedSlot >= brandTargets.length) return service;
+    return subject(service, brandTargets[targetedSlot]!);
+  };
   const targetedForIntent = (intentIndex: number, layer: "focus" | "specific") => {
     if (brandTargets.length === 0) return service;
     if (brandTargets.length === 1) return subject(service, brandTargets[0]!);
@@ -273,7 +282,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "local",
       slots: {
-        core: `${coreLocationSurface}에서 ${coreService} 맡길 수 있는 곳 어디야?`,
+        core: `${coreLocationSurface}에서 ${coreForIntent(0)} 맡길 수 있는 곳 어디야?`,
         focus: `${detailLocationSurface}에서 ${targetedForIntent(0, "focus")} 맡기기 편한 업체 몇 곳 알려줘`,
         specific: customerNeed
           ? `${detailLocationSurface}에서 ${targetedForIntent(0, "specific")} 맡길 때 ${need}도 고려할 수 있는 업체 알려줘`
@@ -283,7 +292,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "recommendation",
       slots: {
-        core: `${coreLocationSurface}에서 ${coreService} 잘하는 업체 추천해줘`,
+        core: `${coreLocationSurface}에서 ${coreForIntent(1)} 잘하는 업체 추천해줘`,
         focus: `${detailLocationSurface}에서 ${targetedForIntent(1, "focus")} 맡길 만한 업체 추천해줘`,
         specific: customerNeed
           ? `${detailLocationSurface}에서 ${targetedForIntent(1, "specific")} 업체 찾을 때 ${need}도 고려해서 추천해줘`
@@ -293,7 +302,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "service",
       slots: {
-        core: `${coreLocationSurface}에서 ${coreService} 전문으로 하는 곳 알려줘`,
+        core: `${coreLocationSurface}에서 ${coreForIntent(2)} 전문으로 하는 곳 알려줘`,
         focus: `${detailLocationSurface}에서 ${targetedForIntent(2, "focus")} 잘하는 곳 알려줘`,
         specific: customerNeed
           ? `${detailLocationSurface}에서 ${targetedForIntent(2, "specific")} 하면서 ${need}도 가능한 곳 알려줘`
@@ -303,7 +312,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "review_quality",
       slots: {
-        core: `${coreLocationSurface} ${coreService} 실제 이용 후기 좋은 곳 알려줘`,
+        core: `${coreLocationSurface} ${coreForIntent(3)} 실제 이용 후기 좋은 곳 알려줘`,
         focus: `${detailLocationSurface} ${targetedForIntent(3, "focus")} 이용 후기와 작업 사례를 함께 볼 수 있는 업체 알려줘`,
         specific: customerNeed
           ? `${detailLocationSurface} ${targetedForIntent(3, "specific")} ${need} 관련 실제 이용 후기 좋은 업체 알려줘`
@@ -313,7 +322,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "trust",
       slots: {
-        core: `${coreService} 작업 경험 많은 ${coreLocationSurface} 업체 어디야?`,
+        core: `${coreForIntent(4)} 작업 경험 많은 ${coreLocationSurface} 업체 어디야?`,
         focus: `${detailLocationSurface}에서 ${targetedForIntent(4, "focus")} 작업 경험이 많은 업체 몇 곳 알려줘`,
         specific: customerNeed
           ? `${detailLocationSurface}에서 ${targetedForIntent(4, "specific")} ${need}도 믿고 맡길 만한 곳 알려줘`
@@ -323,7 +332,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "comparison",
       slots: {
-        core: `${coreLocationSurface} ${coreService} 업체 여러 곳 후기랑 작업 내용 비교해줘`,
+        core: `${coreLocationSurface} ${coreForIntent(5)} 업체 여러 곳 후기랑 작업 내용 비교해줘`,
         focus: `${detailLocationSurface} ${targetedForIntent(5, "focus")} 업체 몇 곳 후기랑 작업 내용 비교해줘`,
         specific: customerNeed
           ? `${detailLocationSurface} ${targetedForIntent(5, "specific")} 업체 몇 곳 ${need} 가능 여부랑 후기 비교해줘`
@@ -333,7 +342,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "price_value",
       slots: {
-        core: `${coreLocationSurface}에서 ${coreService} 비용 대비 괜찮은 곳 알려줘`,
+        core: `${coreLocationSurface}에서 ${coreForIntent(6)} 비용 대비 괜찮은 곳 알려줘`,
         focus: `${detailLocationSurface}에서 ${targetedForIntent(6, "focus")} 가격대와 작업 구성을 함께 볼 수 있는 업체 알려줘`,
         specific: customerNeed
           ? `${detailLocationSurface} ${targetedForIntent(6, "specific")} 업체 중 ${need} 포함 비용과 작업 구성을 함께 비교해줘`
@@ -343,7 +352,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     {
       intent: "discovery",
       slots: {
-        core: `${coreLocationSurface}에서 ${coreService} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
+        core: `${coreLocationSurface}에서 ${coreForIntent(7)} 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘`,
         focus: `${detailLocationSurface}에서 ${targetedForIntent(7, "focus")} 업체 후보를 몇 곳 먼저 추려줘`,
         specific: customerNeed
           ? `${detailLocationSurface}에서 ${targetedForIntent(7, "specific")} 업체 중 ${need} 기준으로 볼 만한 후보 몇 곳 찾아줘`
