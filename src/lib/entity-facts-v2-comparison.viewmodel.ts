@@ -29,6 +29,13 @@ export type EntityFactsV2ComparisonTrendPointViewModel = {
   unresolvedCount: number;
 };
 
+export type EntityFactsV2ComparisonSearchScopeViewModel = {
+  custom: EntityFactsV2ComparisonMetricViewModel;
+  core: EntityFactsV2ComparisonMetricViewModel;
+  newlyConfirmedQuestionCount: number;
+  noLongerConfirmedQuestionCount: number;
+};
+
 export type EntityFactsV2ComparisonViewModel = {
   version: typeof ENTITY_FACTS_V2_COMPARISON_VIEW_MODEL_VERSION;
   mode: EntityFactsV2ComparisonDisplayMode;
@@ -39,6 +46,7 @@ export type EntityFactsV2ComparisonViewModel = {
   compatibleMeasurementCount: number | null;
   visibility: EntityFactsV2ComparisonMetricViewModel | null;
   top3: EntityFactsV2ComparisonMetricViewModel | null;
+  searchScope: EntityFactsV2ComparisonSearchScopeViewModel | null;
   trendSeries: EntityFactsV2ComparisonTrendPointViewModel[];
 };
 
@@ -138,6 +146,7 @@ function unavailable(args: {
     compatibleMeasurementCount: null,
     visibility: null,
     top3: null,
+    searchScope: null,
     trendSeries: [],
   };
 }
@@ -186,6 +195,7 @@ export function buildEntityFactsV2ComparisonViewModel(
         metric: dto.top3,
         comparisonAvailable: false,
       }),
+      searchScope: null,
       trendSeries: [],
     };
   }
@@ -232,6 +242,25 @@ export function buildEntityFactsV2ComparisonViewModel(
     dto.trendEligible &&
     dto.compatibleRunCount >= 3 &&
     dto.series.length >= 3;
+  const searchScope =
+    dto.searchScope &&
+    dto.searchScope.custom.previous !== null &&
+    dto.searchScope.core.previous !== null
+      ? {
+          custom: metricViewModel({
+            label: "맞춤 검색 확정 노출",
+            metric: dto.searchScope.custom,
+            comparisonAvailable: true,
+          }),
+          core: metricViewModel({
+            label: "기준 검색 확정 노출",
+            metric: dto.searchScope.core,
+            comparisonAvailable: true,
+          }),
+          newlyConfirmedQuestionCount: dto.searchScope.newlyConfirmedQuestionCount,
+          noLongerConfirmedQuestionCount: dto.searchScope.noLongerConfirmedQuestionCount,
+        }
+      : null;
 
   return {
     version: ENTITY_FACTS_V2_COMPARISON_VIEW_MODEL_VERSION,
@@ -254,6 +283,7 @@ export function buildEntityFactsV2ComparisonViewModel(
       metric: dto.top3,
       comparisonAvailable: true,
     }),
+    searchScope,
     trendSeries: trendAvailable
       ? dto.series.map((point) => ({
           measuredAt: point.measuredAt,
