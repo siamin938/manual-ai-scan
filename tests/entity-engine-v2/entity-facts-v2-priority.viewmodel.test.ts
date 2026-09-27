@@ -292,13 +292,10 @@ describe("Entity Facts v2 priority View Model", () => {
     expect(dashboardSource).toContain(
       "evidenceExamples={actionEvidenceExamples}",
     );
-    expect(dashboardSource).toContain("왜 확인하나요?");
     expect(dashboardSource).toContain("실제로 비교할 수 있는 같은 채널 사례");
-    expect(dashboardSource).toContain(
-      "이번 측정에서 확인된 타업체 출처 사례",
-    );
     expect(dashboardSource).toContain("실제 페이지 보기 ↗");
     expect(dashboardSource).toContain("확인해볼 차이");
+    expect(dashboardSource).not.toContain("<CurrentRunReferenceSection");
     expect(dashboardSource).toContain("MeasurementStatusBar");
     expect(dashboardSource).toContain("SearchContextChart");
     expect(dashboardSource).toContain("BenchmarkCard");
