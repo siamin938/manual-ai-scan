@@ -260,6 +260,7 @@ function makeUnifiedCandidate(
  * - Focus/Specific은 등록 상세 지역 + 사용자가 확인한 브랜드·차종/니즈를 조합한다.
  * - 상세 지역이 없으면 Core와 동일 지역을 사용한다.
  * - LLM/웹 추론 없이 사용자 확인 입력만 사용한다.
+ * - 고객이 실제 검색창에 넣을 법한 짧고 자연스러운 표현을 우선한다.
  * - 업체명은 질문에 넣지 않는다.
  *
  * 현재 24문항 측정 파이프라인과의 호환을 위해 별도 DB role 컬럼은 사용하지 않는다.
@@ -315,10 +316,10 @@ export function buildUnifiedDiagnosticQuestionCandidates(
       intent: "service",
       slots: {
         core: `${coreLocationSurface}에서 ${coreService} 전문으로 하는 곳 알려줘`,
-        focus: `${detailLocationSurface}에서 ${targetedForIntent(2, "focus")} 작업을 주력으로 하는 업체 알려줘`,
+        focus: `${detailLocationSurface}에서 ${targetedForIntent(2, "focus")} 잘하는 곳 알려줘`,
         specific: customerNeed
-          ? `${detailLocationSurface}에서 ${targetedForIntent(2, "specific")} 중 ${need}에 맞는 작업을 제공하는 업체 알려줘`
-          : `${detailLocationSurface}에서 ${targetedForIntent(2, "specific")} 작업 범위를 다양하게 제공하는 업체 알려줘`,
+          ? `${detailLocationSurface}에서 ${targetedForIntent(2, "specific")} 하면서 ${need}도 가능한 곳 알려줘`
+          : `${detailLocationSurface}에서 ${targetedForIntent(2, "specific")} 맡길 수 있는 업체 몇 곳 알려줘`,
       },
     },
     {
@@ -337,18 +338,18 @@ export function buildUnifiedDiagnosticQuestionCandidates(
         core: `${coreService} 작업 경험 많은 ${coreLocationSurface} 업체 어디야?`,
         focus: `${detailLocationSurface}에서 ${targetedForIntent(4, "focus")} 작업 경험이 많은 업체 몇 곳 알려줘`,
         specific: customerNeed
-          ? `${detailLocationSurface} ${targetedForIntent(4, "specific")} ${need}까지 맡길 경험이 있는 업체 알려줘`
-          : `${detailLocationSurface} ${targetedForIntent(4, "specific")} 전문성과 작업 경험을 확인할 수 있는 업체 알려줘`,
+          ? `${detailLocationSurface}에서 ${targetedForIntent(4, "specific")} ${need}도 믿고 맡길 만한 곳 알려줘`
+          : `${detailLocationSurface}에서 ${targetedForIntent(4, "specific")} 믿고 맡길 만한 곳 알려줘`,
       },
     },
     {
       intent: "comparison",
       slots: {
-        core: `${coreLocationSurface} ${coreService} 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘`,
-        focus: `${detailLocationSurface}에서 ${targetedForIntent(5, "focus")} 업체 몇 곳을 작업 범위와 후기 기준으로 비교해줘`,
+        core: `${coreLocationSurface} ${coreService} 업체 여러 곳 후기랑 작업 내용 비교해줘`,
+        focus: `${detailLocationSurface} ${targetedForIntent(5, "focus")} 업체 몇 곳 후기랑 작업 내용 비교해줘`,
         specific: customerNeed
-          ? `${detailLocationSurface} ${targetedForIntent(5, "specific")} 업체를 ${need}, 후기, 전문성 기준으로 비교해줘`
-          : `${detailLocationSurface} ${targetedForIntent(5, "specific")} 업체를 작업 범위, 후기, 전문성 기준으로 비교해줘`,
+          ? `${detailLocationSurface} ${targetedForIntent(5, "specific")} 업체 몇 곳 ${need} 가능 여부랑 후기 비교해줘`
+          : `${detailLocationSurface} ${targetedForIntent(5, "specific")} 업체 몇 곳 후기랑 가격 비교해줘`,
       },
     },
     {
