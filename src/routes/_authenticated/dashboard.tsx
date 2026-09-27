@@ -1368,13 +1368,20 @@ function ActionOpportunitySection({
             억지로 보여주지 않습니다.
           </p>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div
+            className={
+              model.items.length === 1
+                ? "grid gap-4"
+                : model.items.length === 2
+                  ? "grid gap-4 lg:grid-cols-2"
+                  : "grid gap-4 lg:grid-cols-3"
+            }
+          >
             {model.items.map((item) => (
               <div key={item.sourceGroupKey} className="rounded-lg border p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={item.rank === 1 ? "default" : "outline"}>{item.rank}순위</Badge>
-                  <Badge variant="secondary">
-                    {item.signalStrength === "strong" ? "강한 신호" : "보통 신호"}
+                  <Badge variant="outline">
+                    {item.evidenceScope === "category" ? "같은 업종 관찰" : "전체 자동차 관찰"}
                   </Badge>
                 </div>
 
