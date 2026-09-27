@@ -396,6 +396,22 @@ describe("custom question suggestions v0.1", () => {
     expect(result.some((item) => item.promptText.includes("전문성과 작업 경험을 확인"))).toBe(false);
   });
 
+  it("clarifies generic tuning as automobile tuning when no model is present", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "경기도",
+        service: "튜닝",
+      },
+      "커스텀개러지",
+      "르노 자동차 튜닝",
+      "남양주시",
+    );
+
+    expect(result).toHaveLength(24);
+    expect(result.every((item) => item.promptText.includes("자동차 튜닝"))).toBe(true);
+    expect(result.every((item) => !item.promptText.includes("르노"))).toBe(true);
+  });
+
   it("does not narrow a broad tuning service from registered category metadata", () => {
     const result = buildUnifiedDiagnosticQuestionCandidates(
       {
@@ -413,16 +429,18 @@ describe("custom question suggestions v0.1", () => {
     expect(coreQuestions).toHaveLength(8);
     expect(coreQuestions.every((item) => item.promptText.includes("튜닝"))).toBe(true);
     expect(coreQuestions.every((item) => !item.promptText.includes("르노"))).toBe(true);
+    expect(coreQuestions.filter((item) => !/필랑트|그랑콜레오스|아르카나/u.test(item.promptText))
+      .every((item) => item.promptText.includes("자동차 튜닝"))).toBe(true);
 
     expect(coreQuestions.map((item) => item.promptText)).toEqual([
-      "경기에서 튜닝 맡길 수 있는 곳 어디야?",
-      "경기에서 튜닝 잘하는 업체 추천해줘",
+      "경기에서 자동차 튜닝 맡길 수 있는 곳 어디야?",
+      "경기에서 자동차 튜닝 잘하는 업체 추천해줘",
       "경기에서 필랑트 튜닝 전문으로 하는 곳 알려줘",
       "경기 그랑콜레오스 튜닝 실제 이용 후기 좋은 곳 알려줘",
-      "튜닝 작업 경험 많은 경기 업체 어디야?",
-      "경기 튜닝 업체 여러 곳 후기랑 작업 내용 비교해줘",
+      "자동차 튜닝 작업 경험 많은 경기 업체 어디야?",
+      "경기 자동차 튜닝 업체 여러 곳 후기랑 작업 내용 비교해줘",
       "경기에서 아르카나 튜닝 비용 대비 괜찮은 곳 알려줘",
-      "경기에서 튜닝 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘",
+      "경기에서 자동차 튜닝 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘",
     ]);
   });
 
