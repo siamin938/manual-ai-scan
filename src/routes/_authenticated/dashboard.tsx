@@ -1451,7 +1451,7 @@ function ComparisonCard({
             <div>
               <p className="text-sm font-semibold">검색 범위별 변화</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                같은 통합 24문항에서 맞춤 검색과 기준 검색의 확정 노출만 따로 비교합니다.
+                같은 통합 24문항에서 상세 검색과 기준 검색의 확정 노출만 따로 비교합니다.
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
