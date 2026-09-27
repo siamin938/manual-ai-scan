@@ -298,7 +298,7 @@ describe("custom question suggestions v0.1", () => {
     expect(result.every((item) => item.promptText.includes("타이어 교체"))).toBe(true);
   });
 
-  it("uses Seoul for Core and Jungnang for the 16 local model questions", () => {
+  it("keeps most Core questions broad while mixing optional models into some Core intents", () => {
     const result = buildUnifiedDiagnosticQuestionCandidates(
       {
         location: "서울특별시",
@@ -320,8 +320,6 @@ describe("custom question suggestions v0.1", () => {
       expect(core.promptText).toContain("튜닝");
       expect(core.promptText).not.toContain("르노");
       expect(core.promptText).not.toContain("중랑");
-      expect(core.promptText).not.toContain("필랑트");
-      expect(core.promptText).not.toContain("그랑콜레오스");
       expect(focus.promptText).toContain("중랑");
       expect(specific.promptText).toContain("중랑");
       expect(focus.promptText.includes("필랑트")).not.toBe(
@@ -332,10 +330,17 @@ describe("custom question suggestions v0.1", () => {
       );
     }
 
+    const coreQuestions = result.filter((_, index) => index % 3 === 0);
+    expect(coreQuestions.filter((item) => item.promptText.includes("필랑트"))).toHaveLength(1);
+    expect(coreQuestions.filter((item) => item.promptText.includes("그랑콜레오스"))).toHaveLength(1);
+    expect(coreQuestions.filter((item) =>
+      !item.promptText.includes("필랑트") && !item.promptText.includes("그랑콜레오스"),
+    )).toHaveLength(6);
+
     expect(result.filter((item) => item.promptText.includes("서울")).length).toBe(8);
     expect(result.filter((item) => item.promptText.includes("중랑")).length).toBe(16);
-    expect(result.filter((item) => item.promptText.includes("필랑트")).length).toBe(8);
-    expect(result.filter((item) => item.promptText.includes("그랑콜레오스")).length).toBe(8);
+    expect(result.filter((item) => item.promptText.includes("필랑트")).length).toBe(9);
+    expect(result.filter((item) => item.promptText.includes("그랑콜레오스")).length).toBe(9);
     expect(result.some((item) => item.promptText.includes("오래 작업한"))).toBe(false);
   });
 
@@ -408,9 +413,17 @@ describe("custom question suggestions v0.1", () => {
     expect(coreQuestions).toHaveLength(8);
     expect(coreQuestions.every((item) => item.promptText.includes("튜닝"))).toBe(true);
     expect(coreQuestions.every((item) => !item.promptText.includes("르노"))).toBe(true);
-    expect(coreQuestions.every((item) => !item.promptText.includes("필랑트"))).toBe(true);
-    expect(coreQuestions.every((item) => !item.promptText.includes("그랑콜레오스"))).toBe(true);
-    expect(coreQuestions.every((item) => !item.promptText.includes("아르카나"))).toBe(true);
+
+    expect(coreQuestions.map((item) => item.promptText)).toEqual([
+      "경기에서 튜닝 맡길 수 있는 곳 어디야?",
+      "경기에서 튜닝 잘하는 업체 추천해줘",
+      "경기에서 필랑트 튜닝 전문으로 하는 곳 알려줘",
+      "경기 그랑콜레오스 튜닝 실제 이용 후기 좋은 곳 알려줘",
+      "튜닝 작업 경험 많은 경기 업체 어디야?",
+      "경기 튜닝 업체 여러 곳 후기랑 작업 내용 비교해줘",
+      "경기에서 아르카나 튜닝 비용 대비 괜찮은 곳 알려줘",
+      "경기에서 튜닝 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘",
+    ]);
   });
 
   it("does not narrow a broad engine-oil service to premium from category metadata", () => {
