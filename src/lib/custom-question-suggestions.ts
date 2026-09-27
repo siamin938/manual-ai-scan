@@ -243,7 +243,7 @@ function makeUnifiedCandidate(
  * - Core는 등록 광역 지역 + 사용자가 확인한 주력 서비스 중심의 넓은 기준 질문이다.
  * - 브랜드·차종을 입력한 경우에도 Core 전체를 좁히지 않고 일부 검색 상황에만 분산 반영한다.
  * - 등록 업종명은 Core 질문을 더 좁히는 용도로 사용하지 않는다.
- * - Focus/Specific은 등록 상세 지역 + 사용자가 확인한 브랜드·차종/니즈를 조합한다.
+ * - Focus/Specific은 등록 상세 지역에서 일반형과 브랜드·차종형을 균형 있게 섞는다.
  * - 상세 지역이 없으면 Core와 동일 지역을 사용한다.
  * - LLM/웹 추론 없이 사용자 확인 입력만 사용한다.
  * - 고객이 실제 검색창에 넣을 법한 짧고 자연스러운 표현을 우선한다.
@@ -280,9 +280,15 @@ export function buildUnifiedDiagnosticQuestionCandidates(
   };
   const targetedForIntent = (intentIndex: number, layer: "focus" | "specific") => {
     if (brandTargets.length === 0) return generalService;
-    if (brandTargets.length === 1) return subject(service, brandTargets[0]!);
-    const offset = layer === "focus" ? 0 : 1;
-    return subject(service, brandTargets[(intentIndex + offset) % brandTargets.length]!);
+
+    // 상세지역 16문항도 전부 차종형으로 좁히지 않는다.
+    // intent마다 Focus/Specific 중 하나만 차종형으로 만들어
+    // 일반형 8 + 차종형 8의 균형을 유지한다.
+    const useModel =
+      layer === "focus" ? intentIndex % 2 === 1 : intentIndex % 2 === 0;
+    if (!useModel) return generalService;
+
+    return subject(service, brandTargets[intentIndex % brandTargets.length]!);
   };
   const need = customerNeed ? `‘${customerNeed}’` : "";
 
