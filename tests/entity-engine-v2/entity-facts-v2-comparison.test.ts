@@ -44,6 +44,27 @@ describe("Entity Facts v2 comparison contract", () => {
     expect(result.previous?.confirmedPct).toBe(29.17);
   });
 
+  it("calculates percentage-point change from exact counts, not rounded display percentages", () => {
+    const result = buildEntityFactsV2MetricComparison(
+      {
+        validCount: 24,
+        confirmedCount: 2,
+        unresolvedCount: 0,
+        confirmedPct: 8.33,
+        maxPct: 8.33,
+      },
+      {
+        validCount: 24,
+        confirmedCount: 1,
+        unresolvedCount: 0,
+        confirmedPct: 4.17,
+        maxPct: 4.17,
+      },
+    );
+
+    expect(result.confirmedDeltaPctPoints).toBe(4.17);
+  });
+
   it("does not invent a delta without a verified previous run", () => {
     const result = buildEntityFactsV2MetricComparison(
       {
