@@ -190,6 +190,15 @@ function subject(service: string, brandModel: string): string {
   return brandModel ? `${brandModel} ${service}` : service;
 }
 
+/**
+ * 사용자 입력은 짧게 받되, AI에 보내는 일반 질문에서는 의미가 모호한 서비스만
+ * 자동차 업종 문맥으로 최소 보정한다.
+ * 브랜드·차종이 함께 붙는 질문은 이미 자동차 문맥이 충분하므로 원문 service를 쓴다.
+ */
+function customerSearchServiceSurface(service: string): string {
+  return normalizeQuestion(service) === normalizeQuestion("튜닝") ? "자동차 튜닝" : service;
+}
+
 function makeCandidate(
   index: number,
   promptText: string,
@@ -238,6 +247,7 @@ function makeUnifiedCandidate(
  * - 상세 지역이 없으면 Core와 동일 지역을 사용한다.
  * - LLM/웹 추론 없이 사용자 확인 입력만 사용한다.
  * - 고객이 실제 검색창에 넣을 법한 짧고 자연스러운 표현을 우선한다.
+ * - 단독 "튜닝"처럼 문맥이 모호한 일반 서비스 표현만 "자동차 튜닝"으로 최소 보정한다.
  * - 업체명은 질문에 넣지 않는다.
  *
  * 현재 24문항 측정 파이프라인과의 호환을 위해 별도 DB role 컬럼은 사용하지 않는다.
@@ -256,6 +266,7 @@ export function buildUnifiedDiagnosticQuestionCandidates(
   const coreLocationSurface = naturalizeQuestionLocation(location);
   const detailLocationSurface = naturalizeQuestionLocation(clean(detailLocation) || location);
   const brandTargets = parseBrandModelTargets(brandModel);
+  const generalService = customerSearchServiceSurface(service);
   // 등록 카테고리는 질문 범위를 자동으로 좁히지 않는다.
   // Core는 대부분 넓은 서비스 질문으로 유지하되, 사용자가 브랜드·차종을 직접 입력한 경우
   // 일부 검색 상황에만 순환 반영해 광역 질문도 한 가지 패턴으로 고정되지 않게 한다.
@@ -264,11 +275,11 @@ export function buildUnifiedDiagnosticQuestionCandidates(
     const targetedSlot = CORE_TARGETED_INTENT_INDEXES.indexOf(
       intentIndex as (typeof CORE_TARGETED_INTENT_INDEXES)[number],
     );
-    if (targetedSlot < 0 || targetedSlot >= brandTargets.length) return service;
+    if (targetedSlot < 0 || targetedSlot >= brandTargets.length) return generalService;
     return subject(service, brandTargets[targetedSlot]!);
   };
   const targetedForIntent = (intentIndex: number, layer: "focus" | "specific") => {
-    if (brandTargets.length === 0) return service;
+    if (brandTargets.length === 0) return generalService;
     if (brandTargets.length === 1) return subject(service, brandTargets[0]!);
     const offset = layer === "focus" ? 0 : 1;
     return subject(service, brandTargets[(intentIndex + offset) % brandTargets.length]!);
