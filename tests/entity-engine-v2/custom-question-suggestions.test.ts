@@ -367,6 +367,37 @@ describe("custom question suggestions v0.1", () => {
     });
   });
 
+  it("does not narrow a broad engine-oil service to premium from category metadata", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "경기도",
+        service: "엔진오일",
+      },
+      "현대엑스티어 판교",
+      "자동차 엔진오일 교환·프리미엄 윤활유 전문점",
+      "성남시 분당구",
+    );
+
+    expect(result).toHaveLength(24);
+    expect(result.every((item) => item.promptText.includes("엔진오일"))).toBe(true);
+    expect(result.every((item) => !item.promptText.includes("프리미엄"))).toBe(true);
+  });
+
+  it("keeps premium wording when the owner-confirmed service itself is premium", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "경기도",
+        service: "프리미엄 엔진오일",
+      },
+      "프리미엄오일 전문점",
+      "자동차 프리미엄 엔진오일 전문점",
+      "성남시 분당구",
+    );
+
+    expect(result).toHaveLength(24);
+    expect(result.every((item) => item.promptText.includes("프리미엄"))).toBe(true);
+  });
+
   it("keeps Gyeonggi Core broad while Seongnam Bundang stays detailed", () => {
     const candidates = buildUnifiedDiagnosticQuestionCandidates(
       {
