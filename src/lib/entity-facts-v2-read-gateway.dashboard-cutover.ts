@@ -217,11 +217,11 @@ export type EntityFactsV2DashboardCutoverModel = {
     rows: EntityFactsV2DashboardQuestionAreaRow[];
   };
   citationSources: {
-    heading: "AI 답변에서 실제 인용된 주요 출처";
+    heading: "AI 답변에서 실제 인용된 출처";
     rows: EntityFactsV2DashboardCitationSourceRow[];
   };
   sources: {
-    heading: "업체와 연결이 확인된 출처";
+    heading: "업체 연결까지 확인된 출처";
     available: boolean;
     rows: EntityFactsV2DashboardSourceRow[];
     referenceSourcesAvailable: false;
@@ -393,11 +393,11 @@ export function buildEntityFactsV2DashboardCutoverModel(
       rows: weakQuestions,
     },
     citationSources: {
-      heading: "AI 답변에서 실제 인용된 주요 출처",
+      heading: "AI 답변에서 실제 인용된 출처",
       rows: citationSources,
     },
     sources: {
-      heading: "업체와 연결이 확인된 출처",
+      heading: "업체 연결까지 확인된 출처",
       available: dto.observedSourcesStatus === "available",
       rows: sources,
       referenceSourcesAvailable: false,
