@@ -249,7 +249,7 @@ export function buildEntityFactsV2ComparisonViewModel(
     dto.searchScope.core.previous !== null
       ? {
           custom: metricViewModel({
-            label: "맞춤 검색 확정 노출",
+            label: "상세 검색 확정 노출",
             metric: dto.searchScope.custom,
             comparisonAvailable: true,
           }),
