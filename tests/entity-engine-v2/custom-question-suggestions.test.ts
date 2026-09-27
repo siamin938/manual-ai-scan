@@ -268,18 +268,18 @@ describe("custom question suggestions v0.1", () => {
 
     expect(result.slice(0, 3).map((item) => item.promptText)).toEqual([
       "서울에서 신차패키지 맡길 수 있는 곳 어디야?",
-      "서울에서 테슬라 신차패키지 맡기기 편한 업체 몇 곳 알려줘",
-      "서울에서 테슬라 모델Y 신차패키지 맡길 곳을 위치와 접근성 기준으로 몇 곳 알려줘",
+      "서울에서 신차패키지 맡기기 편한 업체 몇 곳 알려줘",
+      "서울에서 테슬라 신차패키지 맡길 곳을 위치와 접근성 기준으로 몇 곳 알려줘",
     ]);
     expect(result.slice(3, 6).map((item) => item.promptText)).toEqual([
       "서울에서 신차패키지 잘하는 업체 추천해줘",
       "서울에서 테슬라 모델Y 신차패키지 맡길 만한 업체 추천해줘",
-      "서울에서 테슬라 모델3 신차패키지 업체 중 작업 경험과 후기를 함께 보고 추천해줘",
+      "서울에서 신차패키지 업체 중 작업 경험과 후기를 함께 보고 추천해줘",
     ]);
     expect(result.slice(15, 18).map((item) => item.promptText)).toEqual([
       "서울 신차패키지 업체 여러 곳 후기랑 작업 내용 비교해줘",
       "서울 테슬라 모델3 신차패키지 업체 몇 곳 후기랑 작업 내용 비교해줘",
-      "서울 테슬라 신차패키지 업체 몇 곳 후기랑 가격 비교해줘",
+      "서울 신차패키지 업체 몇 곳 후기랑 가격 비교해줘",
     ]);
   });
 
@@ -322,12 +322,6 @@ describe("custom question suggestions v0.1", () => {
       expect(core.promptText).not.toContain("중랑");
       expect(focus.promptText).toContain("중랑");
       expect(specific.promptText).toContain("중랑");
-      expect(focus.promptText.includes("필랑트")).not.toBe(
-        specific.promptText.includes("필랑트"),
-      );
-      expect(focus.promptText.includes("그랑콜레오스")).not.toBe(
-        specific.promptText.includes("그랑콜레오스"),
-      );
     }
 
     const coreQuestions = result.filter((_, index) => index % 3 === 0);
@@ -339,8 +333,15 @@ describe("custom question suggestions v0.1", () => {
 
     expect(result.filter((item) => item.promptText.includes("서울")).length).toBe(8);
     expect(result.filter((item) => item.promptText.includes("중랑")).length).toBe(16);
-    expect(result.filter((item) => item.promptText.includes("필랑트")).length).toBe(9);
-    expect(result.filter((item) => item.promptText.includes("그랑콜레오스")).length).toBe(9);
+    expect(result.filter((item) => item.promptText.includes("필랑트")).length).toBe(5);
+    expect(result.filter((item) => item.promptText.includes("그랑콜레오스")).length).toBe(5);
+
+    const localQuestions = result.filter((_, index) => index % 3 !== 0);
+    const localModelQuestions = localQuestions.filter((item) =>
+      item.promptText.includes("필랑트") || item.promptText.includes("그랑콜레오스"),
+    );
+    expect(localQuestions).toHaveLength(16);
+    expect(localModelQuestions).toHaveLength(8);
     expect(result.some((item) => item.promptText.includes("오래 작업한"))).toBe(false);
   });
 
@@ -442,6 +443,19 @@ describe("custom question suggestions v0.1", () => {
       "경기에서 아르카나 튜닝 비용 대비 괜찮은 곳 알려줘",
       "경기에서 자동차 튜닝 업체를 처음 알아볼 때 후보로 볼 만한 곳 몇 곳 알려줘",
     ]);
+
+    const localQuestions = result.filter((_, index) => index % 3 !== 0);
+    const localModelQuestions = localQuestions.filter((item) =>
+      /필랑트|그랑콜레오스|아르카나/u.test(item.promptText),
+    );
+    const localGenericQuestions = localQuestions.filter((item) =>
+      !/필랑트|그랑콜레오스|아르카나/u.test(item.promptText),
+    );
+    expect(localQuestions).toHaveLength(16);
+    expect(localModelQuestions).toHaveLength(8);
+    expect(localGenericQuestions).toHaveLength(8);
+    expect(localGenericQuestions.every((item) => item.promptText.includes("자동차 튜닝"))).toBe(true);
+
   });
 
   it("does not narrow a broad engine-oil service to premium from category metadata", () => {
