@@ -190,9 +190,26 @@ function subject(service: string, brandModel: string): string {
   return brandModel ? `${brandModel} ${service}` : service;
 }
 
+const CATEGORY_NARROWING_QUALIFIERS = [
+  "프리미엄",
+  "고급",
+  "가성비",
+  "저가",
+  "보급형",
+] as const;
+
 function coreServicePhrase(service: string, businessCategory: string | null | undefined): string {
   const category = phrase(clean(businessCategory));
   if (!category) return service;
+
+  // 사용자가 확인한 서비스보다 등록 업종명이 더 좁은 상품군을 암시하면
+  // Core 질문도 사용자 입력 범위를 그대로 유지한다.
+  // 예: service="엔진오일", category="자동차 엔진오일 교환·프리미엄 윤활유 전문점"
+  const hasCategoryOnlyQualifier = CATEGORY_NARROWING_QUALIFIERS.some(
+    (qualifier) => category.includes(qualifier) && !service.includes(qualifier),
+  );
+  if (hasCategoryOnlyQualifier) return service;
+
   const serviceKey = normalizeQuestion(service);
   const categoryKey = normalizeQuestion(category);
   return serviceKey && categoryKey.includes(serviceKey) ? category : service;
