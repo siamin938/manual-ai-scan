@@ -524,6 +524,15 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).toContain('.eq("contract_ok", true)');
   });
 
+  it("keeps supplemental final-answer citation summary non-blocking and run-scoped", () => {
+    expect(serverSource).toContain("Supplemental final-answer citation summary");
+    expect(serverSource).toContain('.from("measurement_citations")');
+    expect(serverSource).toContain('measurements!inner(run_id)');
+    expect(serverSource).toContain('.eq("measurements.run_id", run.id)');
+    expect(serverSource).toContain("citationError");
+    expect(serverSource).toContain("gatewayResponse.data.citationSources");
+  });
+
   it("keeps supplemental question location metadata non-blocking", () => {
     expect(serverSource).toContain("Supplemental question-location metadata");
     expect(serverSource).toContain('.from("questions")');
