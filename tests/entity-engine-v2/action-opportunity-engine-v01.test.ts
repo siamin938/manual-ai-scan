@@ -247,7 +247,6 @@ describe("Action Opportunity Engine v0.1", () => {
 
     expect(result.items.map((item) => item.kind)).toEqual([
       "profile_directory",
-      "auto_platform",
     ]);
     expect(result.items.every((item) => item.evidenceScope === "global")).toBe(
       true,
@@ -313,7 +312,6 @@ describe("Action Opportunity Engine v0.1", () => {
     expect(result.items.map((item) => item.kind)).toEqual([
       "owned_web_presence",
       "profile_directory",
-      "auto_platform",
     ]);
     expect(result.items[0].signalStrength).toBe("strong");
     expect(result.items[1].title).toBe(
@@ -322,6 +320,25 @@ describe("Action Opportunity Engine v0.1", () => {
     expect(result.items[1].actionText).toContain(
       "실제 타업체 사례가 표시되면 링크를 열어",
     );
+  });
+
+  it("does not surface a low-share global pattern only because it appears in three entities", () => {
+    const benchmark = baseBenchmark({
+      highVisibilityEntityCount: 21,
+      sourceGroups: [
+        group({
+          key: "auto_platform",
+          label: "자동차 전문 플랫폼",
+          count: 3,
+          share: 14.29,
+          targetConnected: false,
+          strength: "emerging",
+        }),
+      ],
+    });
+
+    const result = buildActionOpportunityEngineV01({ benchmark });
+    expect(result.items).toEqual([]);
   });
 
   it("uses only strong/moderate repeated patterns and never turns early evidence into an action", () => {
