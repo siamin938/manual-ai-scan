@@ -152,6 +152,13 @@ export type EntityFactsV2DashboardSourceRow = {
   }>;
 };
 
+export type EntityFactsV2DashboardCitationSourceRow = {
+  domain: string;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+};
+
 export type EntityFactsV2DashboardQuestionAreaRow = {
   questionId: string;
   questionText: string;
@@ -197,6 +204,7 @@ export type EntityFactsV2DashboardCutoverModel = {
     top3: EntityFactsV2MetricViewModel;
     competitorCount: number;
     targetSourceCount: number;
+    citationSourceCount: number;
     observedSourceCount: number;
   };
   competitors: {
@@ -208,8 +216,12 @@ export type EntityFactsV2DashboardCutoverModel = {
     heading: "내 업체가 잘 보이지 않거나 추가 확인이 필요한 검색 질문";
     rows: EntityFactsV2DashboardQuestionAreaRow[];
   };
+  citationSources: {
+    heading: "AI 답변에서 실제 인용된 주요 출처";
+    rows: EntityFactsV2DashboardCitationSourceRow[];
+  };
   sources: {
-    heading: "AI 답변에서 관찰된 주요 출처";
+    heading: "업체와 연결이 확인된 출처";
     available: boolean;
     rows: EntityFactsV2DashboardSourceRow[];
     referenceSourcesAvailable: false;
@@ -326,6 +338,14 @@ export function buildEntityFactsV2DashboardCutoverModel(
       })),
     }));
 
+  const citationSources: EntityFactsV2DashboardCitationSourceRow[] =
+    (dto.citationSources ?? []).map((item) => ({
+      domain: item.domain,
+      responseCount: item.responseCount,
+      citationCount: item.citationCount,
+      sampleUrl: item.sampleUrl,
+    }));
+
   const questionGroups: EntityFactsV2DashboardQuestionGroupRow[] =
     dto.questionGroups.map((item) => ({
       intentType: item.intentType,
@@ -360,6 +380,7 @@ export function buildEntityFactsV2DashboardCutoverModel(
       top3: overviewVm.top3,
       competitorCount: dto.competitors.length,
       targetSourceCount: dto.targetSources.length,
+      citationSourceCount: citationSources.length,
       observedSourceCount: dto.observedSources.length,
     },
     competitors: {
@@ -371,8 +392,12 @@ export function buildEntityFactsV2DashboardCutoverModel(
       heading: "내 업체가 잘 보이지 않거나 추가 확인이 필요한 검색 질문",
       rows: weakQuestions,
     },
+    citationSources: {
+      heading: "AI 답변에서 실제 인용된 주요 출처",
+      rows: citationSources,
+    },
     sources: {
-      heading: "AI 답변에서 관찰된 주요 출처",
+      heading: "업체와 연결이 확인된 출처",
       available: dto.observedSourcesStatus === "available",
       rows: sources,
       referenceSourcesAvailable: false,
