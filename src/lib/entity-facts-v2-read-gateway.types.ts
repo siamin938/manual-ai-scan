@@ -77,6 +77,13 @@ export type EntityFactsV2ReadObservedSourceDTO = {
   linkedEntities: EntityFactsV2ReadObservedSourceEntityDTO[];
 };
 
+export type EntityFactsV2ReadCitationSourceDTO = {
+  domain: string;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+};
+
 export type EntityFactsV2ReadObservedSourcesStatus =
   | "available"
   | "not_materialized";
@@ -120,6 +127,8 @@ export type EntityFactsV2ReadGatewayDTO = {
   questionAreas: EntityFactsV2ReadQuestionAreaDTO[];
   competitors: EntityFactsV2ReadCompetitorDTO[];
   targetSources: EntityFactsV2ReadTargetSourceDTO[];
+  /** Supplemental final-answer citation summary for the exact representative run. */
+  citationSources?: EntityFactsV2ReadCitationSourceDTO[];
   observedSourcesStatus: EntityFactsV2ReadObservedSourcesStatus;
   observedSources: EntityFactsV2ReadObservedSourceDTO[];
 };
