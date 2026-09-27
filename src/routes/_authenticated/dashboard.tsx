@@ -209,6 +209,13 @@ function waitForDashboardRetry(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+type ChartTooltipPayload = {
+  name?: string;
+  value?: number | string;
+  color?: string;
+  payload?: { label?: string; connected?: boolean; validCount?: number };
+};
+
 function MeasurementTooltip({
   active,
   payload,
