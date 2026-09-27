@@ -23,6 +23,7 @@ import {
   pickEntityFactsV2AutoCompetitorDisplayName,
   type EntityFactsV2CompetitorDisplayEvidence,
   type EntityFactsV2ReadBusinessDTO,
+  type EntityFactsV2ReadCitationSourceDTO,
   type EntityFactsV2ReadCompetitorDTO,
   type EntityFactsV2ReadGatewayResponse,
 } from "./entity-facts-v2-read-gateway.types";
@@ -569,6 +570,64 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   });
 
   if (!gatewayResponse.ok) return gatewayResponse;
+
+  // Supplemental final-answer citation summary for the exact representative run.
+  // This is intentionally separate from strict entity-linked observedSources:
+  // citationSources answers "what did the AI actually cite?", while observedSources
+  // answers "which cited sources were confidently connected to a specific business?".
+  // A citation-summary failure must never make an otherwise valid diagnosis unavailable.
+  const { data: citationRows, error: citationError } = await supabaseAdmin
+    .from("measurement_citations")
+    .select("domain, url, measurement_id, measurements!inner(run_id)")
+    .eq("org_id", orgId)
+    .eq("measurements.run_id", run.id)
+    .limit(2000);
+
+  if (!citationError) {
+    const byDomain = new Map<
+      string,
+      {
+        measurementIds: Set<string>;
+        citationCount: number;
+        sampleUrl: string;
+      }
+    >();
+
+    for (const row of citationRows ?? []) {
+      const domain =
+        typeof row.domain === "string"
+          ? row.domain.trim().toLowerCase().replace(/^www\./u, "")
+          : "";
+      const url = typeof row.url === "string" ? row.url.trim() : "";
+      if (!domain || !url || !/^https?:\/\//iu.test(url)) continue;
+
+      const current = byDomain.get(domain) ?? {
+        measurementIds: new Set<string>(),
+        citationCount: 0,
+        sampleUrl: url,
+      };
+      current.measurementIds.add(row.measurement_id);
+      current.citationCount += 1;
+      if (!current.sampleUrl) current.sampleUrl = url;
+      byDomain.set(domain, current);
+    }
+
+    const citationSources: EntityFactsV2ReadCitationSourceDTO[] = [...byDomain.entries()]
+      .map(([domain, value]) => ({
+        domain,
+        responseCount: value.measurementIds.size,
+        citationCount: value.citationCount,
+        sampleUrl: value.sampleUrl,
+      }))
+      .sort(
+        (a, b) =>
+          b.responseCount - a.responseCount ||
+          b.citationCount - a.citationCount ||
+          a.domain.localeCompare(b.domain, "en"),
+      );
+
+    gatewayResponse.data.citationSources = citationSources;
+  }
 
   // Supplemental question-location metadata powers Core/Custom presentation only.
   // It must never make an otherwise valid diagnosis unavailable.
