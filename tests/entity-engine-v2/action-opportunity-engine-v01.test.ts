@@ -163,7 +163,7 @@ describe("Action Opportunity Engine v0.1", () => {
     ]);
     expect(result.items[0].signalStrength).toBe("strong");
     expect(result.items[0].evidenceText).toContain(
-      "같은 업종 고노출 업체 6곳 중 3곳 · 50.0%",
+      "같은 업종에서 AI에 자주 관찰된 업체 6곳 중 3곳 · 50.0%",
     );
     expect(result.items[0].sites.map((site) => site.label)).toEqual([
       "당근 동네업체",
@@ -258,7 +258,7 @@ describe("Action Opportunity Engine v0.1", () => {
       result.items.some((item) => item.kind === "blog_presence"),
     ).toBe(false);
     expect(result.items[0].whyText).toContain(
-      "전체 자동차 고노출 업체 18곳 중 8곳 · 44.4%",
+      "전체 자동차에서 AI에 자주 관찰된 업체 18곳 중 8곳 · 44.4%",
     );
   });
 
