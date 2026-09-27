@@ -406,8 +406,8 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       "추가 확인이 필요한 응답까지 모두 같은 업체로 확인될 경우 최대",
     );
     expect(dashboardSource).toContain('label="실제 인용 출처"');
-    expect(dashboardSource).toContain("AI 답변에서 실제 인용된 주요 출처");
-    expect(dashboardSource).toContain("업체와 연결이 확인된 출처");
+    expect(dashboardSource).toContain("model.citationSources.heading");
+    expect(dashboardSource).toContain("model.sources.heading");
     expect(dashboardSource).toContain("전체 ${model.citationSources.rows.length}개 출처 보기");
     expect(dashboardSource).toContain("인용 페이지 보기 ↗");
     expect(dashboardSource).toContain("검색 과정에서만 참고된 후보 출처는 포함하지 않습니다.");
