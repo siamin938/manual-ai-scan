@@ -296,7 +296,7 @@ describe("Entity Facts v2 priority View Model", () => {
     expect(dashboardSource).toContain("실제 페이지 보기 ↗");
     expect(dashboardSource).toContain("확인해볼 차이");
     expect(dashboardSource).not.toContain("<CurrentRunReferenceSection");
-    expect(dashboardSource).toContain("MeasurementStatusBar");
+    expect(dashboardSource).not.toContain("MeasurementStatusBar");
     expect(dashboardSource).toContain("SearchContextChart");
     expect(dashboardSource).toContain("BenchmarkCard");
     expect(dashboardSource).not.toContain(
