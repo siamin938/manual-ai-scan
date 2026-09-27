@@ -293,6 +293,14 @@ describe("Entity Facts v2 priority View Model", () => {
       "evidenceExamples={actionEvidenceExamples}",
     );
     expect(dashboardSource).toContain("실제로 비교할 수 있는 같은 채널 사례");
+    expect(dashboardSource).toContain("sameChannelEntityKeys");
+    expect(dashboardSource).toContain(
+      "!sameChannelEntityKeys.has(normalizeQuestion(example.entityName))",
+    );
+    expect(dashboardSource).toContain("dedupedEvidenceExamples.length > 0");
+    expect(dashboardSource).toContain(
+      "위 동일 채널 사례와 겹치지 않는 다른 업체 사례만 표시합니다.",
+    );
     expect(dashboardSource).toContain("실제 페이지 보기 ↗");
     expect(dashboardSource).toContain("확인해볼 차이");
     expect(dashboardSource).not.toContain("<CurrentRunReferenceSection");
