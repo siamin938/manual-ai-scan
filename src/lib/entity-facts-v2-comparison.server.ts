@@ -3,6 +3,11 @@ import type { Database } from "@/integrations/supabase/types";
 import { CUSTOMER_STANDARD_QUESTION_COUNT } from "@/lib/customer-measurement.helpers";
 import { UNIFIED_DIAGNOSTIC_SET_PREFIX } from "@/lib/custom-question-suggestions";
 import {
+  buildUnifiedDiagnosticLayerSummary,
+  confirmedRatePct,
+  type UnifiedDiagnosticLayerMetric,
+} from "@/lib/unified-diagnostic-layer-summary";
+import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
   ENTITY_FACTS_V2_READ_FACT_VERSION,
@@ -167,6 +172,58 @@ function metricSnapshots(
       maxPct: overview.top3UpperBoundPct,
     },
   };
+}
+
+function roundPct(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function layerMetricSnapshot(
+  metric: UnifiedDiagnosticLayerMetric,
+): EntityFactsV2ComparisonMetricSnapshot {
+  const confirmedPct = confirmedRatePct(metric);
+  const maxPct =
+    metric.validCount > 0
+      ? roundPct(
+          ((metric.confirmedCount + metric.unresolvedCount) / metric.validCount) * 100,
+        )
+      : null;
+
+  return {
+    validCount: metric.validCount,
+    confirmedCount: metric.confirmedCount,
+    unresolvedCount: metric.unresolvedCount,
+    confirmedPct,
+    maxPct,
+  };
+}
+
+function questionChangeCounts(
+  current: ParsedEntityFactsV2Aggregate["questionAreas"],
+  previous: ParsedEntityFactsV2Aggregate["questionAreas"],
+): {
+  newlyConfirmedQuestionCount: number;
+  noLongerConfirmedQuestionCount: number;
+} | null {
+  if (current.length !== 24 || previous.length !== 24) return null;
+
+  const previousById = new Map(previous.map((row) => [row.questionId, row]));
+  if (previousById.size !== previous.length) return null;
+
+  let newlyConfirmedQuestionCount = 0;
+  let noLongerConfirmedQuestionCount = 0;
+
+  for (const row of current) {
+    const prior = previousById.get(row.questionId);
+    if (!prior) return null;
+
+    const currentConfirmed = row.confirmedMentionCount > 0;
+    const previousConfirmed = prior.confirmedMentionCount > 0;
+    if (currentConfirmed && !previousConfirmed) newlyConfirmedQuestionCount += 1;
+    if (!currentConfirmed && previousConfirmed) noLongerConfirmedQuestionCount += 1;
+  }
+
+  return { newlyConfirmedQuestionCount, noLongerConfirmedQuestionCount };
 }
 
 function runPoint(
@@ -537,6 +594,57 @@ export async function fetchEntityFactsV2Comparison(args: {
   const previous = compatiblePrior[0]!;
   const previousPoint = runPoint(previous.run, previous.aggregate.parsed);
   const previousMetrics = metricSnapshots(previous.aggregate.parsed);
+
+  let searchScope: NonNullable<EntityFactsV2ComparisonDTO["searchScope"]> | null = null;
+  if (currentUnifiedSet?.id === currentRun.question_set_id) {
+    const questionIds = currentAggregate.parsed.questionAreas.map((row) => row.questionId);
+    if (questionIds.length === 24 && new Set(questionIds).size === 24) {
+      const { data: questionLocationRows, error: questionLocationError } =
+        await supabaseAdmin
+          .from("questions")
+          .select("id, city")
+          .eq("org_id", orgId)
+          .eq("question_set_id", currentRun.question_set_id)
+          .in("id", questionIds);
+
+      // Search-scope detail is supplemental. Never block the verified overall comparison.
+      if (!questionLocationError && (questionLocationRows ?? []).length === 24) {
+        const questionLocations = (questionLocationRows ?? []).map((row) => ({
+          questionId: row.id,
+          city: row.city ?? null,
+        }));
+        const currentLayerSummary = buildUnifiedDiagnosticLayerSummary({
+          questionAreas: currentAggregate.parsed.questionAreas,
+          questionLocations,
+          overview: currentAggregate.parsed.overview,
+        });
+        const previousLayerSummary = buildUnifiedDiagnosticLayerSummary({
+          questionAreas: previous.aggregate.parsed.questionAreas,
+          questionLocations,
+          overview: previous.aggregate.parsed.overview,
+        });
+        const questionChanges = questionChangeCounts(
+          currentAggregate.parsed.questionAreas,
+          previous.aggregate.parsed.questionAreas,
+        );
+
+        if (currentLayerSummary && previousLayerSummary && questionChanges) {
+          searchScope = {
+            custom: buildEntityFactsV2MetricComparison(
+              layerMetricSnapshot(currentLayerSummary.custom),
+              layerMetricSnapshot(previousLayerSummary.custom),
+            ),
+            core: buildEntityFactsV2MetricComparison(
+              layerMetricSnapshot(currentLayerSummary.core),
+              layerMetricSnapshot(previousLayerSummary.core),
+            ),
+            ...questionChanges,
+          };
+        }
+      }
+    }
+  }
+
   const compatibleRunCount = compatiblePrior.length + 1;
 
   const priorSeries = compatiblePrior
@@ -567,6 +675,7 @@ export async function fetchEntityFactsV2Comparison(args: {
         currentMetrics.top3,
         previousMetrics.top3,
       ),
+      searchScope,
     },
   };
 }
