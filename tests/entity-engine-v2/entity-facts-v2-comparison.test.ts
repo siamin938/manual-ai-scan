@@ -167,6 +167,24 @@ describe("Entity Facts v2 comparison contract", () => {
     );
   });
 
+  it("adds unified search-scope detail only after verified compatible-run matching", () => {
+    expect(serverSource).toContain("buildUnifiedDiagnosticLayerSummary");
+    expect(serverSource).toContain("questionChangeCounts");
+    expect(serverSource).toContain('.from("questions")');
+    expect(serverSource).toContain('.select("id, city")');
+    expect(serverSource).toContain("currentUnifiedSet?.id === currentRun.question_set_id");
+    expect(serverSource).toContain("Search-scope detail is supplemental");
+    expect(serverSource).toContain("searchScope = {");
+    expect(serverSource).toContain("newlyConfirmedQuestionCount");
+    expect(serverSource).toContain("noLongerConfirmedQuestionCount");
+    expect(dashboardSource).toContain("검색 범위별 변화");
+    expect(dashboardSource).toContain("새로 확정된 질문");
+    expect(dashboardSource).toContain(
+      "이전에는 확정됐지만 이번 측정에서 확정되지 않은 질문",
+    );
+    expect(dashboardSource).toContain("변화의 원인을");
+  });
+
   it("wires the customer-safe comparison path into the dashboard without legacy repeat truth", () => {
     expect(dashboardSource).toContain("getEntityFactsV2Comparison");
     expect(dashboardSource).toContain(
