@@ -79,11 +79,15 @@ export function buildEntityFactsV2MetricComparison(
   current: EntityFactsV2ComparisonMetricSnapshot,
   previous: EntityFactsV2ComparisonMetricSnapshot | null,
 ): EntityFactsV2ComparisonMetricDTO {
+  const currentConfirmedPct =
+    current.validCount > 0 ? (100 * current.confirmedCount) / current.validCount : null;
+  const previousConfirmedPct =
+    previous && previous.validCount > 0
+      ? (100 * previous.confirmedCount) / previous.validCount
+      : null;
   const confirmedDeltaPctPoints =
-    previous !== null &&
-    current.confirmedPct !== null &&
-    previous.confirmedPct !== null
-      ? roundPctPoints(current.confirmedPct - previous.confirmedPct)
+    currentConfirmedPct !== null && previousConfirmedPct !== null
+      ? roundPctPoints(currentConfirmedPct - previousConfirmedPct)
       : null;
 
   return {
