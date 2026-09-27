@@ -152,17 +152,17 @@ function UnifiedDiagnosticLayerSummaryCard({
         <div className="grid overflow-hidden rounded-lg border bg-border sm:grid-cols-3 sm:gap-px">
           {[
             {
-              label: "전체 AI 노출",
+              label: "전체 확정 노출",
               metric: summary.overall,
               note: "통합 24문항 전체",
             },
             {
-              label: "맞춤 검색",
+              label: "맞춤 검색 확정 노출",
               metric: summary.custom,
               note: "상세 지역 · 브랜드/차종",
             },
             {
-              label: "기준 검색",
+              label: "기준 검색 확정 노출",
               metric: summary.core,
               note: "넓은 지역 · 주력 서비스",
             },
@@ -178,6 +178,9 @@ function UnifiedDiagnosticLayerSummaryCard({
         </div>
         <p className="rounded-md bg-muted/40 px-3 py-2 text-sm leading-6">
           {unifiedLayerSummarySentence(summary)}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          이번 통합 24문항 측정에서 확정된 응답 기준입니다.
         </p>
         {hasUnresolved && (
           <p className="text-xs text-muted-foreground">
