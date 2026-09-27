@@ -895,7 +895,7 @@ function QuestionsPage() {
                 onChange={(e) => setCustomForm({ ...customForm, service: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                고객이 실제로 검색할 만한 넓은 서비스 표현을 입력해 주세요. 예: 엔진오일, 자동차 튜닝, 신차패키지
+                고객이 실제로 검색할 만한 넓은 서비스 표현을 입력해 주세요. 예: 엔진오일, 튜닝, 신차패키지. ‘튜닝’처럼 단독으로 의미가 넓은 표현은 측정 질문에서 자동차 문맥으로만 보정합니다.
               </p>
             </div>
 
