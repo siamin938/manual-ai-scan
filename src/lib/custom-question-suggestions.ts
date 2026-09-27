@@ -190,31 +190,6 @@ function subject(service: string, brandModel: string): string {
   return brandModel ? `${brandModel} ${service}` : service;
 }
 
-const CATEGORY_NARROWING_QUALIFIERS = [
-  "프리미엄",
-  "고급",
-  "가성비",
-  "저가",
-  "보급형",
-] as const;
-
-function coreServicePhrase(service: string, businessCategory: string | null | undefined): string {
-  const category = phrase(clean(businessCategory));
-  if (!category) return service;
-
-  // 사용자가 확인한 서비스보다 등록 업종명이 더 좁은 상품군을 암시하면
-  // Core 질문도 사용자 입력 범위를 그대로 유지한다.
-  // 예: service="엔진오일", category="자동차 엔진오일 교환·프리미엄 윤활유 전문점"
-  const hasCategoryOnlyQualifier = CATEGORY_NARROWING_QUALIFIERS.some(
-    (qualifier) => category.includes(qualifier) && !service.includes(qualifier),
-  );
-  if (hasCategoryOnlyQualifier) return service;
-
-  const serviceKey = normalizeQuestion(service);
-  const categoryKey = normalizeQuestion(category);
-  return serviceKey && categoryKey.includes(serviceKey) ? category : service;
-}
-
 function makeCandidate(
   index: number,
   promptText: string,
@@ -256,7 +231,8 @@ function makeUnifiedCandidate(
  * 통합 AI 진단 질문 v0.2
  * - 고객이 만드는 질문 세트는 하나만 사용한다.
  * - 8개 intent마다 Core 1 + Focus 1 + Specific 1 = 정확히 24문항을 생성한다.
- * - Core는 등록 광역 지역 + 주력 서비스 중심의 넓은 기준 질문이다.
+ * - Core는 등록 광역 지역 + 사용자가 확인한 주력 서비스 중심의 넓은 기준 질문이다.
+ * - 등록 업종명은 Core 질문을 더 좁히는 용도로 사용하지 않는다.
  * - Focus/Specific은 등록 상세 지역 + 사용자가 확인한 브랜드·차종/니즈를 조합한다.
  * - 상세 지역이 없으면 Core와 동일 지역을 사용한다.
  * - LLM/웹 추론 없이 사용자 확인 입력만 사용한다.
@@ -269,7 +245,7 @@ function makeUnifiedCandidate(
 export function buildUnifiedDiagnosticQuestionCandidates(
   input: CustomQuestionInput,
   businessName: string,
-  businessCategory?: string | null,
+  _businessCategory?: string | null,
   detailLocation?: string | null,
 ): SuggestionCandidate[] {
   const validation = validateCustomQuestionInput(input, businessName);
@@ -279,7 +255,9 @@ export function buildUnifiedDiagnosticQuestionCandidates(
   const coreLocationSurface = naturalizeQuestionLocation(location);
   const detailLocationSurface = naturalizeQuestionLocation(clean(detailLocation) || location);
   const brandTargets = parseBrandModelTargets(brandModel);
-  const coreService = coreServicePhrase(service, businessCategory);
+  // 등록 카테고리는 질문 범위를 자동으로 좁히지 않는다.
+  // 사용자가 확인한 주력 서비스 표현을 Core에서도 그대로 사용한다.
+  const coreService = service;
   const targetedForIntent = (intentIndex: number, layer: "focus" | "specific") => {
     if (brandTargets.length === 0) return service;
     if (brandTargets.length === 1) return subject(service, brandTargets[0]!);
