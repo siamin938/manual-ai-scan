@@ -1104,7 +1104,7 @@ function DashboardPage() {
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
                   {isUnifiedDiagnostic
-                    ? "내 업체의 상세 지역·차종을 반영한 맞춤 검색을 먼저 보여드리고, 넓은 기준 검색은 그다음에 표시합니다."
+                    ? "상세 지역과 선택 조건이 반영된 상세 검색을 먼저 보여드리고, 넓은 기준 검색은 그다음에 표시합니다."
                     : "노출이 확정되지 않았거나, 일부만 확인됐거나, 대상 동일성 확인이 더 필요한 질문입니다."}
                 </p>
                 {weakQuestionRows.length === 0 ? (
@@ -1127,7 +1127,7 @@ function DashboardPage() {
                           {isUnifiedDiagnostic && (
                             <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
                               {questionUsesDetailedLocation(q.questionText, dto.business.city)
-                                ? "맞춤 검색"
+                                ? "상세 검색"
                                 : "기준 검색"}
                             </Badge>
                           )}
