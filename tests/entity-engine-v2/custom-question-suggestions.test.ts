@@ -256,7 +256,7 @@ describe("custom question suggestions v0.1", () => {
     });
   });
 
-  it("uses the locked Core + Focus + Specific wording for the Seoul Tesla example", () => {
+  it("uses customer-like Core + Focus + Specific wording for the Seoul Tesla example", () => {
     const result = buildUnifiedDiagnosticQuestionCandidates(
       {
         location: "서울특별시",
@@ -277,9 +277,9 @@ describe("custom question suggestions v0.1", () => {
       "서울에서 테슬라 모델3 신차패키지 업체 중 작업 경험과 후기를 함께 보고 추천해줘",
     ]);
     expect(result.slice(15, 18).map((item) => item.promptText)).toEqual([
-      "서울 신차패키지 업체 여러 곳을 작업 범위와 후기 기준으로 비교해줘",
-      "서울에서 테슬라 모델3 신차패키지 업체 몇 곳을 작업 범위와 후기 기준으로 비교해줘",
-      "서울 테슬라 신차패키지 업체를 작업 범위, 후기, 전문성 기준으로 비교해줘",
+      "서울 신차패키지 업체 여러 곳 후기랑 작업 내용 비교해줘",
+      "서울 테슬라 모델3 신차패키지 업체 몇 곳 후기랑 작업 내용 비교해줘",
+      "서울 테슬라 신차패키지 업체 몇 곳 후기랑 가격 비교해줘",
     ]);
   });
 
@@ -365,6 +365,29 @@ describe("custom question suggestions v0.1", () => {
         expect(row.city).toBe("중랑구");
       }
     });
+  });
+
+  it("uses natural customer wording for service, trust, and comparison questions", () => {
+    const result = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "경기도",
+        service: "엔진오일",
+      },
+      "현대엑스티어 판교",
+      "자동차 엔진오일 교환·프리미엄 윤활유 전문점",
+      "성남시 분당구",
+    );
+
+    expect(result[7]?.promptText).toBe("성남 분당에서 엔진오일 잘하는 곳 알려줘");
+    expect(result[8]?.promptText).toBe("성남 분당에서 엔진오일 맡길 수 있는 업체 몇 곳 알려줘");
+    expect(result[14]?.promptText).toBe("성남 분당에서 엔진오일 믿고 맡길 만한 곳 알려줘");
+    expect(result.slice(15, 18).map((item) => item.promptText)).toEqual([
+      "경기 엔진오일 업체 여러 곳 후기랑 작업 내용 비교해줘",
+      "성남 분당 엔진오일 업체 몇 곳 후기랑 작업 내용 비교해줘",
+      "성남 분당 엔진오일 업체 몇 곳 후기랑 가격 비교해줘",
+    ]);
+    expect(result.some((item) => item.promptText.includes("작업 범위를 다양하게"))).toBe(false);
+    expect(result.some((item) => item.promptText.includes("전문성과 작업 경험을 확인"))).toBe(false);
   });
 
   it("does not narrow a broad engine-oil service to premium from category metadata", () => {
