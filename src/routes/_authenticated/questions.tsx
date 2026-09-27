@@ -895,7 +895,7 @@ function QuestionsPage() {
                 onChange={(e) => setCustomForm({ ...customForm, service: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                실제로 제공하고 있고 이번에 확인하고 싶은 서비스만 입력해 주세요.
+                고객이 실제로 검색할 만한 넓은 서비스 표현을 입력해 주세요. 예: 엔진오일, 자동차 튜닝, 신차패키지
               </p>
             </div>
 
@@ -908,7 +908,7 @@ function QuestionsPage() {
                 onChange={(e) => setCustomForm({ ...customForm, brandModel: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
-                여러 개라면 쉼표로 구분해 주세요. 최대 4개까지 질문에 나눠 반영합니다.
+                특정 브랜드·차종 검색까지 확인하고 싶을 때만 입력해 주세요. 여러 개라면 쉼표로 구분하며 최대 4개까지 반영합니다.
               </p>
             </div>
 
