@@ -119,8 +119,8 @@ function evidencePrefix(args: {
   highVisibilityEntityCount: number;
   highEntitySharePct: number | null;
 }): string {
-  const scopeLabel = args.scope === "category" ? "같은 업종" : "전체 자동차";
-  return `${scopeLabel} 고노출 업체 ${args.highVisibilityEntityCount}곳 중 ${args.highEntityCount}곳${pctText(args.highEntitySharePct)}`;
+  const scopeLabel = args.scope === "category" ? "같은 업종에서" : "전체 자동차에서";
+  return `${scopeLabel} AI에 자주 관찰된 업체 ${args.highVisibilityEntityCount}곳 중 ${args.highEntityCount}곳${pctText(args.highEntitySharePct)}`;
 }
 
 function siteText(sites: readonly BenchmarkSourceSiteDTO[]): string {
@@ -140,14 +140,14 @@ function customerCopy(args: {
       return {
         title: "업체 프로필·등록 채널에서 확인되는 차이",
         actionText:
-          `같은 업종 고노출 업체에서는 ${siteExamples || "업체 프로필·등록 채널"} 같은 출처가 반복 관찰됐습니다. 실제 타업체 사례가 표시되면 링크를 열어 어떤 업체가 어떤 페이지로 연결되어 있는지 내 업체와 직접 비교해보세요.`,
+          `같은 업종에서 AI에 자주 관찰된 업체에서는 ${siteExamples || "업체 프로필·등록 채널"} 같은 출처가 반복 관찰됐습니다. 실제 타업체 사례가 표시되면 링크를 열어 어떤 업체가 어떤 페이지로 연결되어 있는지 내 업체와 직접 비교해보세요.`,
         sites: args.sites.slice(0, 4),
       };
     case "owned_web_presence":
       return {
         title: "공식 홈페이지·브랜드 페이지 연결에서 확인되는 차이",
         actionText:
-          "고노출 업체에서는 공식 홈페이지나 브랜드 페이지가 출처로 반복 관찰됐지만, 현재 내 업체에서는 같은 유형의 연결이 확인되지 않았습니다. 실제 사례가 표시되면 연결된 페이지 자체를 열어 어떤 정보가 AI 답변과 연결됐는지 비교해보세요.",
+          "AI에 자주 관찰된 업체에서는 공식 홈페이지나 브랜드 페이지가 출처로 반복 관찰됐지만, 현재 내 업체에서는 같은 유형의 연결이 확인되지 않았습니다. 실제 사례가 표시되면 연결된 페이지 자체를 열어 어떤 정보가 AI 답변과 연결됐는지 비교해보세요.",
         // Benchmark examples here are often competitor-owned sites, so never
         // surface them as places the target business should edit.
         sites: [],
@@ -156,7 +156,7 @@ function customerCopy(args: {
       return {
         title: "자동차 전문 플랫폼 연결에서 확인되는 차이",
         actionText:
-          `같은 업종 고노출 업체에서는 ${siteExamples || "자동차 전문 플랫폼"} 같은 출처가 반복 관찰됐습니다. 실제 사례가 표시되면 해당 업체의 실제 페이지를 열어 내 업체와 어떤 연결 차이가 있는지 확인해보세요.`,
+          `같은 업종에서 AI에 자주 관찰된 업체에서는 ${siteExamples || "자동차 전문 플랫폼"} 같은 출처가 반복 관찰됐습니다. 실제 사례가 표시되면 해당 업체의 실제 페이지를 열어 내 업체와 어떤 연결 차이가 있는지 확인해보세요.`,
         sites: args.sites.slice(0, 4),
       };
     case "blog_presence":
@@ -330,7 +330,7 @@ export function buildActionOpportunityEngineV01(
     version: ACTION_OPPORTUNITY_ENGINE_VERSION,
     heading: "우선 확인해볼 차이",
     description:
-      "고노출 업체에서 반복 관찰됐지만 현재 내 업체에서는 같은 연결이 확인되지 않은 출처 차이만 보여드립니다.",
+      "AI에 자주 관찰된 업체에서 반복 관찰됐지만 현재 내 업체에서는 같은 연결이 확인되지 않은 출처 차이만 보여드립니다.",
     disclaimer:
       "관찰된 출처 연결 차이를 바탕으로 한 확인 우선순위입니다. 이 차이가 AI 노출의 원인임을 의미하지 않으며, 등록·수정을 권하는 결과가 아닙니다.",
     items,
