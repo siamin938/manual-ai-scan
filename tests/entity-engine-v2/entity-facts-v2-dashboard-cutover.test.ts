@@ -151,6 +151,20 @@ function fixture(): EntityFactsV2ReadGatewayDTO {
         partialResponseCount: 1,
       },
     ],
+    citationSources: [
+      {
+        domain: "oh-car.kr",
+        responseCount: 10,
+        citationCount: 12,
+        sampleUrl: "https://oh-car.kr/example",
+      },
+      {
+        domain: "daangn.com",
+        responseCount: 5,
+        citationCount: 8,
+        sampleUrl: "https://www.daangn.com/example",
+      },
+    ],
     observedSourcesStatus: "available",
     observedSources: [
       {
@@ -264,7 +278,23 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
   it("uses observed source supplement without overstating source trust", () => {
     const model = buildEntityFactsV2DashboardCutoverModel(fixture());
 
-    expect(model.sources.heading).toBe("AI 답변에서 관찰된 주요 출처");
+    expect(model.citationSources.heading).toBe("AI 답변에서 실제 인용된 주요 출처");
+    expect(model.citationSources.rows).toEqual([
+      {
+        domain: "oh-car.kr",
+        responseCount: 10,
+        citationCount: 12,
+        sampleUrl: "https://oh-car.kr/example",
+      },
+      {
+        domain: "daangn.com",
+        responseCount: 5,
+        citationCount: 8,
+        sampleUrl: "https://www.daangn.com/example",
+      },
+    ]);
+    expect(model.metricCards.citationSourceCount).toBe(2);
+    expect(model.sources.heading).toBe("업체와 연결이 확인된 출처");
     expect(model.sources.available).toBe(true);
     expect(model.sources.referenceSourcesAvailable).toBe(false);
     expect(model.metricCards.targetSourceCount).toBe(1);
@@ -375,7 +405,12 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain(
       "추가 확인이 필요한 응답까지 모두 같은 업체로 확인될 경우 최대",
     );
-    expect(dashboardSource).toContain("확인된 연결과 연결 단서를 포함한 출처");
+    expect(dashboardSource).toContain('label="실제 인용 출처"');
+    expect(dashboardSource).toContain("AI 답변에서 실제 인용된 주요 출처");
+    expect(dashboardSource).toContain("업체와 연결이 확인된 출처");
+    expect(dashboardSource).toContain("전체 ${model.citationSources.rows.length}개 출처 보기");
+    expect(dashboardSource).toContain("인용 페이지 보기 ↗");
+    expect(dashboardSource).toContain("검색 과정에서만 참고된 후보 출처는 포함하지 않습니다.");
     expect(dashboardSource).toContain("상위 3곳 여부 추가 확인");
     expect(dashboardSource).toContain('note="이번 측정에서 업체로 확인된 항목"');
     expect(dashboardSource).toContain("같은 업체가 여러 답변에서");
