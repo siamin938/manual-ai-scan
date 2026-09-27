@@ -262,7 +262,7 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
       }),
     );
 
-    expect(vm.searchScope?.custom.label).toBe("맞춤 검색 확정 노출");
+    expect(vm.searchScope?.custom.label).toBe("상세 검색 확정 노출");
     expect(vm.searchScope?.custom.currentValueText).toBe("100%");
     expect(vm.searchScope?.custom.previousValueText).toBe("75%");
     expect(vm.searchScope?.custom.deltaText).toBe("+25%p");
