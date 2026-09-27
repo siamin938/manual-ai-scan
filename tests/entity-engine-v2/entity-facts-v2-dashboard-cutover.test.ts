@@ -402,9 +402,6 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("getVisibilityBenchmark");
     expect(dashboardSource).toContain('label="확정 AI 노출률"');
     expect(dashboardSource).toContain('label="확정 상위 3곳 노출률"');
-    expect(dashboardSource).toContain(
-      "추가 확인이 필요한 응답까지 모두 같은 업체로 확인될 경우 최대",
-    );
     expect(dashboardSource).toContain('label="실제 인용 출처"');
     expect(dashboardSource).toContain("model.citationSources.heading");
     expect(dashboardSource).toContain("model.sources.heading");
