@@ -220,6 +220,7 @@ export function buildEntityFactsV2ComparisonViewModel(
         metric: dto.top3,
         comparisonAvailable: false,
       }),
+      searchScope: null,
       trendSeries: [],
     };
   }
