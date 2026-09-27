@@ -367,6 +367,47 @@ describe("custom question suggestions v0.1", () => {
     });
   });
 
+  it("keeps Gyeonggi Core broad while Seongnam Bundang stays detailed", () => {
+    const candidates = buildUnifiedDiagnosticQuestionCandidates(
+      {
+        location: "경기도",
+        service: "프리미엄 엔진오일",
+      },
+      "현대엑스티어 판교",
+      "자동차 엔진오일 교환·프리미엄 윤활유 전문점",
+      "성남시 분당구",
+    );
+
+    expect(candidates).toHaveLength(24);
+    expect(new Set(candidates.map((item) => item.promptText)).size).toBe(24);
+
+    candidates.forEach((item, index) => {
+      if (index % 3 === 0) {
+        expect(item.promptText).toContain("경기");
+        expect(item.promptText).not.toContain("성남");
+        expect(item.promptText).not.toContain("분당");
+      } else {
+        expect(item.promptText).toContain("성남 분당");
+      }
+    });
+
+    const payloads = buildInsertPayloads(candidates, {
+      orgId: "org",
+      questionSetId: "set",
+      region: "경기도",
+      city: "성남시 분당구",
+    });
+
+    payloads.forEach((row, index) => {
+      expect(row.region).toBe("경기도");
+      if (index % 3 === 0) {
+        expect(row.city).toBeNull();
+      } else {
+        expect(row.city).toBe("성남시 분당구");
+      }
+    });
+  });
+
   it("uses owner-confirmed customer need only in the specific layer", () => {
     const result = buildUnifiedDiagnosticQuestionCandidates(
       {
