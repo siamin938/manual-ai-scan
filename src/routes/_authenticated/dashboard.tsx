@@ -209,91 +209,6 @@ function waitForDashboardRetry(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function MeasurementStatusBar({
-  confirmed,
-  unresolved,
-  total,
-}: {
-  confirmed: number;
-  unresolved: number;
-  total: number;
-}) {
-  const missing = Math.max(0, total - confirmed - unresolved);
-  const confirmedPct = percentOf(confirmed, total);
-  const unresolvedPct = percentOf(unresolved, total);
-  const missingPct = percentOf(missing, total);
-  const chartData = [{ name: "최근 측정", confirmed, unresolved, missing }];
-
-  return (
-    <div className="rounded-lg border bg-muted/15 p-4 lg:col-span-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold">이번 측정 한눈에 보기</p>
-        <p className="text-xs text-muted-foreground">유효 AI 답변 {total}건</p>
-      </div>
-      <div
-        className="mt-3 h-16 w-full"
-        role="img"
-        aria-label={`확정 노출 ${confirmed}건, 추가 확인 ${unresolved}건, 노출 미확인 ${missing}건`}
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={chartData}
-            layout="vertical"
-            margin={{ top: 8, right: 0, bottom: 8, left: 0 }}
-          >
-            <XAxis type="number" domain={[0, Math.max(total, 1)]} hide />
-            <YAxis type="category" dataKey="name" hide />
-            <Tooltip content={<MeasurementTooltip />} cursor={{ fill: "var(--color-muted)" }} />
-            <Bar
-              dataKey="confirmed"
-              name="확정 노출"
-              stackId="measurement"
-              fill="var(--color-chart-1)"
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="unresolved"
-              name="추가 확인"
-              stackId="measurement"
-              fill="var(--color-chart-2)"
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="missing"
-              name="노출 미확인"
-              stackId="measurement"
-              fill="var(--color-muted)"
-              isAnimationActive={false}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
-        <span>
-          <span className="font-semibold text-primary">확정 노출 {confirmed}건</span>
-          {" · "}
-          {confirmedPct.toFixed(1)}%
-        </span>
-        {unresolved > 0 && (
-          <span className="text-muted-foreground">
-            추가 확인 {unresolved}건 · {unresolvedPct.toFixed(1)}%
-          </span>
-        )}
-        <span className="text-muted-foreground">
-          노출 미확인 {missing}건 · {missingPct.toFixed(1)}%
-        </span>
-      </div>
-    </div>
-  );
-}
-
-type ChartTooltipPayload = {
-  name?: string;
-  value?: number | string;
-  color?: string;
-  payload?: { label?: string; connected?: boolean; validCount?: number };
-};
-
 function MeasurementTooltip({
   active,
   payload,
@@ -452,9 +367,13 @@ function DashboardPage() {
   const [expandedCitationSourceBusinessId, setExpandedCitationSourceBusinessId] = useState<
     string | null
   >(null);
+  const [expandedLinkedClueBusinessId, setExpandedLinkedClueBusinessId] = useState<
+    string | null
+  >(null);
   const showAllCompetitors = expandedCompetitorBusinessId === businessId;
   const showAllWeakQuestions = expandedWeakQuestionBusinessId === businessId;
   const showAllCitationSources = expandedCitationSourceBusinessId === businessId;
+  const showLinkedClues = expandedLinkedClueBusinessId === businessId;
 
   const unifiedSetQuery = useQuery({
     queryKey: ["active-unified-diagnostic-set", activeOrgId, businessId],
@@ -639,18 +558,19 @@ function DashboardPage() {
     model && model.competitors.rows.length > 0
       ? Math.max(...model.competitors.rows.map((item) => item.responseCount))
       : null;
-  const topObservedCompetitors =
-    model && topObservedCompetitorResponseCount !== null
-      ? model.competitors.rows.filter(
-          (item) => item.responseCount === topObservedCompetitorResponseCount,
-        )
-      : [];
   const linkedTargetSourceCount =
     model?.sources.rows.filter((source) => source.targetResponseCount > 0).length ?? 0;
   const linkedCompetitorSourceCount =
     model?.sources.rows.filter((source) => source.competitorResponseCount > 0).length ?? 0;
   const linkedClueSourceCount =
     model?.sources.rows.filter((source) => source.clueResponseCount > 0).length ?? 0;
+  const linkedConfirmedSources =
+    model?.sources.rows.filter((source) => source.evidence !== "clue") ?? [];
+  const linkedClueSources =
+    model?.sources.rows.filter((source) => source.evidence === "clue") ?? [];
+  const visibleLinkedSources = showLinkedClues
+    ? [...linkedConfirmedSources, ...linkedClueSources]
+    : linkedConfirmedSources;
   const weakQuestionRows =
     model && isUnifiedDiagnostic
       ? model.weakQuestions.rows
@@ -841,72 +761,6 @@ function DashboardPage() {
             <UnifiedDiagnosticLayerSummaryCard summary={unifiedLayerSummary} />
           )}
 
-          <Card className="report-section border-t-2 border-t-primary">
-            <CardHeader className="border-b bg-muted/25 pb-4">
-              <p className="report-kicker">EXECUTIVE SUMMARY</p>
-              <CardTitle className="text-xl">
-                {isUnifiedDiagnostic ? "AI 진단 최근 측정 결과" : "기본 진단 최근 측정 결과"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 pt-5 text-base leading-7 lg:grid-cols-2 lg:gap-x-10">
-              <MeasurementStatusBar
-                confirmed={model.recentSummary.visibility.confirmedCount}
-                unresolved={model.recentSummary.visibility.unresolvedCount}
-                total={model.recentSummary.visibility.validCount}
-              />
-              <p className="font-medium">
-                확정 AI 노출률{" "}
-                {pctRange(
-                  model.recentSummary.visibility.lowerPct,
-                  model.recentSummary.visibility.lowerPct,
-                )}
-              </p>
-              <p className="text-muted-foreground">
-                유효 응답 {model.recentSummary.visibility.validCount}건 중 확정 노출{" "}
-                {model.recentSummary.visibility.confirmedCount}건
-                {model.recentSummary.visibility.unresolvedCount > 0
-                  ? ` · 추가 확인 ${model.recentSummary.visibility.unresolvedCount}건`
-                  : ""}
-              </p>
-              {model.recentSummary.visibility.unresolvedCount > 0 &&
-                model.recentSummary.visibility.upperPct !== null && (
-                  <p className="text-sm text-muted-foreground">
-                    추가 확인이 필요한 응답까지 모두 같은 업체로 확인될 경우 최대{" "}
-                    {pctRange(
-                      model.recentSummary.visibility.upperPct,
-                      model.recentSummary.visibility.upperPct,
-                    )}
-                  </p>
-                )}
-              {model.recentSummary.uncertaintyNotice && (
-                <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground lg:col-span-2">
-                  {model.recentSummary.uncertaintyNotice}
-                </p>
-              )}
-              <p className="text-muted-foreground">{model.recentSummary.questionSummaryText}</p>
-              {topObservedCompetitors.length > 0 && (
-                <p>
-                  가장 자주 함께 관찰된 업체
-                  {topObservedCompetitors.length > 1 ? " (공동)" : ""}:{" "}
-                  {topObservedCompetitors
-                    .slice(0, 3)
-                    .map((item) => item.name)
-                    .join(" · ")}
-                  {topObservedCompetitors.length > 3
-                    ? ` 외 ${topObservedCompetitors.length - 3}곳`
-                    : ""}{" "}
-                  · {topObservedCompetitors.length > 1 ? "각 " : ""}
-                  {topObservedCompetitors[0]!.responseCount}개 답변
-                </p>
-              )}
-              {model.recentSummary.sourceQualityNotice && (
-                <p className="text-xs text-muted-foreground">
-                  {model.recentSummary.sourceQualityNotice}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
           {actionOpportunityModel && (
             <ActionOpportunitySection
               model={actionOpportunityModel}
@@ -965,11 +819,8 @@ function DashboardPage() {
                       .slice(0, showAllCompetitors ? model.competitors.rows.length : 6)
                       .map((c) => (
                         <TableRow key={c.name}>
-                          <TableCell className="text-sm">
-                            <span className="flex flex-wrap items-center gap-2">
-                              <span className="font-medium">{c.name}</span>
-                              <Badge variant="outline">{c.label}</Badge>
-                            </span>
+                          <TableCell className="text-sm font-medium">
+                            {c.name}
                           </TableCell>
                           <TableCell className="text-sm">
                             <span className="tabular-nums">{c.responseCount}건</span>
@@ -1190,7 +1041,7 @@ function DashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {model.sources.rows.map((s) => (
+                      {visibleLinkedSources.map((s) => (
                         <TableRow key={s.domain}>
                           <TableCell className="text-sm font-medium">
                             <span className="flex flex-wrap items-center gap-2">
@@ -1247,6 +1098,21 @@ function DashboardPage() {
                       ))}
                     </TableBody>
                   </Table>
+                )}
+                {linkedClueSources.length > 0 && (
+                  <div className="mt-3 flex justify-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setExpandedLinkedClueBusinessId(showLinkedClues ? null : businessId)
+                      }
+                    >
+                      {showLinkedClues
+                        ? "연결 단서 접기"
+                        : `연결 단서 ${linkedClueSources.length}개 보기`}
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1475,9 +1341,6 @@ function ActionOpportunitySection({
                   </div>
                 </div>
 
-                <p className="mt-4 border-t pt-3 text-xs text-muted-foreground">
-                  근거 · {item.evidenceText}
-                </p>
               </div>
             ))}
           </div>
