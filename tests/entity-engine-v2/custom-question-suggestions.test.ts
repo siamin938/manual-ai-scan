@@ -5,12 +5,17 @@ import {
   buildCustomQuestionSetSignature,
   buildUnifiedDiagnosticQuestionCandidates,
   hasUnifiedDiagnosticIntentShape,
+  UNIFIED_DIAGNOSTIC_CONTRACT_VERSION,
   naturalizeQuestionLocation,
   parseBrandModelTargets,
   validateCustomQuestionInput,
 } from "../../src/lib/custom-question-suggestions";
 
 describe("custom question suggestions v0.1", () => {
+  it("pins the unified diagnostic contract at v0.2", () => {
+    expect(UNIFIED_DIAGNOSTIC_CONTRACT_VERSION).toBe("0.2");
+  });
+
   it("builds one deterministic question for each allowed intent", () => {
     const result = buildCustomQuestionCandidates(
       {
