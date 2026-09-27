@@ -1239,7 +1239,40 @@ function ActionOpportunitySection({
                   : "grid gap-4 lg:grid-cols-3"
             }
           >
-            {model.items.map((item) => (
+            {model.items.map((item) => {
+              const sameChannelExamples = item.sites.flatMap((site) => {
+                const normalizedDomain = site.domain?.toLowerCase().replace(/^www\./, "");
+                const currentReference = currentRunReferences.find(
+                  (reference) =>
+                    normalizedDomain &&
+                    reference.domain === normalizedDomain &&
+                    reference.entities.length > 0,
+                );
+                if (!currentReference?.entities[0]) return [];
+                return [
+                  {
+                    siteLabel: site.label,
+                    entityName: currentReference.entities[0].entityName,
+                    url: currentReference.entities[0].url,
+                  },
+                ];
+              });
+              const sameChannelEntityKeys = new Set(
+                sameChannelExamples.map((example) => normalizeQuestion(example.entityName)),
+              );
+              const seenEvidenceExamples = new Set<string>();
+              const dedupedEvidenceExamples = evidenceExamples
+                .filter((example) => example.sourceGroupKey === item.sourceGroupKey)
+                .filter((example) => !sameChannelEntityKeys.has(normalizeQuestion(example.entityName)))
+                .filter((example) => {
+                  const key = `${normalizeQuestion(example.entityName)}|${example.url}`;
+                  if (seenEvidenceExamples.has(key)) return false;
+                  seenEvidenceExamples.add(key);
+                  return true;
+                })
+                .slice(0, 2);
+
+              return (
               <div key={item.sourceGroupKey} className="rounded-lg border p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">
@@ -1261,42 +1294,24 @@ function ActionOpportunitySection({
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  {item.sites.some((site) => {
-                    const normalizedDomain = site.domain?.toLowerCase().replace(/^www\./, "");
-                    return currentRunReferences.some(
-                      (reference) =>
-                        normalizedDomain &&
-                        reference.domain === normalizedDomain &&
-                        reference.entities.length > 0,
-                    );
-                  }) && (
+                  {sameChannelExamples.length > 0 && (
                     <div>
                       <p className="text-xs font-medium">실제로 비교할 수 있는 같은 채널 사례</p>
                       <div className="mt-2 space-y-2">
-                        {item.sites.flatMap((site) => {
-                          const normalizedDomain = site.domain?.toLowerCase().replace(/^www\./, "");
-                          const currentReference = currentRunReferences.find(
-                            (reference) =>
-                              normalizedDomain &&
-                              reference.domain === normalizedDomain &&
-                              reference.entities.length > 0,
-                          );
-                          if (!currentReference?.entities[0]) return [];
-                          return [
-                            <a
-                              key={`${site.label}:${currentReference.entities[0].entityName}:${currentReference.entities[0].url}`}
-                              href={currentReference.entities[0].url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
-                            >
-                              <span className="font-medium">{site.label}</span>
-                              <span className="ml-2 text-muted-foreground">
-                                {currentReference.entities[0].entityName} · 실제 페이지 보기 ↗
-                              </span>
-                            </a>,
-                          ];
-                        })}
+                        {sameChannelExamples.map((example) => (
+                          <a
+                            key={`${example.siteLabel}:${example.entityName}:${example.url}`}
+                            href={example.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+                          >
+                            <span className="font-medium">{example.siteLabel}</span>
+                            <span className="ml-2 text-muted-foreground">
+                              {example.entityName} · 실제 페이지 보기 ↗
+                            </span>
+                          </a>
+                        ))}
                       </div>
                       <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
                         이번 측정에서 다른 업체와 확정 연결된 동일 채널만 표시합니다.
@@ -1304,34 +1319,28 @@ function ActionOpportunitySection({
                     </div>
                   )}
 
-                  {evidenceExamples.some(
-                    (example) => example.sourceGroupKey === item.sourceGroupKey,
-                  ) && (
+                  {dedupedEvidenceExamples.length > 0 && (
                     <div>
                       <p className="text-xs font-medium">실제 비교해볼 업체 사례</p>
                       <div className="mt-2 space-y-1.5">
-                        {evidenceExamples
-                          .filter((example) => example.sourceGroupKey === item.sourceGroupKey)
-                          .slice(0, 2)
-                          .map((example) => (
-                            <a
-                              key={`${example.entityName}:${example.url}`}
-                              href={example.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
-                            >
-                              <span className="font-medium">{example.entityName}</span>
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                {example.domain} · 실제 페이지 보기 ↗
-                              </span>
-                            </a>
-                          ))}
+                        {dedupedEvidenceExamples.map((example) => (
+                          <a
+                            key={`${example.entityName}:${example.url}`}
+                            href={example.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/50"
+                          >
+                            <span className="font-medium">{example.entityName}</span>
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              {example.domain} · 실제 페이지 보기 ↗
+                            </span>
+                          </a>
+                        ))}
                       </div>
                       <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                        현재 선택한 업체의 최근 AI 측정에서 함께 관찰된 업체와 실제 출처 연결만
-                        보여줍니다. 직접 비교용 참고 사례이며, 해당 페이지가 노출의 원인임을
-                        의미하지 않습니다.
+                        위 동일 채널 사례와 겹치지 않는 다른 업체 사례만 표시합니다. 직접 비교용
+                        참고 사례이며, 해당 페이지가 노출의 원인임을 의미하지 않습니다.
                       </p>
                     </div>
                   )}
@@ -1345,7 +1354,8 @@ function ActionOpportunitySection({
                 </div>
 
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
