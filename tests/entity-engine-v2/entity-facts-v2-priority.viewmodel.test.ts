@@ -294,6 +294,7 @@ describe("Entity Facts v2 priority View Model", () => {
     );
     expect(dashboardSource).toContain("실제로 비교할 수 있는 같은 채널 사례");
     expect(dashboardSource).toContain("sameChannelEntityKeys");
+    expect(dashboardSource).toContain("lowValueComparisonSourceDomain(example.domain)");
     expect(dashboardSource).toContain(
       "!sameChannelEntityKeys.has(normalizeQuestion(example.entityName))",
     );
