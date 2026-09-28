@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
+import { useImeSafeForm } from "@/hooks/use-ime-safe-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,13 +21,17 @@ import {
 
 const AUTO_CATEGORY_OPTIONS = [
   "자동차 튜닝",
-  "자동차 정비",
+  "자동차 정비/엔진오일",
   "자동차 디테일링/세차",
   "썬팅/신차패키지",
+  "PPF/랩핑",
   "자동차 용품/전장",
   "타이어/휠",
   "렌터카/자동차 서비스",
+  "기타 자동차 서비스",
 ] as const;
+
+const ONBOARDING_IME_FIELDS = ["name", "address", "region", "city"] as const;
 
 const SETUP_ERROR_MESSAGE = "업체 등록 중 오류가 발생했습니다. 다시 시도해 주세요.";
 
@@ -45,14 +50,33 @@ export function OrgOnboarding() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [address, setAddress] = useState("");
+  const [region, setRegion] = useState("");
+  const [city, setCity] = useState("");
   const [busy, setBusy] = useState(false);
   const [createdOrgId, setCreatedOrgId] = useState<string | null>(null);
+  const { formRef, snapshot, compositionProps, isComposing } =
+    useImeSafeForm(ONBOARDING_IME_FIELDS);
 
   const normalizedName = normalizeBusinessName(name);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!normalizedName || !category) return;
+
+    const latest = snapshot();
+    const latestName = normalizeBusinessName(latest.name ?? name);
+    const latestAddress = (latest.address ?? address).trim();
+    const latestRegion = (latest.region ?? region).trim();
+    const latestCity = (latest.city ?? city).trim();
+
+    if (!latestName || !category || !latestRegion || !latestCity) {
+      toast.error("업체명, 업종, 지역(시/도), 도시(시/군/구)를 모두 입력해 주세요.");
+      return;
+    }
+
+    setName(latestName);
+    setAddress(latestAddress);
+    setRegion(latestRegion);
+    setCity(latestCity);
     setBusy(true);
 
     let orgId = createdOrgId;
@@ -60,7 +84,7 @@ export function OrgOnboarding() {
     if (!orgId) {
       const { data, error } = await supabase.functions.invoke("create-organization-with-owner", {
         body: {
-          name: normalizedName,
+          name: latestName,
           slug: generateInternalSlug(),
         },
       });
@@ -76,13 +100,13 @@ export function OrgOnboarding() {
 
     const { error: insertError } = await supabase.from("businesses").insert({
       org_id: orgId,
-      name: normalizedName,
+      name: latestName,
       aliases: [],
       category,
-      address: address.trim() || null,
+      address: latestAddress || null,
       country_code: "KR",
-      region: null,
-      city: null,
+      region: latestRegion,
+      city: latestCity,
       website_url: null,
       naver_place_url: null,
       google_maps_url: null,
@@ -111,14 +135,16 @@ export function OrgOnboarding() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={submit}>
+          <form ref={formRef} className="space-y-4" onSubmit={submit}>
             <div className="space-y-2">
               <Label htmlFor="biz-name">업체명</Label>
               <Input
                 id="biz-name"
+                name="name"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                {...compositionProps(setName)}
                 placeholder="예: 현대엑스티어 판교점"
               />
             </div>
@@ -141,27 +167,69 @@ export function OrgOnboarding() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                엔진오일·윤활유 전문점은 「자동차 정비」를 선택해 주세요.
+                엔진오일·윤활유 전문점은 「자동차 정비/엔진오일」을 선택해 주세요.
               </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="biz-region">지역(시/도)</Label>
+                <Input
+                  id="biz-region"
+                  name="region"
+                  required
+                  value={region}
+                  onChange={(e) => setRegion(e.target.value)}
+                  {...compositionProps(setRegion)}
+                  placeholder="예: 경기도"
+                />
+                <p className="text-xs text-muted-foreground">
+                  넓은 기준 검색에 사용됩니다. 예: 서울특별시, 경기도
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="biz-city">도시(시/군/구)</Label>
+                <Input
+                  id="biz-city"
+                  name="city"
+                  required
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  {...compositionProps(setCity)}
+                  placeholder="예: 성남시 분당구"
+                />
+                <p className="text-xs text-muted-foreground">
+                  상세 검색에 사용됩니다. 예: 남양주시, 성남시 분당구
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="biz-address">주소 (권장)</Label>
               <Input
                 id="biz-address"
+                name="address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
+                {...compositionProps(setAddress)}
                 placeholder="예: 경기도 성남시 분당구 …"
               />
               <p className="text-xs text-muted-foreground">
-                주소를 입력하면 지역 기반 검색 질문을 더 정확하게 만들 수 있습니다.
+                주소는 업체 식별과 지역 정보 확인에 참고합니다.
               </p>
             </div>
 
             <Button
               type="submit"
               className="w-full"
-              disabled={busy || !normalizedName || !category}
+              disabled={
+                busy ||
+                isComposing() ||
+                !normalizedName ||
+                !category ||
+                !region.trim() ||
+                !city.trim()
+              }
             >
               내 업체 등록하고 시작하기
             </Button>
