@@ -433,7 +433,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("상위 3곳 여부 추가 확인");
     expect(dashboardSource).toContain('note="이번 측정에서 업체로 확인된 항목"');
     expect(dashboardSource).toContain("같은 업체가 여러 답변에서");
-    expect(dashboardSource).toContain("애매한 경우에는 확정 연결로 표시하지 않습니다.");
+    expect(dashboardSource).toContain("확정 연결 기준은 그대로 유지하고");
     expect(dashboardSource).toContain("내 업체 직접 연결");
     expect(dashboardSource).toContain("연결 단서");
     expect(dashboardSource).toContain("showAllCompetitors");
