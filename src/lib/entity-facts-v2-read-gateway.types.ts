@@ -84,6 +84,12 @@ export type EntityFactsV2ReadCitationSourceDTO = {
   sampleUrl: string;
 };
 
+export type EntityFactsV2ReadTargetReferenceSourceDTO = {
+  domain: string;
+  responseCount: number;
+  sampleUrl: string;
+};
+
 export type EntityFactsV2ReadObservedSourcesStatus =
   | "available"
   | "not_materialized";
@@ -129,6 +135,11 @@ export type EntityFactsV2ReadGatewayDTO = {
   targetSources: EntityFactsV2ReadTargetSourceDTO[];
   /** Supplemental final-answer citation summary for the exact representative run. */
   citationSources?: EntityFactsV2ReadCitationSourceDTO[];
+  /**
+   * Advisory target-link clues from close section-level citation attribution that
+   * did not satisfy the repeated-evidence promotion rule. Never treat as confirmed.
+   */
+  targetReferenceSources?: EntityFactsV2ReadTargetReferenceSourceDTO[];
   observedSourcesStatus: EntityFactsV2ReadObservedSourcesStatus;
   observedSources: EntityFactsV2ReadObservedSourceDTO[];
 };
