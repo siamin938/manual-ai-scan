@@ -347,6 +347,33 @@ function SearchContextChart({
   );
 }
 
+const LOW_VALUE_COMPARISON_SOURCE_PATTERNS = [
+  /(^|\.)saramin\.co\.kr$/u,
+  /(^|\.)jobkorea\.co\.kr$/u,
+  /(^|\.)albamon\.com$/u,
+  /(^|\.)alba\.co\.kr$/u,
+  /(^|\.)career\.co\.kr$/u,
+  /(^|\.)jobplanet\.co\.kr$/u,
+  /(^|\.)work24\.go\.kr$/u,
+  /(^|\.)govjob\.co\.kr$/u,
+  /(^|\.)easylaw\.go\.kr$/u,
+  /(^|\.)news\.nate\.com$/u,
+  /(^|\.)n\.news\.naver\.com$/u,
+  /(^|\.)yna\.co\.kr$/u,
+  /(^|\.)newsis\.com$/u,
+  /(^|\.)wowtv\.co\.kr$/u,
+  /(^|\.)v\.daum\.net$/u,
+] as const;
+
+function lowValueComparisonSourceDomain(value: string): boolean {
+  const domain = value.trim().toLowerCase().replace(/^www\./u, "");
+  return (
+    !domain ||
+    domain.endsWith(".go.kr") ||
+    LOW_VALUE_COMPARISON_SOURCE_PATTERNS.some((pattern) => pattern.test(domain))
+  );
+}
+
 function weakQuestionBadgeVariant(
   tone: "positive" | "neutral" | "attention",
 ): "default" | "secondary" | "outline" {
@@ -377,10 +404,17 @@ function DashboardPage() {
   const [expandedLinkedClueBusinessId, setExpandedLinkedClueBusinessId] = useState<
     string | null
   >(null);
+  const [expandedTargetReferenceBusinessId, setExpandedTargetReferenceBusinessId] = useState<
+    string | null
+  >(null);
+  const [expandedOtherConfirmedSourceBusinessId, setExpandedOtherConfirmedSourceBusinessId] =
+    useState<string | null>(null);
   const showAllCompetitors = expandedCompetitorBusinessId === businessId;
   const showAllWeakQuestions = expandedWeakQuestionBusinessId === businessId;
   const showAllCitationSources = expandedCitationSourceBusinessId === businessId;
   const showLinkedClues = expandedLinkedClueBusinessId === businessId;
+  const showTargetReferenceSources = expandedTargetReferenceBusinessId === businessId;
+  const showOtherConfirmedSources = expandedOtherConfirmedSourceBusinessId === businessId;
 
   const unifiedSetQuery = useQuery({
     queryKey: ["active-unified-diagnostic-set", activeOrgId, businessId],
@@ -561,19 +595,29 @@ function DashboardPage() {
         })
       : null;
 
-  const linkedTargetSourceCount =
-    model?.sources.rows.filter((source) => source.targetResponseCount > 0).length ?? 0;
-  const linkedCompetitorSourceCount =
-    model?.sources.rows.filter((source) => source.competitorResponseCount > 0).length ?? 0;
-  const linkedClueSourceCount =
-    model?.sources.rows.filter((source) => source.clueResponseCount > 0).length ?? 0;
-  const linkedConfirmedSources =
-    model?.sources.rows.filter((source) => source.evidence !== "clue") ?? [];
+  const linkedTargetSources =
+    model?.sources.rows.filter(
+      (source) => source.evidence !== "clue" && source.targetResponseCount > 0,
+    ) ?? [];
+  const linkedCompetitorConfirmedSources =
+    model?.sources.rows.filter(
+      (source) =>
+        source.evidence !== "clue" &&
+        source.targetResponseCount === 0 &&
+        source.competitorResponseCount > 0,
+    ) ?? [];
+  const usefulCompetitorSources = linkedCompetitorConfirmedSources.filter(
+    (source) => !lowValueComparisonSourceDomain(source.domain),
+  );
+  const otherConfirmedSources = linkedCompetitorConfirmedSources.filter((source) =>
+    lowValueComparisonSourceDomain(source.domain),
+  );
   const linkedClueSources =
     model?.sources.rows.filter((source) => source.evidence === "clue") ?? [];
-  const visibleLinkedSources = showLinkedClues
-    ? [...linkedConfirmedSources, ...linkedClueSources]
-    : linkedConfirmedSources;
+  const targetReferenceSources = model?.targetReferenceSources.rows ?? [];
+  const linkedTargetSourceCount = linkedTargetSources.length;
+  const linkedCompetitorSourceCount = usefulCompetitorSources.length;
+  const linkedClueSourceCount = linkedClueSources.length;
   const weakQuestionRows =
     model && isUnifiedDiagnostic
       ? model.weakQuestions.rows
