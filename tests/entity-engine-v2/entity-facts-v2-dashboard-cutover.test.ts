@@ -165,6 +165,13 @@ function fixture(): EntityFactsV2ReadGatewayDTO {
         sampleUrl: "https://www.daangn.com/example",
       },
     ],
+    targetReferenceSources: [
+      {
+        domain: "oh-car.kr",
+        responseCount: 1,
+        sampleUrl: "https://oh-car.kr/target-clue",
+      },
+    ],
     observedSourcesStatus: "available",
     observedSources: [
       {
@@ -294,6 +301,14 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       },
     ]);
     expect(model.metricCards.citationSourceCount).toBe(2);
+    expect(model.targetReferenceSources.heading).toBe("내 업체 연결 단서");
+    expect(model.targetReferenceSources.rows).toEqual([
+      {
+        domain: "oh-car.kr",
+        responseCount: 1,
+        sampleUrl: "https://oh-car.kr/target-clue",
+      },
+    ]);
     expect(model.sources.heading).toBe("업체 연결까지 확인된 출처");
     expect(model.sources.available).toBe(true);
     expect(model.sources.referenceSourcesAvailable).toBe(false);
@@ -410,9 +425,11 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("검색 과정에서만 참고된 후보 출처는 포함하지 않습니다.");
     expect(dashboardSource).toContain("인용된 답변 수");
     expect(dashboardSource).toContain("전체 인용 횟수");
-    expect(dashboardSource).toContain("내 업체 직접 연결");
-    expect(dashboardSource).toContain("다른 업체 확정 연결");
-    expect(dashboardSource).toContain("연결 단서");
+    expect(dashboardSource).toContain("내 업체 확정 연결");
+    expect(dashboardSource).toContain("내 업체 연결 단서");
+    expect(dashboardSource).toContain("비교해볼 타업체 출처");
+    expect(dashboardSource).toContain("기타 확정 연결");
+    expect(dashboardSource).toContain("타업체 연결 단서");
     expect(dashboardSource).toContain("상위 3곳 여부 추가 확인");
     expect(dashboardSource).toContain('note="이번 측정에서 업체로 확인된 항목"');
     expect(dashboardSource).toContain("같은 업체가 여러 답변에서");
@@ -420,8 +437,11 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("내 업체 직접 연결");
     expect(dashboardSource).toContain("연결 단서");
     expect(dashboardSource).toContain("showAllCompetitors");
-    expect(dashboardSource).toContain("visibleLinkedSources");
-    expect(dashboardSource).toContain("연결 단서 ${linkedClueSources.length}개 보기");
+    expect(dashboardSource).toContain("usefulCompetitorSources");
+    expect(dashboardSource).toContain("lowValueComparisonSourceDomain");
+    expect(dashboardSource).toContain("내 업체 연결 단서 ${targetReferenceSources.length}개 보기");
+    expect(dashboardSource).toContain("기타 확정 연결 ${otherConfirmedSources.length}개 보기");
+    expect(dashboardSource).toContain("타업체 연결 단서 ${linkedClueSources.length}개 보기");
     expect(dashboardSource).not.toContain('<Badge variant="outline">{c.label}</Badge>');
     expect(dashboardSource).toContain("showAllWeakQuestions");
     expect(dashboardSource).toContain("model.competitors.rows.length > 6");
