@@ -449,7 +449,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("전체 ${model.competitors.rows.length}곳 보기");
     expect(dashboardSource).toContain("전체 ${weakQuestionRows.length}개 질문 보기");
     expect(dashboardSource).not.toContain("노출 범위 ${q.visibilityDisplayText}");
-    expect(dashboardSource).toContain("AI 답변 {s.clueResponseCount}건에서 단서 확인");
+    expect(dashboardSource).toContain("AI 답변 {source.clueResponseCount}건");
     expect(dashboardSource).toContain("최근 측정에서 내 업체 직접 연결 미확인");
     expect(dashboardSource).not.toContain("기본 진단 최근 측정 결과");
     expect(dashboardSource).toContain("기본 진단 기준");
