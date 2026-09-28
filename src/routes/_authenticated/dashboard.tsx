@@ -1307,6 +1307,7 @@ function ActionOpportunitySection({
               const seenEvidenceExamples = new Set<string>();
               const dedupedEvidenceExamples = evidenceExamples
                 .filter((example) => example.sourceGroupKey === item.sourceGroupKey)
+                .filter((example) => !lowValueComparisonSourceDomain(example.domain))
                 .filter((example) => !sameChannelEntityKeys.has(normalizeQuestion(example.entityName)))
                 .filter((example) => {
                   const key = `${normalizeQuestion(example.entityName)}|${example.url}`;
