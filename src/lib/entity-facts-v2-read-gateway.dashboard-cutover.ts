@@ -159,6 +159,12 @@ export type EntityFactsV2DashboardCitationSourceRow = {
   sampleUrl: string;
 };
 
+export type EntityFactsV2DashboardTargetReferenceSourceRow = {
+  domain: string;
+  responseCount: number;
+  sampleUrl: string;
+};
+
 export type EntityFactsV2DashboardQuestionAreaRow = {
   questionId: string;
   questionText: string;
@@ -219,6 +225,10 @@ export type EntityFactsV2DashboardCutoverModel = {
   citationSources: {
     heading: "AI 답변에서 실제 인용된 출처";
     rows: EntityFactsV2DashboardCitationSourceRow[];
+  };
+  targetReferenceSources: {
+    heading: "내 업체 연결 단서";
+    rows: EntityFactsV2DashboardTargetReferenceSourceRow[];
   };
   sources: {
     heading: "업체 연결까지 확인된 출처";
@@ -346,6 +356,13 @@ export function buildEntityFactsV2DashboardCutoverModel(
       sampleUrl: item.sampleUrl,
     }));
 
+  const targetReferenceSources: EntityFactsV2DashboardTargetReferenceSourceRow[] =
+    (dto.targetReferenceSources ?? []).map((item) => ({
+      domain: item.domain,
+      responseCount: item.responseCount,
+      sampleUrl: item.sampleUrl,
+    }));
+
   const questionGroups: EntityFactsV2DashboardQuestionGroupRow[] =
     dto.questionGroups.map((item) => ({
       intentType: item.intentType,
@@ -395,6 +412,10 @@ export function buildEntityFactsV2DashboardCutoverModel(
     citationSources: {
       heading: "AI 답변에서 실제 인용된 출처",
       rows: citationSources,
+    },
+    targetReferenceSources: {
+      heading: "내 업체 연결 단서",
+      rows: targetReferenceSources,
     },
     sources: {
       heading: "업체 연결까지 확인된 출처",
