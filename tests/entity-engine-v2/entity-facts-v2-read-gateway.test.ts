@@ -533,6 +533,18 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).toContain("gatewayResponse.data.citationSources");
   });
 
+  it("keeps advisory target source clues non-blocking and separate from confirmed target sources", () => {
+    expect(serverSource).toContain("Advisory target-link clues");
+    expect(serverSource).toContain('.from("measurement_citation_attributions")');
+    expect(serverSource).toContain('.eq("source_run_id", run.id)');
+    expect(serverSource).toContain('.eq("canonical_key", targetCanonicalKey)');
+    expect(serverSource).toContain('.eq("attribution_level", "section")');
+    expect(serverSource).toContain("distance > 250");
+    expect(serverSource).toContain("confirmedTargetDomains.has(domain)");
+    expect(serverSource).toContain("targetReferenceError");
+    expect(serverSource).toContain("gatewayResponse.data.targetReferenceSources");
+  });
+
   it("keeps supplemental question location metadata non-blocking", () => {
     expect(serverSource).toContain("Supplemental question-location metadata");
     expect(serverSource).toContain('.from("questions")');
