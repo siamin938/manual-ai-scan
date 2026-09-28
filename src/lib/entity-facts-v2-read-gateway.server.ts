@@ -25,8 +25,42 @@ import {
   type EntityFactsV2ReadBusinessDTO,
   type EntityFactsV2ReadCitationSourceDTO,
   type EntityFactsV2ReadCompetitorDTO,
+  type EntityFactsV2ReadTargetReferenceSourceDTO,
   type EntityFactsV2ReadGatewayResponse,
 } from "./entity-facts-v2-read-gateway.types";
+
+function jsonObject(value: Json | null): Record<string, Json> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, Json>)
+    : null;
+}
+
+function distanceCharsFromEvidence(value: Json | null): number | null {
+  const evidence = jsonObject(value);
+  const raw = evidence?.["distance_chars"];
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim()) {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function normalizeSourceDomain(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/^www\./u, "");
+}
+
+function infrastructureSourceHost(domain: string): boolean {
+  return (
+    domain === "s3.amazonaws.com" ||
+    domain.endsWith(".s3.amazonaws.com") ||
+    /\.s3[.-][^.]+\.amazonaws\.com$/u.test(domain) ||
+    domain === "storage.googleapis.com" ||
+    domain.endsWith(".blob.core.windows.net") ||
+    domain.endsWith(".r2.cloudflarestorage.com") ||
+    domain.endsWith(".digitaloceanspaces.com")
+  );
+}
 
 type EntityFactsV2AggregateStorageRow = {
   id: string;
@@ -627,6 +661,71 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       );
 
     gatewayResponse.data.citationSources = citationSources;
+  }
+
+  // Advisory target-link clues: keep close section-level target attribution visible
+  // without promoting it into confirmed targetSources. This mirrors the distance
+  // boundary used by source replay, but intentionally does NOT relax the repeated
+  // evidence rule. Failures here must never block the core dashboard.
+  const targetCanonicalKey = `business:${businessId.trim().toLowerCase()}`;
+  const confirmedTargetDomains = new Set(
+    gatewayResponse.data.targetSources.map((item) => normalizeSourceDomain(item.domain)),
+  );
+  const { data: targetReferenceRows, error: targetReferenceError } =
+    await supabaseAdmin
+      .from("measurement_citation_attributions")
+      .select("domain, citation_url, measurement_id, attribution_level, evidence, canonical_key")
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("source_run_id", run.id)
+      .eq("canonical_key", targetCanonicalKey)
+      .eq("attribution_level", "section")
+      .limit(1000);
+
+  if (!targetReferenceError) {
+    const byDomain = new Map<
+      string,
+      { measurementIds: Set<string>; sampleUrl: string }
+    >();
+
+    for (const row of targetReferenceRows ?? []) {
+      const domain = normalizeSourceDomain(row.domain);
+      const sampleUrl = typeof row.citation_url === "string" ? row.citation_url.trim() : "";
+      const distance = distanceCharsFromEvidence(row.evidence);
+      if (
+        !domain ||
+        confirmedTargetDomains.has(domain) ||
+        infrastructureSourceHost(domain) ||
+        distance === null ||
+        distance > 250 ||
+        !/^https?:\/\//iu.test(sampleUrl)
+      ) {
+        continue;
+      }
+
+      const current = byDomain.get(domain) ?? {
+        measurementIds: new Set<string>(),
+        sampleUrl,
+      };
+      current.measurementIds.add(row.measurement_id);
+      if (!current.sampleUrl) current.sampleUrl = sampleUrl;
+      byDomain.set(domain, current);
+    }
+
+    const targetReferenceSources: EntityFactsV2ReadTargetReferenceSourceDTO[] =
+      [...byDomain.entries()]
+        .map(([domain, value]) => ({
+          domain,
+          responseCount: value.measurementIds.size,
+          sampleUrl: value.sampleUrl,
+        }))
+        .sort(
+          (a, b) =>
+            b.responseCount - a.responseCount ||
+            a.domain.localeCompare(b.domain, "en"),
+        );
+
+    gatewayResponse.data.targetReferenceSources = targetReferenceSources;
   }
 
   // Supplemental question-location metadata powers Core/Custom presentation only.
