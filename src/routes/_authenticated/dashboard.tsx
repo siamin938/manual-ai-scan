@@ -1055,111 +1055,275 @@ function DashboardPage() {
                   <BaselineBadge label={detailBasisLabel} />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <p className="mb-3 text-xs leading-5 text-muted-foreground">
-                  위의 실제 인용 출처 중에서 특정 업체와의 연결까지 확인된 출처만 보여드립니다.
-                  답변 안에서 업체명과 citation이 같은 문장·줄·표 행 또는 같은 업체 섹션에 있는
-                  경우를 보수적으로 확인하며, 애매한 경우에는 확정 연결로 표시하지 않습니다.
+              <CardContent className="space-y-5 overflow-x-auto">
+                <p className="text-xs leading-5 text-muted-foreground">
+                  실제 인용 출처 중에서 업체와의 연결 근거가 확인된 경우를 나눠 보여드립니다.
+                  확정 연결 기준은 그대로 유지하고, 한 답변에서만 가까이 관찰된 내 업체 출처는
+                  별도의 ‘연결 단서’로만 표시합니다.
                 </p>
-                <div className="mb-4 flex flex-wrap gap-2 text-xs">
+
+                <div className="flex flex-wrap gap-2 text-xs">
                   <Badge variant={linkedTargetSourceCount > 0 ? "default" : "outline"}>
-                    내 업체 직접 연결 {linkedTargetSourceCount}개
+                    내 업체 확정 연결 {linkedTargetSourceCount}개
+                  </Badge>
+                  <Badge variant="secondary">
+                    내 업체 연결 단서 {targetReferenceSources.length}개
                   </Badge>
                   <Badge variant="outline">
-                    다른 업체 확정 연결 {linkedCompetitorSourceCount}개
+                    비교해볼 타업체 출처 {linkedCompetitorSourceCount}개
                   </Badge>
-                  <Badge variant="secondary">연결 단서 {linkedClueSourceCount}개</Badge>
                 </div>
+
                 {!model.sources.available ? (
                   <p className="py-6 text-center text-sm text-muted-foreground">
                     이번 측정의 출처 진단 데이터가 아직 준비되지 않았습니다.
                   </p>
-                ) : model.sources.rows.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    이번 측정의 AI 답변에서 업체와 연결된 출처가 확인되지 않았습니다.
-                  </p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>출처</TableHead>
-                        <TableHead>연결이 확인된 답변</TableHead>
-                        <TableHead>연결된 업체</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visibleLinkedSources.map((s) => (
-                        <TableRow key={s.domain}>
-                          <TableCell className="text-sm font-medium">
-                            <span className="flex flex-wrap items-center gap-2">
-                              <span>{s.domain}</span>
-                              {s.evidence === "clue" && (
-                                <Badge variant="secondary">연결 단서</Badge>
-                              )}
-                              {s.evidence === "mixed" && (
-                                <Badge variant="outline">확인 + 단서</Badge>
-                              )}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {s.evidence === "clue" ? (
-                              <span className="text-sm">
-                                AI 답변 {s.clueResponseCount}건에서 단서 확인
-                              </span>
-                            ) : (
-                              <>
-                                <span className="tabular-nums">{s.responseCount}건</span>
-                                <span className="mt-0.5 block text-xs text-muted-foreground">
-                                  내 업체 연결 {s.targetResponseCount}건 · 함께 관찰된 업체 연결{" "}
-                                  {s.competitorResponseCount}건
-                                  {s.evidence === "mixed" && s.clueResponseCount > 0
-                                    ? ` · 추가 단서 ${s.clueResponseCount}건`
-                                    : ""}
-                                </span>
-                              </>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <div className="flex flex-wrap gap-1.5">
-                              {s.linkedEntities.map((entity) => (
-                                <Badge
-                                  key={`${s.domain}:${entity.isTarget ? "target" : "other"}:${entity.name}:${entity.evidence}`}
-                                  variant={
-                                    entity.isTarget
-                                      ? "default"
-                                      : entity.evidence === "clue"
-                                        ? "secondary"
-                                        : "outline"
-                                  }
+                  <>
+                    <div className="space-y-2">
+                      <div>
+                        <h3 className="text-sm font-semibold">내 업체와 확정 연결된 출처</h3>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          반복 또는 직접 연결 기준을 통과한 출처입니다. 가장 강한 연결 증거만
+                          여기에 포함합니다.
+                        </p>
+                      </div>
+                      {linkedTargetSources.length === 0 ? (
+                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                          이번 측정에서는 내 업체와 확정 연결된 출처가 확인되지 않았습니다.
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>출처</TableHead>
+                              <TableHead>확인된 답변</TableHead>
+                              <TableHead>연결</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {linkedTargetSources.map((source) => (
+                              <TableRow key={`target:${source.domain}`}>
+                                <TableCell className="text-sm font-medium">
+                                  {siteDisplayName(source.domain)}
+                                  {siteDisplayName(source.domain) !== source.domain && (
+                                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                      {source.domain}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-sm tabular-nums">
+                                  {source.targetResponseCount}건
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <Badge variant="default">내 업체</Badge>
+                                    {source.linkedEntities
+                                      .filter((entity) => !entity.isTarget)
+                                      .map((entity) => (
+                                        <Badge
+                                          key={`${source.domain}:${entity.name}:target-row`}
+                                          variant="outline"
+                                        >
+                                          {entity.name} · {entity.responseCount}건
+                                        </Badge>
+                                      ))}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+
+                    {targetReferenceSources.length > 0 && (
+                      <div className="space-y-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setExpandedTargetReferenceBusinessId(
+                              showTargetReferenceSources ? null : businessId,
+                            )
+                          }
+                        >
+                          {showTargetReferenceSources
+                            ? "내 업체 연결 단서 접기"
+                            : `내 업체 연결 단서 ${targetReferenceSources.length}개 보기`}
+                        </Button>
+                        {showTargetReferenceSources && (
+                          <div className="rounded-lg border bg-muted/10 p-3">
+                            <p className="mb-2 text-xs leading-5 text-muted-foreground">
+                              업체명과 citation이 가까운 위치에서 관찰됐지만 반복 기준을 충족하지
+                              않아 확정 연결에는 포함하지 않은 보조 증거입니다.
+                            </p>
+                            <div className="divide-y">
+                              {targetReferenceSources.map((source) => (
+                                <div
+                                  key={`target-clue:${source.domain}`}
+                                  className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm"
                                 >
-                                  {entity.isTarget ? "내 업체" : entity.name}
-                                  {!entity.isTarget && entity.evidence === "confirmed"
-                                    ? ` · ${entity.responseCount}건`
-                                    : ""}
-                                  {entity.evidence === "clue" ? " · 연결 단서" : ""}
-                                </Badge>
+                                  <div className="min-w-0">
+                                    <span className="font-medium">
+                                      {siteDisplayName(source.domain)}
+                                    </span>
+                                    {siteDisplayName(source.domain) !== source.domain && (
+                                      <span className="ml-2 text-xs text-muted-foreground">
+                                        {source.domain}
+                                      </span>
+                                    )}
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      AI 답변 {source.responseCount}건에서 단서
+                                    </span>
+                                  </div>
+                                  <a
+                                    href={source.sampleUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs text-primary underline-offset-4 hover:underline"
+                                  >
+                                    단서 페이지 예시 보기 ↗
+                                  </a>
+                                </div>
                               ))}
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-                {linkedClueSources.length > 0 && (
-                  <div className="mt-3 flex justify-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setExpandedLinkedClueBusinessId(showLinkedClues ? null : businessId)
-                      }
-                    >
-                      {showLinkedClues
-                        ? "연결 단서 접기"
-                        : `연결 단서 ${linkedClueSources.length}개 보기`}
-                    </Button>
-                  </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="space-y-2 border-t pt-4">
+                      <div>
+                        <h3 className="text-sm font-semibold">비교해볼 타업체 출처</h3>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          홈페이지·업체 프로필·자동차 플랫폼처럼 실제 업체 비교에 활용하기 쉬운
+                          확정 연결만 기본으로 보여드립니다.
+                        </p>
+                      </div>
+                      {usefulCompetitorSources.length === 0 ? (
+                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                          이번 측정에서는 기본 화면에 보여줄 타업체 비교 출처가 없습니다.
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>출처</TableHead>
+                              <TableHead>확인된 답변</TableHead>
+                              <TableHead>연결된 업체</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {usefulCompetitorSources.map((source) => (
+                              <TableRow key={`competitor:${source.domain}`}>
+                                <TableCell className="text-sm font-medium">
+                                  {siteDisplayName(source.domain)}
+                                  {siteDisplayName(source.domain) !== source.domain && (
+                                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                      {source.domain}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-sm tabular-nums">
+                                  {source.competitorResponseCount}건
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {source.linkedEntities
+                                      .filter((entity) => !entity.isTarget)
+                                      .map((entity) => (
+                                        <Badge
+                                          key={`${source.domain}:${entity.name}:competitor-row`}
+                                          variant="outline"
+                                        >
+                                          {entity.name} · {entity.responseCount}건
+                                        </Badge>
+                                      ))}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+
+                    {otherConfirmedSources.length > 0 && (
+                      <div className="space-y-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setExpandedOtherConfirmedSourceBusinessId(
+                              showOtherConfirmedSources ? null : businessId,
+                            )
+                          }
+                        >
+                          {showOtherConfirmedSources
+                            ? "기타 확정 연결 접기"
+                            : `기타 확정 연결 ${otherConfirmedSources.length}개 보기`}
+                        </Button>
+                        {showOtherConfirmedSources && (
+                          <div className="rounded-lg border bg-muted/10 p-3">
+                            <p className="mb-2 text-xs leading-5 text-muted-foreground">
+                              채용·공공·뉴스처럼 연결 자체는 확인됐지만 업체 비교에는 상대적으로
+                              덜 유용한 출처입니다. 데이터에서는 유지하되 기본 화면에서는 강조하지
+                              않습니다.
+                            </p>
+                            <div className="divide-y">
+                              {otherConfirmedSources.map((source) => (
+                                <div key={`other:${source.domain}`} className="py-2 text-sm">
+                                  <span className="font-medium">{source.domain}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    {source.competitorResponseCount}개 답변 ·{" "}
+                                    {source.linkedEntities
+                                      .filter((entity) => !entity.isTarget)
+                                      .map((entity) => entity.name)
+                                      .join(", ")}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {linkedClueSources.length > 0 && (
+                      <div className="space-y-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setExpandedLinkedClueBusinessId(showLinkedClues ? null : businessId)
+                          }
+                        >
+                          {showLinkedClues
+                            ? "타업체 연결 단서 접기"
+                            : `타업체 연결 단서 ${linkedClueSources.length}개 보기`}
+                        </Button>
+                        {showLinkedClues && (
+                          <div className="rounded-lg border bg-muted/10 p-3">
+                            <p className="mb-2 text-xs leading-5 text-muted-foreground">
+                              확정 연결 기준을 통과하지 않은 타업체 보조 단서입니다.
+                            </p>
+                            <div className="divide-y">
+                              {linkedClueSources.map((source) => (
+                                <div key={`competitor-clue:${source.domain}`} className="py-2 text-sm">
+                                  <span className="font-medium">{source.domain}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    AI 답변 {source.clueResponseCount}건 ·{" "}
+                                    {source.linkedEntities.map((entity) => entity.name).join(", ")}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
