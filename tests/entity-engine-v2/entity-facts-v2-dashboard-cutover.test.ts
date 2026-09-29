@@ -460,6 +460,11 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("active-unified-diagnostic-set");
     expect(dashboardSource).toContain("UNIFIED_DIAGNOSTIC_SET_PREFIX");
     expect(dashboardSource).toContain("hasUnifiedDiagnosticSet");
+    expect(dashboardSource).toContain("questionsReady={unifiedTransitionPending}");
+    expect(dashboardSource).toContain("통합 AI 진단 질문 24개가 준비되었습니다.");
+    expect(dashboardSource).toContain("질문 확인·수정");
+    expect(dashboardSource).toContain("첫 통합 진단 측정하기");
+    expect(dashboardSource).toContain("저장된 통합 24문항으로 첫 측정을 진행해 주세요.");
     expect(dashboardSource).toContain("UNIFIED_V2_RETRY_DELAYS_MS");
     expect(dashboardSource).toContain("isTransientV2ReadError");
     expect(dashboardSource).toContain('"NO_V2_DATA"');
