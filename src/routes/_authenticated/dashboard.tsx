@@ -411,6 +411,10 @@ function DashboardPage() {
     expandedTargetExposureCitationBusinessId,
     setExpandedTargetExposureCitationBusinessId,
   ] = useState<string | null>(null);
+  const [
+    expandedAllTargetExposureCitationBusinessId,
+    setExpandedAllTargetExposureCitationBusinessId,
+  ] = useState<string | null>(null);
   const [expandedOtherConfirmedSourceBusinessId, setExpandedOtherConfirmedSourceBusinessId] =
     useState<string | null>(null);
   const showAllCompetitors = expandedCompetitorBusinessId === businessId;
@@ -418,8 +422,10 @@ function DashboardPage() {
   const showAllCitationSources = expandedCitationSourceBusinessId === businessId;
   const showLinkedClues = expandedLinkedClueBusinessId === businessId;
   const showTargetReferenceSources = expandedTargetReferenceBusinessId === businessId;
-  const showAllTargetExposureCitationSources =
+  const showTargetExposureCitationSources =
     expandedTargetExposureCitationBusinessId === businessId;
+  const showAllTargetExposureCitationSources =
+    expandedAllTargetExposureCitationBusinessId === businessId;
   const showOtherConfirmedSources = expandedOtherConfirmedSourceBusinessId === businessId;
 
   const unifiedSetQuery = useQuery({
@@ -1214,93 +1220,122 @@ function DashboardPage() {
                     )}
 
                     <div className="space-y-2 border-t pt-4">
-                      <div>
-                        <h3 className="text-sm font-semibold">
-                          {model.targetExposureCitationSources.heading}
-                        </h3>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          확정 노출 {model.metricCards.visibility.confirmedCount}개 답변에서 실제
-                          citation으로 함께 등장한 출처입니다. 이 출처가 내 업체를 직접 설명하거나
-                          노출 원인이라는 뜻은 아닙니다.
-                        </p>
-                      </div>
-                      {!model.targetExposureCitationSources.available ? (
-                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
-                          내 업체 노출 답변의 인용 출처 집계를 불러오지 못했습니다. 확정 연결
-                          판정에는 영향이 없습니다.
-                        </p>
-                      ) : targetExposureCitationSources.length === 0 ? (
-                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
-                          확정 노출된 답변에서는 실제 citation이 확인되지 않았습니다.
-                        </p>
-                      ) : (
-                        <>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>출처</TableHead>
-                                <TableHead>노출 답변에서 인용</TableHead>
-                                <TableHead>전체 인용 횟수</TableHead>
-                                <TableHead className="text-right">예시</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {targetExposureCitationSources
-                                .slice(
-                                  0,
-                                  showAllTargetExposureCitationSources
-                                    ? targetExposureCitationSources.length
-                                    : 8,
-                                )
-                                .map((source) => (
-                                  <TableRow key={`target-exposure:${source.domain}`}>
-                                    <TableCell className="text-sm font-medium">
-                                      {siteDisplayName(source.domain)}
-                                      {siteDisplayName(source.domain) !== source.domain && (
-                                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                                          {source.domain}
-                                        </span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-sm tabular-nums">
-                                      확정 노출 {model.metricCards.visibility.confirmedCount}건 중{" "}
-                                      {source.responseCount}건
-                                    </TableCell>
-                                    <TableCell className="text-sm tabular-nums">
-                                      {source.citationCount}회
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      <a
-                                        href={source.sampleUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-sm text-primary underline-offset-4 hover:underline"
-                                      >
-                                        인용 페이지 예시 보기 ↗
-                                      </a>
-                                    </TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const nextOpen = !showTargetExposureCitationSources;
+                          setExpandedTargetExposureCitationBusinessId(
+                            nextOpen ? businessId : null,
+                          );
+                          if (!nextOpen) {
+                            setExpandedAllTargetExposureCitationBusinessId(null);
+                          }
+                        }}
+                      >
+                        {showTargetExposureCitationSources
+                          ? `${model.businessName} 노출 답변 출처 접기`
+                          : `${model.businessName} 노출 답변 출처 ${targetExposureCitationSourceCount}개 보기`}
+                      </Button>
+
+                      {showTargetExposureCitationSources && (
+                        <div className="rounded-lg border bg-muted/10 p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-semibold">
+                              {model.businessName} 노출 답변에서 함께 인용된 출처
+                            </h3>
+                            <Badge variant="outline">
+                              {model.businessName} · 노출 답변 기준
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                            확정 노출 {model.metricCards.visibility.confirmedCount}건에 실제
+                            citation으로 함께 등장한 출처입니다. 내 업체와 직접 연결된 출처이거나
+                            노출 원인이라는 뜻은 아닙니다.
+                          </p>
+
+                          {!model.targetExposureCitationSources.available ? (
+                            <p className="mt-3 rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                              내 업체 노출 답변의 인용 출처 집계를 불러오지 못했습니다. 확정 연결
+                              판정에는 영향이 없습니다.
+                            </p>
+                          ) : targetExposureCitationSources.length === 0 ? (
+                            <p className="mt-3 rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                              확정 노출된 답변에서는 실제 citation이 확인되지 않았습니다.
+                            </p>
+                          ) : (
+                            <>
+                              <Table className="mt-3">
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>출처</TableHead>
+                                    <TableHead>{model.businessName} 노출 답변</TableHead>
+                                    <TableHead>인용 횟수</TableHead>
+                                    <TableHead className="text-right">예시</TableHead>
                                   </TableRow>
-                                ))}
-                            </TableBody>
-                          </Table>
-                          {targetExposureCitationSources.length > 8 && (
-                            <div className="flex justify-center pt-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  setExpandedTargetExposureCitationBusinessId(
-                                    showAllTargetExposureCitationSources ? null : businessId,
-                                  )
-                                }
-                              >
-                                {showAllTargetExposureCitationSources
-                                  ? "접기"
-                                  : `전체 ${targetExposureCitationSources.length}개 출처 보기`}
-                              </Button>
-                            </div>
+                                </TableHeader>
+                                <TableBody>
+                                  {targetExposureCitationSources
+                                    .slice(
+                                      0,
+                                      showAllTargetExposureCitationSources
+                                        ? targetExposureCitationSources.length
+                                        : 5,
+                                    )
+                                    .map((source) => (
+                                      <TableRow key={`target-exposure:${source.domain}`}>
+                                        <TableCell className="text-sm font-medium">
+                                          {siteDisplayName(source.domain)}
+                                          {siteDisplayName(source.domain) !== source.domain && (
+                                            <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                              {source.domain}
+                                            </span>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="text-sm tabular-nums">
+                                          {source.responseCount}/
+                                          {model.metricCards.visibility.confirmedCount}건
+                                        </TableCell>
+                                        <TableCell className="text-sm tabular-nums">
+                                          {source.citationCount}회
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                          <a
+                                            href={source.sampleUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-sm text-primary underline-offset-4 hover:underline"
+                                          >
+                                            인용 페이지 예시 보기 ↗
+                                          </a>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                </TableBody>
+                              </Table>
+
+                              {targetExposureCitationSources.length > 5 && (
+                                <div className="flex justify-center pt-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      setExpandedAllTargetExposureCitationBusinessId(
+                                        showAllTargetExposureCitationSources
+                                          ? null
+                                          : businessId,
+                                      )
+                                    }
+                                  >
+                                    {showAllTargetExposureCitationSources
+                                      ? "상위 5개만 보기"
+                                      : `나머지 ${targetExposureCitationSources.length - 5}개 더 보기`}
+                                  </Button>
+                                </div>
+                              )}
+                            </>
                           )}
-                        </>
+                        </div>
                       )}
                     </div>
 
