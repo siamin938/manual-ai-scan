@@ -16,11 +16,13 @@ const questionsSource = readFileSync(
 );
 
 describe("beta customer onboarding contract", () => {
-  it("keeps the beta auth screen login-only", () => {
-    expect(authSource).toContain("현재 신규 가입은 열려 있지 않습니다.");
-    expect(authSource).not.toContain("supabase.auth.signUp(");
-    expect(authSource).not.toContain('TabsTrigger value="signup"');
-    expect(authSource).not.toContain("onSubmit={signUp}");
+  it("allows beta self-signup only through the explicit auth surface", () => {
+    expect(authSource).toContain("const SELF_SIGNUP_ENABLED = true;");
+    expect(authSource).toContain("supabase.auth.signUp({");
+    expect(authSource).toContain('TabsTrigger value="signup"');
+    expect(authSource).toContain("onSubmit={signUp}");
+    expect(authSource).toContain("가입 후 이메일 인증이 완료되어야 로그인할 수 있습니다.");
+    expect(authSource).toContain("회원가입이 완료되었습니다. 이메일 인증 후 로그인해 주세요.");
   });
 
   it("creates organizations through the JWT-protected Edge path instead of a browser RPC", () => {
