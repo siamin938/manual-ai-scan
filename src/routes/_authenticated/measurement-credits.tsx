@@ -83,13 +83,14 @@ function MeasurementCreditsPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 280);
+    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
   const overviewQuery = useQuery({
     queryKey: ["measurement-credit-admin-overview", searchQuery],
     queryFn: () => fetchOverview({ data: { query: searchQuery } }),
+    placeholderData: (previousData) => previousData,
     retry: false,
   });
 
@@ -133,7 +134,7 @@ function MeasurementCreditsPage() {
     },
   });
 
-  if (overviewQuery.isLoading) {
+  if (overviewQuery.isPending && !overviewQuery.data) {
     return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
   }
 
@@ -177,11 +178,20 @@ function MeasurementCreditsPage() {
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="조직명·가입자 이름·이메일 검색"
             />
-            <p className="text-xs text-muted-foreground">
-              {searchQuery
-                ? `검색 결과 ${overview.overview.totalMatches}건`
-                : `총 ${overview.overview.totalMatches}개 조직`}
-            </p>
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <p>
+                {overviewQuery.isFetching && searchQuery
+                  ? "검색 중…"
+                  : searchQuery
+                    ? `검색 결과 ${overview.overview.totalMatches}건`
+                    : `총 ${overview.overview.totalMatches}개 조직`}
+              </p>
+              {overviewQuery.isFetching && (
+                <span className="shrink-0" aria-live="polite">
+                  결과 갱신 중
+                </span>
+              )}
+            </div>
             {orgs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {searchQuery ? "검색 결과가 없습니다." : "표시할 조직이 없습니다."}
