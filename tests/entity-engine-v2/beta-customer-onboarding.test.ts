@@ -18,6 +18,13 @@ const authedRouteSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
   "utf8",
 );
+const organizationPrivilegeMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260929094249_lock_customer_organization_system_columns_v01.sql",
+  ),
+  "utf8",
+);
 
 describe("beta customer onboarding contract", () => {
   it("allows beta self-signup only through the explicit auth surface", () => {
@@ -38,6 +45,30 @@ describe("beta customer onboarding contract", () => {
     expect(authedRouteSource).not.toContain(
       'queryKey: ["can-view-data-asset-admin"],',
     );
+  });
+
+  it("keeps customer organization system columns non-writable from authenticated clients", () => {
+    expect(organizationPrivilegeMigration).toContain(
+      "revoke insert, update, truncate, trigger, references",
+    );
+    expect(organizationPrivilegeMigration).toContain(
+      "on table public.organizations",
+    );
+    expect(organizationPrivilegeMigration).toContain("from authenticated");
+    expect(organizationPrivilegeMigration).toContain(
+      "grant update (name, timezone)",
+    );
+    for (const systemColumn of [
+      "measurement_data_origin",
+      "daily_request_limit",
+      "monthly_budget_usd",
+      "plan",
+      "slug",
+    ]) {
+      expect(organizationPrivilegeMigration).not.toContain(
+        `grant update (${systemColumn}`,
+      );
+    }
   });
 
   it("creates organizations through the JWT-protected Edge path instead of a browser RPC", () => {
