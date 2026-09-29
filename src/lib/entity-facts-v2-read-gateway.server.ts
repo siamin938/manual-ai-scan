@@ -19,6 +19,7 @@ import {
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
   ENTITY_FACTS_V2_READ_FACT_VERSION,
   ENTITY_FACTS_V2_READ_GATEWAY_VERSION,
+  ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION,
   parseEntityFactsV2AggregateForReadGateway,
   pickEntityFactsV2AutoCompetitorDisplayName,
   type EntityFactsV2CompetitorDisplayEvidence,
@@ -27,6 +28,7 @@ import {
   type EntityFactsV2ReadCompetitorDTO,
   type EntityFactsV2ReadTargetReferenceSourceDTO,
   type EntityFactsV2ReadTargetExposureCitationSourceDTO,
+  type EntityFactsV2ReadVerifiedTargetCitationPageDTO,
   type EntityFactsV2ReadGatewayResponse,
 } from "./entity-facts-v2-read-gateway.types";
 
@@ -61,6 +63,36 @@ function infrastructureSourceHost(domain: string): boolean {
     domain.endsWith(".r2.cloudflarestorage.com") ||
     domain.endsWith(".digitaloceanspaces.com")
   );
+}
+
+function verifiedTargetPageBasisLabel(value: Json | null): string {
+  const evidence = jsonObject(value);
+  const reasons = Array.isArray(evidence?.["reasons"])
+    ? evidence["reasons"].filter((item): item is string => typeof item === "string")
+    : [];
+
+  if (reasons.includes("official_source")) return "공식 출처";
+  if (
+    reasons.includes("exact_branch_identity_title") ||
+    reasons.includes("exact_branch_identity_body") ||
+    reasons.includes("safe_branch_identity_title") ||
+    reasons.includes("safe_branch_identity_body") ||
+    reasons.includes("brand_and_branch_on_page")
+  ) {
+    return reasons.includes("location_corroborated")
+      ? "업체명·지점·지역 확인"
+      : "업체명·지점 확인";
+  }
+  if (reasons.includes("location_corroborated")) return "업체명·지역 확인";
+  return "업체명 확인";
+}
+
+function verifiedTargetPageBasisRank(value: string): number {
+  if (value === "공식 출처") return 0;
+  if (value === "업체명·지점·지역 확인") return 1;
+  if (value === "업체명·지점 확인") return 2;
+  if (value === "업체명·지역 확인") return 3;
+  return 4;
 }
 
 type EntityFactsV2AggregateStorageRow = {
@@ -737,6 +769,125 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
       gatewayResponse.data.targetExposureCitationSources =
         targetExposureCitationSources;
+    }
+  }
+
+  // Page-level relevance verification for citations from currently confirmed
+  // target-visible measurements. This is independent from answer-position
+  // citation attribution and never changes visibility, Top3, targetSeen or
+  // targetSources. Failure is non-blocking.
+  const verifiedTargetMeasurementIds =
+    !targetExposureFactError &&
+    (targetExposureFactRows ?? []).length === storage.measurement_count
+      ? new Set(
+          (targetExposureFactRows ?? [])
+            .filter((row) => jsonObject(row.facts)?.["targetSeen"] === true)
+            .map((row) => row.measurement_id),
+        )
+      : null;
+
+  if (
+    verifiedTargetMeasurementIds &&
+    verifiedTargetMeasurementIds.size ===
+      gatewayResponse.data.overview.confirmedMentionCount
+  ) {
+    const { data: verifiedPageRows, error: verifiedPageError } =
+      await supabaseAdmin
+        .from("citation_page_entity_verifications")
+        .select(
+          "measurement_id,canonical_url,domain,citation_title,page_title,confidence,evidence",
+        )
+        .eq("org_id", orgId)
+        .eq("business_id", businessId)
+        .eq("source_run_id", run.id)
+        .eq(
+          "verifier_version",
+          ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION,
+        )
+        .eq("verification_status", "confirmed")
+        .limit(1000);
+
+    if (!verifiedPageError) {
+      const byUrl = new Map<
+        string,
+        {
+          domain: string;
+          title: string | null;
+          sampleUrl: string;
+          measurementIds: Set<string>;
+          citationCount: number;
+          confidence: "high" | "medium";
+          basisLabel: string;
+        }
+      >();
+
+      for (const row of verifiedPageRows ?? []) {
+        if (!verifiedTargetMeasurementIds.has(row.measurement_id)) continue;
+
+        const sampleUrl =
+          typeof row.canonical_url === "string"
+            ? row.canonical_url.trim()
+            : "";
+        const domain = normalizeSourceDomain(row.domain);
+        if (!domain || !/^https?:\/\//iu.test(sampleUrl)) continue;
+
+        const title =
+          typeof row.page_title === "string" && row.page_title.trim()
+            ? row.page_title.trim()
+            : typeof row.citation_title === "string" &&
+                row.citation_title.trim()
+              ? row.citation_title.trim()
+              : null;
+        const confidence =
+          row.confidence === "high" ? "high" : "medium";
+        const basisLabel = verifiedTargetPageBasisLabel(row.evidence);
+        const current = byUrl.get(sampleUrl) ?? {
+          domain,
+          title,
+          sampleUrl,
+          measurementIds: new Set<string>(),
+          citationCount: 0,
+          confidence,
+          basisLabel,
+        };
+
+        current.measurementIds.add(row.measurement_id);
+        current.citationCount += 1;
+        if (!current.title && title) current.title = title;
+        if (confidence === "high") current.confidence = "high";
+        if (
+          verifiedTargetPageBasisRank(basisLabel) <
+          verifiedTargetPageBasisRank(current.basisLabel)
+        ) {
+          current.basisLabel = basisLabel;
+        }
+        byUrl.set(sampleUrl, current);
+      }
+
+      const verifiedTargetCitationPages:
+        EntityFactsV2ReadVerifiedTargetCitationPageDTO[] =
+        [...byUrl.values()]
+          .map((value) => ({
+            domain: value.domain,
+            title: value.title,
+            responseCount: value.measurementIds.size,
+            citationCount: value.citationCount,
+            sampleUrl: value.sampleUrl,
+            confidence: value.confidence,
+            basisLabel: value.basisLabel,
+          }))
+          .sort(
+            (a, b) =>
+              Number(b.confidence === "high") -
+                Number(a.confidence === "high") ||
+              b.responseCount - a.responseCount ||
+              b.citationCount - a.citationCount ||
+              a.domain.localeCompare(b.domain, "en") ||
+              (a.title ?? "").localeCompare(b.title ?? "", "ko"),
+          );
+
+      gatewayResponse.data.verifiedTargetCitationPages =
+        verifiedTargetCitationPages;
     }
   }
 

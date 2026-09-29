@@ -7,6 +7,7 @@ import {
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
   ENTITY_FACTS_V2_READ_FACT_VERSION,
   ENTITY_FACTS_V2_READ_GATEWAY_VERSION,
+  ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION,
   parseEntityFactsV2AggregateForReadGateway,
   pickEntityFactsV2AutoCompetitorDisplayName,
 } from "../../src/lib/entity-facts-v2-read-gateway.types";
@@ -110,6 +111,7 @@ function validAggregate() {
 describe("Entity Facts v2 Read Gateway", () => {
   it("pins the reviewed versions", () => {
     expect(ENTITY_FACTS_V2_READ_GATEWAY_VERSION).toBe("0.1");
+    expect(ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION).toBe("0.1.0");
     expect(ENTITY_FACTS_V2_READ_FACT_VERSION).toBe("0.3");
     expect(ENTITY_FACTS_V2_READ_AGGREGATE_VERSION).toBe("0.1");
     expect(ENTITY_FACTS_V2_READ_ENGINE_VERSION).toBe(
@@ -551,6 +553,29 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).toContain(
       "never be presented as a cause of visibility or a direct business-source link",
     );
+  });
+
+  it("keeps page-level target relevance verification non-blocking and separate from answer attribution", () => {
+    expect(serverSource).toContain(
+      "Page-level relevance verification for citations from currently confirmed",
+    );
+    expect(serverSource).toContain(
+      '.from("citation_page_entity_verifications")',
+    );
+    expect(serverSource).toContain(
+      '.eq("verification_status", "confirmed")',
+    );
+    expect(serverSource).toContain(
+      "ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION",
+    );
+    expect(serverSource).toContain(
+      "verifiedTargetMeasurementIds.has(row.measurement_id)",
+    );
+    expect(serverSource).toContain(
+      "gatewayResponse.data.verifiedTargetCitationPages",
+    );
+    expect(serverSource).toContain("verifiedPageError");
+    expect(serverSource).toContain("verifiedTargetPageBasisLabel");
   });
 
   it("keeps advisory target source clues non-blocking and separate from confirmed target sources", () => {

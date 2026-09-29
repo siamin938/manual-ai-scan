@@ -3,6 +3,7 @@ export const ENTITY_FACTS_V2_READ_FACT_VERSION = "0.3" as const;
 export const ENTITY_FACTS_V2_READ_AGGREGATE_VERSION = "0.1" as const;
 export const ENTITY_FACTS_V2_READ_ENGINE_VERSION =
   "entity-facts-v2:mef0.3:hist0.1:te0.3:src0.1:agg0.1:mat0.1" as const;
+export const ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION = "0.1.0" as const;
 
 export type EntityFactsV2ReadError =
   | "FORBIDDEN"
@@ -97,6 +98,16 @@ export type EntityFactsV2ReadTargetExposureCitationSourceDTO = {
   sampleUrl: string;
 };
 
+export type EntityFactsV2ReadVerifiedTargetCitationPageDTO = {
+  domain: string;
+  title: string | null;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+  confidence: "high" | "medium";
+  basisLabel: string;
+};
+
 export type EntityFactsV2ReadObservedSourcesStatus =
   | "available"
   | "not_materialized";
@@ -152,6 +163,11 @@ export type EntityFactsV2ReadGatewayDTO = {
    * confirmed targetSeen=true. This is co-observation only, not target attribution.
    */
   targetExposureCitationSources?: EntityFactsV2ReadTargetExposureCitationSourceDTO[];
+  /**
+   * Cited pages whose own page-level content was independently confirmed to
+   * concern the current target business. Advisory only; never changes v2 truth.
+   */
+  verifiedTargetCitationPages?: EntityFactsV2ReadVerifiedTargetCitationPageDTO[];
   observedSourcesStatus: EntityFactsV2ReadObservedSourcesStatus;
   observedSources: EntityFactsV2ReadObservedSourceDTO[];
 };

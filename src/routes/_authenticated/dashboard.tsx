@@ -415,6 +415,10 @@ function DashboardPage() {
     expandedAllTargetExposureCitationBusinessId,
     setExpandedAllTargetExposureCitationBusinessId,
   ] = useState<string | null>(null);
+  const [
+    expandedVerifiedTargetCitationBusinessId,
+    setExpandedVerifiedTargetCitationBusinessId,
+  ] = useState<string | null>(null);
   const [expandedOtherConfirmedSourceBusinessId, setExpandedOtherConfirmedSourceBusinessId] =
     useState<string | null>(null);
   const showAllCompetitors = expandedCompetitorBusinessId === businessId;
@@ -426,6 +430,8 @@ function DashboardPage() {
     expandedTargetExposureCitationBusinessId === businessId;
   const showAllTargetExposureCitationSources =
     expandedAllTargetExposureCitationBusinessId === businessId;
+  const showAllVerifiedTargetCitationPages =
+    expandedVerifiedTargetCitationBusinessId === businessId;
   const showOtherConfirmedSources = expandedOtherConfirmedSourceBusinessId === businessId;
 
   const unifiedSetQuery = useQuery({
@@ -631,10 +637,13 @@ function DashboardPage() {
   const targetReferenceSources = model?.targetReferenceSources.rows ?? [];
   const targetExposureCitationSources =
     model?.targetExposureCitationSources.rows ?? [];
+  const verifiedTargetCitationPages =
+    model?.verifiedTargetCitationPages.rows ?? [];
   const linkedTargetSourceCount = linkedTargetSources.length;
   const linkedCompetitorSourceCount = usefulCompetitorSources.length;
   const linkedClueSourceCount = linkedClueSources.length;
   const targetExposureCitationSourceCount = targetExposureCitationSources.length;
+  const verifiedTargetCitationPageCount = verifiedTargetCitationPages.length;
   const weakQuestionRows =
     model && isUnifiedDiagnostic
       ? model.weakQuestions.rows
@@ -1084,6 +1093,11 @@ function DashboardPage() {
                 </p>
 
                 <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge
+                    variant={verifiedTargetCitationPageCount > 0 ? "default" : "outline"}
+                  >
+                    내 업체 관련 확인 {verifiedTargetCitationPageCount}개
+                  </Badge>
                   <Badge variant={linkedTargetSourceCount > 0 ? "default" : "outline"}>
                     내 업체 확정 연결 {linkedTargetSourceCount}개
                   </Badge>
@@ -1107,6 +1121,110 @@ function DashboardPage() {
                 ) : (
                   <>
                     <div className="space-y-2">
+                      <div>
+                        <h3 className="text-sm font-semibold">
+                          {model.verifiedTargetCitationPages.heading}
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          AI가 실제 인용한 페이지 자체에서 내 업체의 업체명·지점·지역 또는
+                          검증된 공식 출처 근거를 확인한 페이지입니다. 답변에서 가까이 배치됐다는
+                          이유만으로는 포함하지 않습니다.
+                        </p>
+                      </div>
+                      {!model.verifiedTargetCitationPages.available ? (
+                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                          인용 페이지의 내 업체 관련성을 확인 중입니다. 기존 노출률과 출처 판정에는
+                          영향이 없습니다.
+                        </p>
+                      ) : verifiedTargetCitationPages.length === 0 ? (
+                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                          이번 측정에서는 페이지 자체에서 내 업체 관련성을 확정한 인용 출처가
+                          확인되지 않았습니다.
+                        </p>
+                      ) : (
+                        <>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>출처</TableHead>
+                                <TableHead>확인된 페이지</TableHead>
+                                <TableHead>확인 근거</TableHead>
+                                <TableHead>노출 답변</TableHead>
+                                <TableHead className="text-right">페이지</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {verifiedTargetCitationPages
+                                .slice(
+                                  0,
+                                  showAllVerifiedTargetCitationPages
+                                    ? verifiedTargetCitationPages.length
+                                    : 6,
+                                )
+                                .map((source) => (
+                                  <TableRow key={`verified-target-page:${source.sampleUrl}`}>
+                                    <TableCell className="text-sm font-medium">
+                                      {siteDisplayName(source.domain)}
+                                      {siteDisplayName(source.domain) !== source.domain && (
+                                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                          {source.domain}
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="max-w-[280px] text-sm">
+                                      <span className="line-clamp-2">
+                                        {source.title ?? "페이지 제목 미확인"}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                      <Badge
+                                        variant={source.confidence === "high" ? "default" : "secondary"}
+                                      >
+                                        {source.basisLabel}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm tabular-nums">
+                                      {source.responseCount}/
+                                      {model.metricCards.visibility.confirmedCount}건
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <a
+                                        href={source.sampleUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sm text-primary underline-offset-4 hover:underline"
+                                      >
+                                        관련 페이지 보기 ↗
+                                      </a>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
+                          {verifiedTargetCitationPages.length > 6 && (
+                            <div className="flex justify-center pt-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setExpandedVerifiedTargetCitationBusinessId(
+                                    showAllVerifiedTargetCitationPages
+                                      ? null
+                                      : businessId,
+                                  )
+                                }
+                              >
+                                {showAllVerifiedTargetCitationPages
+                                  ? "접기"
+                                  : `전체 ${verifiedTargetCitationPages.length}개 관련 출처 보기`}
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 border-t pt-4">
                       <div>
                         <h3 className="text-sm font-semibold">내 업체와 확정 연결된 출처</h3>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">

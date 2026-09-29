@@ -186,6 +186,26 @@ function fixture(): EntityFactsV2ReadGatewayDTO {
         sampleUrl: "https://blog.naver.com/target-exposure",
       },
     ],
+    verifiedTargetCitationPages: [
+      {
+        domain: "blog.naver.com",
+        title: "카스페이스 구로점 신차패키지 시공 후기",
+        responseCount: 1,
+        citationCount: 1,
+        sampleUrl: "https://blog.naver.com/carspace-guro",
+        confidence: "high",
+        basisLabel: "업체명·지점 확인",
+      },
+      {
+        domain: "example.com",
+        title: "카스페이스 구로점 공식 안내",
+        responseCount: 1,
+        citationCount: 1,
+        sampleUrl: "https://example.com/guro",
+        confidence: "high",
+        basisLabel: "공식 출처",
+      },
+    ],
     observedSourcesStatus: "available",
     observedSources: [
       {
@@ -341,6 +361,30 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
         sampleUrl: "https://blog.naver.com/target-exposure",
       },
     ]);
+    expect(model.verifiedTargetCitationPages.heading).toBe(
+      "내 업체 관련성이 확인된 출처",
+    );
+    expect(model.verifiedTargetCitationPages.available).toBe(true);
+    expect(model.verifiedTargetCitationPages.rows).toEqual([
+      {
+        domain: "blog.naver.com",
+        title: "카스페이스 구로점 신차패키지 시공 후기",
+        responseCount: 1,
+        citationCount: 1,
+        sampleUrl: "https://blog.naver.com/carspace-guro",
+        confidence: "high",
+        basisLabel: "업체명·지점 확인",
+      },
+      {
+        domain: "example.com",
+        title: "카스페이스 구로점 공식 안내",
+        responseCount: 1,
+        citationCount: 1,
+        sampleUrl: "https://example.com/guro",
+        confidence: "high",
+        basisLabel: "공식 출처",
+      },
+    ]);
     expect(model.sources.heading).toBe("업체 연결까지 확인된 출처");
     expect(model.sources.available).toBe(true);
     expect(model.sources.referenceSourcesAvailable).toBe(false);
@@ -460,6 +504,11 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("내 업체 확정 연결");
     expect(dashboardSource).toContain("내 업체 근접 연결 단서");
     expect(dashboardSource).toContain("내 업체 노출 답변 출처");
+    expect(dashboardSource).toContain("내 업체 관련 확인");
+    expect(dashboardSource).toContain("model.verifiedTargetCitationPages.heading");
+    expect(dashboardSource).toContain("답변에서 가까이 배치됐다는");
+    expect(dashboardSource).toContain("관련 페이지 보기 ↗");
+    expect(dashboardSource).toContain("showAllVerifiedTargetCitationPages");
     expect(dashboardSource).toContain("내 업체 노출 답변에서 함께 인용된 출처");
     expect(dashboardSource).toContain("비교해볼 타업체 출처");
     expect(dashboardSource).toContain("기타 확정 연결");
