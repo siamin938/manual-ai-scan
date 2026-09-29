@@ -98,6 +98,8 @@ describe("Recovered live Edge source contract", () => {
 
   it("preserves reparse as a bounded stored-answer path with no provider call", () => {
     expect(reparseIndex).toContain("const MAX_MEASUREMENTS = 50;");
+    expect(reparseIndex).toContain('"entity-facts-v2-materialize-run"');
+    expect(reparseIndex).toContain("{runId,refresh:true}");
     expect(reparseIndex).toMatch(/const\s+dryRun\s*=\s*payload\.dry_run\s*!==\s*false\s*;/u);
     expect(reparseIndex).toMatch(/api_provider_called\s*:\s*false/u);
     expect(reparseIndex).not.toMatch(/\bcallProvider\b/u);
