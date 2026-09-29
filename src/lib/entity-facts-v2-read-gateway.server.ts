@@ -26,6 +26,7 @@ import {
   type EntityFactsV2ReadCitationSourceDTO,
   type EntityFactsV2ReadCompetitorDTO,
   type EntityFactsV2ReadTargetReferenceSourceDTO,
+  type EntityFactsV2ReadTargetExposureCitationSourceDTO,
   type EntityFactsV2ReadGatewayResponse,
 } from "./entity-facts-v2-read-gateway.types";
 
@@ -661,6 +662,82 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       );
 
     gatewayResponse.data.citationSources = citationSources;
+  }
+
+  // Supplemental citation co-observation for v2-confirmed target exposure measurements.
+  // This answers "which final-answer citations appeared in answers where my business
+  // was confirmed visible?" It never promotes a source into targetSources and must
+  // never be presented as a cause of visibility or a direct business-source link.
+  // Failures here are non-blocking and do not change the core v2 diagnosis.
+  const { data: targetExposureFactRows, error: targetExposureFactError } =
+    await supabaseAdmin
+      .from("measurement_entity_facts_v2")
+      .select("measurement_id, facts")
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("source_run_id", run.id)
+      .eq("materialization_id", storage.materialization_id)
+      .eq("fact_version", ENTITY_FACTS_V2_READ_FACT_VERSION)
+      .eq("engine_version", ENTITY_FACTS_V2_READ_ENGINE_VERSION)
+      .limit(Math.max(storage.measurement_count, 1));
+
+  if (!targetExposureFactError && !citationError) {
+    const targetMeasurementIds = new Set(
+      (targetExposureFactRows ?? [])
+        .filter((row) => jsonObject(row.facts)?.["targetSeen"] === true)
+        .map((row) => row.measurement_id),
+    );
+
+    if (
+      (targetExposureFactRows ?? []).length === storage.measurement_count &&
+      targetMeasurementIds.size ===
+        gatewayResponse.data.overview.confirmedMentionCount
+    ) {
+      const byDomain = new Map<
+        string,
+        {
+          measurementIds: Set<string>;
+          citationCount: number;
+          sampleUrl: string;
+        }
+      >();
+
+      for (const row of citationRows ?? []) {
+        if (!targetMeasurementIds.has(row.measurement_id)) continue;
+        const domain = normalizeSourceDomain(row.domain);
+        const sampleUrl = typeof row.url === "string" ? row.url.trim() : "";
+        if (!domain || !/^https?:\/\//iu.test(sampleUrl)) continue;
+
+        const current = byDomain.get(domain) ?? {
+          measurementIds: new Set<string>(),
+          citationCount: 0,
+          sampleUrl,
+        };
+        current.measurementIds.add(row.measurement_id);
+        current.citationCount += 1;
+        if (!current.sampleUrl) current.sampleUrl = sampleUrl;
+        byDomain.set(domain, current);
+      }
+
+      const targetExposureCitationSources:
+        EntityFactsV2ReadTargetExposureCitationSourceDTO[] =
+        [...byDomain.entries()]
+          .map(([domain, value]) => ({
+            domain,
+            responseCount: value.measurementIds.size,
+            citationCount: value.citationCount,
+            sampleUrl: value.sampleUrl,
+          }))
+          .sort(
+            (a, b) =>
+              b.responseCount - a.responseCount ||
+              b.citationCount - a.citationCount ||
+              a.domain.localeCompare(b.domain, "en"),
+          );
+
+      gatewayResponse.data.targetExposureCitationSources =
+        targetExposureCitationSources;
+    }
   }
 
   // Advisory target-link clues: keep close section-level target attribution visible

@@ -90,6 +90,13 @@ export type EntityFactsV2ReadTargetReferenceSourceDTO = {
   sampleUrl: string;
 };
 
+export type EntityFactsV2ReadTargetExposureCitationSourceDTO = {
+  domain: string;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+};
+
 export type EntityFactsV2ReadObservedSourcesStatus =
   | "available"
   | "not_materialized";
@@ -140,6 +147,11 @@ export type EntityFactsV2ReadGatewayDTO = {
    * did not satisfy the repeated-evidence promotion rule. Never treat as confirmed.
    */
   targetReferenceSources?: EntityFactsV2ReadTargetReferenceSourceDTO[];
+  /**
+   * Final-answer citations observed specifically inside measurements where v2
+   * confirmed targetSeen=true. This is co-observation only, not target attribution.
+   */
+  targetExposureCitationSources?: EntityFactsV2ReadTargetExposureCitationSourceDTO[];
   observedSourcesStatus: EntityFactsV2ReadObservedSourcesStatus;
   observedSources: EntityFactsV2ReadObservedSourceDTO[];
 };

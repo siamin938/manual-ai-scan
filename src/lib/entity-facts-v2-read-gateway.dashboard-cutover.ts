@@ -227,8 +227,13 @@ export type EntityFactsV2DashboardCutoverModel = {
     rows: EntityFactsV2DashboardCitationSourceRow[];
   };
   targetReferenceSources: {
-    heading: "내 업체 연결 단서";
+    heading: "내 업체 근접 연결 단서";
     rows: EntityFactsV2DashboardTargetReferenceSourceRow[];
+  };
+  targetExposureCitationSources: {
+    heading: "내 업체 노출 답변에서 함께 인용된 출처";
+    available: boolean;
+    rows: EntityFactsV2DashboardCitationSourceRow[];
   };
   sources: {
     heading: "업체 연결까지 확인된 출처";
@@ -363,6 +368,14 @@ export function buildEntityFactsV2DashboardCutoverModel(
       sampleUrl: item.sampleUrl,
     }));
 
+  const targetExposureCitationSources: EntityFactsV2DashboardCitationSourceRow[] =
+    (dto.targetExposureCitationSources ?? []).map((item) => ({
+      domain: item.domain,
+      responseCount: item.responseCount,
+      citationCount: item.citationCount,
+      sampleUrl: item.sampleUrl,
+    }));
+
   const questionGroups: EntityFactsV2DashboardQuestionGroupRow[] =
     dto.questionGroups.map((item) => ({
       intentType: item.intentType,
@@ -414,8 +427,13 @@ export function buildEntityFactsV2DashboardCutoverModel(
       rows: citationSources,
     },
     targetReferenceSources: {
-      heading: "내 업체 연결 단서",
+      heading: "내 업체 근접 연결 단서",
       rows: targetReferenceSources,
+    },
+    targetExposureCitationSources: {
+      heading: "내 업체 노출 답변에서 함께 인용된 출처",
+      available: dto.targetExposureCitationSources !== undefined,
+      rows: targetExposureCitationSources,
     },
     sources: {
       heading: "업체 연결까지 확인된 출처",

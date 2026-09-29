@@ -172,6 +172,20 @@ function fixture(): EntityFactsV2ReadGatewayDTO {
         sampleUrl: "https://oh-car.kr/target-clue",
       },
     ],
+    targetExposureCitationSources: [
+      {
+        domain: "oh-car.kr",
+        responseCount: 1,
+        citationCount: 2,
+        sampleUrl: "https://oh-car.kr/target-exposure",
+      },
+      {
+        domain: "blog.naver.com",
+        responseCount: 1,
+        citationCount: 1,
+        sampleUrl: "https://blog.naver.com/target-exposure",
+      },
+    ],
     observedSourcesStatus: "available",
     observedSources: [
       {
@@ -301,12 +315,30 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       },
     ]);
     expect(model.metricCards.citationSourceCount).toBe(2);
-    expect(model.targetReferenceSources.heading).toBe("내 업체 연결 단서");
+    expect(model.targetReferenceSources.heading).toBe("내 업체 근접 연결 단서");
     expect(model.targetReferenceSources.rows).toEqual([
       {
         domain: "oh-car.kr",
         responseCount: 1,
         sampleUrl: "https://oh-car.kr/target-clue",
+      },
+    ]);
+    expect(model.targetExposureCitationSources.heading).toBe(
+      "내 업체 노출 답변에서 함께 인용된 출처",
+    );
+    expect(model.targetExposureCitationSources.available).toBe(true);
+    expect(model.targetExposureCitationSources.rows).toEqual([
+      {
+        domain: "oh-car.kr",
+        responseCount: 1,
+        citationCount: 2,
+        sampleUrl: "https://oh-car.kr/target-exposure",
+      },
+      {
+        domain: "blog.naver.com",
+        responseCount: 1,
+        citationCount: 1,
+        sampleUrl: "https://blog.naver.com/target-exposure",
       },
     ]);
     expect(model.sources.heading).toBe("업체 연결까지 확인된 출처");
@@ -426,7 +458,9 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("인용된 답변 수");
     expect(dashboardSource).toContain("전체 인용 횟수");
     expect(dashboardSource).toContain("내 업체 확정 연결");
-    expect(dashboardSource).toContain("내 업체 연결 단서");
+    expect(dashboardSource).toContain("내 업체 근접 연결 단서");
+    expect(dashboardSource).toContain("내 업체 노출 답변 출처");
+    expect(dashboardSource).toContain("model.targetExposureCitationSources.heading");
     expect(dashboardSource).toContain("비교해볼 타업체 출처");
     expect(dashboardSource).toContain("기타 확정 연결");
     expect(dashboardSource).toContain("타업체 연결 단서");
@@ -439,7 +473,10 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("showAllCompetitors");
     expect(dashboardSource).toContain("usefulCompetitorSources");
     expect(dashboardSource).toContain("lowValueComparisonSourceDomain");
-    expect(dashboardSource).toContain("내 업체 연결 단서 ${targetReferenceSources.length}개 보기");
+    expect(dashboardSource).toContain("내 업체 근접 연결 단서 ${targetReferenceSources.length}개 보기");
+    expect(dashboardSource).toContain("showAllTargetExposureCitationSources");
+    expect(dashboardSource).toContain("직접 설명하거나");
+    expect(dashboardSource).toContain("노출 원인이라는 뜻은 아닙니다.");
     expect(dashboardSource).toContain("기타 확정 연결 ${otherConfirmedSources.length}개 보기");
     expect(dashboardSource).toContain("타업체 연결 단서 ${linkedClueSources.length}개 보기");
     expect(dashboardSource).not.toContain('<Badge variant="outline">{c.label}</Badge>');

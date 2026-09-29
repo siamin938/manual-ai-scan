@@ -533,6 +533,26 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).toContain("gatewayResponse.data.citationSources");
   });
 
+  it("keeps target-exposure citation co-observation non-blocking and grounded in v2 targetSeen truth", () => {
+    expect(serverSource).toContain(
+      "Supplemental citation co-observation for v2-confirmed target exposure measurements",
+    );
+    expect(serverSource).toContain('.from("measurement_entity_facts_v2")');
+    expect(serverSource).toContain('.eq("materialization_id", storage.materialization_id)');
+    expect(serverSource).toContain('jsonObject(row.facts)?.["targetSeen"] === true');
+    expect(serverSource).toContain("targetMeasurementIds.size ===");
+    expect(serverSource).toContain(
+      "gatewayResponse.data.overview.confirmedMentionCount",
+    );
+    expect(serverSource).toContain("targetExposureFactError");
+    expect(serverSource).toContain(
+      "gatewayResponse.data.targetExposureCitationSources",
+    );
+    expect(serverSource).toContain(
+      "never be presented as a cause of visibility or a direct business-source link",
+    );
+  });
+
   it("keeps advisory target source clues non-blocking and separate from confirmed target sources", () => {
     expect(serverSource).toContain("Advisory target-link clues");
     expect(serverSource).toContain('.from("measurement_citation_attributions")');
@@ -558,7 +578,7 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).not.toContain('.from("measurements")');
     expect(serverSource).not.toContain("was_client_mentioned");
     expect(serverSource).not.toContain("client_position");
-    expect(serverSource).not.toContain("measurement_entity_facts_v2");
+    expect(serverSource).toContain('.from("measurement_entity_facts_v2")');
     expect(serverSource).not.toContain("response_text");
   });
 

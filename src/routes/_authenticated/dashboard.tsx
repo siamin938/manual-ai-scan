@@ -407,6 +407,10 @@ function DashboardPage() {
   const [expandedTargetReferenceBusinessId, setExpandedTargetReferenceBusinessId] = useState<
     string | null
   >(null);
+  const [
+    expandedTargetExposureCitationBusinessId,
+    setExpandedTargetExposureCitationBusinessId,
+  ] = useState<string | null>(null);
   const [expandedOtherConfirmedSourceBusinessId, setExpandedOtherConfirmedSourceBusinessId] =
     useState<string | null>(null);
   const showAllCompetitors = expandedCompetitorBusinessId === businessId;
@@ -414,6 +418,8 @@ function DashboardPage() {
   const showAllCitationSources = expandedCitationSourceBusinessId === businessId;
   const showLinkedClues = expandedLinkedClueBusinessId === businessId;
   const showTargetReferenceSources = expandedTargetReferenceBusinessId === businessId;
+  const showAllTargetExposureCitationSources =
+    expandedTargetExposureCitationBusinessId === businessId;
   const showOtherConfirmedSources = expandedOtherConfirmedSourceBusinessId === businessId;
 
   const unifiedSetQuery = useQuery({
@@ -617,9 +623,12 @@ function DashboardPage() {
   const linkedClueSources =
     model?.sources.rows.filter((source) => source.evidence === "clue") ?? [];
   const targetReferenceSources = model?.targetReferenceSources.rows ?? [];
+  const targetExposureCitationSources =
+    model?.targetExposureCitationSources.rows ?? [];
   const linkedTargetSourceCount = linkedTargetSources.length;
   const linkedCompetitorSourceCount = usefulCompetitorSources.length;
   const linkedClueSourceCount = linkedClueSources.length;
+  const targetExposureCitationSourceCount = targetExposureCitationSources.length;
   const weakQuestionRows =
     model && isUnifiedDiagnostic
       ? model.weakQuestions.rows
@@ -1073,7 +1082,12 @@ function DashboardPage() {
                     내 업체 확정 연결 {linkedTargetSourceCount}개
                   </Badge>
                   <Badge variant="secondary">
-                    내 업체 연결 단서 {targetReferenceSources.length}개
+                    내 업체 근접 연결 단서 {targetReferenceSources.length}개
+                  </Badge>
+                  <Badge
+                    variant={targetExposureCitationSourceCount > 0 ? "secondary" : "outline"}
+                  >
+                    내 업체 노출 답변 출처 {targetExposureCitationSourceCount}개
                   </Badge>
                   <Badge variant="outline">
                     비교해볼 타업체 출처 {linkedCompetitorSourceCount}개
@@ -1155,8 +1169,8 @@ function DashboardPage() {
                           }
                         >
                           {showTargetReferenceSources
-                            ? "내 업체 연결 단서 접기"
-                            : `내 업체 연결 단서 ${targetReferenceSources.length}개 보기`}
+                            ? "내 업체 근접 연결 단서 접기"
+                            : `내 업체 근접 연결 단서 ${targetReferenceSources.length}개 보기`}
                         </Button>
                         {showTargetReferenceSources && (
                           <div className="rounded-lg border bg-muted/10 p-3">
@@ -1198,6 +1212,97 @@ function DashboardPage() {
                         )}
                       </div>
                     )}
+
+                    <div className="space-y-2 border-t pt-4">
+                      <div>
+                        <h3 className="text-sm font-semibold">
+                          {model.targetExposureCitationSources.heading}
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          확정 노출 {model.metricCards.visibility.confirmedCount}개 답변에서 실제
+                          citation으로 함께 등장한 출처입니다. 이 출처가 내 업체를 직접 설명하거나
+                          노출 원인이라는 뜻은 아닙니다.
+                        </p>
+                      </div>
+                      {!model.targetExposureCitationSources.available ? (
+                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                          내 업체 노출 답변의 인용 출처 집계를 불러오지 못했습니다. 확정 연결
+                          판정에는 영향이 없습니다.
+                        </p>
+                      ) : targetExposureCitationSources.length === 0 ? (
+                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                          확정 노출된 답변에서는 실제 citation이 확인되지 않았습니다.
+                        </p>
+                      ) : (
+                        <>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>출처</TableHead>
+                                <TableHead>노출 답변에서 인용</TableHead>
+                                <TableHead>전체 인용 횟수</TableHead>
+                                <TableHead className="text-right">예시</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {targetExposureCitationSources
+                                .slice(
+                                  0,
+                                  showAllTargetExposureCitationSources
+                                    ? targetExposureCitationSources.length
+                                    : 8,
+                                )
+                                .map((source) => (
+                                  <TableRow key={`target-exposure:${source.domain}`}>
+                                    <TableCell className="text-sm font-medium">
+                                      {siteDisplayName(source.domain)}
+                                      {siteDisplayName(source.domain) !== source.domain && (
+                                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                          {source.domain}
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-sm tabular-nums">
+                                      확정 노출 {model.metricCards.visibility.confirmedCount}건 중{" "}
+                                      {source.responseCount}건
+                                    </TableCell>
+                                    <TableCell className="text-sm tabular-nums">
+                                      {source.citationCount}회
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <a
+                                        href={source.sampleUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sm text-primary underline-offset-4 hover:underline"
+                                      >
+                                        인용 페이지 예시 보기 ↗
+                                      </a>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
+                          {targetExposureCitationSources.length > 8 && (
+                            <div className="flex justify-center pt-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setExpandedTargetExposureCitationBusinessId(
+                                    showAllTargetExposureCitationSources ? null : businessId,
+                                  )
+                                }
+                              >
+                                {showAllTargetExposureCitationSources
+                                  ? "접기"
+                                  : `전체 ${targetExposureCitationSources.length}개 출처 보기`}
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
 
                     <div className="space-y-2 border-t pt-4">
                       <div>
