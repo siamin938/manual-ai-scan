@@ -62,10 +62,11 @@ describe("beta customer onboarding contract", () => {
     expect(onboardingSource).not.toContain('"자동차 정비",');
   });
 
-  it("uses the shared IME-safe form path for Korean onboarding fields", () => {
+  it("uses the shared IME-safe form path without leaving the submit button stuck disabled", () => {
     expect(onboardingSource).toContain("useImeSafeForm");
     expect(onboardingSource).toContain("formRef");
     expect(onboardingSource).toContain("compositionProps");
-    expect(onboardingSource).toContain("isComposing()");
+    expect(onboardingSource).toContain('e.key === "Enter" && isComposing(e)');
+    expect(onboardingSource).not.toContain("busy ||\n                isComposing() ||");
   });
 });
