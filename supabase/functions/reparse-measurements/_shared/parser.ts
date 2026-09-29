@@ -7,7 +7,7 @@ import type {
 } from "./types.ts";
 import { normalizeDomain } from "./provider-utils.ts";
 
-export const PARSER_VERSION = "1.2.4";
+export const PARSER_VERSION = "1.2.5";
 
 export interface ParseContext {
   region?: string | null;
@@ -93,7 +93,35 @@ function normalize(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase("ko-KR").replace(/[\u200B-\u200D\uFEFF]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim();
 }
 function compact(value: string): string { return normalize(value).replace(/\s+/g, ""); }
-function aliasesFor(business: BusinessForParsing): string[] { return [...new Set([business.name,...business.aliases].map((alias)=>alias.trim()).filter(Boolean))].sort((a,b)=>compact(b).length-compact(a).length); }
+function explicitAliasesFor(business: BusinessForParsing): string[] {
+  return [...new Set([business.name,...business.aliases].map((alias)=>alias.trim()).filter(Boolean))]
+    .sort((a,b)=>compact(b).length-compact(a).length);
+}
+function branchAliasVariants(value:string):string[] {
+  const normalized=value.normalize("NFKC").replace(/\s+/g," ").trim();
+  if(!normalized)return[];
+  const tokens=normalized.split(" ").filter(Boolean);
+  if(tokens.length<2)return[];
+
+  const last=tokens.at(-1)!;
+  const standaloneSuffix=/^(?:본점|직영점|지점|분점)$/u;
+  if(standaloneSuffix.test(last)&&tokens.length>=3){
+    const alias=tokens.slice(0,-1).join(" ").trim();
+    return compact(alias).length>=4?[alias]:[];
+  }
+
+  const compactSuffix=last.match(/^([0-9A-Za-z가-힣]{2,}?)(?:본점|직영점|지점|분점|점)$/u);
+  if(!compactSuffix?.[1])return[];
+  const branchCore=compactSuffix[1];
+  if(compact(branchCore).length<2)return[];
+  const alias=[...tokens.slice(0,-1),branchCore].join(" ").trim();
+  return compact(alias).length>=4?[alias]:[];
+}
+function aliasesFor(business: BusinessForParsing): string[] {
+  const explicit=explicitAliasesFor(business);
+  return [...new Set(explicit.flatMap((alias)=>[alias,...branchAliasVariants(alias)]))]
+    .sort((a,b)=>compact(b).length-compact(a).length);
+}
 function confidenceRank(confidence: ParseConfidence): number { return confidence === "high" ? 3 : confidence === "medium" ? 2 : 1; }
 function lowerConfidence(a: ParseConfidence,b: ParseConfidence): ParseConfidence { return confidenceRank(a)<=confidenceRank(b)?a:b; }
 
@@ -139,7 +167,7 @@ function classifyResolution(candidate:string,slot:RecommendationSlot,businesses:
 function resolutionToMention(resolution:EntityResolution,businesses:BusinessForParsing[]):ParsedMention|undefined { if(!resolution.countAsConfirmedBusiness)return undefined;const business=resolution.matchedBusinessId?businesses.find((item)=>item.id===resolution.matchedBusinessId):undefined;return{businessId:business?.id,displayName:business?.name??resolution.displayName,matchedAlias:resolution.matchedAlias,position:resolution.position,explicitRank:resolution.explicitRank,confidence:resolution.specificityConfidence}; }
 function mentionKey(mention:ParsedMention):string { return mention.businessId?`business:${mention.businessId}`:`name:${compact(mention.displayName)}`; }
 function addMention(mentions:Map<string,ParsedMention>,next:ParsedMention):void { const key=mentionKey(next),existing=mentions.get(key);if(!existing||next.position<existing.position||(next.position===existing.position&&confidenceRank(next.confidence)>confidenceRank(existing.confidence)))mentions.set(key,next); }
-function findRegisteredBusinessInText(text:string,business:BusinessForParsing):string|undefined { const normalizedText=normalize(text),compactText=compact(text);for(const alias of aliasesFor(business)){const normalizedAlias=normalize(alias),compactAlias=compact(alias);if(compactAlias.length<2)continue;if(normalizedText.includes(normalizedAlias)||compactText.includes(compactAlias))return alias;}return undefined; }
+function findRegisteredBusinessInText(text:string,business:BusinessForParsing):string|undefined { const normalizedText=normalize(text),compactText=compact(text);for(const alias of explicitAliasesFor(business)){const normalizedAlias=normalize(alias),compactAlias=compact(alias);if(compactAlias.length<2)continue;if(normalizedText.includes(normalizedAlias)||compactText.includes(compactAlias))return alias;}return undefined; }
 function summarizeResolutions(resolutions:EntityResolution[]):EntityResolutionSummary { return{slotCount:resolutions.length,specificBusinessConfirmed:resolutions.filter((r)=>r.entityKind==="specific_business"&&r.specificity==="confirmed").length,specificBusinessProbable:resolutions.filter((r)=>r.entityKind==="specific_business"&&r.specificity==="probable").length,brandNetwork:resolutions.filter((r)=>r.entityKind==="brand_network").length,genericCategory:resolutions.filter((r)=>r.entityKind==="generic_category").length,platform:resolutions.filter((r)=>r.entityKind==="platform").length,advice:resolutions.filter((r)=>r.entityKind==="advice").length,ambiguous:resolutions.filter((r)=>r.entityKind==="ambiguous").length}; }
 function emptySummary():EntityResolutionSummary { return{slotCount:0,specificBusinessConfirmed:0,specificBusinessProbable:0,brandNetwork:0,genericCategory:0,platform:0,advice:0,ambiguous:0}; }
 
@@ -147,5 +175,5 @@ export function parseMeasurement(responseText:string,sources:ProviderSource[],bu
   const text=responseText.trim();const client=businesses.find((business)=>business.isClient);
   if(!client)return{valid:false,invalidReason:"CLIENT_BUSINESS_MISSING",wasClientMentioned:false,clientDomainCited:false,parseConfidence:"low",manualReviewRequired:true,mentions:[],entityResolutions:[],resolutionSummary:emptySummary()};
   if(!text)return{valid:false,invalidReason:"EMPTY_RESPONSE",wasClientMentioned:false,clientDomainCited:sourceCitesClient(sources,client),parseConfidence:"low",manualReviewRequired:true,mentions:[],entityResolutions:[],resolutionSummary:emptySummary()};
-  const slots=buildRecommendationSlots(text,businesses);const resolutions=slots.map((slot)=>{const title=extractCandidateTitle(slot.body,businesses);if(!title||!basicCandidateShape(title.candidate))return undefined;return classifyResolution(title.candidate,slot,businesses,context);}).filter((value):value is EntityResolution=>Boolean(value));const mentions=new Map<string,ParsedMention>();for(const resolution of resolutions){const mention=resolutionToMention(resolution,businesses);if(mention)addMention(mentions,mention);}const clientAliasInText=findRegisteredBusinessInText(text,client);const clientResolution=resolutions.find((resolution)=>resolution.matchedBusinessId===client.id);const wasClientMentioned=Boolean(clientAliasInText);const clientPosition=clientResolution?.countAsConfirmedBusiness?clientResolution.position:undefined;const sortedMentions=[...mentions.values()].sort((a,b)=>a.position-b.position||a.displayName.localeCompare(b.displayName,"ko-KR"));const businessRelevantResolutions=resolutions.filter((resolution)=>resolution.entityKind==="specific_business"||(resolution.entityKind==="ambiguous"&&resolution.specificity==="probable"));const unresolvedBusinessLike=resolutions.filter((resolution)=>(resolution.entityKind==="specific_business"&&resolution.specificity==="probable")||(resolution.entityKind==="ambiguous"&&resolution.specificity==="probable"));let overallConfidence:ParseConfidence="low";if(businessRelevantResolutions.length>0){overallConfidence="high";for(const resolution of businessRelevantResolutions)overallConfidence=lowerConfidence(overallConfidence,resolution.specificityConfidence);}else if(resolutions.length>0){overallConfidence=resolutions.some((resolution)=>resolution.specificityConfidence==="low")?"medium":"high";}else if(clientAliasInText){overallConfidence="medium";}const positions=new Map<number,number>();for(const resolution of businessRelevantResolutions)positions.set(resolution.position,(positions.get(resolution.position)??0)+1);const conflictingPositions=[...positions.values()].some((count)=>count>1);const unresolvedSpecificity=unresolvedBusinessLike.length>0;const missingResolution=slots.length>0&&resolutions.length<slots.length;const manualReviewRequired=conflictingPositions||unresolvedSpecificity||missingResolution;return{valid:true,wasClientMentioned,clientPosition,clientDomainCited:sourceCitesClient(sources,client),parseConfidence:overallConfidence,manualReviewRequired,mentions:sortedMentions,entityResolutions:resolutions,resolutionSummary:summarizeResolutions(resolutions)};
+  const slots=buildRecommendationSlots(text,businesses);const resolutions=slots.map((slot)=>{const title=extractCandidateTitle(slot.body,businesses);if(!title||!basicCandidateShape(title.candidate))return undefined;return classifyResolution(title.candidate,slot,businesses,context);}).filter((value):value is EntityResolution=>Boolean(value));const mentions=new Map<string,ParsedMention>();for(const resolution of resolutions){const mention=resolutionToMention(resolution,businesses);if(mention)addMention(mentions,mention);}const clientAliasInText=findRegisteredBusinessInText(text,client);const clientResolution=resolutions.find((resolution)=>resolution.matchedBusinessId===client.id);const wasClientMentioned=Boolean(clientAliasInText||(clientResolution?.countAsConfirmedBusiness&&clientResolution.matchedBusinessId===client.id));const clientPosition=clientResolution?.countAsConfirmedBusiness?clientResolution.position:undefined;const sortedMentions=[...mentions.values()].sort((a,b)=>a.position-b.position||a.displayName.localeCompare(b.displayName,"ko-KR"));const businessRelevantResolutions=resolutions.filter((resolution)=>resolution.entityKind==="specific_business"||(resolution.entityKind==="ambiguous"&&resolution.specificity==="probable"));const unresolvedBusinessLike=resolutions.filter((resolution)=>(resolution.entityKind==="specific_business"&&resolution.specificity==="probable")||(resolution.entityKind==="ambiguous"&&resolution.specificity==="probable"));let overallConfidence:ParseConfidence="low";if(businessRelevantResolutions.length>0){overallConfidence="high";for(const resolution of businessRelevantResolutions)overallConfidence=lowerConfidence(overallConfidence,resolution.specificityConfidence);}else if(resolutions.length>0){overallConfidence=resolutions.some((resolution)=>resolution.specificityConfidence==="low")?"medium":"high";}else if(clientAliasInText){overallConfidence="medium";}const positions=new Map<number,number>();for(const resolution of businessRelevantResolutions)positions.set(resolution.position,(positions.get(resolution.position)??0)+1);const conflictingPositions=[...positions.values()].some((count)=>count>1);const unresolvedSpecificity=unresolvedBusinessLike.length>0;const missingResolution=slots.length>0&&resolutions.length<slots.length;const manualReviewRequired=conflictingPositions||unresolvedSpecificity||missingResolution;return{valid:true,wasClientMentioned,clientPosition,clientDomainCited:sourceCitesClient(sources,client),parseConfidence:overallConfidence,manualReviewRequired,mentions:sortedMentions,entityResolutions:resolutions,resolutionSummary:summarizeResolutions(resolutions)};
 }
