@@ -685,8 +685,9 @@ function DashboardPage() {
                 <Badge variant="outline">첫 측정 필요</Badge>
               </div>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                첫 통합 24문항 측정을 완료하기 전까지는 기존 대표 진단 결과를 계속 보여드립니다.
-                측정이 완료되면 새 통합 진단으로 자동 전환됩니다.
+                {dto
+                  ? "첫 통합 24문항 측정을 완료하기 전까지는 기존 대표 진단 결과를 계속 보여드립니다. 측정이 완료되면 새 통합 진단으로 자동 전환됩니다."
+                  : "저장된 통합 24문항으로 첫 측정을 진행해 주세요. 측정이 완료되면 대표 진단 결과가 표시됩니다."}
               </p>
             </div>
             <Button asChild className="shrink-0">
