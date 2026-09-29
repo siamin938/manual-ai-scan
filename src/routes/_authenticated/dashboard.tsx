@@ -1234,18 +1234,18 @@ function DashboardPage() {
                         }}
                       >
                         {showTargetExposureCitationSources
-                          ? `${model.businessName} 노출 답변 출처 접기`
-                          : `${model.businessName} 노출 답변 출처 ${targetExposureCitationSourceCount}개 보기`}
+                          ? "내 업체 노출 답변 출처 접기"
+                          : `내 업체 노출 답변 출처 ${targetExposureCitationSourceCount}개 보기`}
                       </Button>
 
                       {showTargetExposureCitationSources && (
                         <div className="rounded-lg border bg-muted/10 p-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-sm font-semibold">
-                              {model.businessName} 노출 답변에서 함께 인용된 출처
+                              내 업체 노출 답변에서 함께 인용된 출처
                             </h3>
                             <Badge variant="outline">
-                              {model.businessName} · 노출 답변 기준
+                              내 업체 · 노출 답변 기준
                             </Badge>
                           </div>
                           <p className="mt-2 text-xs leading-5 text-muted-foreground">
@@ -1269,7 +1269,7 @@ function DashboardPage() {
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead>출처</TableHead>
-                                    <TableHead>{model.businessName} 노출 답변</TableHead>
+                                    <TableHead>내 업체 노출 답변</TableHead>
                                     <TableHead>인용 횟수</TableHead>
                                     <TableHead className="text-right">예시</TableHead>
                                   </TableRow>
