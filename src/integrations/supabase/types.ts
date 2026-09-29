@@ -856,6 +856,108 @@ export type Database = {
           },
         ]
       }
+      citation_page_entity_verifications: {
+        Row: {
+          business_id: string
+          canonical_url: string
+          citation_id: string
+          citation_title: string | null
+          citation_url: string
+          confidence: string
+          content_hash: string | null
+          created_at: string
+          domain: string | null
+          evidence: Json
+          fetch_status: string
+          http_status: number | null
+          id: string
+          measurement_id: string
+          org_id: string
+          page_title: string | null
+          source_run_id: string
+          verification_status: string
+          verifier_version: string
+        }
+        Insert: {
+          business_id: string
+          canonical_url: string
+          citation_id: string
+          citation_title?: string | null
+          citation_url: string
+          confidence: string
+          content_hash?: string | null
+          created_at?: string
+          domain?: string | null
+          evidence?: Json
+          fetch_status: string
+          http_status?: number | null
+          id?: string
+          measurement_id: string
+          org_id: string
+          page_title?: string | null
+          source_run_id: string
+          verification_status: string
+          verifier_version: string
+        }
+        Update: {
+          business_id?: string
+          canonical_url?: string
+          citation_id?: string
+          citation_title?: string | null
+          citation_url?: string
+          confidence?: string
+          content_hash?: string | null
+          created_at?: string
+          domain?: string | null
+          evidence?: Json
+          fetch_status?: string
+          http_status?: number | null
+          id?: string
+          measurement_id?: string
+          org_id?: string
+          page_title?: string | null
+          source_run_id?: string
+          verification_status?: string
+          verifier_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "citation_page_entity_verifications_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citation_page_entity_verifications_citation_id_fkey"
+            columns: ["citation_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_citations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citation_page_entity_verifications_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citation_page_entity_verifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citation_page_entity_verifications_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       measurement_citation_attributions: {
         Row: {
           attribution_level: string
