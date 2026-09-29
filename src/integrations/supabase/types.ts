@@ -3948,6 +3948,18 @@ export type Database = {
         Returns: Json
       }
       purge_expired_provider_payloads: { Args: never; Returns: number }
+      refresh_entity_facts_v2_runtime_materialization_v01: {
+        Args: {
+          p_aggregate_row: Json
+          p_clue_supplement: Json
+          p_engine_version: string
+          p_materialization_id: string
+          p_measurement_rows: Json
+          p_observed_supplement: Json
+          p_run_id: string
+        }
+        Returns: Json
+      }
       refresh_run_progress: {
         Args: { p_run_id: string }
         Returns: Database["public"]["Enums"]["run_status"]
