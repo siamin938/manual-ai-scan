@@ -82,9 +82,9 @@ describe("Recovered live Edge source contract", () => {
     }
   });
 
-  it("locks the live Parser 1.2.4 behavioral contract for both parser callers", () => {
-    expect(processParser).toContain('export const PARSER_VERSION = "1.2.4";');
-    expect(reparseParser).toContain('export const PARSER_VERSION = "1.2.4";');
+  it("locks the live Parser 1.2.5 behavioral contract for both parser callers", () => {
+    expect(processParser).toContain('export const PARSER_VERSION = "1.2.5";');
+    expect(reparseParser).toContain('export const PARSER_VERSION = "1.2.5";');
     expect(reparseParser).toBe(processParser);
   });
 

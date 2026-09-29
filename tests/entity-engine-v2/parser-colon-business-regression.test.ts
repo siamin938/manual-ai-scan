@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseMeasurement, PARSER_VERSION } from "../../supabase/functions/reparse-measurements/_shared/parser";
 
-describe("parser 1.2.4 colon suffix business regression", () => {
+describe("parser 1.2.5 colon suffix business regression", () => {
   const target = {
     id: "c9cb39d5-9f04-46ec-8018-14156670446d",
     name: "카스페이스 구로점",
