@@ -585,6 +585,8 @@ function DashboardPage() {
   const isUnifiedDiagnostic =
     hasCompletedUnifiedRun ||
     (!!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName));
+  const showLegacyDiagnosticSection =
+    !isUnifiedDiagnostic && (!unifiedTransitionPending || !!dto);
   const detailBasisLabel = isUnifiedDiagnostic ? "AI 진단 기준" : "기본 진단 기준";
   const unifiedLayerSummary =
     dto && isUnifiedDiagnostic && dto.questionLocations
@@ -707,7 +709,7 @@ function DashboardPage() {
         />
       )}
 
-      {businessId && (
+      {businessId && showLegacyDiagnosticSection && (
         <section className="space-y-2 border-t border-border pt-8">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold">
@@ -743,7 +745,9 @@ function DashboardPage() {
         </div>
       )}
 
-      {result && !result.ok && (
+      {result &&
+        !result.ok &&
+        !(unifiedTransitionPending && result.error === "NO_V2_DATA") && (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
             {result.error === "NO_V2_DATA"
