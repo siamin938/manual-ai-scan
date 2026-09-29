@@ -288,6 +288,7 @@ describe("Entity Facts v2 runtime Edge candidate contract", () => {
     expect(rpcSql).toContain("refresh_entity_facts_v2_runtime_materialization_v01");
     expect(rpcSql).toContain("RUNTIME_V2_REFRESH_REQUIRES_FULL_EXISTING_STATE");
     expect(rpcSql).not.toContain("DELETE FROM public.measurement_entity_facts_v2");
+    expect(rpcSql).not.toContain("max(materialization_id)");
     expect(rpcSql).toContain("RUNTIME_V2_POSTPROCESS_NOT_READY");
     expect(rpcSql).toContain("RUNTIME_V2_CITATION_ATTRIBUTION_NOT_READY");
     expect(rpcSql).toContain(

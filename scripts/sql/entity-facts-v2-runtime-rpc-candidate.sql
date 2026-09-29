@@ -584,11 +584,19 @@ BEGIN
   WHERE f.source_run_id=v_run.id AND f.fact_version='0.3'
     AND f.engine_version=p_engine_version;
 
-  SELECT count(*)::integer, max(materialization_id)
-    INTO v_aggregate_count, v_previous_materialization_id
+  SELECT count(*)::integer
+    INTO v_aggregate_count
   FROM public.run_entity_fact_aggregates_v2 a
   WHERE a.source_run_id=v_run.id AND a.fact_version='0.3'
     AND a.aggregate_version='0.1' AND a.engine_version=p_engine_version;
+
+  SELECT a.materialization_id
+    INTO v_previous_materialization_id
+  FROM public.run_entity_fact_aggregates_v2 a
+  WHERE a.source_run_id=v_run.id AND a.fact_version='0.3'
+    AND a.aggregate_version='0.1' AND a.engine_version=p_engine_version
+  ORDER BY a.created_at DESC
+  LIMIT 1;
 
   SELECT count(*)::integer INTO v_observed_count
   FROM public.run_observed_source_aggregates_v2 o
