@@ -46,21 +46,22 @@ function AuthedLayout() {
   return (
     <OrgProvider session={session}>
       <ActiveTargetBusinessProvider>
-        <Shell />
+        <Shell sessionUserId={session?.user.id ?? null} />
       </ActiveTargetBusinessProvider>
     </OrgProvider>
   );
 }
 
-function Shell() {
+function Shell({ sessionUserId }: { sessionUserId: string | null }) {
   const { memberships, activeOrgId, setActiveOrgId, role, loading } = useOrg();
   const navigate = useNavigate();
   const checkDataAssetAccess = useServerFn(canViewDataAssetAdmin);
   const { data: dataAssetAccess } = useQuery({
-    queryKey: ["can-view-data-asset-admin"],
+    queryKey: ["can-view-data-asset-admin", sessionUserId],
     queryFn: () => checkDataAssetAccess({ data: undefined }),
+    enabled: !!sessionUserId,
     retry: false,
-    staleTime: Infinity,
+    staleTime: 0,
   });
   const navItems = dataAssetAccess?.allowed ? [...NAV, ...INTERNAL_NAV] : [...NAV];
 
