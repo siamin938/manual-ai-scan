@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseMeasurement, PARSER_VERSION } from "../../supabase/functions/reparse-measurements/_shared/parser";
 
-describe("parser 1.2.5 colon suffix business regression", () => {
+describe("parser 1.2.6 colon suffix business regression", () => {
   const target = {
     id: "c9cb39d5-9f04-46ec-8018-14156670446d",
     name: "카스페이스 구로점",
@@ -22,7 +22,7 @@ describe("parser 1.2.5 colon suffix business regression", () => {
 
     const parsed = parseMeasurement(response, [], [target], { region: "서울특별시" });
 
-    expect(PARSER_VERSION).toBe("1.2.5");
+    expect(PARSER_VERSION).toBe("1.2.6");
     expect(parsed.wasClientMentioned).toBe(true);
     expect(parsed.clientPosition).toBe(3);
     expect(
@@ -64,7 +64,7 @@ describe("parser 1.2.5 colon suffix business regression", () => {
       city: "성남시 분당구",
     });
 
-    expect(PARSER_VERSION).toBe("1.2.5");
+    expect(PARSER_VERSION).toBe("1.2.6");
     expect(parsed.wasClientMentioned).toBe(true);
     expect(parsed.clientPosition).toBe(4);
     expect(
@@ -78,7 +78,7 @@ describe("parser 1.2.5 colon suffix business regression", () => {
     ).toBe(true);
   });
 
-  it("keeps a derived branch alias unresolved when it collides across registered businesses", () => {
+  it("keeps a derived branch alias unresolved when normalized registered rows collide", () => {
     const client = {
       id: "11111111-1111-4111-8111-111111111111",
       name: "브랜드 판교점",
@@ -88,7 +88,7 @@ describe("parser 1.2.5 colon suffix business regression", () => {
     };
     const competitor = {
       id: "22222222-2222-4222-8222-222222222222",
-      name: "브랜드 판교본점",
+      name: "브랜드  판교점",
       aliases: [],
       officialDomains: [],
       isClient: false,

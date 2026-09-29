@@ -78,7 +78,7 @@ describe("Entity Engine v2 candidate extractor", () => {
     expect(matched?.matchedAlias).toBe("현대 엑스티어 판교");
   });
 
-  it("keeps a derived branch alias ambiguous when two registered branches collide", () => {
+  it("keeps a derived branch alias ambiguous when two registered rows normalize to the same branch", () => {
     const collisionBusinesses = [
       {
         id: "11111111-1111-4111-8111-111111111111",
@@ -87,7 +87,7 @@ describe("Entity Engine v2 candidate extractor", () => {
       },
       {
         id: "22222222-2222-4222-8222-222222222222",
-        name: "브랜드 판교본점",
+        name: "브랜드  판교점",
         aliases: [],
       },
     ];

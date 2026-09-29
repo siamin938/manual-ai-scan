@@ -7,7 +7,7 @@ import type {
 } from "./types.ts";
 import { normalizeDomain } from "./provider-utils.ts";
 
-export const PARSER_VERSION = "1.2.5";
+export const PARSER_VERSION = "1.2.6";
 
 export interface ParseContext {
   region?: string | null;
@@ -97,26 +97,7 @@ function explicitAliasesFor(business: BusinessForParsing): string[] {
   return [...new Set([business.name,...business.aliases].map((alias)=>alias.trim()).filter(Boolean))]
     .sort((a,b)=>compact(b).length-compact(a).length);
 }
-function branchAliasVariants(value:string):string[] {
-  const normalized=value.normalize("NFKC").replace(/\s+/g," ").trim();
-  if(!normalized)return[];
-  const tokens=normalized.split(" ").filter(Boolean);
-  if(tokens.length<2)return[];
-
-  const last=tokens.at(-1)!;
-  const standaloneSuffix=/^(?:본점|직영점|지점|분점)$/u;
-  if(standaloneSuffix.test(last)&&tokens.length>=3){
-    const alias=tokens.slice(0,-1).join(" ").trim();
-    return compact(alias).length>=4?[alias]:[];
-  }
-
-  const compactSuffix=last.match(/^([0-9A-Za-z가-힣]{2,}?)(?:본점|직영점|지점|분점|점)$/u);
-  if(!compactSuffix?.[1])return[];
-  const branchCore=compactSuffix[1];
-  if(compact(branchCore).length<2)return[];
-  const alias=[...tokens.slice(0,-1),branchCore].join(" ").trim();
-  return compact(alias).length>=4?[alias]:[];
-}
+function branchAliasVariants(value:string):string[]{const normalized=value.normalize("NFKC").replace(/\\s+/gu," ").trim();if(!normalized)return[];const tokens=normalized.split(" ").filter(Boolean);if(tokens.length<2)return[];const last=tokens.at(-1)!;const compactSuffix=last.match(/^([0-9A-Za-z가-힣]{2,}?)점$/u);if(!compactSuffix?.[1])return[];const branchCore=compactSuffix[1];if(/(?:본|직영|지|분)$/u.test(branchCore))return[];if(compact(branchCore).length<2)return[];const alias=[...tokens.slice(0,-1),branchCore].join(" ").trim();return compact(alias).length>=4?[alias]:[];}
 function aliasesFor(business: BusinessForParsing): string[] {
   const explicit=explicitAliasesFor(business);
   return [...new Set(explicit.flatMap((alias)=>[alias,...branchAliasVariants(alias)]))]
