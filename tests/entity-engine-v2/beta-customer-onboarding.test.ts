@@ -14,6 +14,10 @@ const questionsSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/questions.tsx"),
   "utf8",
 );
+const authedRouteSource = readFileSync(
+  resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
+  "utf8",
+);
 
 describe("beta customer onboarding contract", () => {
   it("allows beta self-signup only through the explicit auth surface", () => {
@@ -23,6 +27,17 @@ describe("beta customer onboarding contract", () => {
     expect(authSource).toContain("onSubmit={signUp}");
     expect(authSource).toContain("가입 후 이메일 인증이 완료되어야 로그인할 수 있습니다.");
     expect(authSource).toContain("회원가입이 완료되었습니다. 이메일 인증 후 로그인해 주세요.");
+  });
+
+  it("scopes internal admin navigation access to the current signed-in user", () => {
+    expect(authedRouteSource).toContain(
+      'queryKey: ["can-view-data-asset-admin", sessionUserId]',
+    );
+    expect(authedRouteSource).toContain("enabled: !!sessionUserId");
+    expect(authedRouteSource).toContain("staleTime: 0");
+    expect(authedRouteSource).not.toContain(
+      'queryKey: ["can-view-data-asset-admin"],',
+    );
   });
 
   it("creates organizations through the JWT-protected Edge path instead of a browser RPC", () => {
