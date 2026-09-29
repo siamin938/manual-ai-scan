@@ -100,6 +100,7 @@ function explicitAliasesFor(business: BusinessForParsing): string[] {
 function branchAliasVariants(value:string):string[]{const normalized=value.normalize("NFKC").replace(/\\s+/gu," ").trim();if(!normalized)return[];const tokens=normalized.split(" ").filter(Boolean);if(tokens.length<2)return[];const last=tokens.at(-1)!;const compactSuffix=last.match(/^([0-9A-Za-z가-힣]{2,}?)점$/u);if(!compactSuffix?.[1])return[];const branchCore=compactSuffix[1];if(/(?:본|직영|지|분)$/u.test(branchCore))return[];if(compact(branchCore).length<2)return[];const alias=[...tokens.slice(0,-1),branchCore].join(" ").trim();return compact(alias).length>=4?[alias]:[];}
 function aliasesFor(business: BusinessForParsing): string[] {
   const explicit=explicitAliasesFor(business);
+  if((business.aliases??[]).length>0)return explicit;
   return [...new Set(explicit.flatMap((alias)=>[alias,...branchAliasVariants(alias)]))]
     .sort((a,b)=>compact(b).length-compact(a).length);
 }
