@@ -702,6 +702,7 @@ function DashboardPage() {
           isError={customQuery.isError || (!!customQuery.data && !customQuery.data.ok)}
           data={customQuery.data && customQuery.data.ok ? customQuery.data.data : null}
           loaded={!!customQuery.data && customQuery.data.ok}
+          questionsReady={unifiedTransitionPending}
         />
       )}
 
@@ -1960,11 +1961,13 @@ function CustomDiagnosticSection({
   isError,
   loaded,
   data,
+  questionsReady,
 }: {
   isLoading: boolean;
   isError: boolean;
   loaded: boolean;
   data: CustomDiagnosticDTO | null;
+  questionsReady: boolean;
 }) {
   const [showAllMissing, setShowAllMissing] = useState(false);
   const confirmed = data?.questions.filter((q) => q.status === "confirmed") ?? [];
@@ -1993,13 +1996,30 @@ function CustomDiagnosticSection({
         )}
         {!isLoading && !isError && loaded && !data && (
           <div className="space-y-3 py-4 text-center">
-            <p className="font-medium">아직 완료된 맞춤 진단이 없습니다.</p>
-            <p className="text-sm text-muted-foreground">
-              내 업체에서 중요하게 보는 검색 질문을 먼저 설정해 보세요.
-            </p>
-            <Button asChild>
-              <Link to="/questions">내 업체 맞춤 진단 만들기</Link>
-            </Button>
+            {questionsReady ? (
+              <>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <p className="font-medium">통합 AI 진단 질문 24개가 준비되었습니다.</p>
+                  <Badge variant="outline">첫 측정 필요</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  질문 생성은 완료되었습니다. 위의 ‘첫 통합 진단 측정하기’에서 첫 측정을 진행하세요.
+                </p>
+                <Button asChild variant="outline">
+                  <Link to="/questions">질문 확인·수정</Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="font-medium">아직 완료된 맞춤 진단이 없습니다.</p>
+                <p className="text-sm text-muted-foreground">
+                  내 업체에서 중요하게 보는 검색 질문을 먼저 설정해 보세요.
+                </p>
+                <Button asChild>
+                  <Link to="/questions">내 업체 맞춤 진단 만들기</Link>
+                </Button>
+              </>
+            )}
           </div>
         )}
         {data && (
