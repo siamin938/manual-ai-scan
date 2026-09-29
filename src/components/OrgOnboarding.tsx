@@ -135,7 +135,14 @@ export function OrgOnboarding() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form ref={formRef} className="space-y-4" onSubmit={submit}>
+          <form
+            ref={formRef}
+            className="space-y-4"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && isComposing(e)) e.preventDefault();
+            }}
+            onSubmit={submit}
+          >
             <div className="space-y-2">
               <Label htmlFor="biz-name">업체명</Label>
               <Input
@@ -224,7 +231,6 @@ export function OrgOnboarding() {
               className="w-full"
               disabled={
                 busy ||
-                isComposing() ||
                 !normalizedName ||
                 !category ||
                 !region.trim() ||
