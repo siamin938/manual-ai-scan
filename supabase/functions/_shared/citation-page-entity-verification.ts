@@ -225,6 +225,12 @@ export function verifyCitationPageEntity(args: {
     !!identity.branchCore &&
     compact(identity.branchCore).length >= 2 &&
     containsSurface(combined, identity.branchCore);
+  const branchCombinationCompact =
+    identity.brandCore && identity.branchCore
+      ? compact(identity.brandCore + " " + identity.branchCore)
+      : "";
+  const branchCombinationAmbiguous =
+    !!branchCombinationCompact && ambiguous.has(branchCombinationCompact);
 
   if (identity.branchSpecific) {
     if (fullNameTitle || fullNameBody) {
@@ -255,7 +261,7 @@ export function verifyCitationPageEntity(args: {
       };
     }
 
-    if (brandMatch && branchMatch) {
+    if (brandMatch && branchMatch && !branchCombinationAmbiguous) {
       return {
         verifierVersion: CITATION_PAGE_ENTITY_VERIFIER_VERSION,
         status: "confirmed",
@@ -270,7 +276,12 @@ export function verifyCitationPageEntity(args: {
       };
     }
 
-    if (brandMatch || branchMatch || matched.length > 0) {
+    if (
+      brandMatch ||
+      branchMatch ||
+      matched.length > 0 ||
+      branchCombinationAmbiguous
+    ) {
       return {
         verifierVersion: CITATION_PAGE_ENTITY_VERIFIER_VERSION,
         status: "unresolved",
