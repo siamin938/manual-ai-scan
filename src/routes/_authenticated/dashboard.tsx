@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -50,6 +50,7 @@ import { BusinessSelector, useClientBusinessSelection } from "@/components/busin
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -1813,12 +1814,7 @@ function DashboardSummary({
                         {context.confirmedCount}/{context.validCount}
                       </span>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary"
-                        style={{ width: `${percentOf(context.confirmedCount, context.validCount)}%` }}
-                      />
-                    </div>
+                    <Progress value={percentOf(context.confirmedCount, context.validCount)} />
                   </div>
                 ))}
               </div>
@@ -1954,7 +1950,7 @@ function SummaryKpiCard({
   highlight = false,
   compact = false,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   note: string;

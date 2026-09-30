@@ -601,6 +601,15 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       "아래 상세 분석과 벤치마크는 기본 24문항 측정을 기준으로 합니다.",
     );
     expect(dashboardSource).not.toContain("내 업체에서는 미관찰");
+    expect(dashboardSource).toContain('view: search.view === "detail"');
+    expect(dashboardSource).toContain('view === "summary"');
+    expect(dashboardSource).toContain('view === "detail"');
+    expect(dashboardSource).toContain("AI VISIBILITY SUMMARY");
+    expect(dashboardSource).toContain("사장님이 10초 안에 핵심만 이해할 수 있도록");
+    expect(dashboardSource).toContain("buildEntityFactsV2DashboardSummaryViewModel");
+    expect(dashboardSource).toContain("상세 분석 보기");
+    expect(dashboardSource).toContain('onClick={() => setDashboardView("detail")}');
+    expect(dashboardSource).not.toContain("현대 엑스티어");
 
     expect(dashboardSource).not.toContain("getVisibilityDiagnostic");
     expect(dashboardSource).not.toContain("getVisibilityRepeatAggregate");
