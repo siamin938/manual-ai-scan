@@ -1,5 +1,10 @@
 import { useState, type ReactNode } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useNavigate,
+  type SearchSchemaInput,
+} from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowRight, BarChart3, Building2, FileCheck2, Search } from "lucide-react";
@@ -61,8 +66,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+type DashboardSearch = { view?: "detail" };
+type DashboardSearchInput = SearchSchemaInput & { view?: string };
+
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: DashboardSearchInput): DashboardSearch => ({
     view: search["view"] === "detail" ? ("detail" as const) : undefined,
   }),
   head: () => ({
