@@ -509,7 +509,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("같은 답변에 함께 인용됐다는");
     expect(dashboardSource).toContain("관련 페이지 보기 ↗");
     expect(dashboardSource).toContain("showAllVerifiedTargetCitationPages");
-    expect(dashboardSource).toContain("내 업체 노출 답변에서 함께 인용된 출처");
+    expect(dashboardSource).toContain("함께 인용된 전체 출처");
     expect(dashboardSource).toContain("비교해볼 타업체 출처");
     expect(dashboardSource).not.toContain("내 업체 관련 확인 ");
     expect(dashboardSource).not.toContain("내 업체 확정 연결 ");
@@ -520,7 +520,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("상위 3곳 여부 추가 확인");
     expect(dashboardSource).toContain('note="이번 측정에서 업체로 확인된 항목"');
     expect(dashboardSource).toContain("같은 업체가 여러 답변에서");
-    expect(dashboardSource).toContain("확정 연결 기준은 그대로 유지하고");
+    expect(dashboardSource).toContain("AI 답변 안에서의 직접 연결·근접 단서는");
     expect(dashboardSource).toContain("내 업체 직접 연결");
     expect(dashboardSource).toContain("연결 단서");
     expect(dashboardSource).toContain("showAllCompetitors");
@@ -535,7 +535,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("<TableHead>내 업체 노출 답변</TableHead>");
     expect(dashboardSource).not.toContain("${model.businessName} 노출 답변 출처");
     expect(dashboardSource).toContain("참고용 원본 관찰 자료입니다.");
-    expect(dashboardSource).toContain("노출 원인이라는 뜻은 아닙니다.");
+    expect(dashboardSource).toContain("페이지 자체가 내 업체와 관련됐다는");
     expect(dashboardSource).toContain("상위 5개만 보기");
     expect(dashboardSource).toContain("나머지 ${targetExposureCitationSources.length - 5}개 더 보기");
     expect(dashboardSource).toContain("기타 확정 연결 ${otherConfirmedSources.length}개 보기");
