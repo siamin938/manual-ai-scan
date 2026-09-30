@@ -8,3 +8,6 @@
 - [x] 측정 상세 canonicalization 단일 버전 읽기 및 혼합 버전 fail-closed 처리
 - [x] canonicalization 버전 helper·상세 source 계약 테스트 추가
 - [x] 최신 0.1.1·과거 0.1.0 읽기 전용 QA와 타입·테스트·빌드·Preview 검증
+- [ ] `/dashboard` 기본 한눈에 보기와 URL 기반 상세 분석 전환 추가
+- [ ] 기존 Entity Facts v2 진실값 기반 요약 ViewModel 및 UI 추가
+- [ ] 요약 회귀 테스트·전체 검증·Preview QA 완료
