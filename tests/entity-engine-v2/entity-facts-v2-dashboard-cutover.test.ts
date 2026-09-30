@@ -335,7 +335,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       },
     ]);
     expect(model.metricCards.citationSourceCount).toBe(2);
-    expect(model.targetReferenceSources.heading).toBe("내 업체 근접 연결 단서");
+    expect(model.targetReferenceSources.heading).toBe("AI 답변 내 근접 단서");
     expect(model.targetReferenceSources.rows).toEqual([
       {
         domain: "oh-car.kr",
@@ -344,7 +344,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       },
     ]);
     expect(model.targetExposureCitationSources.heading).toBe(
-      "내 업체 노출 답변에서 함께 인용된 출처",
+      "함께 인용된 전체 출처",
     );
     expect(model.targetExposureCitationSources.available).toBe(true);
     expect(model.targetExposureCitationSources.rows).toEqual([
@@ -362,7 +362,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       },
     ]);
     expect(model.verifiedTargetCitationPages.heading).toBe(
-      "내 업체 관련성이 확인된 출처",
+      "페이지 내용 기준 관련 확인",
     );
     expect(model.verifiedTargetCitationPages.available).toBe(true);
     expect(model.verifiedTargetCitationPages.rows).toEqual([
@@ -501,16 +501,20 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("검색 과정에서만 참고된 후보 출처는 포함하지 않습니다.");
     expect(dashboardSource).toContain("인용된 답변 수");
     expect(dashboardSource).toContain("전체 인용 횟수");
-    expect(dashboardSource).toContain("내 업체 확정 연결");
-    expect(dashboardSource).toContain("내 업체 근접 연결 단서");
-    expect(dashboardSource).toContain("내 업체 노출 답변 출처");
-    expect(dashboardSource).toContain("내 업체 관련 확인");
+    expect(dashboardSource).toContain("AI 답변 내 직접 연결");
+    expect(dashboardSource).toContain("AI 답변 내 근접 단서");
+    expect(dashboardSource).toContain("함께 인용된 전체 출처");
+    expect(dashboardSource).toContain("페이지 내용 기준 관련 확인");
     expect(dashboardSource).toContain("model.verifiedTargetCitationPages.heading");
-    expect(dashboardSource).toContain("답변에서 가까이 배치됐다는");
+    expect(dashboardSource).toContain("같은 답변에 함께 인용됐다는");
     expect(dashboardSource).toContain("관련 페이지 보기 ↗");
     expect(dashboardSource).toContain("showAllVerifiedTargetCitationPages");
     expect(dashboardSource).toContain("내 업체 노출 답변에서 함께 인용된 출처");
     expect(dashboardSource).toContain("비교해볼 타업체 출처");
+    expect(dashboardSource).not.toContain("내 업체 관련 확인 ");
+    expect(dashboardSource).not.toContain("내 업체 확정 연결 ");
+    expect(dashboardSource).not.toContain("내 업체 근접 연결 단서 ");
+    expect(dashboardSource).not.toContain("내 업체 노출 답변 출처 ");
     expect(dashboardSource).toContain("기타 확정 연결");
     expect(dashboardSource).toContain("타업체 연결 단서");
     expect(dashboardSource).toContain("상위 3곳 여부 추가 확인");
@@ -522,15 +526,15 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("showAllCompetitors");
     expect(dashboardSource).toContain("usefulCompetitorSources");
     expect(dashboardSource).toContain("lowValueComparisonSourceDomain");
-    expect(dashboardSource).toContain("내 업체 근접 연결 단서 ${targetReferenceSources.length}개 보기");
+    expect(dashboardSource).toContain("AI 답변 내 근접 단서 ${targetReferenceSources.length}개 보기");
     expect(dashboardSource).toContain("showTargetExposureCitationSources");
     expect(dashboardSource).toContain("showAllTargetExposureCitationSources");
     expect(dashboardSource).toContain("expandedAllTargetExposureCitationBusinessId");
-    expect(dashboardSource).toContain("노출 답변 출처 ${targetExposureCitationSourceCount}개 보기");
-    expect(dashboardSource).toContain("내 업체 · 노출 답변 기준");
+    expect(dashboardSource).toContain("함께 인용된 전체 출처 ${targetExposureCitationSourceCount}개 보기 · 참고");
+    expect(dashboardSource).toContain("참고용 · 내 업체 노출 답변 기준");
     expect(dashboardSource).toContain("<TableHead>내 업체 노출 답변</TableHead>");
     expect(dashboardSource).not.toContain("${model.businessName} 노출 답변 출처");
-    expect(dashboardSource).toContain("직접 연결된 출처이거나");
+    expect(dashboardSource).toContain("참고용 원본 관찰 자료입니다.");
     expect(dashboardSource).toContain("노출 원인이라는 뜻은 아닙니다.");
     expect(dashboardSource).toContain("상위 5개만 보기");
     expect(dashboardSource).toContain("나머지 ${targetExposureCitationSources.length - 5}개 더 보기");

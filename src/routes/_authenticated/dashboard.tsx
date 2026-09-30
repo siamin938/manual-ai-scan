@@ -1087,27 +1087,27 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-5 overflow-x-auto">
                 <p className="text-xs leading-5 text-muted-foreground">
-                  실제 인용 출처 중에서 업체와의 연결 근거가 확인된 경우를 나눠 보여드립니다.
-                  확정 연결 기준은 그대로 유지하고, 한 답변에서만 가까이 관찰된 내 업체 출처는
-                  별도의 ‘연결 단서’로만 표시합니다.
+                  먼저 인용 페이지 자체에서 내 업체 관련성이 확인된 출처를 보여드립니다.
+                  AI 답변 안에서의 직접 연결·근접 단서는 별도 기준으로 구분하고, 같은 답변에 함께
+                  인용됐을 뿐인 전체 출처는 참고용으로 접어둡니다.
                 </p>
 
                 <div className="flex flex-wrap gap-2 text-xs">
                   <Badge
                     variant={verifiedTargetCitationPageCount > 0 ? "default" : "outline"}
                   >
-                    내 업체 관련 확인 {verifiedTargetCitationPageCount}개
+                    페이지 내용 기준 관련 확인 {verifiedTargetCitationPageCount}개
                   </Badge>
                   <Badge variant={linkedTargetSourceCount > 0 ? "default" : "outline"}>
-                    내 업체 확정 연결 {linkedTargetSourceCount}개
+                    AI 답변 내 직접 연결 {linkedTargetSourceCount}개
                   </Badge>
                   <Badge variant="secondary">
-                    내 업체 근접 연결 단서 {targetReferenceSources.length}개
+                    AI 답변 내 근접 단서 {targetReferenceSources.length}개
                   </Badge>
                   <Badge
                     variant={targetExposureCitationSourceCount > 0 ? "secondary" : "outline"}
                   >
-                    내 업체 노출 답변 출처 {targetExposureCitationSourceCount}개
+                    함께 인용된 전체 출처 {targetExposureCitationSourceCount}개 · 참고
                   </Badge>
                   <Badge variant="outline">
                     비교해볼 타업체 출처 {linkedCompetitorSourceCount}개
@@ -1127,7 +1127,7 @@ function DashboardPage() {
                         </h3>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
                           AI가 실제 인용한 페이지 자체에서 내 업체의 업체명·지점·지역 또는
-                          검증된 공식 출처 근거를 확인한 페이지입니다. 답변에서 가까이 배치됐다는
+                          검증된 공식 출처 근거를 확인한 페이지입니다. 같은 답변에 함께 인용됐다는
                           이유만으로는 포함하지 않습니다.
                         </p>
                       </div>
@@ -1226,15 +1226,15 @@ function DashboardPage() {
 
                     <div className="space-y-2 border-t pt-4">
                       <div>
-                        <h3 className="text-sm font-semibold">내 업체와 확정 연결된 출처</h3>
+                        <h3 className="text-sm font-semibold">AI 답변 내 직접 연결된 출처</h3>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          반복 또는 직접 연결 기준을 통과한 출처입니다. 가장 강한 연결 증거만
+                          AI 답변 구조에서 내 업체와 citation의 직접·반복 연결 기준을 통과한 출처입니다.
                           여기에 포함합니다.
                         </p>
                       </div>
                       {linkedTargetSources.length === 0 ? (
                         <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
-                          이번 측정에서는 내 업체와 확정 연결된 출처가 확인되지 않았습니다.
+                          이번 측정에서는 AI 답변 안에서 내 업체와 직접 연결된 출처가 확인되지 않았습니다.
                         </p>
                       ) : (
                         <Table>
@@ -1293,13 +1293,13 @@ function DashboardPage() {
                           }
                         >
                           {showTargetReferenceSources
-                            ? "내 업체 근접 연결 단서 접기"
-                            : `내 업체 근접 연결 단서 ${targetReferenceSources.length}개 보기`}
+                            ? "AI 답변 내 근접 단서 접기"
+                            : `AI 답변 내 근접 단서 ${targetReferenceSources.length}개 보기`}
                         </Button>
                         {showTargetReferenceSources && (
                           <div className="rounded-lg border bg-muted/10 p-3">
                             <p className="mb-2 text-xs leading-5 text-muted-foreground">
-                              업체명과 citation이 가까운 위치에서 관찰됐지만 반복 기준을 충족하지
+                              AI 답변에서 내 업체명과 citation이 가까운 위치에서 관찰됐지만 반복 기준을 충족하지
                               않아 확정 연결에는 포함하지 않은 보조 증거입니다.
                             </p>
                             <div className="divide-y">
@@ -1352,24 +1352,24 @@ function DashboardPage() {
                         }}
                       >
                         {showTargetExposureCitationSources
-                          ? "내 업체 노출 답변 출처 접기"
-                          : `내 업체 노출 답변 출처 ${targetExposureCitationSourceCount}개 보기`}
+                          ? "함께 인용된 전체 출처 접기"
+                          : `함께 인용된 전체 출처 ${targetExposureCitationSourceCount}개 보기 · 참고`}
                       </Button>
 
                       {showTargetExposureCitationSources && (
                         <div className="rounded-lg border bg-muted/10 p-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-sm font-semibold">
-                              내 업체 노출 답변에서 함께 인용된 출처
+                              함께 인용된 전체 출처
                             </h3>
                             <Badge variant="outline">
-                              내 업체 · 노출 답변 기준
+                              참고용 · 내 업체 노출 답변 기준
                             </Badge>
                           </div>
                           <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                            확정 노출 {model.metricCards.visibility.confirmedCount}건에 실제
-                            citation으로 함께 등장한 출처입니다. 내 업체와 직접 연결된 출처이거나
-                            노출 원인이라는 뜻은 아닙니다.
+                            내 업체가 확정 노출된 {model.metricCards.visibility.confirmedCount}건의 답변에 실제
+                            citation으로 함께 등장한 전체 출처입니다. 페이지 자체가 내 업체와 관련됐다는
+                            뜻은 아니며 참고용 원본 관찰 자료입니다.
                           </p>
 
                           {!model.targetExposureCitationSources.available ? (

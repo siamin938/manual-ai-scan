@@ -237,16 +237,16 @@ export type EntityFactsV2DashboardCutoverModel = {
     rows: EntityFactsV2DashboardCitationSourceRow[];
   };
   targetReferenceSources: {
-    heading: "내 업체 근접 연결 단서";
+    heading: "AI 답변 내 근접 단서";
     rows: EntityFactsV2DashboardTargetReferenceSourceRow[];
   };
   targetExposureCitationSources: {
-    heading: "내 업체 노출 답변에서 함께 인용된 출처";
+    heading: "함께 인용된 전체 출처";
     available: boolean;
     rows: EntityFactsV2DashboardCitationSourceRow[];
   };
   verifiedTargetCitationPages: {
-    heading: "내 업체 관련성이 확인된 출처";
+    heading: "페이지 내용 기준 관련 확인";
     available: boolean;
     rows: EntityFactsV2DashboardVerifiedTargetCitationPageRow[];
   };
@@ -454,16 +454,16 @@ export function buildEntityFactsV2DashboardCutoverModel(
       rows: citationSources,
     },
     targetReferenceSources: {
-      heading: "내 업체 근접 연결 단서",
+      heading: "AI 답변 내 근접 단서",
       rows: targetReferenceSources,
     },
     targetExposureCitationSources: {
-      heading: "내 업체 노출 답변에서 함께 인용된 출처",
+      heading: "함께 인용된 전체 출처",
       available: dto.targetExposureCitationSources !== undefined,
       rows: targetExposureCitationSources,
     },
     verifiedTargetCitationPages: {
-      heading: "내 업체 관련성이 확인된 출처",
+      heading: "페이지 내용 기준 관련 확인",
       available: dto.verifiedTargetCitationPages !== undefined,
       rows: verifiedTargetCitationPages,
     },
