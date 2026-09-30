@@ -601,7 +601,8 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
       "아래 상세 분석과 벤치마크는 기본 24문항 측정을 기준으로 합니다.",
     );
     expect(dashboardSource).not.toContain("내 업체에서는 미관찰");
-    expect(dashboardSource).toContain('view: search.view === "detail"');
+    expect(dashboardSource).toContain('view: search["view"] === "detail"');
+    expect(dashboardSource).toContain('const view = requestedView ?? "summary"');
     expect(dashboardSource).toContain('view === "summary"');
     expect(dashboardSource).toContain('view === "detail"');
     expect(dashboardSource).toContain("AI VISIBILITY SUMMARY");

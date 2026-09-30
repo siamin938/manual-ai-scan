@@ -63,7 +63,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   validateSearch: (search: Record<string, unknown>) => ({
-    view: search.view === "detail" ? ("detail" as const) : ("summary" as const),
+    view: search["view"] === "detail" ? ("detail" as const) : undefined,
   }),
   head: () => ({
     meta: [
@@ -399,7 +399,8 @@ type QuestionGroupCounts = {
 };
 
 function DashboardPage() {
-  const { view } = Route.useSearch();
+  const { view: requestedView } = Route.useSearch();
+  const view = requestedView ?? "summary";
   const navigate = useNavigate({ from: "/dashboard" });
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
@@ -687,7 +688,7 @@ function DashboardPage() {
       })
     : null;
   const setDashboardView = (nextView: "summary" | "detail") => {
-    void navigate({ search: { view: nextView }, replace: true });
+    void navigate({ search: { view: nextView === "detail" ? "detail" : undefined }, replace: true });
   };
 
   return (
