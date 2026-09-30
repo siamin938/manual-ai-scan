@@ -605,8 +605,11 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain('const view = requestedView ?? "summary"');
     expect(dashboardSource).toContain('view === "summary"');
     expect(dashboardSource).toContain('view === "detail"');
-    expect(dashboardSource).toContain("AI VISIBILITY SUMMARY");
-    expect(dashboardSource).toContain("사장님이 10초 안에 핵심만 이해할 수 있도록");
+    expect(dashboardSource).toContain("AI VISIBILITY OVERVIEW");
+    expect(dashboardSource).toContain("이번 측정의 핵심 지표와 주요 관찰 결과를 한 화면에서 확인할 수 있습니다.");
+    expect(dashboardSource).toContain("AI 노출 요약");
+    expect(dashboardSource).toContain("핵심 요약");
+    expect(dashboardSource).not.toContain("사장님이 10초 안에 핵심만 이해할 수 있도록");
     expect(dashboardSource).toContain("buildEntityFactsV2DashboardSummaryViewModel");
     expect(dashboardSource).toContain("상세 분석 보기");
     expect(dashboardSource).toContain('onClick={() => setDashboardView("detail")}');

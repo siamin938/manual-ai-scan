@@ -703,14 +703,14 @@ function DashboardPage() {
       <div className="border-b border-border pb-6 lg:flex lg:items-end lg:justify-between lg:gap-8">
         <div className="max-w-3xl">
           <p className="report-kicker mb-3">
-            {view === "summary" ? "AI VISIBILITY SUMMARY" : "AI VISIBILITY REPORT"}
+            {view === "summary" ? "AI VISIBILITY OVERVIEW" : "AI VISIBILITY REPORT"}
           </p>
           <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
-            {view === "summary" ? "한눈에 보기" : "내 AI 노출 진단"}
+            {view === "summary" ? "AI 노출 요약" : "내 AI 노출 진단"}
           </h1>
           <p className="mt-3 text-base leading-7 text-muted-foreground">
             {view === "summary"
-              ? "사장님이 10초 안에 핵심만 이해할 수 있도록 이번 측정 결과를 간단히 요약했습니다."
+              ? "이번 측정의 핵심 지표와 주요 관찰 결과를 한 화면에서 확인할 수 있습니다."
               : isUnifiedDiagnostic
                 ? "내 업체에 맞춘 24개 질문으로 대표 노출·관찰 업체·출처·기간 변화를 한 번에 확인합니다."
                 : "내 업체에서 중요하게 보는 맞춤 검색 결과를 먼저 보여드리고, 기본 진단은 비교 기준으로 따로 제공합니다."}
@@ -724,7 +724,7 @@ function DashboardPage() {
               className="flex-1 shadow-none sm:flex-none"
               onClick={() => setDashboardView("summary")}
             >
-              한눈에 보기
+              핵심 요약
             </Button>
             <Button
               type="button"
