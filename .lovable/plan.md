@@ -1,21 +1,46 @@
-# /dashboard "진단 요청이 실패했습니다" 원인 진단 (변경 0건)
+# 차보임 사장님용 10초 요약
 
-## 원인
-- 새 코드(targetExposureCitationSources / measurement_entity_facts_v2 보조 조회)가 아니라, 미리보기 서버에 서비스 키(SUPABASE_SERVICE_ROLE_KEY)가 빠진 채 기동된 것이 원인입니다. 이전 커밋들과 같은 패턴입니다.
-- 실제 오류: `Error: Missing Supabase environment variable(s): SUPABASE_SERVICE_ROLE_KEY`
-- 스택:
-  - src/integrations/supabase/client.server.ts:43 (createSupabaseAdminClient) ← :66
-  - src/lib/entity-facts-v2-comparison.server.ts:336 (fetchEntityFactsV2Comparison) ← entity-facts-v2-comparison.functions.ts:44
-  - 같은 오류가 entity-facts-v2-read-gateway.functions.ts(getEntityFactsV2ReadGateway) 경로에서도 반복 기록됨 (로그 12건 이상)
-- 관리자 연결 생성 단계에서 실패하므로 read-gateway.server.ts:672의 measurement_entity_facts_v2 조회까지 도달하지 못합니다. 신규 조회 경로의 오류 기록은 0건입니다.
+## 목표
+- `/dashboard`를 `한눈에 보기`와 `상세 분석` 두 모드로 나누고 기본 진입을 한눈에 보기로 설정합니다.
+- 상세 분석은 현재 화면과 데이터 흐름을 그대로 보존합니다.
+- 요약의 모든 숫자와 목록은 현재 선택 업체의 기존 Entity Facts v2 및 기존 화면용 모델만 재사용합니다.
 
-## 런타임 상태
-- 키 누락 프로세스: PID 142 (14:50 UTC 기동)
-- 키 존재 프로세스: PID 1388 (15:00 UTC 새로 기동)
-- 현재 HEAD는 3b0fa46 "Work in progress" (60fdf44의 바로 다음 커밋, 60fdf44 포함). 작업 트리 clean.
+## 구현 범위
+1. **모드 전환**
+   - `view=summary|detail` 검색 파라미터를 검증해 새로고침과 공유에도 선택을 유지합니다.
+   - 값이 없거나 잘못되면 `summary`를 기본값으로 사용합니다.
+   - 상단 분할 탭과 하단 `상세 분석 보기 →` 버튼을 같은 URL 상태에 연결합니다.
 
-## 승인 시 복구 절차 (소스·DB·배포 변경 없음)
-1. 기존 시크릿 재연결 후 미리보기 서버만 재시작
-2. 새 프로세스 전체에 키 존재 확인 (값 미출력)
-3. /dashboard 200 및 재시작 이후 키 누락 로그 0건 확인
-4. 이후에도 오류가 남으면 그때 신규 보조 조회 경로를 별도 점검
+2. **표현 전용 요약 모델**
+   - 기존 dashboard cutover model, unified search-scope summary, action opportunity model을 입력으로 받는 작은 순수 ViewModel을 추가합니다.
+   - 확정 노출 수, 상위 3곳 수, 유효 답변 수, 관련 페이지 수, 최다 관찰 업체, 최대 3개 검색 상황, 유효할 때만 검색 범위 3개, 기존 우선 확인 항목 상위 2개, 관련 페이지 최대 3개를 구성합니다.
+   - 데이터가 없거나 분리 계약이 유효하지 않으면 임의의 0이나 새 추론 대신 명시적 빈 상태를 반환합니다.
+
+3. **한눈에 보기 UI**
+   - 기존 토큰과 Card/Button/Badge를 사용해 헤더, 연한 파란 요약 배너, KPI 4개, 검색 상황·검색 범위 2열, 우선 확인·관련 출처 2열, 상세 전환 버튼을 구성합니다.
+   - 모바일에서는 1열 또는 2열로 자연스럽게 접고, 긴 한국어·업체명·페이지 제목은 줄바꿈 또는 말줄임 처리합니다.
+   - 기존 업체 선택기를 유지해 업체 변경 시 동일 쿼리 결과로 즉시 다시 렌더링합니다.
+
+4. **상세 화면 보존**
+   - 현재 긴 대시보드 JSX를 삭제하거나 단순화하지 않고 `detail` 모드에서 그대로 렌더링합니다.
+   - 기존 측정, 판정, 서버 함수, DB, Edge Function, Supabase 코드는 변경하지 않습니다.
+
+5. **검증**
+   - 순수 요약 ViewModel 테스트로 기존 진실값 재사용, 정렬·최대 개수, unavailable/빈 상태를 확인합니다.
+   - 기본 모드, 탭·버튼 전환, 업체별 하드코딩 부재, 기존 상세 화면 계약 보존을 소스 계약 테스트로 확인합니다.
+   - Entity Facts v2 관련 테스트, 전체 테스트, TypeScript 검사, production build를 실행합니다.
+   - Preview에서 데스크톱·모바일 렌더링과 `/dashboard?view=summary|detail` 전환을 확인하되, 측정 실행이나 게시·배포는 하지 않습니다.
+
+## 변경 예상 파일
+- `src/routes/_authenticated/dashboard.tsx`
+- `src/lib/entity-facts-v2-dashboard-summary.viewmodel.ts` (신규)
+- `tests/entity-engine-v2/entity-facts-v2-dashboard-summary.viewmodel.test.ts` (신규)
+- `tests/entity-engine-v2/entity-facts-v2-dashboard-cutover.test.ts`
+- `roadmap.md`
+
+## 안전 기준
+- 수치 계산식, 판정 기준, 추천 로직은 새로 만들지 않습니다.
+- 업체명·업종·도메인을 하드코딩하지 않습니다.
+- 검색 범위 분해는 기존 24문항 계약 검증이 성공한 경우에만 표시합니다.
+- 우선 확인 항목은 기존 Action Opportunity 결과의 순서와 문구만 축약 재사용합니다.
+- Publish/Deploy, DB 수정, Edge 수정, 신규 측정은 수행하지 않습니다.
