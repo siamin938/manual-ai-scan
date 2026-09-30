@@ -100,6 +100,7 @@ describe("entity facts v2 dashboard summary view model", () => {
 
     expect(summary.visibility).toEqual({ count: 4, total: 24, pct: 16.67 });
     expect(summary.top3).toEqual({ count: 2, total: 24, pct: 8.33 });
+    expect(summary.heroVariant).toBe("visible_top3");
     expect(summary.verifiedPageCount).toBe(4);
     expect(summary.topCompetitor).toEqual({ name: "함께 나온 업체", responseCount: 7 });
     expect(summary.searchContexts.map((item) => [item.intentType, item.confirmedCount])).toEqual([
@@ -117,6 +118,36 @@ describe("entity facts v2 dashboard summary view model", () => {
     expect(JSON.stringify(summary)).not.toContain("현대 엑스티어");
   });
 
+  it("uses a dedicated zero-visibility hero state", () => {
+    const model = makeModel();
+    model.metricCards.visibility = metric(0, 24, 0);
+    model.metricCards.top3 = metric(0, 24, 0);
+
+    const summary = buildEntityFactsV2DashboardSummaryViewModel({
+      model,
+      unifiedLayerSummary: null,
+      actionOpportunityModel: null,
+    });
+
+    expect(summary.heroVariant).toBe("not_visible");
+    expect(summary.visibility).toEqual({ count: 0, total: 24, pct: 0 });
+    expect(summary.top3).toEqual({ count: 0, total: 24, pct: 0 });
+  });
+
+  it("distinguishes visibility without a Top3 appearance", () => {
+    const model = makeModel();
+    model.metricCards.visibility = metric(4, 24, 16.67);
+    model.metricCards.top3 = metric(0, 24, 0);
+
+    const summary = buildEntityFactsV2DashboardSummaryViewModel({
+      model,
+      unifiedLayerSummary: null,
+      actionOpportunityModel: null,
+    });
+
+    expect(summary.heroVariant).toBe("visible_no_top3");
+  });
+
   it("does not turn unavailable values into zero", () => {
     const model = makeModel();
     model.metricCards.visibility = metric(0, 0, null);
@@ -131,6 +162,7 @@ describe("entity facts v2 dashboard summary view model", () => {
 
     expect(summary.visibility).toEqual({ count: null, total: null, pct: null });
     expect(summary.top3).toEqual({ count: null, total: null, pct: null });
+    expect(summary.heroVariant).toBe("unavailable");
     expect(summary.verifiedPageCount).toBeNull();
     expect(summary.searchScopes).toBeNull();
     expect(summary.opportunities).toEqual([]);

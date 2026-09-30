@@ -27,12 +27,19 @@ export type DashboardSummarySearchScope = {
   confirmedPct: number | null;
 };
 
+export type DashboardSummaryHeroVariant =
+  | "unavailable"
+  | "not_visible"
+  | "visible_no_top3"
+  | "visible_top3";
+
 export type EntityFactsV2DashboardSummaryViewModel = {
   version: typeof ENTITY_FACTS_V2_DASHBOARD_SUMMARY_VERSION;
   businessName: string;
   measuredAt: string;
   visibility: DashboardSummaryMetric;
   top3: DashboardSummaryMetric;
+  heroVariant: DashboardSummaryHeroVariant;
   verifiedPageCount: number | null;
   topCompetitor: { name: string; responseCount: number } | null;
   searchContexts: DashboardSummarySearchContext[];
@@ -49,6 +56,22 @@ export type EntityFactsV2DashboardSummaryViewModel = {
     sampleUrl: string;
   }>;
 };
+
+function heroVariantFor(
+  visibility: DashboardSummaryMetric,
+  top3: DashboardSummaryMetric,
+): DashboardSummaryHeroVariant {
+  if (
+    visibility.count === null ||
+    visibility.total === null ||
+    top3.count === null
+  ) {
+    return "unavailable";
+  }
+  if (visibility.count === 0) return "not_visible";
+  if (top3.count === 0) return "visible_no_top3";
+  return "visible_top3";
+}
 
 function exactMetric(args: {
   count: number;
@@ -103,20 +126,24 @@ export function buildEntityFactsV2DashboardSummaryViewModel(args: {
       })))
     : null;
 
+  const visibility = exactMetric({
+    count: model.metricCards.visibility.confirmedCount,
+    total: model.metricCards.visibility.validCount,
+    lowerPct: model.metricCards.visibility.lowerPct,
+  });
+  const top3 = exactMetric({
+    count: model.metricCards.top3.confirmedCount,
+    total: model.metricCards.top3.validCount,
+    lowerPct: model.metricCards.top3.lowerPct,
+  });
+
   return {
     version: ENTITY_FACTS_V2_DASHBOARD_SUMMARY_VERSION,
     businessName: model.businessName,
     measuredAt: model.measuredAt,
-    visibility: exactMetric({
-      count: model.metricCards.visibility.confirmedCount,
-      total: model.metricCards.visibility.validCount,
-      lowerPct: model.metricCards.visibility.lowerPct,
-    }),
-    top3: exactMetric({
-      count: model.metricCards.top3.confirmedCount,
-      total: model.metricCards.top3.validCount,
-      lowerPct: model.metricCards.top3.lowerPct,
-    }),
+    visibility,
+    top3,
+    heroVariant: heroVariantFor(visibility, top3),
     verifiedPageCount: model.verifiedTargetCitationPages.available
       ? model.verifiedTargetCitationPages.rows.length
       : null,

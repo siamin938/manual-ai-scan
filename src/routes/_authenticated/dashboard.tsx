@@ -1747,12 +1747,23 @@ function DashboardSummary({
             <BarChart3 aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            {hasHeroCounts ? (
+            {summary.heroVariant === "visible_top3" && hasHeroCounts ? (
               <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
                 {summary.visibility.total}번 물어봤더니 내 업체는{" "}
                 <strong className="text-primary">{summary.visibility.count}번</strong> 나왔고, 그중{" "}
                 <strong className="text-primary">{summary.top3.count}번</strong>은{" "}
                 <strong className="text-primary">상위 3곳</strong> 안에 나왔습니다.
+              </p>
+            ) : summary.heroVariant === "visible_no_top3" && hasHeroCounts ? (
+              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
+                {summary.visibility.total}번 중 내 업체는{" "}
+                <strong className="text-primary">{summary.visibility.count}번</strong> 나왔지만,{" "}
+                <strong className="text-primary">상위 3곳</strong>에서는 아직 확인되지 않았습니다.
+              </p>
+            ) : summary.heroVariant === "not_visible" && hasHeroCounts ? (
+              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
+                {summary.visibility.total}번 물어봤지만 이번 측정에서는{" "}
+                <strong className="text-primary">내 업체가 확인되지 않았습니다.</strong>
               </p>
             ) : (
               <p className="text-xl font-semibold leading-8 sm:text-2xl">
