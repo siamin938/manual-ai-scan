@@ -15,7 +15,7 @@ const branchBusiness = {
 
 describe("Citation Page Entity Verification v0.1", () => {
   it("pins the verifier version", () => {
-    expect(CITATION_PAGE_ENTITY_VERIFIER_VERSION).toBe("0.1.0");
+    expect(CITATION_PAGE_ENTITY_VERIFIER_VERSION).toBe("0.1.1");
   });
 
   it("derives only the safe terminal 점 branch variant when aliases are empty", () => {

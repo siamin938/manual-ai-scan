@@ -122,17 +122,16 @@ function safePublicUrl(raw: string): URL | null {
   return url;
 }
 
-async function readTextLimited(response: Response): Promise<string> {
+async function readBytesLimited(response: Response): Promise<Uint8Array> {
   const reader = response.body?.getReader();
-  if (!reader) return "";
-  const decoder = new TextDecoder();
-  let bytes = 0;
-  let out = "";
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
   for (;;) {
     const part = await reader.read();
     if (part.done) break;
-    bytes += part.value.byteLength;
-    if (bytes > MAX_BYTES) {
+    const remaining = MAX_BYTES - total;
+    if (remaining <= 0) {
       try {
         await reader.cancel();
       } catch {
@@ -140,10 +139,74 @@ async function readTextLimited(response: Response): Promise<string> {
       }
       break;
     }
-    out += decoder.decode(part.value, { stream: true });
+    const chunk =
+      part.value.byteLength <= remaining
+        ? part.value
+        : part.value.slice(0, remaining);
+    chunks.push(chunk);
+    total += chunk.byteLength;
+    if (part.value.byteLength > remaining || total >= MAX_BYTES) {
+      try {
+        await reader.cancel();
+      } catch {
+        // no-op
+      }
+      break;
+    }
   }
-  out += decoder.decode();
+
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   return out;
+}
+
+function normalizeCharset(value: string | null | undefined): string | null {
+  const raw = (value ?? "").trim().toLowerCase().replace(/["']/gu, "");
+  if (!raw) return null;
+  if (raw === "utf8") return "utf-8";
+  if (
+    raw === "cp949" ||
+    raw === "x-windows-949" ||
+    raw === "ks_c_5601-1987" ||
+    raw === "ksc5601" ||
+    raw === "ks_c_5601"
+  ) {
+    return "euc-kr";
+  }
+  return raw;
+}
+
+function charsetFromContentType(contentType: string): string | null {
+  const match = contentType.match(/charset\s*=\s*["']?([^;"'\s]+)/iu);
+  return normalizeCharset(match?.[1]);
+}
+
+function charsetFromMeta(bytes: Uint8Array): string | null {
+  if (bytes.byteLength === 0) return null;
+  const prefix = new TextDecoder("windows-1252")
+    .decode(bytes.slice(0, Math.min(bytes.byteLength, 8192)));
+  const direct = prefix.match(/<meta\b[^>]*charset\s*=\s*["']?\s*([^"'\s/>]+)/iu);
+  if (direct?.[1]) return normalizeCharset(direct[1]);
+  const content = prefix.match(
+    /<meta\b[^>]*content\s*=\s*["'][^"']*charset\s*=\s*([^"'\s;>]+)/iu,
+  );
+  return normalizeCharset(content?.[1]);
+}
+
+function decodePageBytes(bytes: Uint8Array, contentType: string): string {
+  const charset =
+    charsetFromContentType(contentType) ??
+    charsetFromMeta(bytes) ??
+    "utf-8";
+  try {
+    return new TextDecoder(charset).decode(bytes);
+  } catch {
+    return new TextDecoder("utf-8").decode(bytes);
+  }
 }
 
 function decodeHtmlEntities(value: string): string {
@@ -279,7 +342,8 @@ async function fetchPage(rawUrl: string): Promise<{
       };
     }
 
-    const html = await readTextLimited(response);
+    const bytes = await readBytesLimited(response);
+    const html = decodePageBytes(bytes, contentType);
     return {
       fetchSucceeded: true,
       pageTitle: htmlTitle(html),
@@ -433,6 +497,7 @@ Deno.serve(async (request) => {
         inserted_count: 0,
         skipped_count: 0,
         target_measurement_count: 0,
+        materialization_id: aggregate.materialization_id,
       },
     });
     return json({
@@ -704,6 +769,7 @@ Deno.serve(async (request) => {
       unresolved_count: unresolvedCount,
       unrelated_count: unrelatedCount,
       target_measurement_count: targetMeasurementIds.length,
+      materialization_id: aggregate.materialization_id,
       ssrf_guard_version: SSRF_GUARD_VERSION,
     },
   });

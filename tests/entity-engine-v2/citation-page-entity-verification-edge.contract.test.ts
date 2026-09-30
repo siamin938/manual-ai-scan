@@ -26,6 +26,10 @@ describe("Citation Page Entity Verification edge contract", () => {
     expect(source).toContain("citation_page_entity_verifications");
     expect(source).toContain("x-visibility-postprocess-token");
     expect(source).toContain("SSRF_GUARD_VERSION");
+    expect(source).toContain("charsetFromContentType");
+    expect(source).toContain("charsetFromMeta");
+    expect(source).toContain('return "euc-kr"');
+    expect(source).toContain("materialization_id: aggregate.materialization_id");
     expect(source).not.toContain("api.openai.com");
     expect(source).not.toContain("PERPLEXITY_API_KEY");
     expect(source).not.toContain("GEMINI_API_KEY");

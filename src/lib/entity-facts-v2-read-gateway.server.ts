@@ -775,7 +775,8 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   // Page-level relevance verification for citations from currently confirmed
   // target-visible measurements. This is independent from answer-position
   // citation attribution and never changes visibility, Top3, targetSeen or
-  // targetSources. Failure is non-blocking.
+  // targetSources. Failure is non-blocking. Results are exposed only after a
+  // completion event for the current verifier version and current v2 materialization.
   const verifiedTargetMeasurementIds =
     !targetExposureFactError &&
     (targetExposureFactRows ?? []).length === storage.measurement_count
@@ -791,103 +792,124 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     verifiedTargetMeasurementIds.size ===
       gatewayResponse.data.overview.confirmedMentionCount
   ) {
-    const { data: verifiedPageRows, error: verifiedPageError } =
+    const { data: verifiedPageCompletedEvent, error: verifiedPageEventError } =
       await supabaseAdmin
-        .from("citation_page_entity_verifications")
-        .select(
-          "measurement_id,canonical_url,domain,citation_title,page_title,confidence,evidence",
-        )
+        .from("system_events")
+        .select("id")
         .eq("org_id", orgId)
-        .eq("business_id", businessId)
-        .eq("source_run_id", run.id)
+        .eq("run_id", run.id)
+        .eq("event_type", "citation_page_entity_verification_completed")
         .eq(
-          "verifier_version",
+          "metadata->>verifier_version",
           ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION,
         )
-        .eq("verification_status", "confirmed")
-        .limit(1000);
+        .eq(
+          "metadata->>materialization_id",
+          storage.materialization_id,
+        )
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (!verifiedPageError) {
-      const byUrl = new Map<
-        string,
-        {
-          domain: string;
-          title: string | null;
-          sampleUrl: string;
-          measurementIds: Set<string>;
-          citationCount: number;
-          confidence: "high" | "medium";
-          basisLabel: string;
+    if (!verifiedPageEventError && verifiedPageCompletedEvent) {
+      const { data: verifiedPageRows, error: verifiedPageError } =
+        await supabaseAdmin
+          .from("citation_page_entity_verifications")
+          .select(
+            "measurement_id,canonical_url,domain,citation_title,page_title,confidence,evidence",
+          )
+          .eq("org_id", orgId)
+          .eq("business_id", businessId)
+          .eq("source_run_id", run.id)
+          .eq(
+            "verifier_version",
+            ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION,
+          )
+          .eq("verification_status", "confirmed")
+          .limit(1000);
+
+      if (!verifiedPageError) {
+        const byUrl = new Map<
+          string,
+          {
+            domain: string;
+            title: string | null;
+            sampleUrl: string;
+            measurementIds: Set<string>;
+            citationCount: number;
+            confidence: "high" | "medium";
+            basisLabel: string;
+          }
+        >();
+
+        for (const row of verifiedPageRows ?? []) {
+          if (!verifiedTargetMeasurementIds.has(row.measurement_id)) continue;
+
+          const sampleUrl =
+            typeof row.canonical_url === "string"
+              ? row.canonical_url.trim()
+              : "";
+          const domain = normalizeSourceDomain(row.domain);
+          if (!domain || !/^https?:\/\//iu.test(sampleUrl)) continue;
+
+          const title =
+            typeof row.page_title === "string" && row.page_title.trim()
+              ? row.page_title.trim()
+              : typeof row.citation_title === "string" &&
+                  row.citation_title.trim()
+                ? row.citation_title.trim()
+                : null;
+          const confidence =
+            row.confidence === "high" ? "high" : "medium";
+          const basisLabel = verifiedTargetPageBasisLabel(row.evidence);
+          const current = byUrl.get(sampleUrl) ?? {
+            domain,
+            title,
+            sampleUrl,
+            measurementIds: new Set<string>(),
+            citationCount: 0,
+            confidence,
+            basisLabel,
+          };
+
+          current.measurementIds.add(row.measurement_id);
+          current.citationCount += 1;
+          if (!current.title && title) current.title = title;
+          if (confidence === "high") current.confidence = "high";
+          if (
+            verifiedTargetPageBasisRank(basisLabel) <
+            verifiedTargetPageBasisRank(current.basisLabel)
+          ) {
+            current.basisLabel = basisLabel;
+          }
+          byUrl.set(sampleUrl, current);
         }
-      >();
 
-      for (const row of verifiedPageRows ?? []) {
-        if (!verifiedTargetMeasurementIds.has(row.measurement_id)) continue;
+        const verifiedTargetCitationPages:
+          EntityFactsV2ReadVerifiedTargetCitationPageDTO[] =
+          [...byUrl.values()]
+            .map((value) => ({
+              domain: value.domain,
+              title: value.title,
+              responseCount: value.measurementIds.size,
+              citationCount: value.citationCount,
+              sampleUrl: value.sampleUrl,
+              confidence: value.confidence,
+              basisLabel: value.basisLabel,
+            }))
+            .sort(
+              (a, b) =>
+                Number(b.confidence === "high") -
+                  Number(a.confidence === "high") ||
+                b.responseCount - a.responseCount ||
+                b.citationCount - a.citationCount ||
+                a.domain.localeCompare(b.domain, "en") ||
+                (a.title ?? "").localeCompare(b.title ?? "", "ko"),
+            );
 
-        const sampleUrl =
-          typeof row.canonical_url === "string"
-            ? row.canonical_url.trim()
-            : "";
-        const domain = normalizeSourceDomain(row.domain);
-        if (!domain || !/^https?:\/\//iu.test(sampleUrl)) continue;
-
-        const title =
-          typeof row.page_title === "string" && row.page_title.trim()
-            ? row.page_title.trim()
-            : typeof row.citation_title === "string" &&
-                row.citation_title.trim()
-              ? row.citation_title.trim()
-              : null;
-        const confidence =
-          row.confidence === "high" ? "high" : "medium";
-        const basisLabel = verifiedTargetPageBasisLabel(row.evidence);
-        const current = byUrl.get(sampleUrl) ?? {
-          domain,
-          title,
-          sampleUrl,
-          measurementIds: new Set<string>(),
-          citationCount: 0,
-          confidence,
-          basisLabel,
-        };
-
-        current.measurementIds.add(row.measurement_id);
-        current.citationCount += 1;
-        if (!current.title && title) current.title = title;
-        if (confidence === "high") current.confidence = "high";
-        if (
-          verifiedTargetPageBasisRank(basisLabel) <
-          verifiedTargetPageBasisRank(current.basisLabel)
-        ) {
-          current.basisLabel = basisLabel;
-        }
-        byUrl.set(sampleUrl, current);
+        gatewayResponse.data.verifiedTargetCitationPages =
+          verifiedTargetCitationPages;
       }
-
-      const verifiedTargetCitationPages:
-        EntityFactsV2ReadVerifiedTargetCitationPageDTO[] =
-        [...byUrl.values()]
-          .map((value) => ({
-            domain: value.domain,
-            title: value.title,
-            responseCount: value.measurementIds.size,
-            citationCount: value.citationCount,
-            sampleUrl: value.sampleUrl,
-            confidence: value.confidence,
-            basisLabel: value.basisLabel,
-          }))
-          .sort(
-            (a, b) =>
-              Number(b.confidence === "high") -
-                Number(a.confidence === "high") ||
-              b.responseCount - a.responseCount ||
-              b.citationCount - a.citationCount ||
-              a.domain.localeCompare(b.domain, "en") ||
-              (a.title ?? "").localeCompare(b.title ?? "", "ko"),
-          );
-
-      gatewayResponse.data.verifiedTargetCitationPages =
-        verifiedTargetCitationPages;
     }
   }
 

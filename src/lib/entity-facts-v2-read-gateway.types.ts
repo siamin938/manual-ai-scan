@@ -3,7 +3,7 @@ export const ENTITY_FACTS_V2_READ_FACT_VERSION = "0.3" as const;
 export const ENTITY_FACTS_V2_READ_AGGREGATE_VERSION = "0.1" as const;
 export const ENTITY_FACTS_V2_READ_ENGINE_VERSION =
   "entity-facts-v2:mef0.3:hist0.1:te0.3:src0.1:agg0.1:mat0.1" as const;
-export const ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION = "0.1.0" as const;
+export const ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION = "0.1.1" as const;
 
 export type EntityFactsV2ReadError =
   | "FORBIDDEN"

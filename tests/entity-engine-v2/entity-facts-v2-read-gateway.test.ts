@@ -111,7 +111,7 @@ function validAggregate() {
 describe("Entity Facts v2 Read Gateway", () => {
   it("pins the reviewed versions", () => {
     expect(ENTITY_FACTS_V2_READ_GATEWAY_VERSION).toBe("0.1");
-    expect(ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION).toBe("0.1.0");
+    expect(ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION).toBe("0.1.1");
     expect(ENTITY_FACTS_V2_READ_FACT_VERSION).toBe("0.3");
     expect(ENTITY_FACTS_V2_READ_AGGREGATE_VERSION).toBe("0.1");
     expect(ENTITY_FACTS_V2_READ_ENGINE_VERSION).toBe(
@@ -576,6 +576,13 @@ describe("Entity Facts v2 Read Gateway", () => {
     );
     expect(serverSource).toContain("verifiedPageError");
     expect(serverSource).toContain("verifiedTargetPageBasisLabel");
+    expect(serverSource).toContain("verifiedPageCompletedEvent");
+    expect(serverSource).toContain(
+      '"metadata->>materialization_id"',
+    );
+    expect(serverSource).toContain(
+      '"metadata->>verifier_version"',
+    );
   });
 
   it("keeps advisory target source clues non-blocking and separate from confirmed target sources", () => {
