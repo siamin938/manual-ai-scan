@@ -70,9 +70,8 @@ type DashboardSearch = { view?: "detail" };
 type DashboardSearchInput = SearchSchemaInput & { view?: string };
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  validateSearch: (search: DashboardSearchInput): DashboardSearch => ({
-    view: search["view"] === "detail" ? ("detail" as const) : undefined,
-  }),
+  validateSearch: (search: DashboardSearchInput): DashboardSearch =>
+    search["view"] === "detail" ? { view: "detail" } : {},
   head: () => ({
     meta: [
       { title: "AI 노출 진단 · 차보임 CHABOIM" },
@@ -696,7 +695,7 @@ function DashboardPage() {
       })
     : null;
   const setDashboardView = (nextView: "summary" | "detail") => {
-    void navigate({ search: { view: nextView === "detail" ? "detail" : undefined }, replace: true });
+    void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
   };
 
   return (
