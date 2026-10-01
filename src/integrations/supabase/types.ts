@@ -3629,6 +3629,22 @@ export type Database = {
         Args: { p_business_id: string }
         Returns: Json
       }
+      business_profile_is_shared_host_v01: {
+        Args: { p_host: string }
+        Returns: boolean
+      }
+      business_profile_naver_blog_key_v01: {
+        Args: { p_url: string }
+        Returns: string
+      }
+      business_profile_naver_place_url_v01: {
+        Args: { p_url: string }
+        Returns: string
+      }
+      business_profile_url_host_v01: {
+        Args: { p_url: string }
+        Returns: string
+      }
       can_view_data_asset_admin_v01: { Args: never; Returns: boolean }
       claim_measurement_jobs: {
         Args: { p_limit?: number }
@@ -4090,6 +4106,10 @@ export type Database = {
         Returns: string
       }
       storage_object_org_id: { Args: { object_name: string }; Returns: string }
+      sync_business_profile_first_party_sources_v01: {
+        Args: { p_business_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "owner" | "admin" | "analyst" | "client_viewer"
