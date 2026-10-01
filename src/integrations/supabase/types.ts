@@ -71,6 +71,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          managed_by: string
           match_mode: string
           normalized_host: string | null
           org_id: string
@@ -86,6 +87,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          managed_by?: string
           match_mode: string
           normalized_host?: string | null
           org_id: string
@@ -101,6 +103,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          managed_by?: string
           match_mode?: string
           normalized_host?: string | null
           org_id?: string
