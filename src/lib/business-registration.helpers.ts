@@ -68,3 +68,59 @@ export function getBusinessSaveErrorMessage(error: unknown): string {
 }
 
 export const BUSINESS_DUPLICATE_NAME_MESSAGE = DUPLICATE_NAME_MESSAGE;
+
+/** 쉼표/줄바꿈으로 구분된 사용자 입력 별칭을 목록으로 분리한다. */
+export function parseAliasInput(input: string): string[] {
+  return normalizeAliasList((input ?? "").split(/[,，\n\r]+/));
+}
+
+/**
+ * 최종 별칭 목록을 만든다.
+ * - 기존 별칭 보존 → 사용자가 직접 입력한 별칭 → 공백 제거 안전 후보 순서.
+ * - 지점명 추론(본점↔구로점 등)은 하지 않는다.
+ * - 공식명 자체는 제외한다.
+ */
+export function mergeBusinessAliases(
+  existing: readonly string[],
+  userInput: string,
+  name: string,
+): string[] {
+  const canonical = normalizeBusinessName(name);
+  return normalizeAliasList([
+    ...(existing ?? []),
+    ...parseAliasInput(userInput),
+    ...generateSafeAliasCandidates(name),
+  ]).filter((a) => a !== canonical);
+}
+
+export type PublicUrlNormalization =
+  | { ok: true; value: string | null }
+  | { ok: false };
+
+/** 선택 입력 공개 URL을 http(s) URL로 정규화한다. 빈 값은 null, 잘못된 값은 실패. */
+export function normalizeOptionalPublicUrl(input: string | null | undefined): PublicUrlNormalization {
+  const raw = (input ?? "").trim();
+  if (!raw) return { ok: true, value: null };
+  if (/\s/.test(raw)) return { ok: false };
+
+  let candidate: string;
+  if (/^https?:\/\//i.test(raw)) candidate = raw;
+  else if (raw.startsWith("//")) candidate = `https:${raw}`;
+  else if (/^[a-z][a-z0-9+.-]*:/i.test(raw) && !/^[^:/]+:\d+(\/|$)/.test(raw)) return { ok: false };
+  else candidate = `https://${raw}`;
+
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    return { ok: false };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return { ok: false };
+  const host = url.hostname;
+  if (!host || !(host.includes(".") || host === "localhost") || host.startsWith(".") || host.endsWith(".")) {
+    return { ok: false };
+  }
+  if (url.username || url.password) return { ok: false };
+  // 입력 의미를 바꾸지 않기 위해 원문 기반 candidate를 유지한다.
+  return { ok: true, value: candidate };
+}
