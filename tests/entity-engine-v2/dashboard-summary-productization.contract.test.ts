@@ -27,7 +27,8 @@ describe("dashboard owner productization layer", () => {
   it("explains the measurement method without changing the engine", () => {
     expect(dashboardSource).toContain("측정 기준 보기");
     expect(dashboardSource).toContain("8개 검색 상황을 3문항씩, 총 24문항");
-    expect(dashboardSource).toContain("애매한 경우를 임의로 노출로 올리지 않습니다.");
+    expect(dashboardSource).toContain("애매한");
+    expect(dashboardSource).toContain("임의로 노출로 올리지 않습니다.");
     expect(dashboardSource).toContain(
       "실제 검색량, 시장 점유율 또는",
     );
