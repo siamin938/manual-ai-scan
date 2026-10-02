@@ -1937,7 +1937,14 @@ function DashboardSummary({
         </Card>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      {/* 0% 노출 상태에서는 관련성이 확인된 출처 카드를 숨기고 우선 확인 항목을 전체 폭으로 표시합니다. */}
+      <div
+        className={
+          summary.heroVariant === "not_visible"
+            ? "grid gap-5"
+            : "grid gap-5 lg:grid-cols-2"
+        }
+      >
         <Card className="report-section">
           <CardHeader>
             <CardTitle className="text-xl">지금 먼저 확인할 것</CardTitle>
@@ -1970,6 +1977,7 @@ function DashboardSummary({
           </CardContent>
         </Card>
 
+        {summary.heroVariant !== "not_visible" && (
         <Card className="report-section">
           <CardHeader>
             <CardTitle className="text-xl">관련성이 확인된 출처</CardTitle>
@@ -2012,6 +2020,7 @@ function DashboardSummary({
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       <Card className="report-section">
