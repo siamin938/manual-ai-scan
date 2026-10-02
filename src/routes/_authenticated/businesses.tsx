@@ -7,14 +7,16 @@ import { useImeSafeForm } from "@/hooks/use-ime-safe-form";
 
 import {
   businessNameIdentityKey,
-  generateSafeAliasCandidates,
   getBusinessSaveErrorMessage,
+  mergeBusinessAliases,
   normalizeAliasList,
   normalizeBusinessName,
+  normalizeOptionalPublicUrl,
 } from "@/lib/business-registration.helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,6 +85,7 @@ type FormState = {
   id: string;
   name: string;
   existingAliases: string[];
+  aliasInput: string;
   categorySelect: string;
   categoryCustom: string;
   website_url: string;
@@ -99,6 +102,7 @@ const EMPTY: FormState = {
   id: "",
   name: "",
   existingAliases: [],
+  aliasInput: "",
   categorySelect: "",
   categoryCustom: "",
   website_url: "",
@@ -113,6 +117,7 @@ const EMPTY: FormState = {
 
 const IME_TEXT_FIELDS = [
   "name",
+  "aliasInput",
   "categoryCustom",
   "address",
   "region",
@@ -158,12 +163,14 @@ function BusinessesPage() {
     return f.categorySelect === LEGACY_CATEGORY ? f.categoryCustom.trim() : f.categorySelect.trim();
   }
 
-  /** 기존 별칭은 보존하고, 매우 보수적인 안전 후보만 자동 포함한다. */
-  function buildAliases(f: FormState, canonicalName: string): string[] {
-    return normalizeAliasList([
-      ...f.existingAliases,
-      ...generateSafeAliasCandidates(f.name),
-    ]).filter((a) => a !== canonicalName);
+  /** 기존 별칭 보존 + 사용자가 직접 입력한 별칭 + 공백 제거 안전 후보만 포함한다. */
+  function buildAliases(f: FormState): string[] {
+    return mergeBusinessAliases(f.existingAliases, f.aliasInput, f.name);
+  }
+
+  function urlValue(v: string): string | null {
+    const r = normalizeOptionalPublicUrl(v);
+    return r.ok ? r.value : null;
   }
 
   const save = useMutation({
@@ -172,11 +179,11 @@ function BusinessesPage() {
       const payload = {
         org_id: activeOrgId!,
         name: canonicalName,
-        aliases: buildAliases(f, canonicalName),
+        aliases: buildAliases(f),
         category: resolveCategoryOf(f),
-        website_url: f.website_url.trim() || null,
-        naver_place_url: f.naver_place_url.trim() || null,
-        google_maps_url: f.google_maps_url.trim() || null,
+        website_url: urlValue(f.website_url),
+        naver_place_url: urlValue(f.naver_place_url),
+        google_maps_url: urlValue(f.google_maps_url),
         address: f.address.trim() || null,
         country_code: f.id ? f.country_code || "KR" : "KR",
         region: f.region.trim() || null,
@@ -230,6 +237,7 @@ function BusinessesPage() {
       id: b.id,
       name: b.name,
       existingAliases: normalizeAliasList(b.aliases ?? []),
+      aliasInput: "",
       categorySelect: category ? (isKnown ? category : LEGACY_CATEGORY) : "",
       categoryCustom: category && !isKnown ? category : "",
       website_url: b.website_url ?? "",
@@ -271,7 +279,23 @@ function BusinessesPage() {
       );
       return;
     }
-    save.mutate(latest);
+    const urlFields = [
+      { key: "naver_place_url", label: "네이버 플레이스" },
+      { key: "website_url", label: "홈페이지" },
+      { key: "google_maps_url", label: "구글 지도" },
+    ] as const;
+    const normalizedUrls: Partial<Record<(typeof urlFields)[number]["key"], string>> = {};
+    for (const { key, label } of urlFields) {
+      const r = normalizeOptionalPublicUrl(latest[key]);
+      if (!r.ok) {
+        toast.error(`${label} 주소가 올바르지 않습니다. 예: www.example.com 또는 https://example.com`);
+        return;
+      }
+      normalizedUrls[key] = r.value ?? "";
+    }
+    const finalForm = { ...latest, ...normalizedUrls };
+    setForm(finalForm);
+    save.mutate(finalForm);
   }
 
   return (
@@ -378,6 +402,32 @@ function BusinessesPage() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">대한민국 기준으로 등록됩니다.</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="b-aliases">다른 이름·별칭 (선택)</Label>
+                {form.existingAliases.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {form.existingAliases.map((a) => (
+                      <Badge key={a} variant="secondary" className="font-normal">
+                        {a}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <Textarea
+                  id="b-aliases"
+                  name="aliasInput"
+                  rows={2}
+                  value={form.aliasInput}
+                  onChange={(e) => setForm({ ...form, aliasInput: e.target.value })}
+                  {...compositionProps((v) => setForm((f) => ({ ...f, aliasInput: v })))}
+                  placeholder="예: 카스페이스 구로 본점, 카스페이스구로본점"
+                />
+                <p className="text-xs text-muted-foreground">
+                  실제로 같은 업체를 가리키는 이름만 입력해 주세요. 쉼표나 줄바꿈으로 여러 개를 입력할 수 있습니다.
+                  {form.existingAliases.length > 0 && " 위에 표시된 기존 별칭은 그대로 유지됩니다."}
+                </p>
               </div>
 
               <div className="space-y-2">

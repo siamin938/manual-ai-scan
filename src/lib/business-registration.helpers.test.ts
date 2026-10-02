@@ -80,3 +80,52 @@ describe("getBusinessSaveErrorMessage", () => {
     );
   });
 });
+
+import { mergeBusinessAliases, normalizeOptionalPublicUrl, parseAliasInput } from "./business-registration.helpers";
+
+describe("parseAliasInput", () => {
+  it("쉼표와 줄바꿈으로 분리하고 정규화·중복 제거한다", () => {
+    expect(parseAliasInput("카스페이스 구로 본점,  카스페이스구로본점\n카스페이스  구로 본점\n\n")).toEqual([
+      "카스페이스 구로 본점",
+      "카스페이스구로본점",
+    ]);
+  });
+});
+
+describe("mergeBusinessAliases", () => {
+  it("기존 별칭을 보존하고 새 별칭을 추가하며 공식명은 제외한다", () => {
+    expect(mergeBusinessAliases(["기존별칭"], "카스페이스 구로점, 새 별칭, 기존별칭", "카스페이스 구로점")).toEqual([
+      "기존별칭",
+      "새 별칭",
+      "카스페이스구로점",
+    ]);
+  });
+
+  it("지점 별칭을 자동 추론하지 않는다", () => {
+    const out = mergeBusinessAliases([], "", "카스페이스 구로점");
+    expect(out).toEqual(["카스페이스구로점"]);
+    expect(out).not.toContain("카스페이스 구로 본점");
+  });
+});
+
+describe("normalizeOptionalPublicUrl", () => {
+  it("빈 입력은 null", () => {
+    expect(normalizeOptionalPublicUrl("  ")).toEqual({ ok: true, value: null });
+  });
+  it("scheme 없는 주소에 https를 붙인다", () => {
+    expect(normalizeOptionalPublicUrl("www.carspace.co.kr")).toEqual({ ok: true, value: "https://www.carspace.co.kr" });
+    expect(normalizeOptionalPublicUrl("carspace.co.kr/about")).toEqual({ ok: true, value: "https://carspace.co.kr/about" });
+  });
+  it("이미 http(s)인 URL은 유지한다", () => {
+    expect(normalizeOptionalPublicUrl("https://naver.me/abc")).toEqual({ ok: true, value: "https://naver.me/abc" });
+    expect(normalizeOptionalPublicUrl("http://example.com/x?y=1")).toEqual({ ok: true, value: "http://example.com/x?y=1" });
+  });
+  it("protocol-relative URL은 https로 바꾼다", () => {
+    expect(normalizeOptionalPublicUrl("//example.com")).toEqual({ ok: true, value: "https://example.com" });
+  });
+  it("지원하지 않는 scheme와 잘못된 값은 거부한다", () => {
+    for (const bad of ["ftp://example.com", "javascript:alert(1)", "mailto:a@b.com", "not a url", "https://", "abc", "http://exa mple.com"]) {
+      expect(normalizeOptionalPublicUrl(bad).ok).toBe(false);
+    }
+  });
+});
