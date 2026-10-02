@@ -11,9 +11,11 @@ describe("dashboard owner productization layer", () => {
   it("keeps zero-visibility value useful without changing diagnostic truth", () => {
     expect(dashboardSource).toContain("이번 측정에서 대신 확인된 내용");
     expect(dashboardSource).toContain("가장 자주 함께 나온 업체");
+    expect(dashboardSource).toContain("이번 측정에서 자주 나온 업체");
     expect(dashboardSource).toContain("검증 대상 없음");
-    expect(dashboardSource).toContain("우선 확인할 차이");
+    expect(dashboardSource).toContain("확인할 출처 연결 차이");
     expect(dashboardSource).toContain('summary.heroVariant === "not_visible"');
+    expect(dashboardSource).toContain('summary.heroVariant !== "not_visible"');
   });
 
   it("reuses comparison v2 for repeat confirmation instead of inventing a score", () => {
