@@ -18,6 +18,16 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('summary.heroVariant !== "not_visible"');
   });
 
+  it("hides the verified sources card and widens opportunities in the zero-visibility state", () => {
+    expect(dashboardSource).toContain(
+      "0% 노출 상태에서는 관련성이 확인된 출처 카드를 숨기고 우선 확인 항목을 전체 폭으로 표시합니다.",
+    );
+    expect(dashboardSource).toContain(
+      'summary.heroVariant === "not_visible"\n            ? "grid gap-5"\n            : "grid gap-5 lg:grid-cols-2"',
+    );
+    expect(dashboardSource).toContain('summary.heroVariant !== "not_visible" && (');
+  });
+
   it("reuses comparison v2 for repeat confirmation instead of inventing a score", () => {
     expect(dashboardSource).toContain("재측정 확인");
     expect(dashboardSource).toContain("comparison.compactSummary");
