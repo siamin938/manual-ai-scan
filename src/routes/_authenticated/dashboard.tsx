@@ -1797,7 +1797,13 @@ function DashboardSummary({
         <SummaryKpiCard
           icon={<FileCheck2 aria-hidden="true" />}
           label="내 업체 관련 페이지"
-          value={summary.verifiedPageCount === null ? "확인 중" : `${summary.verifiedPageCount}개`}
+          value={
+            summary.heroVariant === "not_visible"
+              ? "검증 대상 없음"
+              : summary.verifiedPageCount === null
+                ? "확인 중"
+                : `${summary.verifiedPageCount}개`
+          }
           note={
             summary.heroVariant === "not_visible"
               ? "내 업체 노출 답변이 없어 검증 대상 없음"
@@ -1806,7 +1812,11 @@ function DashboardSummary({
         />
         <SummaryKpiCard
           icon={<Building2 aria-hidden="true" />}
-          label="가장 자주 함께 나온 업체"
+          label={
+            summary.heroVariant === "not_visible"
+              ? "이번 측정에서 자주 나온 업체"
+              : "가장 자주 함께 나온 업체"
+          }
           value={summary.topCompetitor?.name ?? "확인된 업체 없음"}
           note={
             summary.topCompetitor
@@ -1822,14 +1832,14 @@ function DashboardSummary({
           <CardHeader>
             <CardTitle className="text-xl">이번 측정에서 대신 확인된 내용</CardTitle>
             <p className="text-sm leading-6 text-muted-foreground">
-              내 업체가 나오지 않은 결과도 시장에서 어떤 업체와 출처 연결 차이가 관찰됐는지
-              확인하는 진단 자료로 활용할 수 있습니다.
+              내 업체가 나오지 않았더라도 이번 24개 질문에서 어떤 업체와 출처 연결 차이가
+              반복 관찰됐는지 확인할 수 있습니다.
             </p>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-3">
+          <CardContent className="grid gap-3 md:grid-cols-2">
             <div className="rounded-lg border bg-card p-4">
               <p className="text-xs font-medium text-muted-foreground">
-                가장 자주 함께 나온 업체
+                이번 측정에서 자주 나온 업체
               </p>
               <p className="mt-2 font-semibold">
                 {summary.topCompetitor?.name ?? "확인된 업체 없음"}
@@ -1842,36 +1852,32 @@ function DashboardSummary({
             </div>
             <div className="rounded-lg border bg-card p-4">
               <p className="text-xs font-medium text-muted-foreground">
-                내 업체 관련 페이지
+                확인할 출처 연결 차이
               </p>
               <p className="mt-2 font-semibold">
-                {summary.verifiedPageCount === null ? "확인 중" : "검증 대상 없음"}
+                {summary.opportunities.length > 0
+                  ? `${summary.opportunities.length}개 확인`
+                  : "근거가 충분한 차이 없음"}
               </p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                내 업체가 나온 AI 답변이 없어 이번 측정에서는 페이지 관련성 검증 대상이
-                생기지 않았습니다.
-              </p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs font-medium text-muted-foreground">
-                우선 확인할 차이
-              </p>
-              <p className="mt-2 font-semibold">
-                {summary.opportunities[0]?.title ?? "근거가 충분한 차이 없음"}
-              </p>
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                {summary.opportunities[0]?.observation ??
-                  "현재 데이터에서는 우선순위를 정할 만큼 반복된 출처 연결 차이가 확인되지 않았습니다."}
+                {summary.opportunities.length > 0
+                  ? "아래 ‘지금 먼저 확인할 것’에서 관찰 근거를 확인할 수 있습니다."
+                  : "현재 데이터에서는 우선순위를 정할 만큼 반복된 출처 연결 차이가 확인되지 않았습니다."}
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className="report-section">
-          <CardHeader>
-            <CardTitle className="text-xl">어떤 검색에서 보였나요?</CardTitle>
+      <div
+        className={
+          summary.heroVariant === "not_visible" ? "grid gap-5" : "grid gap-5 lg:grid-cols-2"
+        }
+      >
+        {summary.heroVariant !== "not_visible" && (
+          <Card className="report-section">
+            <CardHeader>
+              <CardTitle className="text-xl">어떤 검색에서 보였나요?</CardTitle>
             <p className="text-sm leading-6 text-muted-foreground">
               이번 측정에서 실제로 확인된 검색 상황만 요약했습니다.
             </p>
@@ -1897,7 +1903,8 @@ function DashboardSummary({
               </div>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        )}
 
         <Card className="report-section">
           <CardHeader>
