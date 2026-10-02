@@ -239,14 +239,17 @@ export function buildEntityFactsV2ComparisonViewModel(
     };
   }
 
-  const structurallyComparable =
-    dto.status === "verified" &&
-    dto.compatibleRunCount >= 2 &&
-    dto.previousRun !== null &&
-    dto.visibility.previous !== null &&
-    dto.top3.previous !== null;
+  const previousRun = dto.previousRun;
+  const previousVisibility = dto.visibility.previous;
+  const previousTop3 = dto.top3.previous;
 
-  if (!structurallyComparable) {
+  if (
+    dto.status !== "verified" ||
+    dto.compatibleRunCount < 2 ||
+    previousRun === null ||
+    previousVisibility === null ||
+    previousTop3 === null
+  ) {
     return unavailable({
       heading: "측정 비교를 준비할 수 없습니다",
       description: "비교 조건은 확인됐지만 이전 측정 정보를 완전하게 확인할 수 없습니다.",
@@ -278,7 +281,7 @@ export function buildEntityFactsV2ComparisonViewModel(
       : null;
 
   const currentValidCount = dto.visibility.current.validCount;
-  const previousValidCount = dto.visibility.previous?.validCount ?? 0;
+  const previousValidCount = previousVisibility.validCount;
   const newlyConfirmedQuestionCount =
     searchScope?.newlyConfirmedQuestionCount ?? null;
   const noLongerConfirmedQuestionCount =
@@ -296,11 +299,11 @@ export function buildEntityFactsV2ComparisonViewModel(
       : null;
   const compactSummary: EntityFactsV2ComparisonCompactSummary = {
     validCount: currentValidCount,
-    previousConfirmedCount: dto.visibility.previous.confirmedCount,
+    previousConfirmedCount: previousVisibility.confirmedCount,
     currentConfirmedCount: dto.visibility.current.confirmedCount,
     confirmedDeltaCount:
       dto.visibility.current.confirmedCount -
-      dto.visibility.previous.confirmedCount,
+      previousVisibility.confirmedCount,
     newlyConfirmedQuestionCount,
     noLongerConfirmedQuestionCount,
     sameQuestionResultCount,
