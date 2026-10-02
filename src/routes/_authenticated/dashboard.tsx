@@ -1977,6 +1977,7 @@ function DashboardSummary({
           </CardContent>
         </Card>
 
+        {summary.heroVariant !== "not_visible" && (
         <Card className="report-section">
           <CardHeader>
             <CardTitle className="text-xl">관련성이 확인된 출처</CardTitle>
@@ -2019,6 +2020,7 @@ function DashboardSummary({
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       <Card className="report-section">
