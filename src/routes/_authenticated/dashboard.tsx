@@ -854,6 +854,7 @@ function DashboardPage() {
       {dto && model && summaryModel && view === "summary" && (
         <DashboardSummary
           summary={summaryModel}
+          comparison={comparisonModel}
           intentLabelFor={intentLabel}
           onShowDetail={() => setDashboardView("detail")}
         />
@@ -1722,10 +1723,12 @@ function summaryMetricNote(metric: DashboardSummaryMetric): string {
 
 function DashboardSummary({
   summary,
+  comparison,
   intentLabelFor,
   onShowDetail,
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
+  comparison: ReturnType<typeof buildEntityFactsV2ComparisonViewModel> | null;
   intentLabelFor: (intentType: string) => string;
   onShowDetail: () => void;
 }) {
@@ -1795,7 +1798,11 @@ function DashboardSummary({
           icon={<FileCheck2 aria-hidden="true" />}
           label="내 업체 관련 페이지"
           value={summary.verifiedPageCount === null ? "확인 중" : `${summary.verifiedPageCount}개`}
-          note="페이지 내용 기준 관련 확인"
+          note={
+            summary.heroVariant === "not_visible"
+              ? "내 업체 노출 답변이 없어 검증 대상 없음"
+              : "페이지 내용 기준 관련 확인"
+          }
         />
         <SummaryKpiCard
           icon={<Building2 aria-hidden="true" />}
@@ -1809,6 +1816,57 @@ function DashboardSummary({
           compact
         />
       </div>
+
+      {summary.heroVariant === "not_visible" && (
+        <Card className="report-section border-primary/20 bg-primary/[0.02]">
+          <CardHeader>
+            <CardTitle className="text-xl">이번 측정에서 대신 확인된 내용</CardTitle>
+            <p className="text-sm leading-6 text-muted-foreground">
+              내 업체가 나오지 않은 결과도 시장에서 어떤 업체와 출처 연결 차이가 관찰됐는지
+              확인하는 진단 자료로 활용할 수 있습니다.
+            </p>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs font-medium text-muted-foreground">
+                가장 자주 함께 나온 업체
+              </p>
+              <p className="mt-2 font-semibold">
+                {summary.topCompetitor?.name ?? "확인된 업체 없음"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {summary.topCompetitor
+                  ? `AI 답변에서 ${summary.topCompetitor.responseCount}건 관찰`
+                  : "이번 측정에서 업체 관찰 근거가 없습니다."}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs font-medium text-muted-foreground">
+                내 업체 관련 페이지
+              </p>
+              <p className="mt-2 font-semibold">
+                {summary.verifiedPageCount === null ? "확인 중" : "검증 대상 없음"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                내 업체가 나온 AI 답변이 없어 이번 측정에서는 페이지 관련성 검증 대상이
+                생기지 않았습니다.
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card p-4">
+              <p className="text-xs font-medium text-muted-foreground">
+                우선 확인할 차이
+              </p>
+              <p className="mt-2 font-semibold">
+                {summary.opportunities[0]?.title ?? "근거가 충분한 차이 없음"}
+              </p>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                {summary.opportunities[0]?.observation ??
+                  "현재 데이터에서는 우선순위를 정할 만큼 반복된 출처 연결 차이가 확인되지 않았습니다."}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card className="report-section">
@@ -1948,6 +2006,117 @@ function DashboardSummary({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="report-section">
+        <CardHeader>
+          <CardTitle className="text-xl">재측정 확인</CardTitle>
+          <p className="text-sm leading-6 text-muted-foreground">
+            같은 질문과 측정 조건이 확인된 결과끼리만 비교합니다.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {comparison?.comparisonAvailable && comparison.compactSummary ? (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border bg-muted/15 p-4">
+                  <p className="text-xs font-medium text-muted-foreground">이전 측정</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums">
+                    {comparison.compactSummary.previousConfirmedCount}/
+                    {comparison.compactSummary.validCount}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-primary/25 bg-primary/[0.03] p-4">
+                  <p className="text-xs font-medium text-muted-foreground">이번 측정</p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums text-primary">
+                    {comparison.compactSummary.currentConfirmedCount}/
+                    {comparison.compactSummary.validCount}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-muted/15 p-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    질문 결과 일치
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums">
+                    {comparison.compactSummary.sameQuestionResultCount === null
+                      ? "–"
+                      : `${comparison.compactSummary.sameQuestionResultCount}/${comparison.compactSummary.validCount}`}
+                  </p>
+                </div>
+              </div>
+              {comparison.compactSummary.newlyConfirmedQuestionCount !== null &&
+                comparison.compactSummary.noLongerConfirmedQuestionCount !== null && (
+                  <p className="text-sm">
+                    새로 확인된 질문{" "}
+                    <span className="font-semibold tabular-nums">
+                      {comparison.compactSummary.newlyConfirmedQuestionCount}개
+                    </span>
+                    {" · "}
+                    이전에는 확인됐지만 이번에는 확인되지 않은 질문{" "}
+                    <span className="font-semibold tabular-nums">
+                      {comparison.compactSummary.noLongerConfirmedQuestionCount}개
+                    </span>
+                  </p>
+                )}
+              <p className="text-xs leading-5 text-muted-foreground">
+                질문 결과 일치는 같은 질문에서 내 업체의 확정 노출 여부가 같았다는 뜻입니다.
+                별도의 신뢰도 점수나 노출 원인을 의미하지 않습니다.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg bg-muted/30 px-4 py-4">
+              <p className="text-sm font-semibold">
+                {comparison?.heading ?? "동일 조건 재측정 전입니다"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {comparison?.description ??
+                  "같은 질문과 측정 조건으로 다시 측정하면 질문별 일치와 변화를 비교할 수 있습니다."}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <details className="group rounded-xl border bg-card">
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold">
+          측정 기준 보기
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            왜 이 숫자가 나왔는지
+          </span>
+        </summary>
+        <div className="border-t px-5 py-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-sm font-semibold">질문 구성</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {summary.searchScopes && summary.visibility.total === 24
+                  ? "표준 통합 진단은 지역·추천·서비스·후기·신뢰·비교·가격·탐색 8개 검색 상황을 3문항씩, 총 24문항으로 확인합니다."
+                  : "현재 저장된 진단 질문을 같은 측정 조건으로 실행해 결과를 집계합니다."}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">확정 노출</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                AI 답변 안에서 현재 업체로 확정 확인된 경우만 노출 건수에 포함합니다. 애매한
+                경우를 임의로 노출로 올리지 않습니다.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">상위 3곳</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                AI 답변에서 업체로 확인된 항목 중 내 업체의 위치가 3위 이내로 확인된 경우만
+                집계합니다.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold">비율의 의미</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                이 비율은 이번 진단 질문 안에서 확인된 결과이며 실제 검색량, 시장 점유율 또는
+                전체 AI 이용자의 노출 비율을 의미하지 않습니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      </details>
 
       <div className="flex flex-col items-center gap-2 pt-2 text-center">
         <Button type="button" size="lg" onClick={onShowDetail}>
