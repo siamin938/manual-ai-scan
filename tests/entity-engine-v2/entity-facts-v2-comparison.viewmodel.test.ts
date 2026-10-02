@@ -93,6 +93,7 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
     expect(vm.visibility?.currentValueText).toBe("16.67%");
     expect(vm.visibility?.previousValueText).toBeNull();
     expect(vm.visibility?.deltaText).toBeNull();
+    expect(vm.compactSummary).toBeNull();
 
     const customerSurface = JSON.stringify(vm);
     expect(customerSurface).not.toContain("single");
@@ -181,6 +182,15 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
     expect(vm.visibility?.uncertaintyText).toBe(
       "추가 확인 응답: 이전 0건 · 현재 2건",
     );
+    expect(vm.compactSummary).toEqual({
+      validCount: 24,
+      previousConfirmedCount: 7,
+      currentConfirmedCount: 4,
+      confirmedDeltaCount: -3,
+      newlyConfirmedQuestionCount: null,
+      noLongerConfirmedQuestionCount: null,
+      sameQuestionResultCount: null,
+    });
     expect(vm.visibility?.maximumNotice).toContain("현재 최대 25%");
     expect(vm.trendSeries).toEqual([]);
   });
@@ -272,6 +282,15 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
     expect(vm.searchScope?.core.deltaText).toBe("-25%p");
     expect(vm.searchScope?.newlyConfirmedQuestionCount).toBe(4);
     expect(vm.searchScope?.noLongerConfirmedQuestionCount).toBe(2);
+    expect(vm.compactSummary).toEqual({
+      validCount: 24,
+      previousConfirmedCount: 12,
+      currentConfirmedCount: 16,
+      confirmedDeltaCount: 4,
+      newlyConfirmedQuestionCount: 4,
+      noLongerConfirmedQuestionCount: 2,
+      sameQuestionResultCount: 18,
+    });
     expect(JSON.stringify(vm.searchScope)).not.toContain("개선");
     expect(JSON.stringify(vm.searchScope)).not.toContain("악화");
   });
@@ -401,6 +420,7 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
     expect(vm.comparisonAvailable).toBe(false);
     expect(vm.visibility).toBeNull();
     expect(vm.top3).toBeNull();
+    expect(vm.compactSummary).toBeNull();
   });
 
   it("uses customer wording for unavailable states without exposing internal reasons", () => {
