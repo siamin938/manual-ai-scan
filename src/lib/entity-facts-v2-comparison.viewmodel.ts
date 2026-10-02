@@ -29,6 +29,16 @@ export type EntityFactsV2ComparisonTrendPointViewModel = {
   unresolvedCount: number;
 };
 
+export type EntityFactsV2ComparisonCompactSummary = {
+  validCount: number;
+  previousConfirmedCount: number;
+  currentConfirmedCount: number;
+  confirmedDeltaCount: number;
+  newlyConfirmedQuestionCount: number | null;
+  noLongerConfirmedQuestionCount: number | null;
+  sameQuestionResultCount: number | null;
+};
+
 export type EntityFactsV2ComparisonSearchScopeViewModel = {
   custom: EntityFactsV2ComparisonMetricViewModel;
   core: EntityFactsV2ComparisonMetricViewModel;
@@ -47,6 +57,7 @@ export type EntityFactsV2ComparisonViewModel = {
   visibility: EntityFactsV2ComparisonMetricViewModel | null;
   top3: EntityFactsV2ComparisonMetricViewModel | null;
   searchScope: EntityFactsV2ComparisonSearchScopeViewModel | null;
+  compactSummary: EntityFactsV2ComparisonCompactSummary | null;
   trendSeries: EntityFactsV2ComparisonTrendPointViewModel[];
 };
 
@@ -147,6 +158,7 @@ function unavailable(args: {
     visibility: null,
     top3: null,
     searchScope: null,
+    compactSummary: null,
     trendSeries: [],
   };
 }
@@ -196,6 +208,7 @@ export function buildEntityFactsV2ComparisonViewModel(
         comparisonAvailable: false,
       }),
       searchScope: null,
+      compactSummary: null,
       trendSeries: [],
     };
   }
@@ -221,6 +234,7 @@ export function buildEntityFactsV2ComparisonViewModel(
         comparisonAvailable: false,
       }),
       searchScope: null,
+      compactSummary: null,
       trendSeries: [],
     };
   }
@@ -263,6 +277,35 @@ export function buildEntityFactsV2ComparisonViewModel(
         }
       : null;
 
+  const currentValidCount = dto.visibility.current.validCount;
+  const previousValidCount = dto.visibility.previous?.validCount ?? 0;
+  const newlyConfirmedQuestionCount =
+    searchScope?.newlyConfirmedQuestionCount ?? null;
+  const noLongerConfirmedQuestionCount =
+    searchScope?.noLongerConfirmedQuestionCount ?? null;
+  const sameQuestionResultCount =
+    currentValidCount > 0 &&
+    currentValidCount === previousValidCount &&
+    newlyConfirmedQuestionCount !== null &&
+    noLongerConfirmedQuestionCount !== null &&
+    newlyConfirmedQuestionCount + noLongerConfirmedQuestionCount <=
+      currentValidCount
+      ? currentValidCount -
+        newlyConfirmedQuestionCount -
+        noLongerConfirmedQuestionCount
+      : null;
+  const compactSummary: EntityFactsV2ComparisonCompactSummary = {
+    validCount: currentValidCount,
+    previousConfirmedCount: dto.visibility.previous.confirmedCount,
+    currentConfirmedCount: dto.visibility.current.confirmedCount,
+    confirmedDeltaCount:
+      dto.visibility.current.confirmedCount -
+      dto.visibility.previous.confirmedCount,
+    newlyConfirmedQuestionCount,
+    noLongerConfirmedQuestionCount,
+    sameQuestionResultCount,
+  };
+
   return {
     version: ENTITY_FACTS_V2_COMPARISON_VIEW_MODEL_VERSION,
     mode: trendAvailable ? "trend" : "comparison",
@@ -285,6 +328,7 @@ export function buildEntityFactsV2ComparisonViewModel(
       comparisonAvailable: true,
     }),
     searchScope,
+    compactSummary,
     trendSeries: trendAvailable
       ? dto.series.map((point) => ({
           measuredAt: point.measuredAt,
