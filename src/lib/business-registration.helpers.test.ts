@@ -3,6 +3,9 @@ import {
   businessNameIdentityKey,
   generateSafeAliasCandidates,
   getBusinessSaveErrorMessage,
+  mergeBusinessAliases,
+  normalizeOptionalPublicUrl,
+  parseAliasInput,
   normalizeAliasList,
   normalizeBusinessName,
 } from "./business-registration.helpers";
@@ -80,8 +83,6 @@ describe("getBusinessSaveErrorMessage", () => {
     );
   });
 });
-
-import { mergeBusinessAliases, normalizeOptionalPublicUrl, parseAliasInput } from "./business-registration.helpers";
 
 describe("parseAliasInput", () => {
   it("쉼표와 줄바꿈으로 분리하고 정규화·중복 제거한다", () => {
