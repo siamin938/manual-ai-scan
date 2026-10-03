@@ -581,7 +581,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
           )}
 
           <p className="text-xs text-muted-foreground">
-            같은 조건으로 다시 시작해도 중복 측정은 생성되지 않습니다.
+            같은 조건의 최근 측정이 이미 준비·진행 중이면 해당 측정을 이어서 사용합니다.
           </p>
         </div>
 
