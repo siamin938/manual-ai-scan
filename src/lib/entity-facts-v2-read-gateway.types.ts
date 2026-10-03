@@ -54,6 +54,32 @@ export type EntityFactsV2ReadCompetitorDTO = {
   top3ResponseCount: number;
 };
 
+
+export type EntityFactsV2ReadBroadSearchSourceDTO = {
+  domain: string;
+  responseCount: number;
+  directAttributionCount: number;
+};
+
+export type EntityFactsV2ReadBroadSearchCompetitorDTO = {
+  name: string;
+  responseCount: number;
+  questionCount: number;
+  intentCount: number;
+  top3ResponseCount: number;
+  strongestIndependentSource: EntityFactsV2ReadBroadSearchSourceDTO | null;
+};
+
+export type EntityFactsV2ReadBroadSearchObservationDTO = {
+  version: "0.1";
+  validCount: number;
+  targetConfirmedCount: number;
+  targetTop3Count: number;
+  targetIndependentSourceResponseCount: number;
+  targetIndependentSources: EntityFactsV2ReadBroadSearchSourceDTO[];
+  repeatedCompetitors: EntityFactsV2ReadBroadSearchCompetitorDTO[];
+};
+
 export type EntityFactsV2ReadTargetSourceDTO = {
   domain: string;
   responseCount: number;
@@ -154,6 +180,12 @@ export type EntityFactsV2ReadGatewayDTO = {
    * exact-run cross-response supplement after the core v2 snapshot is built.
    */
   competitors: EntityFactsV2ReadCompetitorDTO[];
+  /**
+   * Read-only comparison inside the wide Core search layer. This summarizes
+   * repeated confirmed competitors and co-observed independent web sources.
+   * It is descriptive evidence only and never changes target visibility truth.
+   */
+  broadSearchObservation?: EntityFactsV2ReadBroadSearchObservationDTO;
   targetSources: EntityFactsV2ReadTargetSourceDTO[];
   /** Supplemental final-answer citation summary for the exact representative run. */
   citationSources?: EntityFactsV2ReadCitationSourceDTO[];
