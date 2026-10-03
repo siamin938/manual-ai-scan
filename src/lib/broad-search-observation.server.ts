@@ -4,9 +4,10 @@ import { classifySourceDomain, normalizeSourceDomain } from "./source-domain-cla
 import type {
   EntityFactsV2ReadBroadSearchObservationDTO,
   EntityFactsV2ReadBroadSearchSourceDTO,
+  EntityFactsV2ReadBroadSearchSourcePatternDTO,
 } from "./entity-facts-v2-read-gateway.types";
 
-export const BROAD_SEARCH_OBSERVATION_VERSION = "0.1" as const;
+export const BROAD_SEARCH_OBSERVATION_VERSION = "0.2" as const;
 const REPEATED_COMPETITOR_MIN_RESPONSES = 2;
 
 type QuestionRow = {
@@ -86,6 +87,47 @@ type SourceAccumulator = {
   measurementIds: Set<string>;
   directAttributionCount: number;
 };
+
+
+const SOURCE_PATTERN_LABELS: Record<
+  EntityFactsV2ReadBroadSearchSourcePatternDTO["key"],
+  string
+> = {
+  independent_web: "독립 웹",
+  shared_profile: "공유 프로필",
+  community: "커뮤니티·블로그",
+  auto_platform: "자동차 플랫폼",
+  video_platform: "영상",
+  news: "뉴스",
+  job_board: "채용",
+  public_information: "공공 정보",
+  brand_or_manufacturer: "브랜드·제조사",
+  marketplace_or_directory: "디렉터리·마켓",
+};
+
+function sourcePatternKey(
+  value: ReturnType<typeof classifySourceDomain>["class"],
+): EntityFactsV2ReadBroadSearchSourcePatternDTO["key"] | null {
+  if (value === "unknown" || value === "infrastructure") return null;
+  return value;
+}
+
+function sourceClassesForCompetitor(args: {
+  attributions: AttributionRow[];
+  measurementIds: Set<string>;
+  canonicalKeys: Set<string>;
+}): Set<EntityFactsV2ReadBroadSearchSourcePatternDTO["key"]> {
+  const out = new Set<EntityFactsV2ReadBroadSearchSourcePatternDTO["key"]>();
+  for (const row of args.attributions) {
+    if (!args.measurementIds.has(row.measurement_id)) continue;
+    if (!args.canonicalKeys.has(normalizedKey(row.canonical_key))) continue;
+    const domain = normalizeSourceDomain(row.domain);
+    if (!domain) continue;
+    const key = sourcePatternKey(classifySourceDomain(domain).class);
+    if (key) out.add(key);
+  }
+  return out;
+}
 
 function summarizeIndependentSources(args: {
   attributions: AttributionRow[];
@@ -261,8 +303,7 @@ export function buildBroadSearchObservation(
     groups.set(resolvedKey, group);
   }
 
-  const repeatedCompetitors = [...groups.entries()]
-    .filter(([, group]) => group.measurementIds.size >= REPEATED_COMPETITOR_MIN_RESPONSES)
+  const competitorRows = [...groups.entries()]
     .map(([canonicalKey, group]) => {
       const canonicalKeys =
         rawKeysByResolved.get(canonicalKey) ?? new Set([canonicalKey]);
@@ -271,25 +312,65 @@ export function buildBroadSearchObservation(
         measurementIds: group.measurementIds,
         canonicalKeys,
       });
+      const sourceClasses = sourceClassesForCompetitor({
+        attributions: input.attributions,
+        measurementIds: group.measurementIds,
+        canonicalKeys,
+      });
 
       return {
-        name: input.finalCompetitorNamesByCanonicalKey[canonicalKey]!,
-        responseCount: group.measurementIds.size,
-        questionCount: group.questionIds.size,
-        intentCount: group.intentTypes.size,
-        top3ResponseCount: [...group.bestPositionByMeasurement.values()].filter(
-          (position) => position <= 3,
-        ).length,
-        strongestIndependentSource: sources[0] ?? null,
+        canonicalKey,
+        sourceClasses,
+        row: {
+          name: input.finalCompetitorNamesByCanonicalKey[canonicalKey]!,
+          responseCount: group.measurementIds.size,
+          questionCount: group.questionIds.size,
+          intentCount: group.intentTypes.size,
+          top3ResponseCount: [...group.bestPositionByMeasurement.values()].filter(
+            (position) => position <= 3,
+          ).length,
+          strongestIndependentSource: sources[0] ?? null,
+        },
       };
     })
     .sort(
       (a, b) =>
-        b.responseCount - a.responseCount ||
-        b.intentCount - a.intentCount ||
-        b.top3ResponseCount - a.top3ResponseCount ||
-        a.name.localeCompare(b.name, "ko"),
+        b.row.responseCount - a.row.responseCount ||
+        b.row.intentCount - a.row.intentCount ||
+        b.row.top3ResponseCount - a.row.top3ResponseCount ||
+        a.row.name.localeCompare(b.row.name, "ko"),
     );
+
+  const repeatedCompetitors = competitorRows
+    .filter(({ row }) => row.responseCount >= REPEATED_COMPETITOR_MIN_RESPONSES)
+    .map(({ row }) => row);
+
+  const singleObservationCompetitors = competitorRows
+    .filter(({ row }) => row.responseCount === 1)
+    .map(({ row }) => row);
+
+  const sourcePatternCounts = new Map<
+    EntityFactsV2ReadBroadSearchSourcePatternDTO["key"],
+    number
+  >();
+  for (const competitor of competitorRows) {
+    for (const key of competitor.sourceClasses) {
+      sourcePatternCounts.set(key, (sourcePatternCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const sourcePatterns: EntityFactsV2ReadBroadSearchSourcePatternDTO[] =
+    [...sourcePatternCounts.entries()]
+      .map(([key, competitorCount]) => ({
+        key,
+        label: SOURCE_PATTERN_LABELS[key],
+        competitorCount,
+      }))
+      .sort(
+        (a, b) =>
+          b.competitorCount - a.competitorCount ||
+          a.label.localeCompare(b.label, "ko"),
+      );
 
   const targetCanonicalKey = `business:${input.businessId.trim().toLowerCase()}`;
   const targetSources = summarizeIndependentSources({
@@ -317,6 +398,17 @@ export function buildBroadSearchObservation(
     targetIndependentSourceResponseCount: targetIndependentMeasurementIds.size,
     targetIndependentSources: targetSources,
     repeatedCompetitors,
+    singleObservationCompetitors,
+    observedCompetitorCount: competitorRows.length,
+    independentWebLinkedCompetitorCount: competitorRows.filter(
+      ({ row }) => row.strongestIndependentSource !== null,
+    ).length,
+    repeatedIndependentWebLinkedCompetitorCount: competitorRows.filter(
+      ({ row }) =>
+        row.responseCount >= REPEATED_COMPETITOR_MIN_RESPONSES &&
+        row.strongestIndependentSource !== null,
+    ).length,
+    sourcePatterns,
   };
 }
 
