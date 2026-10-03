@@ -130,9 +130,7 @@ describe("broad search observation v0.1", () => {
         "auto:모터큐브": "모터큐브",
         "auto:t스타일랩": "T 스타일 랩",
       },
-      mergeCanonicalAliases: {
-        "auto:모먼트": "auto:모먼트카케어",
-      },
+      mergeCanonicalAliases: {},
     });
 
     expect(result).toMatchObject({
@@ -166,17 +164,6 @@ describe("broad search observation v0.1", () => {
         },
       }),
       expect.objectContaining({
-        name: "모먼트 카케어",
-        responseCount: 2,
-        questionCount: 2,
-        top3ResponseCount: 2,
-        strongestIndependentSource: {
-          domain: "momentcarcare.co.kr",
-          responseCount: 2,
-          directAttributionCount: 1,
-        },
-      }),
-      expect.objectContaining({
         name: "모터큐브",
         responseCount: 2,
         questionCount: 2,
@@ -189,6 +176,7 @@ describe("broad search observation v0.1", () => {
       }),
     ]);
     expect(result.repeatedCompetitors.some((row) => row.name === "T 스타일 랩")).toBe(false);
+    expect(result.repeatedCompetitors.some((row) => row.name.includes("모먼트"))).toBe(false);
   });
 
   it("counts target independent web evidence separately from visibility", () => {
