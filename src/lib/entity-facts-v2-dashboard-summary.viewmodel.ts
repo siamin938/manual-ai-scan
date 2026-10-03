@@ -1,5 +1,6 @@
 import type { ActionOpportunityEngineResult } from "./action-opportunity-engine-v01";
 import type { EntityFactsV2DashboardCutoverModel } from "./entity-facts-v2-read-gateway.dashboard-cutover";
+import type { EntityFactsV2ReadBroadSearchObservationDTO } from "./entity-facts-v2-read-gateway.types";
 import {
   confirmedRatePct,
   type UnifiedDiagnosticLayerSummary,
@@ -31,6 +32,14 @@ export type DashboardSummarySearchScopeObservation = {
   kind: "custom_without_core";
   headline: string;
   evidence: string | null;
+  repeatedCompetitors: Array<{
+    name: string;
+    responseCount: number;
+    top3ResponseCount: number;
+    intentCount: number;
+    independentSourceDomain: string | null;
+    independentSourceResponseCount: number | null;
+  }>;
 };
 
 export type DashboardSummaryHeroVariant =
@@ -100,12 +109,7 @@ function exactMetric(args: {
 function buildSearchScopeObservation(args: {
   unifiedLayerSummary: UnifiedDiagnosticLayerSummary | null;
   hasVerifiedOwnedDomain: boolean;
-  broadSearchObservation:
-    | {
-        validCount: number;
-        targetIndependentSourceResponseCount: number;
-      }
-    | null;
+  broadSearchObservation: EntityFactsV2ReadBroadSearchObservationDTO | null;
 }): DashboardSummarySearchScopeObservation | null {
   const summary = args.unifiedLayerSummary;
   if (
@@ -134,6 +138,16 @@ function buildSearchScopeObservation(args: {
     kind: "custom_without_core",
     headline,
     evidence,
+    repeatedCompetitors:
+      args.broadSearchObservation?.repeatedCompetitors.slice(0, 2).map((competitor) => ({
+        name: competitor.name,
+        responseCount: competitor.responseCount,
+        top3ResponseCount: competitor.top3ResponseCount,
+        intentCount: competitor.intentCount,
+        independentSourceDomain: competitor.strongestIndependentSource?.domain ?? null,
+        independentSourceResponseCount:
+          competitor.strongestIndependentSource?.responseCount ?? null,
+      })) ?? [],
   };
 }
 
@@ -142,12 +156,7 @@ export function buildEntityFactsV2DashboardSummaryViewModel(args: {
   unifiedLayerSummary: UnifiedDiagnosticLayerSummary | null;
   actionOpportunityModel: ActionOpportunityEngineResult | null;
   hasVerifiedOwnedDomain?: boolean;
-  broadSearchObservation?:
-    | {
-        validCount: number;
-        targetIndependentSourceResponseCount: number;
-      }
-    | null;
+  broadSearchObservation?: EntityFactsV2ReadBroadSearchObservationDTO | null;
 }): EntityFactsV2DashboardSummaryViewModel {
   const { model, unifiedLayerSummary, actionOpportunityModel } = args;
 
