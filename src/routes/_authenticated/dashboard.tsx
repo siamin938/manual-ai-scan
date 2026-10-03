@@ -2129,8 +2129,38 @@ function DashboardSummary({
                         {summary.searchScopeObservation.evidence}
                       </p>
                     )}
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      이번 측정에서 관찰된 차이이며, 특정 출처가 AI 노출의 원인임을 의미하지 않습니다.
+                    {summary.searchScopeObservation.repeatedCompetitors.length > 0 && (
+                      <div className="mt-4 space-y-2 border-t border-primary/10 pt-3">
+                        <p className="text-xs font-semibold text-foreground">
+                          같은 기준 검색에서 반복 확인된 다른 업체
+                        </p>
+                        <div className="grid gap-2">
+                          {summary.searchScopeObservation.repeatedCompetitors.map((competitor) => (
+                            <div
+                              key={competitor.name}
+                              className="flex flex-col gap-1 rounded-md border bg-card px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium">{competitor.name}</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  기준 검색 {competitor.responseCount}/
+                                  {summary.searchScopes?.find((scope) => scope.kind === "core")?.validCount ?? "–"}
+                                  {" · "}Top3 {competitor.top3ResponseCount}회
+                                  {" · "}검색 상황 {competitor.intentCount}종
+                                </p>
+                              </div>
+                              <p className="shrink-0 text-xs text-muted-foreground">
+                                {competitor.independentSourceDomain
+                                  ? `독립 웹 · ${competitor.independentSourceDomain}`
+                                  : "독립 웹 출처 연결 미확인"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                      같은 기준 검색에서 함께 관찰된 사실을 요약한 것이며, 특정 출처가 AI 노출의 원인임을 의미하지 않습니다.
                     </p>
                   </div>
                 )}
