@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +56,7 @@ function AuthedLayout() {
 function Shell({ sessionUserId }: { sessionUserId: string | null }) {
   const { memberships, activeOrgId, setActiveOrgId, role, loading } = useOrg();
   const navigate = useNavigate();
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const checkDataAssetAccess = useServerFn(canViewDataAssetAdmin);
   const { data: dataAssetAccess } = useQuery({
     queryKey: ["can-view-data-asset-admin", sessionUserId],
@@ -68,7 +70,15 @@ function Shell({ sessionUserId }: { sessionUserId: string | null }) {
 
 
   async function signOut() {
-    await supabase.auth.signOut();
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setIsSigningOut(false);
+      return;
+    }
+
     navigate({ to: "/auth" });
   }
 
@@ -112,15 +122,22 @@ function Shell({ sessionUserId }: { sessionUserId: string | null }) {
               </Select>
             )}
             {role && <Badge variant="secondary" className="hidden font-medium sm:inline-flex">{ROLE_LABELS[role]}</Badge>}
-            <Button variant="outline" size="sm" onClick={signOut}>
-              로그아웃
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={signOut}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "로그아웃 중…" : "로그아웃"}
             </Button>
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-7 lg:px-6 lg:py-10">
-        {loading ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>
+        {loading || isSigningOut ? (
+          <p className="py-16 text-center text-sm text-muted-foreground">
+            {isSigningOut ? "로그아웃 중…" : "불러오는 중…"}
+          </p>
         ) : memberships.length === 0 ? (
           <OrgOnboarding />
         ) : (
