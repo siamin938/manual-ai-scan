@@ -41,6 +41,7 @@ export type EntityFactsV2DashboardSummaryViewModel = {
   top3: DashboardSummaryMetric;
   heroVariant: DashboardSummaryHeroVariant;
   verifiedPageCount: number | null;
+  competitorCount: number;
   topCompetitor: { name: string; responseCount: number } | null;
   searchContexts: DashboardSummarySearchContext[];
   searchScopes: DashboardSummarySearchScope[] | null;
@@ -147,6 +148,7 @@ export function buildEntityFactsV2DashboardSummaryViewModel(args: {
     verifiedPageCount: model.verifiedTargetCitationPages.available
       ? model.verifiedTargetCitationPages.rows.length
       : null,
+    competitorCount: model.metricCards.competitorCount,
     topCompetitor: model.recentSummary.topCompetitor,
     searchContexts,
     searchScopes,
