@@ -24,12 +24,20 @@ describe("broad search observation v0.1", () => {
       id,
       question_id: questionIds[i]!,
     }));
+    const confirmedOtherByMeasurement: Record<string, string[]> = {
+      m1: ["auto:모터큐브", "auto:퀀텀팩토리서초점"],
+      m2: ["auto:퀀텀팩토리서초점"],
+      m4: ["auto:퀀텀팩토리서초점"],
+      m5: ["auto:퀀텀팩토리서초점"],
+      m6: ["auto:퀀텀팩토리서초점"],
+    };
     const facts = measurementIds.map((measurement_id) => ({
       measurement_id,
       facts: {
         valid: true,
         targetSeen: false,
         targetBestPosition: null,
+        confirmedOtherEntityKeys: confirmedOtherByMeasurement[measurement_id] ?? [],
       },
     }));
 
@@ -130,6 +138,12 @@ describe("broad search observation v0.1", () => {
         "auto:모터큐브": "모터큐브",
         "auto:t스타일랩": "T 스타일 랩",
       },
+      baseV2CompetitorCanonicalKeys: [
+        "auto:퀀텀팩토리서초점",
+        "auto:모먼트카케어",
+        "auto:모터큐브",
+      ],
+      promotedCompetitorCanonicalKeys: ["auto:국스월드", "auto:t스타일랩"],
       mergeCanonicalAliases: {},
     });
 
@@ -163,18 +177,8 @@ describe("broad search observation v0.1", () => {
           directAttributionCount: 1,
         },
       }),
-      expect.objectContaining({
-        name: "모터큐브",
-        responseCount: 2,
-        questionCount: 2,
-        top3ResponseCount: 2,
-        strongestIndependentSource: {
-          domain: "motorcube.co.kr",
-          responseCount: 2,
-          directAttributionCount: 1,
-        },
-      }),
     ]);
+    expect(result.repeatedCompetitors.some((row) => row.name === "모터큐브")).toBe(false);
     expect(result.repeatedCompetitors.some((row) => row.name === "T 스타일 랩")).toBe(false);
     expect(result.repeatedCompetitors.some((row) => row.name.includes("모먼트"))).toBe(false);
   });
@@ -215,6 +219,8 @@ describe("broad search observation v0.1", () => {
         },
       ],
       finalCompetitorNamesByCanonicalKey: {},
+      baseV2CompetitorCanonicalKeys: [],
+      promotedCompetitorCanonicalKeys: [],
       mergeCanonicalAliases: {},
     });
 
