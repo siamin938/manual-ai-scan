@@ -1963,7 +1963,13 @@ function DashboardSummary({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div
+        className={
+          summary.heroVariant === "not_visible"
+            ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            : "grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        }
+      >
         <SummaryKpiCard
           icon={<BarChart3 aria-hidden="true" />}
           label="내 업체가 나온 답변"
@@ -1977,22 +1983,18 @@ function DashboardSummary({
           value={summaryCountText(summary.top3)}
           note={summaryMetricNote(summary.top3)}
         />
-        <SummaryKpiCard
-          icon={<FileCheck2 aria-hidden="true" />}
-          label="내 업체 관련 페이지"
-          value={
-            summary.heroVariant === "not_visible"
-              ? "검증 대상 없음"
-              : summary.verifiedPageCount === null
+        {summary.heroVariant !== "not_visible" && (
+          <SummaryKpiCard
+            icon={<FileCheck2 aria-hidden="true" />}
+            label="내 업체 관련 페이지"
+            value={
+              summary.verifiedPageCount === null
                 ? "확인 중"
                 : `${summary.verifiedPageCount}개`
-          }
-          note={
-            summary.heroVariant === "not_visible"
-              ? "내 업체 노출 답변이 없어 검증 대상 없음"
-              : "페이지 내용 기준 관련 확인"
-          }
-        />
+            }
+            note="페이지 내용 기준 관련 확인"
+          />
+        )}
         <SummaryKpiCard
           icon={<Building2 aria-hidden="true" />}
           label={
@@ -2022,15 +2024,13 @@ function DashboardSummary({
           <CardContent className="grid gap-3 md:grid-cols-2">
             <div className="rounded-lg border bg-card p-4">
               <p className="text-xs font-medium text-muted-foreground">
-                이번 측정에서 자주 나온 업체
+                이번 측정에서 확인된 다른 업체
               </p>
-              <p className="mt-2 font-semibold">
-                {summary.topCompetitor?.name ?? "확인된 업체 없음"}
+              <p className="mt-2 font-semibold tabular-nums">
+                {summary.competitorCount}곳
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {summary.topCompetitor
-                  ? `AI 답변에서 ${summary.topCompetitor.responseCount}건 관찰`
-                  : "이번 측정에서 업체 관찰 근거가 없습니다."}
+                이번 24개 질문의 AI 답변에서 업체로 확인된 항목입니다.
               </p>
             </div>
             <div className="rounded-lg border bg-card p-4">
@@ -2044,8 +2044,8 @@ function DashboardSummary({
               </p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 {summary.opportunities.length > 0
-                  ? "아래 ‘지금 먼저 확인할 것’에서 관찰 근거를 확인할 수 있습니다."
-                  : "현재 데이터에서는 우선순위를 정할 만큼 반복된 출처 연결 차이가 확인되지 않았습니다."}
+                  ? "아래 ‘확인된 출처 연결 차이’에서 관찰 근거를 확인할 수 있습니다."
+                  : "현재 데이터에서는 반복된 출처 연결 차이를 보여줄 근거가 충분하지 않습니다."}
               </p>
             </div>
           </CardContent>
@@ -2130,7 +2130,7 @@ function DashboardSummary({
       >
         <Card className="report-section">
           <CardHeader>
-            <CardTitle className="text-xl">지금 먼저 확인할 것</CardTitle>
+            <CardTitle className="text-xl">확인된 출처 연결 차이</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {summary.opportunities.length === 0 ? (
