@@ -27,13 +27,10 @@ const organizationPrivilegeMigration = readFileSync(
 );
 
 describe("beta customer onboarding contract", () => {
-  it("allows beta self-signup only through the explicit auth surface", () => {
-    expect(authSource).toContain("const SELF_SIGNUP_ENABLED = true;");
-    expect(authSource).toContain("supabase.auth.signUp({");
-    expect(authSource).toContain('TabsTrigger value="signup"');
-    expect(authSource).toContain("onSubmit={signUp}");
-    expect(authSource).toContain("가입 후 이메일 인증이 완료되어야 로그인할 수 있습니다.");
-    expect(authSource).toContain("회원가입이 완료되었습니다. 이메일 인증 후 로그인해 주세요.");
+  it("keeps public self-signup closed in the customer auth surface", () => {
+    expect(authSource).toContain("const SELF_SIGNUP_ENABLED = false;");
+    expect(authSource).toContain('"이메일과 비밀번호로 로그인하세요."');
+    expect(authSource).toContain("비밀번호를 잊으셨나요?");
   });
 
   it("scopes internal admin navigation access to the current signed-in user", () => {
