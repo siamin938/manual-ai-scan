@@ -270,6 +270,10 @@ function BusinessesPage() {
       toast.error("업종을 입력해 주세요.");
       return;
     }
+    if (!latest.region.trim() || !latest.city.trim()) {
+      toast.error("지역(시/도)과 도시(시/군/구)를 모두 입력해 주세요.");
+      return;
+    }
     const latestKey = businessNameIdentityKey(latestName);
     const latestDuplicate =
       businesses.find((b) => b.id !== latest.id && businessNameIdentityKey(b.name) === latestKey) ?? null;
@@ -481,6 +485,7 @@ function BusinessesPage() {
                   <Input
                     id="b-region"
                     name="region"
+                    required
                     value={form.region}
                     onChange={(e) => setForm({ ...form, region: e.target.value })}
                     {...compositionProps((v) => setForm((f) => ({ ...f, region: v })))}
@@ -491,6 +496,7 @@ function BusinessesPage() {
                   <Input
                     id="b-city"
                     name="city"
+                    required
                     value={form.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
                     {...compositionProps((v) => setForm((f) => ({ ...f, city: v })))}
@@ -542,7 +548,14 @@ function BusinessesPage() {
             <Button
               type="submit"
               form="biz-form"
-              disabled={save.isPending || !normalizedName || !form.categorySelect || !!duplicateBusiness}
+              disabled={
+                save.isPending ||
+                !normalizedName ||
+                !form.categorySelect ||
+                !form.region.trim() ||
+                !form.city.trim() ||
+                !!duplicateBusiness
+              }
             >
               저장
             </Button>
