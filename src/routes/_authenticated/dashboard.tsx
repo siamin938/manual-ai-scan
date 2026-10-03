@@ -163,7 +163,7 @@ function UnifiedDiagnosticLayerSummaryCard({
     summary.core.unresolvedCount > 0;
 
   return (
-    <Card className="report-section">
+    <Card className="report-section print-avoid-break">
       <CardHeader className="border-b bg-muted/20 pb-4">
         <p className="report-kicker">SEARCH SCOPE</p>
         <CardTitle className="text-xl">검색 범위별 확정 노출</CardTitle>
@@ -584,6 +584,42 @@ type QuestionGroupCounts = {
   unresolvedTargetCount: number;
 };
 
+function printableReportNamePart(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/[\\/:*?"<>|]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, 60);
+}
+
+function seoulDateSlug(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "날짜미확인";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  const year = part("year");
+  const month = part("month");
+  const day = part("day");
+  return year && month && day ? `${year}-${month}-${day}` : "날짜미확인";
+}
+
+function dashboardPrintTitle(args: {
+  businessName: string;
+  measuredAt: string;
+  view: "summary" | "detail";
+}): string {
+  const business = printableReportNamePart(args.businessName) || "업체";
+  const viewLabel = args.view === "summary" ? "요약" : "상세";
+  return `차보임 AI 노출 진단 - ${business} - ${seoulDateSlug(args.measuredAt)} - ${viewLabel}`;
+}
+
 function DashboardPage() {
   const { view: requestedView } = Route.useSearch();
   const view = requestedView ?? "summary";
@@ -878,6 +914,27 @@ function DashboardPage() {
   const setDashboardView = (nextView: "summary" | "detail") => {
     void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
   };
+  const printDashboardReport = () => {
+    if (!model) return;
+
+    const originalTitle = document.title;
+    let restored = false;
+    const restoreTitle = () => {
+      if (restored) return;
+      restored = true;
+      document.title = originalTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    document.title = dashboardPrintTitle({
+      businessName: model.businessName,
+      measuredAt: model.measuredAt,
+      view,
+    });
+    window.addEventListener("afterprint", restoreTitle);
+    window.print();
+    window.setTimeout(restoreTitle, 1500);
+  };
 
   return (
     <div className="print-page print-report space-y-8 lg:space-y-10">
@@ -904,15 +961,20 @@ function DashboardPage() {
         </div>
         <div className="no-print mt-5 flex min-w-0 flex-col gap-3 lg:mt-0 lg:items-end">
           {dto && model && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full justify-center gap-2 sm:w-auto"
-              onClick={() => window.print()}
-            >
-              <Printer aria-hidden="true" />
-              인쇄·PDF 저장
-            </Button>
+            <div className="flex flex-col gap-1 sm:items-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-center gap-2 sm:w-auto"
+                onClick={printDashboardReport}
+              >
+                <Printer aria-hidden="true" />
+                인쇄·PDF 저장
+              </Button>
+              <p className="max-w-xs text-[11px] leading-4 text-muted-foreground lg:text-right">
+                PDF 저장 시 브라우저 인쇄 설정의 ‘머리글 및 바닥글’을 끄면 주소·날짜가 빠집니다.
+              </p>
+            </div>
           )}
           <div className="inline-flex w-full rounded-lg border bg-muted/40 p-1 sm:w-auto" aria-label="진단 보기 방식">
             <Button
@@ -1859,7 +1921,7 @@ function DashboardPage() {
             </Card>
           </div>
 
-          <Card className="report-section">
+          <Card className="report-section print-avoid-break">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">SEARCH CONTEXT</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
@@ -2081,7 +2143,7 @@ function DashboardSummary({
         }
       >
         {summary.heroVariant !== "not_visible" && (
-          <Card className="report-section">
+          <Card className="report-section print-avoid-break">
             <CardHeader>
               <CardTitle className="text-xl">어떤 검색에서 보였나요?</CardTitle>
             <p className="text-sm leading-6 text-muted-foreground">
@@ -2388,7 +2450,7 @@ function DashboardSummary({
         </div>
       </details>
 
-      <div className="flex flex-col items-center gap-2 pt-2 text-center">
+      <div className="no-print flex flex-col items-center gap-2 pt-2 text-center">
         <Button type="button" size="lg" onClick={onShowDetail}>
           상세 분석 보기 <ArrowRight aria-hidden="true" />
         </Button>
