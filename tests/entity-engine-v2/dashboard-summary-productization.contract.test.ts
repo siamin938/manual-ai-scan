@@ -66,11 +66,13 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("인쇄·PDF 저장");
     expect(dashboardSource).toContain("dashboardPrintTitle");
     expect(dashboardSource).toContain("차보임 AI 노출 진단 -");
-    expect(dashboardSource).toContain('print?: "1"');
-    expect(dashboardSource).toContain('printUrl.searchParams.set("print", "1")');
-    expect(dashboardSource).toContain('window.open(printUrl.toString(), "_blank")');
+    expect(dashboardSource).toContain("openPrintableSnapshot");
+    expect(dashboardSource).toContain('window.open("", "_blank")');
+    expect(dashboardSource).toContain("waitForPrintableAssets");
+    expect(dashboardSource).toContain('link[rel="stylesheet"]');
     expect(dashboardSource).toContain("document.fonts?.ready");
-    expect(dashboardSource).toContain("window.print()");
+    expect(dashboardSource).toContain("printWindow.print()");
+    expect(dashboardSource).not.toContain('print?: "1"');
     expect(dashboardSource).toContain("대상 업체 · {model.businessName}");
     expect(dashboardSource).toContain("report-section print-avoid-break");
     expect(dashboardSource).toContain("no-print flex flex-col items-center");
