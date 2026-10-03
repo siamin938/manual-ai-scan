@@ -47,18 +47,22 @@ function aggregateFixture() {
 function rowsFor(
   key: string,
   name: string,
-  count: number,
   domain: string,
+  positions: number[],
+  intents: string[],
   directAt = 1,
 ) {
   const canonicalizations = [];
   const mentions = [];
   const verifications = [];
   const attributions = [];
+  const measurements = [];
+  const questions = [];
 
-  for (let i = 0; i < count; i += 1) {
+  for (let i = 0; i < positions.length; i += 1) {
     const mentionId = `${key}:mention:${i}`;
     const measurementId = `${key}:measurement:${i}`;
+    const questionId = `${key}:question:${i}`;
     canonicalizations.push({
       measurement_id: measurementId,
       measurement_mention_id: mentionId,
@@ -70,6 +74,7 @@ function rowsFor(
       measurement_id: measurementId,
       matched_business_id: null,
       display_name: name,
+      position: positions[i] ?? null,
     });
     verifications.push({
       measurement_mention_id: mentionId,
@@ -82,38 +87,63 @@ function rowsFor(
       domain,
       attribution_level: i < directAt ? "direct" : "section",
     });
+    measurements.push({
+      id: measurementId,
+      question_id: questionId,
+    });
+    questions.push({
+      id: questionId,
+      intent_type: intents[i] ?? "other",
+    });
   }
 
-  return { canonicalizations, mentions, verifications, attributions };
+  return {
+    canonicalizations,
+    mentions,
+    verifications,
+    attributions,
+    measurements,
+    questions,
+  };
 }
 
 describe("cross-response competitor runtime shadow supplement", () => {
-  it("builds only competitor shadow output and keeps target metrics explicitly untouched", () => {
-    const kugs = rowsFor("auto:국스월드", "국스월드", 5, "kugs.net");
+  it("builds v2-compatible competitor preview metrics while keeping target metrics untouched", () => {
+    const kugs = rowsFor(
+      "auto:국스월드",
+      "국스월드",
+      "kugs.net",
+      [2, 4, 4, 5, 6],
+      ["discovery", "comparison", "recommendation", "discovery", "trust"],
+    );
     const moment = rowsFor(
       "auto:모먼트",
       "모먼트",
-      3,
       "momentcarcare.co.kr",
+      [1, 2, 3],
+      ["local", "recommendation", "discovery"],
     );
     const existingMoment = rowsFor(
       "auto:모먼트카케어",
       "모먼트 카케어",
-      1,
       "momentcarcare.co.kr",
+      [4],
+      ["comparison"],
       0,
     );
     const tstyle = rowsFor(
       "auto:t스타일랩",
       "T 스타일 랩",
-      2,
       "tstylelab.com",
+      [2, 4],
+      ["service", "comparison"],
     );
     const falsePositive = rowsFor(
       "auto:블랙박스나오토프렁크설치시배선작업방식",
       "블랙박스나 오토프렁크 설치 시 배선 작업 방식",
-      1,
       "example.com",
+      [4],
+      ["service"],
     );
 
     const parts = [kugs, moment, existingMoment, tstyle, falsePositive];
@@ -126,6 +156,8 @@ describe("cross-response competitor runtime shadow supplement", () => {
       mentions: parts.flatMap((part) => part.mentions),
       verifications: parts.flatMap((part) => part.verifications),
       attributions: parts.flatMap((part) => part.attributions),
+      measurements: parts.flatMap((part) => part.measurements),
+      questions: parts.flatMap((part) => part.questions),
     });
 
     expect(result).not.toBeNull();
@@ -143,13 +175,29 @@ describe("cross-response competitor runtime shadow supplement", () => {
       },
     });
 
-    expect(result?.promotedCandidates.map((row) => row.displayName)).toEqual([
-      "국스월드",
-      "T 스타일 랩",
+    expect(result?.promotedCandidates).toEqual([
+      expect.objectContaining({
+        displayName: "국스월드",
+        responseCount: 5,
+        questionCount: 5,
+        intentCount: 4,
+        top3ResponseCount: 1,
+      }),
+      expect.objectContaining({
+        displayName: "T 스타일 랩",
+        responseCount: 2,
+        questionCount: 2,
+        intentCount: 2,
+        top3ResponseCount: 1,
+      }),
     ]);
     expect(result?.mergeReviewCandidates).toEqual([
       expect.objectContaining({
         displayName: "모먼트",
+        responseCount: 3,
+        questionCount: 3,
+        intentCount: 3,
+        top3ResponseCount: 3,
         decision: "merge_review",
         collisionCanonicalKeys: ["auto:모먼트카케어"],
       }),
@@ -162,8 +210,9 @@ describe("cross-response competitor runtime shadow supplement", () => {
     const candidate = rowsFor(
       "auto:후보업체",
       "후보업체",
-      2,
       "candidate.example",
+      [1, 2],
+      ["local", "service"],
     );
     candidate.verifications = candidate.verifications.map((row) => ({
       ...row,
@@ -180,6 +229,8 @@ describe("cross-response competitor runtime shadow supplement", () => {
       mentions: candidate.mentions,
       verifications: candidate.verifications,
       attributions: candidate.attributions,
+      measurements: candidate.measurements,
+      questions: candidate.questions,
     });
 
     expect(result?.allCandidates).toEqual([]);
@@ -195,8 +246,9 @@ describe("cross-response competitor runtime shadow supplement", () => {
     const shared = rowsFor(
       "auto:공유플랫폼후보",
       "공유플랫폼후보",
-      4,
       "pf.kakao.com",
+      [1, 2, 3, 4],
+      ["local", "service", "trust", "discovery"],
       2,
     );
 
@@ -209,6 +261,8 @@ describe("cross-response competitor runtime shadow supplement", () => {
       mentions: shared.mentions,
       verifications: shared.verifications,
       attributions: shared.attributions,
+      measurements: shared.measurements,
+      questions: shared.questions,
     });
 
     expect(result?.allCandidates[0]).toMatchObject({
