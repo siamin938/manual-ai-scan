@@ -56,6 +56,14 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("별도의 신뢰도 점수나 노출 원인을 의미하지 않습니다.");
   });
 
+  it("supports customer report printing without changing measurement data", () => {
+    expect(dashboardSource).toContain("print-page print-report");
+    expect(dashboardSource).toContain("인쇄·PDF 저장");
+    expect(dashboardSource).toContain("window.print()");
+    expect(dashboardSource).toContain("대상 업체 · {model.businessName}");
+    expect(dashboardSource).toContain("no-print");
+  });
+
   it("explains the measurement method without changing the engine", () => {
     expect(dashboardSource).toContain("측정 기준 보기");
     expect(dashboardSource).toContain("8개 검색 상황을 3문항씩, 총 24문항");
