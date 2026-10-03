@@ -102,6 +102,7 @@ describe("entity facts v2 dashboard summary view model", () => {
     expect(summary.top3).toEqual({ count: 2, total: 24, pct: 8.33 });
     expect(summary.heroVariant).toBe("visible_top3");
     expect(summary.verifiedPageCount).toBe(4);
+    expect(summary.competitorCount).toBe(1);
     expect(summary.topCompetitor).toEqual({ name: "함께 나온 업체", responseCount: 7 });
     expect(summary.searchContexts.map((item) => [item.intentType, item.confirmedCount])).toEqual([
       ["service", 2],
@@ -132,6 +133,7 @@ describe("entity facts v2 dashboard summary view model", () => {
     expect(summary.heroVariant).toBe("not_visible");
     expect(summary.visibility).toEqual({ count: 0, total: 24, pct: 0 });
     expect(summary.top3).toEqual({ count: 0, total: 24, pct: 0 });
+    expect(summary.competitorCount).toBe(1);
   });
 
   it("distinguishes visibility without a Top3 appearance", () => {
