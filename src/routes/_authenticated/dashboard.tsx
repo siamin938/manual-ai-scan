@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   createFileRoute,
   Link,
@@ -66,14 +66,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type DashboardSearch = { view?: "detail"; print?: "1" };
-type DashboardSearchInput = SearchSchemaInput & { view?: string; print?: string };
+type DashboardSearch = { view?: "detail" };
+type DashboardSearchInput = SearchSchemaInput & { view?: string };
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  validateSearch: (search: DashboardSearchInput): DashboardSearch => ({
-    ...(search["view"] === "detail" ? { view: "detail" as const } : {}),
-    ...(search["print"] === "1" ? { print: "1" as const } : {}),
-  }),
+  validateSearch: (search: DashboardSearchInput): DashboardSearch =>
+    search["view"] === "detail" ? { view: "detail" } : {},
   head: () => ({
     meta: [
       { title: "AI 노출 진단 · 차보임 CHABOIM" },
@@ -622,10 +620,135 @@ function dashboardPrintTitle(args: {
   return `차보임 AI 노출 진단 - ${business} - ${seoulDateSlug(args.measuredAt)} - ${viewLabel}`;
 }
 
+function copyPrintElementAttributes(source: Element, target: Element): void {
+  for (const attribute of Array.from(source.attributes)) {
+    target.setAttribute(attribute.name, attribute.value);
+  }
+}
+
+async function waitForPrintableAssets(printWindow: Window): Promise<void> {
+  const stylesheetLinks = Array.from(
+    printWindow.document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+  );
+
+  await Promise.all(
+    stylesheetLinks.map(
+      (link) =>
+        new Promise<void>((resolve) => {
+          if (link.sheet) {
+            resolve();
+            return;
+          }
+
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+          };
+
+          link.addEventListener("load", finish, { once: true });
+          link.addEventListener("error", finish, { once: true });
+          printWindow.setTimeout(finish, 3000);
+        }),
+    ),
+  );
+
+  try {
+    await printWindow.document.fonts?.ready;
+  } catch {
+    // Font loading is best effort; stylesheets are the critical print asset.
+  }
+
+  const images = Array.from(printWindow.document.images);
+  await Promise.all(
+    images.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+            return;
+          }
+          img.addEventListener("load", () => resolve(), { once: true });
+          img.addEventListener("error", () => resolve(), { once: true });
+        }),
+    ),
+  );
+
+  await new Promise((resolve) => printWindow.setTimeout(resolve, 180));
+}
+
+function openPrintableSnapshot(title: string): boolean {
+  const source = document.querySelector<HTMLElement>(".print-report");
+  if (!source) return false;
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return false;
+
+  const report = source.cloneNode(true) as HTMLElement;
+  report.querySelectorAll(".no-print").forEach((node) => node.remove());
+
+  const styles = Array.from(
+    document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
+      'link[rel="stylesheet"], style',
+    ),
+  )
+    .map((node) =>
+      node.tagName === "LINK"
+        ? `<link rel="stylesheet" href="${(node as HTMLLinkElement).href}">`
+        : node.outerHTML,
+    )
+    .join("\n");
+
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title></title>
+  ${styles}
+</head>
+<body>
+  <main class="mx-auto max-w-7xl px-4 py-7 lg:px-6 lg:py-10">
+    ${report.outerHTML}
+  </main>
+</body>
+</html>`);
+  printWindow.document.close();
+
+  copyPrintElementAttributes(document.documentElement, printWindow.document.documentElement);
+  copyPrintElementAttributes(document.body, printWindow.document.body);
+  printWindow.document.title = title;
+
+  const originalRootStyle = getComputedStyle(document.documentElement);
+  for (const property of Array.from(originalRootStyle)) {
+    if (!property.startsWith("--")) continue;
+    const value = originalRootStyle.getPropertyValue(property);
+    if (value) {
+      printWindow.document.documentElement.style.setProperty(property, value);
+    }
+  }
+
+  try {
+    printWindow.history.replaceState(null, "", `${window.location.origin}/report`);
+  } catch {
+    // The report title still controls the suggested PDF filename.
+  }
+
+  const printWhenReady = async () => {
+    await waitForPrintableAssets(printWindow);
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  void printWhenReady();
+  return true;
+}
+
 function DashboardPage() {
-  const { view: requestedView, print: printMode } = Route.useSearch();
+  const { view: requestedView } = Route.useSearch();
   const view = requestedView ?? "summary";
-  const printTriggeredRef = useRef(false);
   const navigate = useNavigate({ from: "/dashboard" });
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
@@ -917,63 +1040,28 @@ function DashboardPage() {
   const setDashboardView = (nextView: "summary" | "detail") => {
     void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
   };
-
-  useEffect(() => {
-    if (printMode !== "1" || !model || printTriggeredRef.current) return;
-    printTriggeredRef.current = true;
-
-    document.title = dashboardPrintTitle({
-      businessName: model.businessName,
-      measuredAt: model.measuredAt,
-      view,
-    });
-
-    let cancelled = false;
-    const printWhenReady = async () => {
-      try {
-        await document.fonts?.ready;
-      } catch {
-        // Font readiness is best effort; the fully rendered app page remains printable.
-      }
-      if (cancelled) return;
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          window.setTimeout(() => {
-            if (!cancelled) window.print();
-          }, 180);
-        });
-      });
-    };
-
-    const timer = window.setTimeout(() => void printWhenReady(), 180);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [printMode, model, view]);
-
   const printDashboardReport = () => {
     if (!model) return;
 
-    const printUrl = new URL(window.location.href);
-    if (view === "detail") printUrl.searchParams.set("view", "detail");
-    else printUrl.searchParams.delete("view");
-    printUrl.searchParams.set("print", "1");
-
-    const printWindow = window.open(printUrl.toString(), "_blank");
-    if (printWindow) return;
-
-    // Popup blocking fallback.
-    const originalTitle = document.title;
-    document.title = dashboardPrintTitle({
+    const title = dashboardPrintTitle({
       businessName: model.businessName,
       measuredAt: model.measuredAt,
       view,
     });
-    window.print();
-    window.setTimeout(() => {
-      document.title = originalTitle;
-    }, 1500);
+
+    if (openPrintableSnapshot(title)) return;
+
+    // Popup blocking fallback: print the current document.
+    const originalTitle = document.title;
+    document.title = title;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.print();
+        window.setTimeout(() => {
+          document.title = originalTitle;
+        }, 1500);
+      });
+    });
   };
 
   return (
