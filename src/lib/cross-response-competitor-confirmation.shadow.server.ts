@@ -10,7 +10,10 @@ import {
   classifySourceDomain,
   normalizeSourceDomain,
 } from "./source-domain-classifier";
-import { parseEntityFactsV2AggregateForReadGateway } from "./entity-facts-v2-read-gateway.types";
+import {
+  parseEntityFactsV2AggregateForReadGateway,
+  type EntityFactsV2ReadCompetitorDTO,
+} from "./entity-facts-v2-read-gateway.types";
 
 export const CROSS_RESPONSE_COMPETITOR_SHADOW_SUPPLEMENT_VERSION = "0.1" as const;
 
@@ -107,6 +110,90 @@ export type CrossResponseCompetitorShadowSupplement = {
   mergedCompetitorFactsPreview: CrossResponseCompetitorShadowMergedFactPreview[];
   allCandidates: CrossResponseCompetitorShadowSupplementRow[];
 };
+
+
+function normalizedReadCompetitorName(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z가-힣]/giu, "");
+}
+
+/**
+ * Customer read-layer merge for the already-approved cross-response supplement.
+ *
+ * Fail-closed rules:
+ * - the supplement must be bound to the exact run + aggregate id + aggregate hash;
+ * - only promote_candidate rows can be added;
+ * - merge_review/reject rows are never exposed;
+ * - duplicate normalized display names are skipped;
+ * - target metrics are not accepted as input and cannot be changed here.
+ */
+export function mergeCrossResponsePromotedCompetitorsForReadLayer(args: {
+  baseCompetitors: EntityFactsV2ReadCompetitorDTO[];
+  supplement: CrossResponseCompetitorShadowSupplement | null;
+  expectedRunId: string;
+  expectedAggregateId: string;
+  expectedAggregateHash: string;
+}): EntityFactsV2ReadCompetitorDTO[] {
+  const base = args.baseCompetitors.map((row) => ({ ...row }));
+  const supplement = args.supplement;
+
+  if (
+    !supplement ||
+    supplement.affectsTargetMetrics !== false ||
+    supplement.sourceRunId !== args.expectedRunId ||
+    supplement.baseAggregateId !== args.expectedAggregateId ||
+    supplement.baseAggregateHash !== args.expectedAggregateHash
+  ) {
+    return base;
+  }
+
+  const seenNames = new Set(
+    base
+      .map((row) => normalizedReadCompetitorName(row.name))
+      .filter(Boolean),
+  );
+  const promoted: EntityFactsV2ReadCompetitorDTO[] = [];
+
+  for (const row of supplement.promotedCandidates) {
+    if (
+      row.decision !== "promote_candidate" ||
+      !Number.isInteger(row.responseCount) ||
+      row.responseCount < 1 ||
+      !Number.isInteger(row.questionCount) ||
+      row.questionCount < 1 ||
+      !Number.isInteger(row.intentCount) ||
+      row.intentCount < 1 ||
+      !Number.isInteger(row.top3ResponseCount) ||
+      row.top3ResponseCount < 0 ||
+      row.top3ResponseCount > row.responseCount
+    ) {
+      continue;
+    }
+
+    const name = row.displayName.trim();
+    const normalizedName = normalizedReadCompetitorName(name);
+    if (!name || !normalizedName || seenNames.has(normalizedName)) continue;
+
+    seenNames.add(normalizedName);
+    promoted.push({
+      name,
+      responseCount: row.responseCount,
+      questionCount: row.questionCount,
+      intentCount: row.intentCount,
+      top3ResponseCount: row.top3ResponseCount,
+    });
+  }
+
+  return [...base, ...promoted].sort(
+    (a, b) =>
+      b.responseCount - a.responseCount ||
+      b.questionCount - a.questionCount ||
+      b.top3ResponseCount - a.top3ResponseCount ||
+      a.name.localeCompare(b.name, "ko"),
+  );
+}
 
 function chooseDisplayName(values: string[], fallback: string): string {
   const counts = new Map<string, number>();
