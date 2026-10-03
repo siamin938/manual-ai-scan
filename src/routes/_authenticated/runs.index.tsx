@@ -432,7 +432,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     if (!questionSetId) list.push("질문 세트를 선택하세요.");
     if (questionSetId && !questions.isLoading && activeCount === 0)
       list.push("측정할 활성 질문이 없습니다.");
-    if (creditBalance !== null && creditBalance < 1) list.push("AI 노출 측정권이 없습니다.");
+    if (creditBalance !== null && creditBalance < 1) list.push("AI 노출 측정권이 없습니다. 차보임 운영자에게 측정권을 요청해 주세요.");
     return list;
   }, [session, businessId, questionSetId, activeCount, questions.isLoading, creditBalance]);
 
