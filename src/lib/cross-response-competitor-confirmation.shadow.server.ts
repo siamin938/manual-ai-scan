@@ -26,6 +26,17 @@ type ShadowMentionRow = {
   measurement_id: string;
   matched_business_id: string | null;
   display_name: string;
+  position: number | null;
+};
+
+type ShadowMeasurementRow = {
+  id: string;
+  question_id: string;
+};
+
+type ShadowQuestionRow = {
+  id: string;
+  intent_type: string;
 };
 
 type ShadowVerificationRow = {
@@ -50,6 +61,8 @@ export type CrossResponseCompetitorShadowRuntimeInput = {
   mentions: ShadowMentionRow[];
   verifications: ShadowVerificationRow[];
   attributions: ShadowAttributionRow[];
+  measurements: ShadowMeasurementRow[];
+  questions: ShadowQuestionRow[];
 };
 
 export type CrossResponseCompetitorShadowSupplementRow = {
@@ -57,6 +70,9 @@ export type CrossResponseCompetitorShadowSupplementRow = {
   displayName: string;
   decision: CrossResponseCompetitorShadowDecision;
   responseCount: number;
+  questionCount: number;
+  intentCount: number;
+  top3ResponseCount: number;
   corroboratingDomain: string | null;
   corroboratingDomainResponseCount: number;
   directAttributionCount: number;
@@ -144,6 +160,7 @@ export function buildCrossResponseCompetitorShadowSupplement(
     {
       displayNames: string[];
       measurementIds: Set<string>;
+      bestPositionByMeasurement: Map<string, number>;
     }
   >();
 
@@ -158,12 +175,31 @@ export function buildCrossResponseCompetitorShadowSupplement(
     const group = candidateGroups.get(key) ?? {
       displayNames: [],
       measurementIds: new Set<string>(),
+      bestPositionByMeasurement: new Map<string, number>(),
     };
     group.displayNames.push(
       canonicalization.canonical_display_name || mention.display_name,
     );
     group.displayNames.push(mention.display_name);
     group.measurementIds.add(canonicalization.measurement_id);
+    if (
+      typeof mention.position === "number" &&
+      Number.isInteger(mention.position) &&
+      mention.position >= 1
+    ) {
+      const currentPosition = group.bestPositionByMeasurement.get(
+        canonicalization.measurement_id,
+      );
+      if (
+        currentPosition === undefined ||
+        mention.position < currentPosition
+      ) {
+        group.bestPositionByMeasurement.set(
+          canonicalization.measurement_id,
+          mention.position,
+        );
+      }
+    }
     candidateGroups.set(key, group);
   }
 
@@ -208,6 +244,11 @@ export function buildCrossResponseCompetitorShadowSupplement(
       };
     });
 
+  const measurementById = new Map(
+    input.measurements.map((row) => [row.id, row]),
+  );
+  const questionById = new Map(input.questions.map((row) => [row.id, row]));
+
   const allCandidates: CrossResponseCompetitorShadowSupplementRow[] = [];
 
   for (const [canonicalKey, group] of candidateGroups) {
@@ -236,11 +277,26 @@ export function buildCrossResponseCompetitorShadowSupplement(
       existingV2Competitors,
     });
 
+    const questionIds = new Set<string>();
+    const intentTypes = new Set<string>();
+    for (const measurementId of group.measurementIds) {
+      const measurement = measurementById.get(measurementId);
+      if (!measurement) continue;
+      questionIds.add(measurement.question_id);
+      const question = questionById.get(measurement.question_id);
+      if (question?.intent_type) intentTypes.add(question.intent_type);
+    }
+    const top3ResponseCount = [...group.bestPositionByMeasurement.values()]
+      .filter((position) => position <= 3).length;
+
     allCandidates.push({
       canonicalKey,
       displayName,
       decision: result.decision,
       responseCount: group.measurementIds.size,
+      questionCount: questionIds.size,
+      intentCount: intentTypes.size,
+      top3ResponseCount,
       corroboratingDomain: domain,
       corroboratingDomainResponseCount:
         domainEvidence?.measurementIds.size ?? 0,
@@ -378,14 +434,26 @@ export async function fetchCrossResponseCompetitorShadowSupplement(args: {
       mentions: [],
       verifications: [],
       attributions: [],
+      measurements: [],
+      questions: [],
     });
   }
 
-  const [mentionsResult, verificationsResult, attributionsResult] =
-    await Promise.all([
+  const measurementIds = [
+    ...new Set(
+      (canonicalizations ?? []).map((row) => row.measurement_id),
+    ),
+  ];
+
+  const [
+    mentionsResult,
+    verificationsResult,
+    attributionsResult,
+    measurementsResult,
+  ] = await Promise.all([
       supabaseAdmin
         .from("measurement_mentions")
-        .select("id,measurement_id,matched_business_id,display_name")
+        .select("id,measurement_id,matched_business_id,display_name,position")
         .eq("org_id", orgId)
         .in("id", mentionIds),
       supabaseAdmin
@@ -403,15 +471,36 @@ export async function fetchCrossResponseCompetitorShadowSupplement(args: {
         .eq("business_id", businessId)
         .eq("source_run_id", runId)
         .limit(5000),
+      supabaseAdmin
+        .from("measurements")
+        .select("id,question_id")
+        .eq("org_id", orgId)
+        .in("id", measurementIds),
     ]);
 
   if (
     mentionsResult.error ||
     verificationsResult.error ||
-    attributionsResult.error
+    attributionsResult.error ||
+    measurementsResult.error
   ) {
     return null;
   }
+
+  const questionIds = [
+    ...new Set(
+      (measurementsResult.data ?? []).map((row) => row.question_id),
+    ),
+  ];
+  const questionsResult =
+    questionIds.length > 0
+      ? await supabaseAdmin
+          .from("questions")
+          .select("id,intent_type")
+          .eq("org_id", orgId)
+          .in("id", questionIds)
+      : { data: [], error: null };
+  if (questionsResult.error) return null;
 
   return buildCrossResponseCompetitorShadowSupplement({
     sourceRunId: runId,
@@ -424,5 +513,8 @@ export async function fetchCrossResponseCompetitorShadowSupplement(args: {
     verifications:
       (verificationsResult.data ?? []) as ShadowVerificationRow[],
     attributions: (attributionsResult.data ?? []) as ShadowAttributionRow[],
+    measurements:
+      (measurementsResult.data ?? []) as ShadowMeasurementRow[],
+    questions: (questionsResult.data ?? []) as ShadowQuestionRow[],
   });
 }
