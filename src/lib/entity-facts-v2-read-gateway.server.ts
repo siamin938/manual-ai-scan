@@ -9,6 +9,10 @@ import {
 } from "@/lib/source-domain-classifier";
 import { buildEntityFactsV2ReadGatewayFromSnapshot } from "./entity-facts-v2-read-gateway.build";
 import {
+  fetchCrossResponseCompetitorShadowSupplement,
+  mergeCrossResponsePromotedCompetitorsForReadLayer,
+} from "./cross-response-competitor-confirmation.shadow.server";
+import {
   ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION,
   ENTITY_FACTS_V2_OBSERVED_SOURCES_SOURCE_REPLAY_VERSION,
   ENTITY_FACTS_V2_OBSERVED_SOURCES_VERSION,
@@ -304,7 +308,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   const { data: aggregateRows, error: aggregateError } = await v2Admin
     .from("run_entity_fact_aggregates_v2")
     .select(
-      "id, materialization_id, source_run_id, fact_version, aggregate_version, engine_version, measurement_count, valid_measurement_count, contract_ok, aggregate",
+      "id, materialization_id, source_run_id, fact_version, aggregate_version, engine_version, measurement_count, valid_measurement_count, contract_ok, aggregate, aggregate_hash",
     )
     .eq("org_id", orgId)
     .eq("business_id", businessId)
@@ -625,6 +629,24 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   });
 
   if (!gatewayResponse.ok) return gatewayResponse;
+
+  // Read-layer competitor supplement only. This never mutates stored v2 facts or
+  // target metrics. A failure or baseline mismatch falls back to the core v2 list.
+  const competitorShadowSupplement =
+    await fetchCrossResponseCompetitorShadowSupplement({
+      orgId,
+      businessId,
+      runId: run.id,
+    }).catch(() => null);
+
+  gatewayResponse.data.competitors =
+    mergeCrossResponsePromotedCompetitorsForReadLayer({
+      baseCompetitors: gatewayResponse.data.competitors,
+      supplement: competitorShadowSupplement,
+      expectedRunId: run.id,
+      expectedAggregateId: storage.id,
+      expectedAggregateHash: storage.aggregate_hash,
+    });
 
   // Supplemental final-answer citation summary for the exact representative run.
   // This is intentionally separate from strict entity-linked observedSources:
