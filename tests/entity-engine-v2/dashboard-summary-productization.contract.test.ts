@@ -33,6 +33,9 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("이번 측정에서 확인된 검색 범위 차이");
     expect(dashboardSource).toContain("summary.searchScopeObservation.headline");
     expect(dashboardSource).toContain("summary.searchScopeObservation.evidence");
+    expect(dashboardSource).toContain("같은 기준 검색에서 반복 확인된 다른 업체");
+    expect(dashboardSource).toContain("summary.searchScopeObservation.repeatedCompetitors");
+    expect(dashboardSource).toContain("독립 웹 ·");
     expect(dashboardSource).toContain(
       "특정 출처가 AI 노출의 원인임을 의미하지 않습니다.",
     );
