@@ -14,6 +14,13 @@ const migrationSource = readFileSync(
   ),
   "utf8",
 );
+const definerReductionMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20261003090628_reduce_security_definer_surface_v01.sql",
+  ),
+  "utf8",
+);
 
 describe("measurement-credit admin SECURITY DEFINER surface", () => {
   it("uses v0.2 as the current authenticated admin overview path", () => {
@@ -22,6 +29,15 @@ describe("measurement-credit admin SECURITY DEFINER surface", () => {
     );
     expect(functionsSource).not.toContain(
       'client.rpc("get_measurement_credit_admin_overview_v01"',
+    );
+  });
+
+  it("moves safe auth-context helpers off SECURITY DEFINER", () => {
+    expect(definerReductionMigration).toContain(
+      "alter function public.can_view_data_asset_admin_v01() security invoker",
+    );
+    expect(definerReductionMigration).toContain(
+      "alter function public.get_org_usage(uuid) security invoker",
     );
   });
 
