@@ -142,6 +142,13 @@ export function evaluateCrossResponseCompetitorConfirmationShadow(
     return result("reject", ["NOT_UNREGISTERED_AUTO_ENTITY"]);
   }
 
+  const exactExisting = input.existingV2Competitors.find(
+    (item) => item.canonicalKey.trim() === key,
+  );
+  if (exactExisting) {
+    return result("already_confirmed", ["ALREADY_IN_V2"]);
+  }
+
   if (!candidate.verifierConfirmedBusiness) {
     return result("reject", ["VERIFIER_NOT_CONFIRMED"]);
   }
@@ -166,13 +173,6 @@ export function evaluateCrossResponseCompetitorConfirmationShadow(
 
   if (candidate.directAttributionCount < 1) {
     return result("reject", ["DIRECT_ATTRIBUTION_MISSING"]);
-  }
-
-  const exactExisting = input.existingV2Competitors.find(
-    (item) => item.canonicalKey.trim() === key,
-  );
-  if (exactExisting) {
-    return result("already_confirmed", ["ALREADY_IN_V2"]);
   }
 
   const collisions = input.existingV2Competitors.filter((item) => {
