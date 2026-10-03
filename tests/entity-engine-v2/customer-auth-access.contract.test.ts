@@ -12,6 +12,11 @@ const landingSource = readFileSync(
   "utf8",
 );
 
+const authedRouteSource = readFileSync(
+  resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
+  "utf8",
+);
+
 describe("customer auth access contract", () => {
   it("keeps self-service signup closed in the customer UI", () => {
     expect(authSource).toContain("const SELF_SIGNUP_ENABLED = false;");
@@ -39,6 +44,14 @@ describe("customer auth access contract", () => {
     expect(authSource).toContain("beforeLoad: async ({ search }) =>");
     expect(authSource).toContain("supabase.auth.getUser()");
     expect(authSource).toContain('redirect({ to: "/dashboard" })');
+  });
+
+  it("does not render onboarding while sign-out is in progress", () => {
+    expect(authedRouteSource).toContain("const [isSigningOut, setIsSigningOut] = useState(false)");
+    expect(authedRouteSource).toContain("setIsSigningOut(true)");
+    expect(authedRouteSource).toContain("loading || isSigningOut");
+    expect(authedRouteSource).toContain('isSigningOut ? "로그아웃 중…" : "불러오는 중…"');
+    expect(authedRouteSource).toContain('disabled={isSigningOut}');
   });
 
   it("does not redirect an authenticated recovery session away from the reset form", () => {
