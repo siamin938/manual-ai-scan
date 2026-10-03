@@ -100,6 +100,7 @@ describe("entity facts v2 dashboard summary view model", () => {
       broadSearchObservation: {
         validCount: 8,
         targetIndependentSourceResponseCount: 1,
+        repeatedCompetitors: [],
       },
     });
 
@@ -138,6 +139,40 @@ describe("entity facts v2 dashboard summary view model", () => {
       broadSearchObservation: {
         validCount: 8,
         targetIndependentSourceResponseCount: 0,
+        repeatedCompetitors: [
+          {
+            name: "퀀텀팩토리 서초점",
+            responseCount: 5,
+            questionCount: 5,
+            top3ResponseCount: 4,
+            intentCount: 5,
+            strongestIndependentSource: {
+              domain: "carcarescenter.com",
+              responseCount: 5,
+              directAttributionCount: 1,
+            },
+          },
+          {
+            name: "국스월드",
+            responseCount: 4,
+            questionCount: 4,
+            top3ResponseCount: 0,
+            intentCount: 4,
+            strongestIndependentSource: {
+              domain: "kugs.net",
+              responseCount: 4,
+              directAttributionCount: 1,
+            },
+          },
+          {
+            name: "세 번째 업체",
+            responseCount: 3,
+            questionCount: 3,
+            top3ResponseCount: 1,
+            intentCount: 2,
+            strongestIndependentSource: null,
+          },
+        ],
       },
     });
 
@@ -146,6 +181,24 @@ describe("entity facts v2 dashboard summary view model", () => {
       headline: "상세 검색 14/16에서는 확인됐지만, 기준 검색 0/8에서는 확인되지 않았습니다.",
       evidence:
         "공식 홈페이지는 등록돼 있지만, 이번 기준 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다.",
+      repeatedCompetitors: [
+        {
+          name: "퀀텀팩토리 서초점",
+          responseCount: 5,
+          top3ResponseCount: 4,
+          intentCount: 5,
+          independentSourceDomain: "carcarescenter.com",
+          independentSourceResponseCount: 5,
+        },
+        {
+          name: "국스월드",
+          responseCount: 4,
+          top3ResponseCount: 0,
+          intentCount: 4,
+          independentSourceDomain: "kugs.net",
+          independentSourceResponseCount: 4,
+        },
+      ],
     });
   });
 
@@ -162,6 +215,7 @@ describe("entity facts v2 dashboard summary view model", () => {
       broadSearchObservation: {
         validCount: 8,
         targetIndependentSourceResponseCount: 0,
+        repeatedCompetitors: [],
       },
     });
 
