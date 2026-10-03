@@ -81,6 +81,15 @@ export type CrossResponseCompetitorShadowSupplementRow = {
   reasons: string[];
 };
 
+export type CrossResponseCompetitorShadowMergedFactPreview = {
+  canonicalKey: string;
+  responseCount: number;
+  questionCount: number;
+  intentCount: number;
+  top3ResponseCount: number;
+  origin: "v2" | "shadow_promote";
+};
+
 export type CrossResponseCompetitorShadowSupplement = {
   version: typeof CROSS_RESPONSE_COMPETITOR_SHADOW_SUPPLEMENT_VERSION;
   sourceRunId: string;
@@ -95,6 +104,7 @@ export type CrossResponseCompetitorShadowSupplement = {
   };
   promotedCandidates: CrossResponseCompetitorShadowSupplementRow[];
   mergeReviewCandidates: CrossResponseCompetitorShadowSupplementRow[];
+  mergedCompetitorFactsPreview: CrossResponseCompetitorShadowMergedFactPreview[];
   allCandidates: CrossResponseCompetitorShadowSupplementRow[];
 };
 
@@ -318,6 +328,33 @@ export function buildCrossResponseCompetitorShadowSupplement(
   const count = (decision: CrossResponseCompetitorShadowDecision) =>
     allCandidates.filter((row) => row.decision === decision).length;
 
+  const mergedCompetitorFactsPreview: CrossResponseCompetitorShadowMergedFactPreview[] = [
+    ...aggregate.competitors.map((competitor) => ({
+      canonicalKey: competitor.canonicalKey,
+      responseCount: competitor.responseCount,
+      questionCount: competitor.questionCount,
+      intentCount: competitor.intentCount,
+      top3ResponseCount: competitor.top3ResponseCount,
+      origin: "v2" as const,
+    })),
+    ...allCandidates
+      .filter((row) => row.decision === "promote_candidate")
+      .map((row) => ({
+        canonicalKey: row.canonicalKey,
+        responseCount: row.responseCount,
+        questionCount: row.questionCount,
+        intentCount: row.intentCount,
+        top3ResponseCount: row.top3ResponseCount,
+        origin: "shadow_promote" as const,
+      })),
+  ].sort(
+    (a, b) =>
+      b.responseCount - a.responseCount ||
+      b.questionCount - a.questionCount ||
+      b.top3ResponseCount - a.top3ResponseCount ||
+      a.canonicalKey.localeCompare(b.canonicalKey, "en"),
+  );
+
   return {
     version: CROSS_RESPONSE_COMPETITOR_SHADOW_SUPPLEMENT_VERSION,
     sourceRunId: input.sourceRunId,
@@ -336,6 +373,7 @@ export function buildCrossResponseCompetitorShadowSupplement(
     mergeReviewCandidates: allCandidates.filter(
       (row) => row.decision === "merge_review",
     ),
+    mergedCompetitorFactsPreview,
     allCandidates,
   };
 }
