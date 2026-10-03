@@ -752,10 +752,14 @@ function openPrintableSnapshot(title: string): boolean {
   const printWhenReady = async () => {
     await waitForPrintableAssets(printWindow);
 
+    const originalParentTitle = document.title;
+    document.title = title;
+
     let cleaned = false;
     const cleanup = () => {
       if (cleaned) return;
       cleaned = true;
+      document.title = originalParentTitle;
       printWindow.removeEventListener("afterprint", cleanup);
       printFrame.remove();
     };
