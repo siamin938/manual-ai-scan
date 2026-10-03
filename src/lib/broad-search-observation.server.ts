@@ -60,6 +60,8 @@ export type BroadSearchObservationInput = {
   attributions: AttributionRow[];
   facts: FactRow[];
   finalCompetitorNamesByCanonicalKey: Record<string, string>;
+  baseV2CompetitorCanonicalKeys: string[];
+  promotedCompetitorCanonicalKeys: string[];
   mergeCanonicalAliases: Record<string, string>;
 };
 
@@ -135,6 +137,7 @@ export function buildBroadSearchObservation(
   const mentionById = new Map(input.mentions.map((row) => [row.id, row]));
 
   const validMeasurementIds = new Set<string>();
+  const confirmedOtherKeysByMeasurement = new Map<string, Set<string>>();
   let targetConfirmedCount = 0;
   let targetTop3Count = 0;
 
@@ -142,6 +145,16 @@ export function buildBroadSearchObservation(
     const facts = factObject(row.facts);
     if (!facts || facts["valid"] !== true) continue;
     validMeasurementIds.add(row.measurement_id);
+
+    const confirmedOtherKeys = Array.isArray(facts["confirmedOtherEntityKeys"])
+      ? facts["confirmedOtherEntityKeys"].filter(
+          (value): value is string => typeof value === "string" && value.trim().length > 0,
+        )
+      : [];
+    confirmedOtherKeysByMeasurement.set(
+      row.measurement_id,
+      new Set(confirmedOtherKeys.map((value) => value.trim())),
+    );
 
     if (facts["targetSeen"] === true) {
       targetConfirmedCount += 1;
@@ -178,6 +191,13 @@ export function buildBroadSearchObservation(
     rawKeysByResolved.set(resolvedKey, keys);
   }
 
+  const baseV2Keys = new Set(
+    input.baseV2CompetitorCanonicalKeys.map((value) => value.trim()).filter(Boolean),
+  );
+  const promotedKeys = new Set(
+    input.promotedCompetitorCanonicalKeys.map((value) => value.trim()).filter(Boolean),
+  );
+
   const groups = new Map<
     string,
     {
@@ -198,6 +218,18 @@ export function buildBroadSearchObservation(
     const rawKey = normalizedKey(row.canonical_key);
     const resolvedKey = resolveCanonicalKey(rawKey, input.mergeCanonicalAliases);
     if (!input.finalCompetitorNamesByCanonicalKey[resolvedKey]) continue;
+
+    // Existing v2 competitors use exact per-response v2 confirmation. Only
+    // cross-response PROMOTE identities may use the persisted legacy verifier
+    // for scoped counting. This keeps the scoped count from exceeding or
+    // contradicting the final run-wide v2 competitor truth.
+    if (
+      baseV2Keys.has(resolvedKey) &&
+      !confirmedOtherKeysByMeasurement.get(row.measurement_id)?.has(resolvedKey)
+    ) {
+      continue;
+    }
+    if (!baseV2Keys.has(resolvedKey) && !promotedKeys.has(resolvedKey)) continue;
 
     const measurement = measurementById.get(row.measurement_id);
     if (!measurement) continue;
@@ -297,6 +329,8 @@ export async function fetchBroadSearchObservation(args: {
   factVersion: string;
   engineVersion: string;
   finalCompetitorNamesByCanonicalKey: Record<string, string>;
+  baseV2CompetitorCanonicalKeys: string[];
+  promotedCompetitorCanonicalKeys: string[];
   mergeCanonicalAliases: Record<string, string>;
 }): Promise<EntityFactsV2ReadBroadSearchObservationDTO | null> {
   const { data: questions, error: questionError } = await supabaseAdmin
@@ -400,6 +434,8 @@ export async function fetchBroadSearchObservation(args: {
     facts: (facts ?? []) as FactRow[],
     finalCompetitorNamesByCanonicalKey:
       args.finalCompetitorNamesByCanonicalKey,
+    baseV2CompetitorCanonicalKeys: args.baseV2CompetitorCanonicalKeys,
+    promotedCompetitorCanonicalKeys: args.promotedCompetitorCanonicalKeys,
     mergeCanonicalAliases: args.mergeCanonicalAliases,
   });
 }
