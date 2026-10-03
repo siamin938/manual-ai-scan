@@ -12,8 +12,9 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("이번 측정에서 대신 확인된 내용");
     expect(dashboardSource).toContain("가장 자주 함께 나온 업체");
     expect(dashboardSource).toContain("이번 측정에서 자주 나온 업체");
-    expect(dashboardSource).toContain("검증 대상 없음");
-    expect(dashboardSource).toContain("확인할 출처 연결 차이");
+    expect(dashboardSource).not.toContain("검증 대상 없음");
+    expect(dashboardSource).toContain("이번 측정에서 확인된 다른 업체");
+    expect(dashboardSource).toContain("확인된 출처 연결 차이");
     expect(dashboardSource).toContain('summary.heroVariant === "not_visible"');
     expect(dashboardSource).toContain('summary.heroVariant !== "not_visible"');
   });
