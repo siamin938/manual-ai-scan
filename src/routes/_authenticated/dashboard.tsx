@@ -682,8 +682,21 @@ function openPrintableSnapshot(title: string): boolean {
   const source = document.querySelector<HTMLElement>(".print-report");
   if (!source) return false;
 
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return false;
+  const printFrame = document.createElement("iframe");
+  printFrame.setAttribute("aria-hidden", "true");
+  printFrame.style.position = "fixed";
+  printFrame.style.left = "-10000px";
+  printFrame.style.top = "0";
+  printFrame.style.width = "1280px";
+  printFrame.style.height = "1px";
+  printFrame.style.border = "0";
+  document.body.appendChild(printFrame);
+
+  const printWindow = printFrame.contentWindow;
+  if (!printWindow) {
+    printFrame.remove();
+    return false;
+  }
 
   const report = source.cloneNode(true) as HTMLElement;
   report.querySelectorAll(".no-print").forEach((node) => node.remove());
@@ -738,8 +751,21 @@ function openPrintableSnapshot(title: string): boolean {
 
   const printWhenReady = async () => {
     await waitForPrintableAssets(printWindow);
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      printWindow.removeEventListener("afterprint", cleanup);
+      printFrame.remove();
+    };
+
+    printWindow.addEventListener("afterprint", cleanup, { once: true });
     printWindow.focus();
     printWindow.print();
+
+    // Safety cleanup for browsers that do not fire afterprint reliably.
+    printWindow.setTimeout(cleanup, 60000);
   };
 
   void printWhenReady();
