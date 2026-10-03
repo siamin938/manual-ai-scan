@@ -148,8 +148,12 @@ function unifiedLayerSummarySentence(summary: UnifiedDiagnosticLayerSummary): st
 
 function UnifiedDiagnosticLayerSummaryCard({
   summary,
+  broadSearchObservation,
 }: {
   summary: UnifiedDiagnosticLayerSummary;
+  broadSearchObservation:
+    | import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadBroadSearchObservationDTO
+    | undefined;
 }) {
   const hasUnresolved =
     summary.overall.unresolvedCount > 0 ||
@@ -196,6 +200,89 @@ function UnifiedDiagnosticLayerSummaryCard({
         <p className="rounded-md bg-muted/40 px-3 py-2 text-sm leading-6">
           {unifiedLayerSummarySentence(summary)}
         </p>
+
+        {broadSearchObservation && (
+          <div className="space-y-3 border-t border-border pt-4">
+            <div>
+              <p className="text-sm font-semibold">기준 검색에서 반복 관찰된 업체</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                넓은 기준 검색 {broadSearchObservation.validCount}문항에서 2회 이상 확인된
+                타업체입니다. 출처는 같은 기준 검색 답변에서 업체와 연결된 독립 웹 출처만
+                표시합니다.
+              </p>
+            </div>
+
+            <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs leading-5">
+              <span className="font-medium">내 업체</span>
+              <span className="ml-2 tabular-nums">
+                기준 검색 {broadSearchObservation.targetConfirmedCount}/
+                {broadSearchObservation.validCount}
+              </span>
+              <span className="mx-1 text-muted-foreground">·</span>
+              <span className="text-muted-foreground">
+                독립 웹 출처 연결{" "}
+                {broadSearchObservation.targetIndependentSourceResponseCount}/
+                {broadSearchObservation.validCount}
+              </span>
+            </div>
+
+            {broadSearchObservation.repeatedCompetitors.length > 0 ? (
+              <div className="overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>업체</TableHead>
+                      <TableHead className="text-right">관찰</TableHead>
+                      <TableHead className="text-right">Top3</TableHead>
+                      <TableHead className="text-right">검색 상황</TableHead>
+                      <TableHead>함께 확인된 독립 웹 출처</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {broadSearchObservation.repeatedCompetitors.map((row) => (
+                      <TableRow key={row.name}>
+                        <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {row.responseCount}/{broadSearchObservation.validCount}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {row.top3ResponseCount}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {row.intentCount}종
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {row.strongestIndependentSource ? (
+                            <>
+                              <span>{row.strongestIndependentSource.domain}</span>
+                              <span className="ml-1 text-xs text-muted-foreground">
+                                · {row.strongestIndependentSource.responseCount}개 답변
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              반복 독립 출처 없음
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="rounded-md border px-3 py-3 text-sm text-muted-foreground">
+                기준 검색에서 2회 이상 반복 관찰된 다른 업체가 없습니다.
+              </p>
+            )}
+
+            <p className="text-xs leading-5 text-muted-foreground">
+              이 표는 이번 측정에서 함께 관찰된 차이를 보여줍니다. 특정 출처나 정보가 AI
+              노출을 발생시켰다는 인과관계를 의미하지 않습니다.
+            </p>
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground">
           이번 통합 24문항 측정에서 확정된 응답 기준입니다.
         </p>
@@ -900,7 +987,10 @@ function DashboardPage() {
           </div>
 
           {unifiedLayerSummary && (
-            <UnifiedDiagnosticLayerSummaryCard summary={unifiedLayerSummary} />
+            <UnifiedDiagnosticLayerSummaryCard
+              summary={unifiedLayerSummary}
+              broadSearchObservation={dto?.broadSearchObservation}
+            />
           )}
 
           {actionOpportunityModel && (
