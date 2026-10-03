@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   createFileRoute,
   Link,
@@ -66,12 +66,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type DashboardSearch = { view?: "detail" };
-type DashboardSearchInput = SearchSchemaInput & { view?: string };
+type DashboardSearch = { view?: "detail"; print?: "1" };
+type DashboardSearchInput = SearchSchemaInput & { view?: string; print?: string };
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  validateSearch: (search: DashboardSearchInput): DashboardSearch =>
-    search["view"] === "detail" ? { view: "detail" } : {},
+  validateSearch: (search: DashboardSearchInput): DashboardSearch => ({
+    ...(search["view"] === "detail" ? { view: "detail" as const } : {}),
+    ...(search["print"] === "1" ? { print: "1" as const } : {}),
+  }),
   head: () => ({
     meta: [
       { title: "AI 노출 진단 · 차보임 CHABOIM" },
@@ -620,77 +622,10 @@ function dashboardPrintTitle(args: {
   return `차보임 AI 노출 진단 - ${business} - ${seoulDateSlug(args.measuredAt)} - ${viewLabel}`;
 }
 
-function openPrintableSnapshot(title: string): boolean {
-  const source = document.querySelector<HTMLElement>(".print-report");
-  if (!source) return false;
-
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return false;
-
-  const report = source.cloneNode(true) as HTMLElement;
-  report.querySelectorAll(".no-print").forEach((node) => node.remove());
-
-  const styles = Array.from(
-    document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
-      'link[rel="stylesheet"], style',
-    ),
-  )
-    .map((node) =>
-      node.tagName === "LINK"
-        ? `<link rel="stylesheet" href="${(node as HTMLLinkElement).href}">`
-        : node.outerHTML,
-    )
-    .join("\n");
-
-  printWindow.document.open();
-  printWindow.document.write(`<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  ${styles}
-</head>
-<body>
-  <main class="mx-auto max-w-7xl px-4 py-7 lg:px-6 lg:py-10">
-    ${report.outerHTML}
-  </main>
-</body>
-</html>`);
-  printWindow.document.close();
-
-  printWindow.document.title = title;
-  printWindow.document.documentElement.className = document.documentElement.className;
-  printWindow.document.body.className = document.body.className;
-
-  try {
-    printWindow.history.replaceState(null, "", `${window.location.origin}/report`);
-  } catch {
-    // The title still controls the PDF job name even if the friendly print URL cannot be set.
-  }
-
-  const printWhenReady = async () => {
-    try {
-      await printWindow.document.fonts?.ready;
-    } catch {
-      // Font readiness is a best-effort enhancement; printing can still continue.
-    }
-    await new Promise((resolve) => printWindow.setTimeout(resolve, 120));
-    printWindow.focus();
-    printWindow.print();
-  };
-
-  if (printWindow.document.readyState === "complete") {
-    void printWhenReady();
-  } else {
-    printWindow.addEventListener("load", () => void printWhenReady(), { once: true });
-  }
-
-  return true;
-}
-
 function DashboardPage() {
-  const { view: requestedView } = Route.useSearch();
+  const { view: requestedView, print: printMode } = Route.useSearch();
   const view = requestedView ?? "summary";
+  const printTriggeredRef = useRef(false);
   const navigate = useNavigate({ from: "/dashboard" });
   const { activeOrgId } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
@@ -982,31 +917,63 @@ function DashboardPage() {
   const setDashboardView = (nextView: "summary" | "detail") => {
     void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
   };
-  const printDashboardReport = () => {
-    if (!model) return;
 
-    const title = dashboardPrintTitle({
+  useEffect(() => {
+    if (printMode !== "1" || !model || printTriggeredRef.current) return;
+    printTriggeredRef.current = true;
+
+    document.title = dashboardPrintTitle({
       businessName: model.businessName,
       measuredAt: model.measuredAt,
       view,
     });
 
-    if (openPrintableSnapshot(title)) return;
-
-    // Popup blocking fallback: print the current document with a temporary title.
-    const originalTitle = document.title;
-    let restored = false;
-    const restoreTitle = () => {
-      if (restored) return;
-      restored = true;
-      document.title = originalTitle;
-      window.removeEventListener("afterprint", restoreTitle);
+    let cancelled = false;
+    const printWhenReady = async () => {
+      try {
+        await document.fonts?.ready;
+      } catch {
+        // Font readiness is best effort; the fully rendered app page remains printable.
+      }
+      if (cancelled) return;
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          window.setTimeout(() => {
+            if (!cancelled) window.print();
+          }, 180);
+        });
+      });
     };
 
-    document.title = title;
-    window.addEventListener("afterprint", restoreTitle);
+    const timer = window.setTimeout(() => void printWhenReady(), 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [printMode, model, view]);
+
+  const printDashboardReport = () => {
+    if (!model) return;
+
+    const printUrl = new URL(window.location.href);
+    if (view === "detail") printUrl.searchParams.set("view", "detail");
+    else printUrl.searchParams.delete("view");
+    printUrl.searchParams.set("print", "1");
+
+    const printWindow = window.open(printUrl.toString(), "_blank");
+    if (printWindow) return;
+
+    // Popup blocking fallback.
+    const originalTitle = document.title;
+    document.title = dashboardPrintTitle({
+      businessName: model.businessName,
+      measuredAt: model.measuredAt,
+      view,
+    });
     window.print();
-    window.setTimeout(restoreTitle, 1500);
+    window.setTimeout(() => {
+      document.title = originalTitle;
+    }, 1500);
   };
 
   return (
