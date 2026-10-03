@@ -1,4 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  redirect,
+  useNavigate,
+  type SearchSchemaInput,
+} from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,11 +15,13 @@ import { toast } from "sonner";
 
 const SELF_SIGNUP_ENABLED = false;
 
+type AuthSearch = { mode?: "recovery" };
+type AuthSearchInput = SearchSchemaInput & { mode?: string };
+
 export const Route = createFileRoute("/auth")({
   ssr: false,
-  validateSearch: (search: Record<string, unknown>) => ({
-    mode: search["mode"] === "recovery" ? ("recovery" as const) : undefined,
-  }),
+  validateSearch: (search: AuthSearchInput): AuthSearch =>
+    search["mode"] === "recovery" ? { mode: "recovery" } : {},
   beforeLoad: async ({ search }) => {
     if (search.mode === "recovery") return;
 
