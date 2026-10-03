@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, BarChart3, Building2, FileCheck2, Search } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, FileCheck2, Printer, Search } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -880,7 +880,7 @@ function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8 lg:space-y-10">
+    <div className="print-page print-report space-y-8 lg:space-y-10">
       <div className="border-b border-border pb-6 lg:flex lg:items-end lg:justify-between lg:gap-8">
         <div className="max-w-3xl">
           <p className="report-kicker mb-3">
@@ -896,8 +896,24 @@ function DashboardPage() {
                 ? "내 업체에 맞춘 24개 질문으로 대표 노출·관찰 업체·출처·기간 변화를 한 번에 확인합니다."
                 : "내 업체에서 중요하게 보는 맞춤 검색 결과를 먼저 보여드리고, 기본 진단은 비교 기준으로 따로 제공합니다."}
           </p>
+          {model?.businessName && (
+            <p className="mt-2 text-sm font-medium text-foreground">
+              대상 업체 · {model.businessName}
+            </p>
+          )}
         </div>
-        <div className="mt-5 flex min-w-0 flex-col gap-3 lg:mt-0 lg:items-end">
+        <div className="no-print mt-5 flex min-w-0 flex-col gap-3 lg:mt-0 lg:items-end">
+          {dto && model && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-center gap-2 sm:w-auto"
+              onClick={() => window.print()}
+            >
+              <Printer aria-hidden="true" />
+              인쇄·PDF 저장
+            </Button>
+          )}
           <div className="inline-flex w-full rounded-lg border bg-muted/40 p-1 sm:w-auto" aria-label="진단 보기 방식">
             <Button
               type="button"
