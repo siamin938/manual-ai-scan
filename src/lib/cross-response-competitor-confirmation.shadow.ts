@@ -76,7 +76,17 @@ export interface CrossResponseCompetitorShadowResult {
 }
 
 function normalizeDomain(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase().replace(/^www\./u, "");
+  const raw = (value ?? "").trim().toLowerCase();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(
+      /^https?:\/\//u.test(raw) ? raw : `https://${raw}`,
+    );
+    return parsed.hostname.replace(/^www\./u, "");
+  } catch {
+    return raw.replace(/^www\./u, "").replace(/\/$/u, "");
+  }
 }
 
 function compactName(value: string): string {
@@ -91,6 +101,15 @@ function compactName(value: string): string {
  * A same-domain collision is held for review only when the normalized names
  * are equal or one is a clear prefix/contained form of the other.
  */
+function stripTerminalBranchMarker(value: string): string {
+  for (const marker of ["직영점", "본점", "지점", "분점", "점"]) {
+    if (value.length > marker.length + 2 && value.endsWith(marker)) {
+      return value.slice(0, -marker.length);
+    }
+  }
+  return value;
+}
+
 export function crossResponseCompetitorNamesPotentiallySameBusiness(
   left: string,
   right: string,
@@ -99,6 +118,10 @@ export function crossResponseCompetitorNamesPotentiallySameBusiness(
   const b = compactName(right);
   if (!a || !b) return false;
   if (a === b) return true;
+
+  const branchA = stripTerminalBranchMarker(a);
+  const branchB = stripTerminalBranchMarker(b);
+  if (branchA.length >= 3 && branchA === branchB) return true;
 
   const shorter = a.length <= b.length ? a : b;
   const longer = a.length <= b.length ? b : a;
