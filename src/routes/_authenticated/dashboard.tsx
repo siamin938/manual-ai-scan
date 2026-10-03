@@ -163,7 +163,7 @@ function UnifiedDiagnosticLayerSummaryCard({
     summary.core.unresolvedCount > 0;
 
   return (
-    <Card className="report-section print-avoid-break">
+    <Card className="report-section">
       <CardHeader className="border-b bg-muted/20 pb-4">
         <p className="report-kicker">SEARCH SCOPE</p>
         <CardTitle className="text-xl">검색 범위별 확정 노출</CardTitle>
@@ -620,6 +620,74 @@ function dashboardPrintTitle(args: {
   return `차보임 AI 노출 진단 - ${business} - ${seoulDateSlug(args.measuredAt)} - ${viewLabel}`;
 }
 
+function openPrintableSnapshot(title: string): boolean {
+  const source = document.querySelector<HTMLElement>(".print-report");
+  if (!source) return false;
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return false;
+
+  const report = source.cloneNode(true) as HTMLElement;
+  report.querySelectorAll(".no-print").forEach((node) => node.remove());
+
+  const styles = Array.from(
+    document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
+      'link[rel="stylesheet"], style',
+    ),
+  )
+    .map((node) =>
+      node.tagName === "LINK"
+        ? `<link rel="stylesheet" href="${(node as HTMLLinkElement).href}">`
+        : node.outerHTML,
+    )
+    .join("\n");
+
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  ${styles}
+</head>
+<body>
+  <main class="mx-auto max-w-7xl px-4 py-7 lg:px-6 lg:py-10">
+    ${report.outerHTML}
+  </main>
+</body>
+</html>`);
+  printWindow.document.close();
+
+  printWindow.document.title = title;
+  printWindow.document.documentElement.className = document.documentElement.className;
+  printWindow.document.body.className = document.body.className;
+
+  try {
+    printWindow.history.replaceState(null, "", `${window.location.origin}/report`);
+  } catch {
+    // The title still controls the PDF job name even if the friendly print URL cannot be set.
+  }
+
+  const printWhenReady = async () => {
+    try {
+      await printWindow.document.fonts?.ready;
+    } catch {
+      // Font readiness is a best-effort enhancement; printing can still continue.
+    }
+    await new Promise((resolve) => printWindow.setTimeout(resolve, 120));
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  if (printWindow.document.readyState === "complete") {
+    void printWhenReady();
+  } else {
+    printWindow.addEventListener("load", () => void printWhenReady(), { once: true });
+  }
+
+  return true;
+}
+
 function DashboardPage() {
   const { view: requestedView } = Route.useSearch();
   const view = requestedView ?? "summary";
@@ -917,6 +985,15 @@ function DashboardPage() {
   const printDashboardReport = () => {
     if (!model) return;
 
+    const title = dashboardPrintTitle({
+      businessName: model.businessName,
+      measuredAt: model.measuredAt,
+      view,
+    });
+
+    if (openPrintableSnapshot(title)) return;
+
+    // Popup blocking fallback: print the current document with a temporary title.
     const originalTitle = document.title;
     let restored = false;
     const restoreTitle = () => {
@@ -926,11 +1003,7 @@ function DashboardPage() {
       window.removeEventListener("afterprint", restoreTitle);
     };
 
-    document.title = dashboardPrintTitle({
-      businessName: model.businessName,
-      measuredAt: model.measuredAt,
-      view,
-    });
+    document.title = title;
     window.addEventListener("afterprint", restoreTitle);
     window.print();
     window.setTimeout(restoreTitle, 1500);
@@ -1191,7 +1264,7 @@ function DashboardPage() {
               : ""}
           </p>
 
-          <Card className="report-section">
+          <Card className="report-section print-avoid-break">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">OBSERVED BUSINESSES</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
@@ -1943,7 +2016,7 @@ function DashboardPage() {
 
           {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} />}
 
-          <Card className="report-section">
+          <Card className="report-section print-avoid-break">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">METHODOLOGY</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
@@ -2535,7 +2608,7 @@ function ActionOpportunitySection({
   }>;
 }) {
   return (
-    <Card className="report-section border-t-2 border-t-primary">
+    <Card className="report-section print-avoid-break border-t-2 border-t-primary">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">ACTION OPPORTUNITIES</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
