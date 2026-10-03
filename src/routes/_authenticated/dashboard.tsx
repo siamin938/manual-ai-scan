@@ -1264,7 +1264,7 @@ function DashboardPage() {
               : ""}
           </p>
 
-          <Card className="report-section print-avoid-break">
+          <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">OBSERVED BUSINESSES</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
@@ -2016,7 +2016,7 @@ function DashboardPage() {
 
           {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} />}
 
-          <Card className="report-section print-avoid-break">
+          <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">METHODOLOGY</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
@@ -2608,7 +2608,7 @@ function ActionOpportunitySection({
   }>;
 }) {
   return (
-    <Card className="report-section print-avoid-break border-t-2 border-t-primary">
+    <Card className="report-section border-t-2 border-t-primary">
       <CardHeader className="border-b bg-muted/20">
         <p className="report-kicker">ACTION OPPORTUNITIES</p>
         <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
