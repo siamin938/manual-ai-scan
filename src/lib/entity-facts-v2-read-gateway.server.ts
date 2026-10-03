@@ -696,6 +696,13 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       factVersion: storage.fact_version,
       engineVersion: storage.engine_version,
       finalCompetitorNamesByCanonicalKey,
+      baseV2CompetitorCanonicalKeys: aggregateForResolution.competitors.map(
+        (row) => row.canonicalKey,
+      ),
+      promotedCompetitorCanonicalKeys:
+        competitorShadowSupplement?.promotedCandidates.map(
+          (row) => row.canonicalKey,
+        ) ?? [],
       mergeCanonicalAliases,
     }).catch(() => null);
 
