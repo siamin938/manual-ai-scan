@@ -286,6 +286,8 @@ export function buildCrossResponseCompetitorShadowSupplement(
 
 type ShadowAggregateStorageRow = {
   id: string;
+  source_run_id: string;
+  contract_ok: boolean;
   aggregate: Json;
   aggregate_hash: string;
 };
