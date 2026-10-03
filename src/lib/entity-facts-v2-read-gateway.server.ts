@@ -3,6 +3,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { CUSTOMER_STANDARD_QUESTION_COUNT } from "@/lib/customer-measurement.helpers";
 import { UNIFIED_DIAGNOSTIC_SET_PREFIX } from "@/lib/custom-question-suggestions";
+import {
+  isInfrastructureSourceDomain,
+  normalizeSourceDomain,
+} from "@/lib/source-domain-classifier";
 import { buildEntityFactsV2ReadGatewayFromSnapshot } from "./entity-facts-v2-read-gateway.build";
 import {
   ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION,
@@ -47,22 +51,6 @@ function distanceCharsFromEvidence(value: Json | null): number | null {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
-}
-
-function normalizeSourceDomain(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase().replace(/^www\./u, "");
-}
-
-function infrastructureSourceHost(domain: string): boolean {
-  return (
-    domain === "s3.amazonaws.com" ||
-    domain.endsWith(".s3.amazonaws.com") ||
-    /\.s3[.-][^.]+\.amazonaws\.com$/u.test(domain) ||
-    domain === "storage.googleapis.com" ||
-    domain.endsWith(".blob.core.windows.net") ||
-    domain.endsWith(".r2.cloudflarestorage.com") ||
-    domain.endsWith(".digitaloceanspaces.com")
-  );
 }
 
 function verifiedTargetPageBasisLabel(value: Json | null): string {
@@ -945,7 +933,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       if (
         !domain ||
         confirmedTargetDomains.has(domain) ||
-        infrastructureSourceHost(domain) ||
+        isInfrastructureSourceDomain(domain) ||
         distance === null ||
         distance > 250 ||
         !/^https?:\/\//iu.test(sampleUrl)
