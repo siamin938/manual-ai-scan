@@ -149,11 +149,13 @@ function unifiedLayerSummarySentence(summary: UnifiedDiagnosticLayerSummary): st
 function UnifiedDiagnosticLayerSummaryCard({
   summary,
   broadSearchObservation,
+  hasVerifiedOwnedDomain,
 }: {
   summary: UnifiedDiagnosticLayerSummary;
   broadSearchObservation:
     | import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadBroadSearchObservationDTO
     | undefined;
+  hasVerifiedOwnedDomain: boolean;
 }) {
   const hasUnresolved =
     summary.overall.unresolvedCount > 0 ||
@@ -212,18 +214,34 @@ function UnifiedDiagnosticLayerSummaryCard({
               </p>
             </div>
 
-            <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs leading-5">
-              <span className="font-medium">내 업체</span>
-              <span className="ml-2 tabular-nums">
-                기준 검색 {broadSearchObservation.targetConfirmedCount}/
-                {broadSearchObservation.validCount}
-              </span>
-              <span className="mx-1 text-muted-foreground">·</span>
-              <span className="text-muted-foreground">
-                독립 웹 출처 연결{" "}
-                {broadSearchObservation.targetIndependentSourceResponseCount}/
-                {broadSearchObservation.validCount}
-              </span>
+            <div className="space-y-1 rounded-md border bg-muted/20 px-3 py-2 text-xs leading-5">
+              <div>
+                <span className="font-medium">내 업체</span>
+                <span className="ml-2 tabular-nums">
+                  기준 검색 {broadSearchObservation.targetConfirmedCount}/
+                  {broadSearchObservation.validCount}
+                </span>
+                <span className="mx-1 text-muted-foreground">·</span>
+                <span className="text-muted-foreground">
+                  독립 웹 출처 연결{" "}
+                  {broadSearchObservation.targetIndependentSourceResponseCount}/
+                  {broadSearchObservation.validCount}
+                </span>
+              </div>
+              {hasVerifiedOwnedDomain &&
+                broadSearchObservation.targetIndependentSourceResponseCount === 0 && (
+                  <p className="text-muted-foreground">
+                    공식 홈페이지는 등록돼 있지만, 이번 기준 검색 답변에서는 내 업체와 독립 웹
+                    출처 연결이 확인되지 않았습니다.
+                  </p>
+                )}
+              {!hasVerifiedOwnedDomain &&
+                broadSearchObservation.targetIndependentSourceResponseCount === 0 && (
+                  <p className="text-muted-foreground">
+                    차보임에 등록된 공식 홈페이지가 없고, 이번 기준 검색에서도 내 업체와 독립 웹
+                    출처 연결이 확인되지 않았습니다.
+                  </p>
+                )}
             </div>
 
             {broadSearchObservation.repeatedCompetitors.length > 0 ? (
@@ -274,6 +292,72 @@ function UnifiedDiagnosticLayerSummaryCard({
               <p className="rounded-md border px-3 py-3 text-sm text-muted-foreground">
                 기준 검색에서 2회 이상 반복 관찰된 다른 업체가 없습니다.
               </p>
+            )}
+
+            {broadSearchObservation.singleObservationCompetitors.length > 0 && (
+              <details className="rounded-md border bg-muted/10">
+                <summary className="cursor-pointer px-3 py-3 text-sm font-medium">
+                  기준 검색에서 추가로 한 번 확인된 업체{" "}
+                  {broadSearchObservation.singleObservationCompetitors.length}곳
+                </summary>
+                <div className="border-t px-3 py-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {broadSearchObservation.singleObservationCompetitors
+                      .slice(0, 8)
+                      .map((row) => (
+                        <div key={row.name} className="rounded-md border bg-card px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-medium">{row.name}</span>
+                            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                              1/{broadSearchObservation.validCount}
+                              {row.top3ResponseCount > 0 ? " · Top3" : ""}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {row.strongestIndependentSource
+                              ? "독립 웹 출처: " + row.strongestIndependentSource.domain
+                              : "반복 독립 웹 출처는 확인되지 않음"}
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+                  {broadSearchObservation.singleObservationCompetitors.length > 8 && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      그 외{" "}
+                      {broadSearchObservation.singleObservationCompetitors.length - 8}곳이
+                      추가로 한 번씩 관찰됐습니다.
+                    </p>
+                  )}
+                </div>
+              </details>
+            )}
+
+            {broadSearchObservation.observedCompetitorCount > 0 && (
+              <div className="space-y-2 rounded-md border px-3 py-3">
+                <p className="text-sm font-semibold">이번 기준 검색에서 확인된 공개 근거 패턴</p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  기준 검색에서 확인된 타업체 {broadSearchObservation.observedCompetitorCount}곳 중{" "}
+                  {broadSearchObservation.independentWebLinkedCompetitorCount}곳에서 독립 웹
+                  출처가 함께 연결됐습니다.
+                  {broadSearchObservation.repeatedCompetitors.length > 0 && (
+                    <>
+                      {" "}
+                      2회 이상 반복된 업체 {broadSearchObservation.repeatedCompetitors.length}곳 중{" "}
+                      {broadSearchObservation.repeatedIndependentWebLinkedCompetitorCount}곳에서
+                      독립 웹 출처가 확인됐습니다.
+                    </>
+                  )}
+                </p>
+                {broadSearchObservation.sourcePatterns.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {broadSearchObservation.sourcePatterns.slice(0, 6).map((item) => (
+                      <Badge key={item.key} variant="secondary">
+                        {item.label} {item.competitorCount}곳
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             <p className="text-xs leading-5 text-muted-foreground">
@@ -990,6 +1074,7 @@ function DashboardPage() {
             <UnifiedDiagnosticLayerSummaryCard
               summary={unifiedLayerSummary}
               broadSearchObservation={dto?.broadSearchObservation}
+              hasVerifiedOwnedDomain={verifiedFirstPartySourceTypes.includes("owned_domain")}
             />
           )}
 
