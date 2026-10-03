@@ -301,6 +301,9 @@ function UnifiedDiagnosticLayerSummaryCard({
                   {broadSearchObservation.singleObservationCompetitors.length}곳
                 </summary>
                 <div className="border-t px-3 py-3">
+                  <p className="mb-3 text-xs leading-5 text-muted-foreground">
+                    1회 관찰은 반복 패턴이 아니라 참고 신호입니다.
+                  </p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {broadSearchObservation.singleObservationCompetitors
                       .slice(0, 8)
@@ -349,13 +352,18 @@ function UnifiedDiagnosticLayerSummaryCard({
                   )}
                 </p>
                 {broadSearchObservation.sourcePatterns.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {broadSearchObservation.sourcePatterns.slice(0, 6).map((item) => (
-                      <Badge key={item.key} variant="secondary">
-                        {item.label} {item.competitorCount}곳
-                      </Badge>
-                    ))}
-                  </div>
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {broadSearchObservation.sourcePatterns.slice(0, 6).map((item) => (
+                        <Badge key={item.key} variant="secondary">
+                          {item.label} {item.competitorCount}곳
+                        </Badge>
+                      ))}
+                    </div>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      한 업체가 여러 출처 유형에 동시에 포함될 수 있습니다.
+                    </p>
+                  </>
                 )}
               </div>
             )}
