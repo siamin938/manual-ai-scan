@@ -29,6 +29,15 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('summary.heroVariant !== "not_visible" && (');
   });
 
+  it("shows the broad-versus-detail observation without causal wording", () => {
+    expect(dashboardSource).toContain("이번 측정에서 확인된 검색 범위 차이");
+    expect(dashboardSource).toContain("summary.searchScopeObservation.headline");
+    expect(dashboardSource).toContain("summary.searchScopeObservation.evidence");
+    expect(dashboardSource).toContain(
+      "특정 출처가 AI 노출의 원인임을 의미하지 않습니다.",
+    );
+  });
+
   it("reuses comparison v2 for repeat confirmation instead of inventing a score", () => {
     expect(dashboardSource).toContain("재측정 확인");
     expect(dashboardSource).toContain("comparison.compactSummary");
