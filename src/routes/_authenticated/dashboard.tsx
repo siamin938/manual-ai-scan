@@ -1926,6 +1926,7 @@ function DashboardSummary({
     core: "기준 검색",
     overall: "전체",
   } as const;
+  const coreScope = summary.searchScopes?.find((scope) => scope.kind === "core") ?? null;
 
   return (
     <section className="space-y-6" aria-label="사장님용 10초 요약">
@@ -1981,9 +1982,13 @@ function DashboardSummary({
         />
         <SummaryKpiCard
           icon={<Search aria-hidden="true" />}
-          label="상위 3곳에 나온 답변"
-          value={summaryCountText(summary.top3)}
-          note={summaryMetricNote(summary.top3)}
+          label="기준 검색 노출"
+          value={coreScope ? `${coreScope.confirmedCount}/${coreScope.validCount}` : "확인 불가"}
+          note={
+            coreScope
+              ? `넓은 지역 · 주력 서비스 · ${coreScope.confirmedPct === null ? "비율 확인 불가" : pctRange(coreScope.confirmedPct, coreScope.confirmedPct)}`
+              : "이번 측정은 기준 검색을 분리해 표시할 수 없습니다."
+          }
         />
         {summary.heroVariant !== "not_visible" && (
           <SummaryKpiCard
