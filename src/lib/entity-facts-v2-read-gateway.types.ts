@@ -61,6 +61,22 @@ export type EntityFactsV2ReadBroadSearchSourceDTO = {
   directAttributionCount: number;
 };
 
+export type EntityFactsV2ReadBroadSearchSourcePatternDTO = {
+  key:
+    | "independent_web"
+    | "shared_profile"
+    | "community"
+    | "auto_platform"
+    | "video_platform"
+    | "news"
+    | "job_board"
+    | "public_information"
+    | "brand_or_manufacturer"
+    | "marketplace_or_directory";
+  label: string;
+  competitorCount: number;
+};
+
 export type EntityFactsV2ReadBroadSearchCompetitorDTO = {
   name: string;
   responseCount: number;
@@ -71,13 +87,18 @@ export type EntityFactsV2ReadBroadSearchCompetitorDTO = {
 };
 
 export type EntityFactsV2ReadBroadSearchObservationDTO = {
-  version: "0.1";
+  version: "0.2";
   validCount: number;
   targetConfirmedCount: number;
   targetTop3Count: number;
   targetIndependentSourceResponseCount: number;
   targetIndependentSources: EntityFactsV2ReadBroadSearchSourceDTO[];
   repeatedCompetitors: EntityFactsV2ReadBroadSearchCompetitorDTO[];
+  singleObservationCompetitors: EntityFactsV2ReadBroadSearchCompetitorDTO[];
+  observedCompetitorCount: number;
+  independentWebLinkedCompetitorCount: number;
+  repeatedIndependentWebLinkedCompetitorCount: number;
+  sourcePatterns: EntityFactsV2ReadBroadSearchSourcePatternDTO[];
 };
 
 export type EntityFactsV2ReadTargetSourceDTO = {
