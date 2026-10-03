@@ -202,6 +202,37 @@ describe("cross-response competitor runtime shadow supplement", () => {
         collisionCanonicalKeys: ["auto:모먼트카케어"],
       }),
     ]);
+    expect(result?.mergedCompetitorFactsPreview).toEqual([
+      {
+        canonicalKey: "auto:국스월드",
+        responseCount: 5,
+        questionCount: 5,
+        intentCount: 4,
+        top3ResponseCount: 1,
+        origin: "shadow_promote",
+      },
+      {
+        canonicalKey: "auto:t스타일랩",
+        responseCount: 2,
+        questionCount: 2,
+        intentCount: 2,
+        top3ResponseCount: 1,
+        origin: "shadow_promote",
+      },
+      {
+        canonicalKey: "auto:모먼트카케어",
+        responseCount: 1,
+        questionCount: 1,
+        intentCount: 1,
+        top3ResponseCount: 1,
+        origin: "v2",
+      },
+    ]);
+    expect(
+      result?.mergedCompetitorFactsPreview.some(
+        (row) => row.canonicalKey === "auto:모먼트",
+      ),
+    ).toBe(false);
     expect(JSON.stringify(result)).not.toContain("targetSeen");
     expect(JSON.stringify(result)).not.toContain("targetBestPosition");
   });
