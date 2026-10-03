@@ -20,6 +20,12 @@ describe("broad search customer insight contract", () => {
     expect(dashboardSource).toContain("기준 검색에서 추가로 한 번 확인된 업체");
     expect(dashboardSource).toContain("이번 기준 검색에서 확인된 공개 근거 패턴");
     expect(dashboardSource).toContain(
+      "1회 관찰은 반복 패턴이 아니라 참고 신호입니다.",
+    );
+    expect(dashboardSource).toContain(
+      "한 업체가 여러 출처 유형에 동시에 포함될 수 있습니다.",
+    );
+    expect(dashboardSource).toContain(
       "공식 홈페이지는 등록돼 있지만, 이번 기준 검색 답변에서는 내 업체와 독립 웹",
     );
     expect(dashboardSource).toContain(
