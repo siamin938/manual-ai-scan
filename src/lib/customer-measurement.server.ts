@@ -246,8 +246,23 @@ export async function createCustomerMeasurementRun(args: {
       })
       .select("id")
       .single();
-    if (insertErr || !inserted) return fail("MEASUREMENT_NOT_READY");
-    runId = inserted.id;
+    if (insertErr || !inserted) {
+      // DB partial unique index가 동시에 들어온 같은 조건의 active run을 원자적으로 막는다.
+      // 경쟁 요청이 먼저 생성한 row를 다시 읽어 동일 run으로 수렴시킨다.
+      if (insertErr?.code !== "23505") return fail("MEASUREMENT_NOT_READY");
+
+      const { data: racedRun, error: racedRunError } =
+        await baseSameConditionRunQuery()
+          .in("status", ["draft", "queued", "running"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+      if (racedRunError || !racedRun) return fail("MEASUREMENT_NOT_READY");
+      runId = racedRun.id;
+    } else {
+      runId = inserted.id;
+    }
   }
 
   // enqueue-run은 runId 기준 idempotent → 같은 run 재호출 안전
