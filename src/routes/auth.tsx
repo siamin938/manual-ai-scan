@@ -42,8 +42,6 @@ function AuthPage() {
       typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("mode") === "recovery";
 
-    if (recoveryRedirect) setRecoveryMode(true);
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
