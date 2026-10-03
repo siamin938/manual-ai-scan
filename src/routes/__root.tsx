@@ -14,6 +14,8 @@ import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
+const CHABOIM_FAVICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CjxkZWZzPgogIDxsaW5lYXJHcmFkaWVudCBpZD0iYmciIHgxPSI4IiB5MT0iNCIgeDI9IjU2IiB5Mj0iNjAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgIDxzdG9wIHN0b3AtY29sb3I9IiMxNzY0QzkiLz4KICAgIDxzdG9wIG9mZnNldD0iLjQ4IiBzdG9wLWNvbG9yPSIjMEEzNTZGIi8+CiAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwNDE2MkQiLz4KICA8L2xpbmVhckdyYWRpZW50PgogIDxsaW5lYXJHcmFkaWVudCBpZD0iYmFyIiB4MT0iMzIiIHkxPSIyMiIgeDI9IjUyIiB5Mj0iNDgiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgIDxzdG9wIHN0b3AtY29sb3I9IiMyN0Q3RjQiLz4KICAgIDxzdG9wIG9mZnNldD0iLjU1IiBzdG9wLWNvbG9yPSIjMUI5Q0Y2Ii8+CiAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxOTUzRjMiLz4KICA8L2xpbmVhckdyYWRpZW50Pgo8L2RlZnM+CjxyZWN0IHg9IjIiIHk9IjIiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcng9IjE0IiBmaWxsPSJ1cmwoI2JnKSIvPgo8cGF0aCBkPSJNNDMgMTZhMjAgMjAgMCAxIDAgMCAzMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRjhGQkZGIiBzdHJva2Utd2lkdGg9IjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8cmVjdCB4PSIzMSIgeT0iMzciIHdpZHRoPSI2IiBoZWlnaHQ9IjEwIiByeD0iMS41IiBmaWxsPSJ1cmwoI2JhcikiLz4KPHJlY3QgeD0iMzkiIHk9IjMxIiB3aWR0aD0iNiIgaGVpZ2h0PSIxNiIgcng9IjEuNSIgZmlsbD0idXJsKCNiYXIpIi8+CjxyZWN0IHg9IjQ3IiB5PSIyNCIgd2lkdGg9IjYiIGhlaWdodD0iMjMiIHJ4PSIxLjUiIGZpbGw9InVybCgjYmFyKSIvPgo8L3N2Zz4=";
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -81,20 +83,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "차보임 CHABOIM | 자동차 업체 AI 추천시장 분석" },
       { name: "description", content: "실제 고객 질문을 반복 측정해 자동차 업체의 AI 노출, 경쟁업체, 실제 인용 출처를 분석합니다." },
-      { name: "author", content: "Lovable" },
+      { name: "author", content: "차보임 CHABOIM" },
+      { name: "theme-color", content: "#071b36" },
       { property: "og:title", content: "차보임 CHABOIM" },
       { property: "og:description", content: "자동차 업체 AI 추천시장 분석" },
 
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: CHABOIM_FAVICON, type: "image/svg+xml" },
+      { rel: "shortcut icon", href: CHABOIM_FAVICON, type: "image/svg+xml" },
     ],
   }),
   shellComponent: RootShell,
