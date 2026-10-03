@@ -10,6 +10,13 @@ const runsSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/runs.index.tsx"),
   "utf8",
 );
+const migrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20261003084606_customer_measurement_active_run_unique_v01.sql",
+  ),
+  "utf8",
+);
 
 describe("customer measurement retry and duplicate guard contract", () => {
   it("reuses same-condition queued/running customer runs before creating a new draft", () => {
@@ -27,6 +34,36 @@ describe("customer measurement retry and duplicate guard contract", () => {
     expect(serverSource).toContain('.eq("status", "draft")');
     expect(serverSource).toContain('.eq("created_by", userId)');
     expect(serverSource).toContain("30 * 60 * 1000");
+  });
+
+
+  it("enforces one active customer run per org/business/question-set at the DB layer", () => {
+    expect(migrationSource).toContain(
+      "create unique index measurement_runs_customer_active_condition_uq",
+    );
+    expect(migrationSource).toContain(
+      "on public.measurement_runs (org_id, business_id, question_set_id)",
+    );
+    expect(migrationSource).toContain(
+      "diagnostic_scope = 'customer'",
+    );
+    expect(migrationSource).toContain(
+      "'draft'::public.run_status",
+    );
+    expect(migrationSource).toContain(
+      "'queued'::public.run_status",
+    );
+    expect(migrationSource).toContain(
+      "'running'::public.run_status",
+    );
+  });
+
+  it("recovers a 23505 insert race by reusing the DB-winning active run", () => {
+    expect(serverSource).toContain('insertErr?.code !== "23505"');
+    expect(serverSource).toContain(
+      '.in("status", ["draft", "queued", "running"])',
+    );
+    expect(serverSource).toContain("runId = racedRun.id");
   });
 
   it("still delegates final per-run enqueue idempotency to enqueue-run", () => {
