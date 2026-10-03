@@ -8,6 +8,13 @@ const dashboardSource = readFileSync(
 );
 
 describe("dashboard owner productization layer", () => {
+  it("keeps Top3 as supporting context while promoting broad-search visibility in the summary KPIs", () => {
+    expect(dashboardSource).toContain('label="기준 검색 노출"');
+    expect(dashboardSource).not.toContain('label="상위 3곳에 나온 답변"');
+    expect(dashboardSource).toContain("<strong className=\"text-primary\">상위 3곳</strong>");
+    expect(dashboardSource).toContain('label="확정 상위 3곳 노출률"');
+  });
+
   it("keeps zero-visibility value useful without changing diagnostic truth", () => {
     expect(dashboardSource).toContain("이번 측정에서 대신 확인된 내용");
     expect(dashboardSource).toContain("가장 자주 함께 나온 업체");
