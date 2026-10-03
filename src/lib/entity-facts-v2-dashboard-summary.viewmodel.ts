@@ -27,6 +27,12 @@ export type DashboardSummarySearchScope = {
   confirmedPct: number | null;
 };
 
+export type DashboardSummarySearchScopeObservation = {
+  kind: "custom_without_core";
+  headline: string;
+  evidence: string | null;
+};
+
 export type DashboardSummaryHeroVariant =
   | "unavailable"
   | "not_visible"
@@ -45,6 +51,7 @@ export type EntityFactsV2DashboardSummaryViewModel = {
   topCompetitor: { name: string; responseCount: number } | null;
   searchContexts: DashboardSummarySearchContext[];
   searchScopes: DashboardSummarySearchScope[] | null;
+  searchScopeObservation: DashboardSummarySearchScopeObservation | null;
   opportunities: Array<{
     rank: number;
     title: string;
@@ -90,10 +97,57 @@ function exactMetric(args: {
   };
 }
 
+function buildSearchScopeObservation(args: {
+  unifiedLayerSummary: UnifiedDiagnosticLayerSummary | null;
+  hasVerifiedOwnedDomain: boolean;
+  broadSearchObservation:
+    | {
+        validCount: number;
+        targetIndependentSourceResponseCount: number;
+      }
+    | null;
+}): DashboardSummarySearchScopeObservation | null {
+  const summary = args.unifiedLayerSummary;
+  if (
+    !summary ||
+    summary.custom.confirmedCount <= 0 ||
+    summary.core.confirmedCount !== 0
+  ) {
+    return null;
+  }
+
+  const headline =
+    `상세 검색 ${summary.custom.confirmedCount}/${summary.custom.validCount}에서는 확인됐지만, ` +
+    `기준 검색 ${summary.core.confirmedCount}/${summary.core.validCount}에서는 확인되지 않았습니다.`;
+
+  let evidence: string | null = null;
+  if (
+    args.broadSearchObservation &&
+    args.broadSearchObservation.targetIndependentSourceResponseCount === 0
+  ) {
+    evidence = args.hasVerifiedOwnedDomain
+      ? "공식 홈페이지는 등록돼 있지만, 이번 기준 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다."
+      : "이번 기준 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다.";
+  }
+
+  return {
+    kind: "custom_without_core",
+    headline,
+    evidence,
+  };
+}
+
 export function buildEntityFactsV2DashboardSummaryViewModel(args: {
   model: EntityFactsV2DashboardCutoverModel;
   unifiedLayerSummary: UnifiedDiagnosticLayerSummary | null;
   actionOpportunityModel: ActionOpportunityEngineResult | null;
+  hasVerifiedOwnedDomain?: boolean;
+  broadSearchObservation?:
+    | {
+        validCount: number;
+        targetIndependentSourceResponseCount: number;
+      }
+    | null;
 }): EntityFactsV2DashboardSummaryViewModel {
   const { model, unifiedLayerSummary, actionOpportunityModel } = args;
 
@@ -137,6 +191,11 @@ export function buildEntityFactsV2DashboardSummaryViewModel(args: {
     total: model.metricCards.top3.validCount,
     lowerPct: model.metricCards.top3.lowerPct,
   });
+  const searchScopeObservation = buildSearchScopeObservation({
+    unifiedLayerSummary,
+    hasVerifiedOwnedDomain: args.hasVerifiedOwnedDomain === true,
+    broadSearchObservation: args.broadSearchObservation ?? null,
+  });
 
   return {
     version: ENTITY_FACTS_V2_DASHBOARD_SUMMARY_VERSION,
@@ -152,6 +211,7 @@ export function buildEntityFactsV2DashboardSummaryViewModel(args: {
     topCompetitor: model.recentSummary.topCompetitor,
     searchContexts,
     searchScopes,
+    searchScopeObservation,
     opportunities:
       actionOpportunityModel?.items.slice(0, 2).map((item) => ({
         rank: item.rank,
