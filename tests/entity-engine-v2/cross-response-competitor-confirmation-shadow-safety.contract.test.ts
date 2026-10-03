@@ -58,7 +58,18 @@ describe("cross-response competitor shadow safety contract", () => {
     expect(readGatewayServer).not.toContain(
       "gatewayResponse.data.questionAreas =",
     );
-    expect(readGatewayServer).not.toContain("mergeReviewCandidates");
+    expect(readGatewayServer).toContain(
+      "competitorShadowSupplement?.mergeReviewCandidates ?? []",
+    );
+    expect(readGatewayServer).toContain(
+      "mergeCanonicalAliases[row.canonicalKey]",
+    );
+    expect(readGatewayServer).not.toContain(
+      "gatewayResponse.data.competitors.push(...competitorShadowSupplement.mergeReviewCandidates",
+    );
+    expect(readGatewayServer).not.toContain(
+      "gatewayResponse.data.competitors = competitorShadowSupplement.mergeReviewCandidates",
+    );
   });
 
   it("keeps the runtime materialization path outside the supplement module", () => {
