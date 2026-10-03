@@ -149,6 +149,10 @@ export type EntityFactsV2ReadGatewayDTO = {
   overview: EntityFactsV2ReadOverviewDTO;
   questionGroups: EntityFactsV2ReadQuestionGroupDTO[];
   questionAreas: EntityFactsV2ReadQuestionAreaDTO[];
+  /**
+   * Customer-visible confirmed competitor rows. The server may append the
+   * exact-run cross-response supplement after the core v2 snapshot is built.
+   */
   competitors: EntityFactsV2ReadCompetitorDTO[];
   targetSources: EntityFactsV2ReadTargetSourceDTO[];
   /** Supplemental final-answer citation summary for the exact representative run. */
