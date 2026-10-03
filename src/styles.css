@@ -214,11 +214,15 @@
   }
   .print-report .print-avoid-break,
   .print-report .print-avoid-break[data-slot="card"],
-  .print-report table,
   .print-report tr,
   .print-report li {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  .print-report table,
+  .print-report tbody {
+    break-inside: auto;
+    page-break-inside: auto;
   }
   .print-report .print-section {
     break-inside: auto;
@@ -226,6 +230,10 @@
   .print-report [data-slot="card-header"] {
     break-after: avoid;
     page-break-after: avoid;
+  }
+  .print-report p {
+    orphans: 3;
+    widows: 3;
   }
   .print-report thead {
     display: table-header-group;
