@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { aggregateBusinessShare } from "@/lib/business-share.helpers";
+import { useServerFn } from "@tanstack/react-start";
+import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
 import {
   CANONICALIZATION_VERSION_CONFLICT,
   resolveCanonicalizationVersion,
@@ -303,7 +305,21 @@ function RunDetailPage() {
     },
   });
 
-
+  // 대시보드 AI 진단 상세와 같은 v2 확정 업체 기준(보조 조회). 페이지 run과 정확히 일치할 때만 사용한다.
+  const fetchV2Gateway = useServerFn(getEntityFactsV2ReadGateway);
+  const runBusinessId = data?.run?.business_id ?? null;
+  const v2Query = useQuery({
+    queryKey: ["run-detail-entity-facts-v2", activeOrgId, runBusinessId, runId],
+    enabled: !!activeOrgId && !!runBusinessId,
+    retry: false,
+    queryFn: () =>
+      fetchV2Gateway({ data: { orgId: activeOrgId!, businessId: runBusinessId! } }),
+  });
+  const v2Response = v2Query.data;
+  const v2ExactRun =
+    v2Response && v2Response.ok === true && v2Response.data.scope.runId === runId
+      ? v2Response.data
+      : null;
 
   if (isLoading) {
     return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
@@ -347,6 +363,24 @@ function RunDetailPage() {
       },
     ];
   });
+  const v2ShareRows = v2ExactRun
+    ? [
+        {
+          key: `target:${v2ExactRun.business.id}`,
+          name: v2ExactRun.business.name,
+          count: v2ExactRun.overview.confirmedMentionCount,
+          isTarget: true,
+        },
+        ...v2ExactRun.competitors.map((c, i) => ({
+          key: `v2:${i}:${c.name}`,
+          name: c.name,
+          count: c.responseCount,
+          isTarget: false,
+        })),
+      ]
+    : null;
+  const v2ValidCount = v2ExactRun ? v2ExactRun.overview.validCount : 0;
+
   const shareRows = aggregateBusinessShare({
     mentions: approvedMentions,
     validMeasurementCount: Number(validMeasurementCount ?? 0),
@@ -580,14 +614,63 @@ function RunDetailPage() {
         </CardContent>
       </Card>
 
-      {/* AI 답변에서 관찰된 업체 */}
-      {showSummary ? (
+      {/* AI 답변에서 관찰된 업체 (v2 확정 업체 기준, 정확히 같은 측정일 때만) */}
+      {showSummary && v2ShareRows ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">AI 답변에서 관찰된 업체</CardTitle>
             <p className="text-xs leading-5 text-muted-foreground">
-              이번 측정의 유효 질문에서 업체로 정리된 항목입니다. 내 업체와 자동 발견 업체를 함께
-              보여줍니다.
+              AI 진단 상세와 같은 확정 업체 기준으로 정리한 목록입니다.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>업체명</TableHead>
+                    <TableHead className="text-right">관찰된 질문 수</TableHead>
+                    <TableHead className="text-right">관찰률</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {v2ShareRows.map((r) => (
+                    <TableRow key={r.key}>
+                      <TableCell className="text-sm">
+                        <span className="font-medium">{r.name}</span>
+                        {r.isTarget ? (
+                          <Badge className="ml-2">내 업체</Badge>
+                        ) : (
+                          <Badge variant="outline" className="ml-2">
+                            함께 관찰
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{r.count}</TableCell>
+                      <TableCell className="text-right">
+                        {v2ValidCount > 0 ? pct((r.count / v2ValidCount) * 100) : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">
+              관찰률은 유효 답변 {v2ValidCount}건 중 해당 업체가 확인된 답변의 비율입니다. 함께
+              관찰됐다는 것이 추천 원인이라는 뜻은 아닙니다.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* AI 답변에서 관찰된 업체 */}
+      {showSummary && !v2ShareRows ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">AI 답변에서 1차 감지된 업체 후보</CardTitle>
+            <p className="text-xs leading-5 text-muted-foreground">
+              이전 방식으로 1차 감지된 업체 후보 목록입니다. 추가 업체 확인이 필요한 항목이 포함될 수
+              있으며, AI 진단 상세의 확정 업체 기준과 다를 수 있습니다.
             </p>
           </CardHeader>
           <CardContent>
@@ -740,9 +823,12 @@ function JobDetail({
               .sort((a, b) => a.position - b.position);
             return (
               <div>
-                <p className="mb-1 text-xs font-semibold">감지된 업체 ({confirmed.length})</p>
+                <p className="mb-1 text-xs font-semibold">1차 감지 업체 후보 ({confirmed.length})</p>
+                <p className="mb-1 text-[11px] text-muted-foreground">
+                  최종 확정 업체 목록은 위 요약(AI 진단 상세와 같은 기준)을 확인해 주세요.
+                </p>
                 {confirmed.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">감지된 업체가 없습니다.</p>
+                  <p className="text-xs text-muted-foreground">1차 감지된 업체 후보가 없습니다.</p>
                 ) : (
                   <ul className="space-y-1 text-xs">
                     {confirmed.map((m) => (
