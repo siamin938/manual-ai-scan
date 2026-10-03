@@ -17,6 +17,7 @@ describe("customer auth production UX contract", () => {
     expect(authSource).toContain("resetPasswordForEmail");
     expect(authSource).toContain('redirectTo: `${window.location.origin}/auth?mode=recovery`');
     expect(authSource).toContain('event === "PASSWORD_RECOVERY"');
+    expect(authSource).not.toContain("if (recoveryRedirect) setRecoveryMode(true)");
     expect(authSource).toContain("updateUser({ password: newPassword })");
     expect(authSource).toContain("비밀번호를 잊으셨나요?");
     expect(authSource).toContain("재설정 메일 보내기");
