@@ -971,9 +971,6 @@ function DashboardPage() {
                 <Printer aria-hidden="true" />
                 인쇄·PDF 저장
               </Button>
-              <p className="max-w-xs text-[11px] leading-4 text-muted-foreground lg:text-right">
-                PDF 저장 시 브라우저 인쇄 설정의 ‘머리글 및 바닥글’을 끄면 주소·날짜가 빠집니다.
-              </p>
             </div>
           )}
           <div className="inline-flex w-full rounded-lg border bg-muted/40 p-1 sm:w-auto" aria-label="진단 보기 방식">
