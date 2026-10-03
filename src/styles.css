@@ -223,6 +223,10 @@
   .print-report .print-section {
     break-inside: auto;
   }
+  .print-report [data-slot="card-header"] {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
   .print-report thead {
     display: table-header-group;
   }
