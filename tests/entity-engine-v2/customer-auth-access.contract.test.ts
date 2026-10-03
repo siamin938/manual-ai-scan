@@ -7,6 +7,11 @@ const authSource = readFileSync(
   "utf8",
 );
 
+const landingSource = readFileSync(
+  resolve(process.cwd(), "src/routes/index.tsx"),
+  "utf8",
+);
+
 describe("customer auth access contract", () => {
   it("keeps self-service signup closed in the customer UI", () => {
     expect(authSource).toContain("const SELF_SIGNUP_ENABLED = false;");
@@ -26,10 +31,19 @@ describe("customer auth access contract", () => {
     );
   });
 
+  it("redirects authenticated users before rendering public entry screens", () => {
+    expect(landingSource).toContain("beforeLoad: async () =>");
+    expect(landingSource).toContain("supabase.auth.getUser()");
+    expect(landingSource).toContain('redirect({ to: "/dashboard" })');
+
+    expect(authSource).toContain("beforeLoad: async ({ search }) =>");
+    expect(authSource).toContain("supabase.auth.getUser()");
+    expect(authSource).toContain('redirect({ to: "/dashboard" })');
+  });
+
   it("does not redirect an authenticated recovery session away from the reset form", () => {
-    expect(authSource).toContain(
-      'new URLSearchParams(window.location.search).get("mode") === "recovery"',
-    );
-    expect(authSource).toContain("if (!recoveryRedirect)");
+    expect(authSource).toContain('search["mode"] === "recovery"');
+    expect(authSource).toContain('if (search.mode === "recovery") return;');
+    expect(authSource).toContain('event === "PASSWORD_RECOVERY"');
   });
 });
