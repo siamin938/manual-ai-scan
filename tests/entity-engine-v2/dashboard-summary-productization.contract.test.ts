@@ -7,6 +7,11 @@ const dashboardSource = readFileSync(
   "utf8",
 );
 
+const stylesSource = readFileSync(
+  resolve(process.cwd(), "src/styles.css"),
+  "utf8",
+);
+
 describe("dashboard owner productization layer", () => {
   it("keeps Top3 as supporting context while promoting broad-search visibility in the summary KPIs", () => {
     expect(dashboardSource).toContain('label="기준 검색 노출"');
@@ -69,6 +74,22 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("대상 업체 · {model.businessName}");
     expect(dashboardSource).toContain("report-section print-avoid-break");
     expect(dashboardSource).toContain("no-print flex flex-col items-center");
+  });
+
+  it("lets long detail tables flow across PDF pages without splitting individual rows", () => {
+    expect(stylesSource).toContain(".print-report table,");
+    expect(stylesSource).toContain(".print-report tbody");
+    expect(stylesSource).toContain("break-inside: auto");
+    expect(stylesSource).toContain(".print-report tr,");
+    expect(dashboardSource).toContain(
+      '<p className="report-kicker">OBSERVED BUSINESSES</p>',
+    );
+    expect(dashboardSource).toContain(
+      '<p className="report-kicker">METHODOLOGY</p>',
+    );
+    expect(dashboardSource).not.toContain(
+      'report-section print-avoid-break border-t-2 border-t-primary',
+    );
   });
 
   it("explains the measurement method without changing the engine", () => {
