@@ -871,6 +871,8 @@ function DashboardPage() {
         model,
         unifiedLayerSummary,
         actionOpportunityModel,
+        hasVerifiedOwnedDomain: verifiedFirstPartySourceTypes.includes("owned_domain"),
+        broadSearchObservation: dto?.broadSearchObservation ?? null,
       })
     : null;
   const setDashboardView = (nextView: "summary" | "detail") => {
@@ -2102,18 +2104,36 @@ function DashboardSummary({
                 이번 측정은 검색 범위를 안전하게 나눠 표시할 수 없습니다.
               </p>
             ) : (
-              <div className="divide-y rounded-lg border px-4">
-                {summary.searchScopes.map((scope) => (
-                  <div key={scope.kind} className="flex items-center justify-between gap-4 py-3">
-                    <span className="text-sm font-medium">{scopeLabels[scope.kind]}</span>
-                    <span className="text-sm font-semibold tabular-nums">
-                      {scope.confirmedCount}/{scope.validCount}
-                      <span className="ml-2 font-normal text-muted-foreground">
-                        {scope.confirmedPct === null ? "–" : pctRange(scope.confirmedPct, scope.confirmedPct)}
+              <div className="space-y-4">
+                <div className="divide-y rounded-lg border px-4">
+                  {summary.searchScopes.map((scope) => (
+                    <div key={scope.kind} className="flex items-center justify-between gap-4 py-3">
+                      <span className="text-sm font-medium">{scopeLabels[scope.kind]}</span>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {scope.confirmedCount}/{scope.validCount}
+                        <span className="ml-2 font-normal text-muted-foreground">
+                          {scope.confirmedPct === null ? "–" : pctRange(scope.confirmedPct, scope.confirmedPct)}
+                        </span>
                       </span>
-                    </span>
+                    </div>
+                  ))}
+                </div>
+                {summary.searchScopeObservation && (
+                  <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
+                    <p className="text-xs font-semibold text-primary">이번 측정에서 확인된 검색 범위 차이</p>
+                    <p className="mt-2 text-sm font-semibold leading-6">
+                      {summary.searchScopeObservation.headline}
+                    </p>
+                    {summary.searchScopeObservation.evidence && (
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {summary.searchScopeObservation.evidence}
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      이번 측정에서 관찰된 차이이며, 특정 출처가 AI 노출의 원인임을 의미하지 않습니다.
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             )}
           </CardContent>
