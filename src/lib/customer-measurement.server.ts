@@ -178,28 +178,45 @@ export async function createCustomerMeasurementRun(args: {
   });
   if (limitError) return fail(limitError);
 
-  // 4) run 생성 (재시도 시 최근 draft 재사용 → 중복 run 방지)
+  // 4) run 생성.
+  // 이미 같은 조건의 고객 측정이 queued/running이면 사용자/탭과 무관하게 그 run을 재사용한다.
+  // 아직 enqueue 전인 draft는 같은 사용자의 최근 30분 draft만 재사용한다.
+  // enqueue-run 자체도 runId 기준 idempotent라 재호출은 안전하다.
   const now = new Date();
   const runName = (args.name ?? "").trim() || defaultRunName(business.name, now);
 
-  const reuseSince = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-  const { data: existingDraft } = await supabase
-    .from("measurement_runs")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("business_id", businessId)
-    .eq("question_set_id", questionSetId)
-    .eq("run_type", "audit")
-    .eq("phase", "standalone")
-    .eq("diagnostic_scope", "customer")
-    .eq("status", "draft")
-    .eq("created_by", userId)
-    .gte("created_at", reuseSince)
+  const baseSameConditionRunQuery = () =>
+    supabase
+      .from("measurement_runs")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("question_set_id", questionSetId)
+      .eq("run_type", "audit")
+      .eq("phase", "standalone")
+      .eq("diagnostic_scope", "customer");
+
+  const { data: existingActiveRun } = await baseSameConditionRunQuery()
+    .in("status", ["queued", "running"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  let runId = existingDraft?.id ?? null;
+  let runId = existingActiveRun?.id ?? null;
+
+  if (!runId) {
+    const reuseSince = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+    const { data: existingDraft } = await baseSameConditionRunQuery()
+      .eq("status", "draft")
+      .eq("created_by", userId)
+      .gte("created_at", reuseSince)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    runId = existingDraft?.id ?? null;
+  }
+
   if (!runId) {
     // data_origin은 조직 설정값을 그대로 승계한다(NOT NULL, DB 기본값 없음).
     const { data: orgRow } = await supabase
