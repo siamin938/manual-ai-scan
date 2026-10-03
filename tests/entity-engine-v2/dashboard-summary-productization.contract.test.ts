@@ -61,6 +61,9 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("인쇄·PDF 저장");
     expect(dashboardSource).toContain("dashboardPrintTitle");
     expect(dashboardSource).toContain("차보임 AI 노출 진단 -");
+    expect(dashboardSource).toContain("openPrintableSnapshot");
+    expect(dashboardSource).toContain('window.open("", "_blank")');
+    expect(dashboardSource).toContain("printWindow.document.title = title");
     expect(dashboardSource).toContain("window.print()");
     expect(dashboardSource).toContain("afterprint");
     expect(dashboardSource).toContain("대상 업체 · {model.businessName}");
