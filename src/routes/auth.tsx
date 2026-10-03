@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,17 @@ const SELF_SIGNUP_ENABLED = false;
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>) => ({
+    mode: search["mode"] === "recovery" ? ("recovery" as const) : undefined,
+  }),
+  beforeLoad: async ({ search }) => {
+    if (search.mode === "recovery") return;
+
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "로그인 · 차보임 CHABOIM" },
@@ -38,21 +49,11 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const recoveryRedirect =
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("mode") === "recovery";
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
     });
-
-    if (!recoveryRedirect) {
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session) navigate({ to: "/dashboard" });
-      });
-    }
 
     return () => subscription.unsubscribe();
   }, [navigate]);
