@@ -59,9 +59,14 @@ describe("dashboard owner productization layer", () => {
   it("supports customer report printing without changing measurement data", () => {
     expect(dashboardSource).toContain("print-page print-report");
     expect(dashboardSource).toContain("인쇄·PDF 저장");
+    expect(dashboardSource).toContain("dashboardPrintTitle");
+    expect(dashboardSource).toContain("차보임 AI 노출 진단 -");
     expect(dashboardSource).toContain("window.print()");
+    expect(dashboardSource).toContain("afterprint");
+    expect(dashboardSource).toContain("머리글 및 바닥글");
     expect(dashboardSource).toContain("대상 업체 · {model.businessName}");
-    expect(dashboardSource).toContain("no-print");
+    expect(dashboardSource).toContain("report-section print-avoid-break");
+    expect(dashboardSource).toContain("no-print flex flex-col items-center");
   });
 
   it("explains the measurement method without changing the engine", () => {
