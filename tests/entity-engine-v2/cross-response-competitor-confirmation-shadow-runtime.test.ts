@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CROSS_RESPONSE_COMPETITOR_SHADOW_SUPPLEMENT_VERSION,
   buildCrossResponseCompetitorShadowSupplement,
+  mergeCrossResponsePromotedCompetitorsForReadLayer,
 } from "../../src/lib/cross-response-competitor-confirmation.shadow.server";
 
 function aggregateFixture() {
@@ -301,5 +302,125 @@ describe("cross-response competitor runtime shadow supplement", () => {
       sourceDomainClass: "shared_profile",
       reasons: ["SHARED_OR_AGGREGATOR_DOMAIN"],
     });
+  });
+});
+
+
+describe("cross-response competitor customer read-layer merge", () => {
+  function supplementFixture() {
+    const kugs = rowsFor(
+      "auto:국스월드",
+      "국스월드",
+      "kugs.net",
+      [2, 4, 4, 5, 6],
+      ["discovery", "comparison", "recommendation", "discovery", "trust"],
+    );
+    const moment = rowsFor(
+      "auto:모먼트",
+      "모먼트",
+      "momentcarcare.co.kr",
+      [1, 2, 3],
+      ["local", "recommendation", "discovery"],
+    );
+    const existingMoment = rowsFor(
+      "auto:모먼트카케어",
+      "모먼트 카케어",
+      "momentcarcare.co.kr",
+      [4],
+      ["comparison"],
+      0,
+    );
+    const tstyle = rowsFor(
+      "auto:t스타일랩",
+      "T 스타일 랩",
+      "tstylelab.com",
+      [2, 4],
+      ["service", "comparison"],
+    );
+    const parts = [kugs, moment, existingMoment, tstyle];
+
+    return buildCrossResponseCompetitorShadowSupplement({
+      sourceRunId: "run-merge",
+      baseAggregateId: "aggregate-merge",
+      baseAggregateHash: "hash-merge",
+      aggregate: aggregateFixture(),
+      canonicalizations: parts.flatMap((part) => part.canonicalizations),
+      mentions: parts.flatMap((part) => part.mentions),
+      verifications: parts.flatMap((part) => part.verifications),
+      attributions: parts.flatMap((part) => part.attributions),
+      measurements: parts.flatMap((part) => part.measurements),
+      questions: parts.flatMap((part) => part.questions),
+    });
+  }
+
+  it("adds only PROMOTE rows and preserves v2-compatible ordering", () => {
+    const supplement = supplementFixture();
+    const merged = mergeCrossResponsePromotedCompetitorsForReadLayer({
+      baseCompetitors: [
+        {
+          name: "모먼트 카케어",
+          responseCount: 1,
+          questionCount: 1,
+          intentCount: 1,
+          top3ResponseCount: 1,
+        },
+      ],
+      supplement,
+      expectedRunId: "run-merge",
+      expectedAggregateId: "aggregate-merge",
+      expectedAggregateHash: "hash-merge",
+    });
+
+    expect(merged).toEqual([
+      {
+        name: "국스월드",
+        responseCount: 5,
+        questionCount: 5,
+        intentCount: 4,
+        top3ResponseCount: 1,
+      },
+      {
+        name: "T 스타일 랩",
+        responseCount: 2,
+        questionCount: 2,
+        intentCount: 2,
+        top3ResponseCount: 1,
+      },
+      {
+        name: "모먼트 카케어",
+        responseCount: 1,
+        questionCount: 1,
+        intentCount: 1,
+        top3ResponseCount: 1,
+      },
+    ]);
+    expect(merged.some((row) => row.name === "모먼트")).toBe(false);
+  });
+
+  it("fails closed to the core v2 list on any baseline mismatch", () => {
+    const supplement = supplementFixture();
+    const base = [
+      {
+        name: "기존 업체",
+        responseCount: 3,
+        questionCount: 3,
+        intentCount: 2,
+        top3ResponseCount: 2,
+      },
+    ];
+
+    for (const mismatch of [
+      { expectedRunId: "wrong", expectedAggregateId: "aggregate-merge", expectedAggregateHash: "hash-merge" },
+      { expectedRunId: "run-merge", expectedAggregateId: "wrong", expectedAggregateHash: "hash-merge" },
+      { expectedRunId: "run-merge", expectedAggregateId: "aggregate-merge", expectedAggregateHash: "wrong" },
+    ]) {
+      expect(
+        mergeCrossResponsePromotedCompetitorsForReadLayer({
+          baseCompetitors: base,
+          supplement,
+          ...mismatch,
+        }),
+      ).toEqual(base);
+    }
   });
 });
