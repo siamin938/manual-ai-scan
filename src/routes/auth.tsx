@@ -8,14 +8,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
-const SELF_SIGNUP_ENABLED = true;
+const SELF_SIGNUP_ENABLED = false;
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
     meta: [
       { title: "로그인 · 차보임 CHABOIM" },
-      { name: "description", content: "차보임 CHABOIM 로그인 및 회원가입 화면입니다. 자동차 업체 AI 추천시장 분석 서비스." },
+      { name: "description", content: "차보임 CHABOIM 로그인 화면입니다. 자동차 업체 AI 추천시장 분석 서비스." },
       { property: "og:title", content: "로그인 · 차보임 CHABOIM" },
       { property: "og:description", content: "자동차 업체 AI 추천시장 분석 서비스 로그인" },
 
