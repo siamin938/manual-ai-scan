@@ -96,6 +96,11 @@ describe("entity facts v2 dashboard summary view model", () => {
         overall: { questionCount: 24, validCount: 24, confirmedCount: 4, unresolvedCount: 0 },
       },
       actionOpportunityModel: opportunities,
+      hasVerifiedOwnedDomain: true,
+      broadSearchObservation: {
+        validCount: 8,
+        targetIndependentSourceResponseCount: 1,
+      },
     });
 
     expect(summary.visibility).toEqual({ count: 4, total: 24, pct: 16.67 });
@@ -114,9 +119,53 @@ describe("entity facts v2 dashboard summary view model", () => {
       ["core", 1, 8],
       ["overall", 4, 24],
     ]);
+    expect(summary.searchScopeObservation).toBeNull();
     expect(summary.opportunities).toHaveLength(2);
     expect(summary.verifiedPages).toHaveLength(3);
     expect(JSON.stringify(summary)).not.toContain("현대 엑스티어");
+  });
+
+  it("surfaces a non-causal observation when detail search is visible but broad search is not", () => {
+    const summary = buildEntityFactsV2DashboardSummaryViewModel({
+      model: makeModel(),
+      unifiedLayerSummary: {
+        custom: { questionCount: 16, validCount: 16, confirmedCount: 14, unresolvedCount: 0 },
+        core: { questionCount: 8, validCount: 8, confirmedCount: 0, unresolvedCount: 0 },
+        overall: { questionCount: 24, validCount: 24, confirmedCount: 14, unresolvedCount: 0 },
+      },
+      actionOpportunityModel: opportunities,
+      hasVerifiedOwnedDomain: true,
+      broadSearchObservation: {
+        validCount: 8,
+        targetIndependentSourceResponseCount: 0,
+      },
+    });
+
+    expect(summary.searchScopeObservation).toEqual({
+      kind: "custom_without_core",
+      headline: "상세 검색 14/16에서는 확인됐지만, 기준 검색 0/8에서는 확인되지 않았습니다.",
+      evidence:
+        "공식 홈페이지는 등록돼 있지만, 이번 기준 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다.",
+    });
+  });
+
+  it("does not create the observation when broad search visibility is already confirmed", () => {
+    const summary = buildEntityFactsV2DashboardSummaryViewModel({
+      model: makeModel(),
+      unifiedLayerSummary: {
+        custom: { questionCount: 16, validCount: 16, confirmedCount: 3, unresolvedCount: 0 },
+        core: { questionCount: 8, validCount: 8, confirmedCount: 1, unresolvedCount: 0 },
+        overall: { questionCount: 24, validCount: 24, confirmedCount: 4, unresolvedCount: 0 },
+      },
+      actionOpportunityModel: null,
+      hasVerifiedOwnedDomain: true,
+      broadSearchObservation: {
+        validCount: 8,
+        targetIndependentSourceResponseCount: 0,
+      },
+    });
+
+    expect(summary.searchScopeObservation).toBeNull();
   });
 
   it("uses a dedicated zero-visibility hero state", () => {
@@ -167,6 +216,7 @@ describe("entity facts v2 dashboard summary view model", () => {
     expect(summary.heroVariant).toBe("unavailable");
     expect(summary.verifiedPageCount).toBeNull();
     expect(summary.searchScopes).toBeNull();
+    expect(summary.searchScopeObservation).toBeNull();
     expect(summary.opportunities).toEqual([]);
     expect(summary.verifiedPages).toEqual([]);
   });
