@@ -69,6 +69,9 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("openPrintableSnapshot");
     expect(dashboardSource).toContain('document.createElement("iframe")');
     expect(dashboardSource).toContain("printFrame.contentWindow");
+    expect(dashboardSource).toContain("const originalParentTitle = document.title");
+    expect(dashboardSource).toContain("document.title = title");
+    expect(dashboardSource).toContain("document.title = originalParentTitle");
     expect(dashboardSource).toContain("waitForPrintableAssets");
     expect(dashboardSource).toContain('link[rel="stylesheet"]');
     expect(dashboardSource).toContain("document.fonts?.ready");
