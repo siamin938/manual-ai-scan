@@ -70,7 +70,7 @@ export const ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP: readonly EntityFactsV2Dashbo
     {
       section: "competitor_list",
       mode: "direct_v2",
-      note: "Use v2 names/counts only. Do not synthesize legacy tier, repeat, newness or response-rate fields.",
+      note: "Use the customer read-gateway competitor rows: core v2 plus the exact-run approved cross-response supplement. Do not synthesize legacy tier, repeat, newness or response-rate fields.",
     },
     {
       section: "weak_questions",
