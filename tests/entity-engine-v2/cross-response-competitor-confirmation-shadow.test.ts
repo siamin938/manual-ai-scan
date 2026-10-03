@@ -18,7 +18,6 @@ function candidate(
     corroboratingDomain: "example.com",
     corroboratingDomainResponseCount: 2,
     directAttributionCount: 1,
-    corroboratingDomainIsSharedOrAggregator: false,
     ...overrides,
   };
 }
@@ -129,7 +128,6 @@ describe("cross-response competitor confirmation shadow v0.1", () => {
         corroboratingDomain: "pf.kakao.com",
         corroboratingDomainResponseCount: 5,
         directAttributionCount: 3,
-        corroboratingDomainIsSharedOrAggregator: true,
       }),
       existingV2Competitors: [],
     });
