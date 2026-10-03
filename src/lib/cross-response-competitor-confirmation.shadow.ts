@@ -1,3 +1,8 @@
+import {
+  classifySourceDomain,
+  normalizeSourceDomain,
+} from "./source-domain-classifier";
+
 /**
  * Cross-response competitor confirmation shadow v0.1.
  *
@@ -51,10 +56,9 @@ export interface CrossResponseCompetitorShadowCandidate {
   /** Number of stored direct attributions from the candidate to that domain. */
   directAttributionCount: number;
   /**
-   * True when upstream classifies the domain as a shared platform, directory,
-   * aggregator, or otherwise unsuitable as strong identity corroboration.
+   * The source-domain classifier decides whether this domain is strong enough
+   * to corroborate an unregistered competitor identity.
    */
-  corroboratingDomainIsSharedOrAggregator: boolean;
 }
 
 export interface ExistingV2CompetitorShadowEvidence {
@@ -73,20 +77,6 @@ export interface CrossResponseCompetitorShadowResult {
   decision: CrossResponseCompetitorShadowDecision;
   reasons: CrossResponseCompetitorShadowReason[];
   collisionCanonicalKeys: string[];
-}
-
-function normalizeDomain(value: string | null | undefined): string {
-  const raw = (value ?? "").trim().toLowerCase();
-  if (!raw) return "";
-
-  try {
-    const parsed = new URL(
-      /^https?:\/\//u.test(raw) ? raw : `https://${raw}`,
-    );
-    return parsed.hostname.replace(/^www\./u, "");
-  } catch {
-    return raw.replace(/^www\./u, "").replace(/\/$/u, "");
-  }
 }
 
 function compactName(value: string): string {
@@ -160,12 +150,13 @@ export function evaluateCrossResponseCompetitorConfirmationShadow(
     return result("reject", ["INSUFFICIENT_DISTINCT_RESPONSES"]);
   }
 
-  const domain = normalizeDomain(candidate.corroboratingDomain);
+  const domain = normalizeSourceDomain(candidate.corroboratingDomain);
   if (!domain) {
     return result("reject", ["CORROBORATING_DOMAIN_MISSING"]);
   }
 
-  if (candidate.corroboratingDomainIsSharedOrAggregator) {
+  const domainClassification = classifySourceDomain(domain);
+  if (!domainClassification.strongCompetitorIdentityEligible) {
     return result("reject", ["SHARED_OR_AGGREGATOR_DOMAIN"]);
   }
 
@@ -195,7 +186,7 @@ export function evaluateCrossResponseCompetitorConfirmationShadow(
     }
 
     return item.corroboratingDomains.some(
-      (candidateDomain) => normalizeDomain(candidateDomain) === domain,
+      (candidateDomain) => normalizeSourceDomain(candidateDomain) === domain,
     );
   });
 
