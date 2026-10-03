@@ -213,6 +213,7 @@
     font-size: 12pt;
   }
   .print-report .print-avoid-break,
+  .print-report .print-avoid-break[data-slot="card"],
   .print-report table,
   .print-report tr,
   .print-report li {
