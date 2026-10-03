@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildBroadSearchObservation } from "../../src/lib/broad-search-observation.server";
 
-describe("broad search observation v0.1", () => {
+describe("broad search observation v0.2", () => {
   it("summarizes repeated Core competitors without changing target truth", () => {
     const questionIds = Array.from({ length: 8 }, (_, i) => `q${i + 1}`);
     const measurementIds = Array.from({ length: 8 }, (_, i) => `m${i + 1}`);
@@ -148,7 +148,7 @@ describe("broad search observation v0.1", () => {
     });
 
     expect(result).toMatchObject({
-      version: "0.1",
+      version: "0.2",
       validCount: 8,
       targetConfirmedCount: 0,
       targetTop3Count: 0,
@@ -181,6 +181,37 @@ describe("broad search observation v0.1", () => {
     expect(result.repeatedCompetitors.some((row) => row.name === "모터큐브")).toBe(false);
     expect(result.repeatedCompetitors.some((row) => row.name === "T 스타일 랩")).toBe(false);
     expect(result.repeatedCompetitors.some((row) => row.name.includes("모먼트"))).toBe(false);
+
+    expect(result.singleObservationCompetitors).toEqual([
+      expect.objectContaining({
+        name: "모터큐브",
+        responseCount: 1,
+        top3ResponseCount: 1,
+        strongestIndependentSource: {
+          domain: "motorcube.co.kr",
+          responseCount: 1,
+          directAttributionCount: 1,
+        },
+      }),
+      expect.objectContaining({
+        name: "T 스타일 랩",
+        responseCount: 1,
+        top3ResponseCount: 1,
+        strongestIndependentSource: {
+          domain: "tstylelab.com",
+          responseCount: 1,
+          directAttributionCount: 1,
+        },
+      }),
+    ]);
+    expect(result.observedCompetitorCount).toBe(4);
+    expect(result.independentWebLinkedCompetitorCount).toBe(4);
+    expect(result.repeatedIndependentWebLinkedCompetitorCount).toBe(2);
+    expect(result.sourcePatterns).toContainEqual({
+      key: "independent_web",
+      label: "독립 웹",
+      competitorCount: 4,
+    });
   });
 
   it("counts target independent web evidence separately from visibility", () => {
