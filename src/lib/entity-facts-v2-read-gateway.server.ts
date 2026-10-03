@@ -12,6 +12,7 @@ import {
   fetchCrossResponseCompetitorShadowSupplement,
   mergeCrossResponsePromotedCompetitorsForReadLayer,
 } from "./cross-response-competitor-confirmation.shadow.server";
+import { fetchBroadSearchObservation } from "./broad-search-observation.server";
 import {
   ENTITY_FACTS_V2_OBSERVED_SOURCES_ENGINE_VERSION,
   ENTITY_FACTS_V2_OBSERVED_SOURCES_SOURCE_REPLAY_VERSION,
@@ -647,6 +648,65 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       expectedAggregateId: storage.id,
       expectedAggregateHash: storage.aggregate_hash,
     });
+
+  // Broad/Core search comparison is descriptive read-layer evidence only.
+  // It reuses the final customer-visible competitor identities and never
+  // changes targetSeen, Top3, aggregate truth, or measurement storage.
+  if (questionSet?.name?.startsWith(UNIFIED_DIAGNOSTIC_SET_PREFIX)) {
+    const visibleCompetitorNames = new Set(
+      gatewayResponse.data.competitors.map((row) => row.name),
+    );
+    const finalCompetitorNamesByCanonicalKey: Record<string, string> = {};
+
+    for (const competitor of aggregateForResolution.competitors) {
+      const canonicalKey = competitor.canonicalKey.trim();
+      const registeredId = businessIdFromCanonicalKey(canonicalKey);
+      const name = registeredId
+        ? registeredCompetitorNames[registeredId] ?? null
+        : canonicalKey.startsWith("auto:")
+          ? pickEntityFactsV2AutoCompetitorDisplayName(
+              canonicalKey,
+              autoCompetitorEvidence[canonicalKey] ?? [],
+            )
+          : null;
+
+      if (name && visibleCompetitorNames.has(name)) {
+        finalCompetitorNamesByCanonicalKey[canonicalKey] = name;
+      }
+    }
+
+    for (const row of competitorShadowSupplement?.promotedCandidates ?? []) {
+      if (visibleCompetitorNames.has(row.displayName)) {
+        finalCompetitorNamesByCanonicalKey[row.canonicalKey] = row.displayName;
+      }
+    }
+
+    const mergeCanonicalAliases: Record<string, string> = {};
+    for (const row of competitorShadowSupplement?.mergeReviewCandidates ?? []) {
+      if (
+        row.collisionCanonicalKeys.length === 1 &&
+        finalCompetitorNamesByCanonicalKey[row.collisionCanonicalKeys[0]!]
+      ) {
+        mergeCanonicalAliases[row.canonicalKey] = row.collisionCanonicalKeys[0]!;
+      }
+    }
+
+    const broadSearchObservation = await fetchBroadSearchObservation({
+      orgId,
+      businessId,
+      runId: run.id,
+      questionSetId: run.question_set_id,
+      materializationId: storage.materialization_id,
+      factVersion: storage.fact_version,
+      engineVersion: storage.engine_version,
+      finalCompetitorNamesByCanonicalKey,
+      mergeCanonicalAliases,
+    }).catch(() => null);
+
+    if (broadSearchObservation?.validCount === 8) {
+      gatewayResponse.data.broadSearchObservation = broadSearchObservation;
+    }
+  }
 
   // Supplemental final-answer citation summary for the exact representative run.
   // This is intentionally separate from strict entity-linked observedSources:
