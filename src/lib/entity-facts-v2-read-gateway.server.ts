@@ -681,15 +681,11 @@ export async function fetchEntityFactsV2ReadGateway(args: {
       }
     }
 
+    // merge_review candidates remain excluded here as well. Until identity
+    // is resolved, a scoped count must never be reassigned to another visible
+    // competitor because that could make a scope count exceed the confirmed
+    // run-wide count shown elsewhere.
     const mergeCanonicalAliases: Record<string, string> = {};
-    for (const row of competitorShadowSupplement?.mergeReviewCandidates ?? []) {
-      if (
-        row.collisionCanonicalKeys.length === 1 &&
-        finalCompetitorNamesByCanonicalKey[row.collisionCanonicalKeys[0]!]
-      ) {
-        mergeCanonicalAliases[row.canonicalKey] = row.collisionCanonicalKeys[0]!;
-      }
-    }
 
     const broadSearchObservation = await fetchBroadSearchObservation({
       orgId,
