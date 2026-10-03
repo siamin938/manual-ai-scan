@@ -28,6 +28,11 @@ export type DashboardSummarySearchScope = {
   confirmedPct: number | null;
 };
 
+type DashboardSummaryBroadSearchObservation = Pick<
+  EntityFactsV2ReadBroadSearchObservationDTO,
+  "validCount" | "targetIndependentSourceResponseCount" | "repeatedCompetitors"
+>;
+
 export type DashboardSummarySearchScopeObservation = {
   kind: "custom_without_core";
   headline: string;
@@ -109,7 +114,7 @@ function exactMetric(args: {
 function buildSearchScopeObservation(args: {
   unifiedLayerSummary: UnifiedDiagnosticLayerSummary | null;
   hasVerifiedOwnedDomain: boolean;
-  broadSearchObservation: EntityFactsV2ReadBroadSearchObservationDTO | null;
+  broadSearchObservation: DashboardSummaryBroadSearchObservation | null;
 }): DashboardSummarySearchScopeObservation | null {
   const summary = args.unifiedLayerSummary;
   if (
@@ -156,7 +161,7 @@ export function buildEntityFactsV2DashboardSummaryViewModel(args: {
   unifiedLayerSummary: UnifiedDiagnosticLayerSummary | null;
   actionOpportunityModel: ActionOpportunityEngineResult | null;
   hasVerifiedOwnedDomain?: boolean;
-  broadSearchObservation?: EntityFactsV2ReadBroadSearchObservationDTO | null;
+  broadSearchObservation?: DashboardSummaryBroadSearchObservation | null;
 }): EntityFactsV2DashboardSummaryViewModel {
   const { model, unifiedLayerSummary, actionOpportunityModel } = args;
 
