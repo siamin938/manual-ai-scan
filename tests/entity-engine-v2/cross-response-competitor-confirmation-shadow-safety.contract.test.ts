@@ -24,7 +24,7 @@ const shadowPolicy = readFileSync(
 );
 
 describe("cross-response competitor shadow safety contract", () => {
-  it("is read-only and does not write or mutate stored measurement truth", () => {
+  it("remains read-only and cannot mutate stored measurement truth", () => {
     expect(shadowServer).toContain(
       "fetchCrossResponseCompetitorShadowSupplement",
     );
@@ -37,12 +37,35 @@ describe("cross-response competitor shadow safety contract", () => {
     expect(shadowServer).not.toContain("targetBestPosition");
   });
 
-  it("is not wired into the customer v2 read gateway yet", () => {
-    expect(readGatewayServer).not.toContain(
-      "cross-response-competitor-confirmation.shadow.server",
+  it("is wired only at the customer read layer with exact baseline binding", () => {
+    expect(readGatewayServer).toContain(
+      "fetchCrossResponseCompetitorShadowSupplement",
+    );
+    expect(readGatewayServer).toContain(
+      "mergeCrossResponsePromotedCompetitorsForReadLayer",
+    );
+    expect(readGatewayServer).toContain("expectedRunId: run.id");
+    expect(readGatewayServer).toContain("expectedAggregateId: storage.id");
+    expect(readGatewayServer).toContain(
+      "expectedAggregateHash: storage.aggregate_hash",
     );
     expect(readGatewayServer).not.toContain(
-      "fetchCrossResponseCompetitorShadowSupplement",
+      "gatewayResponse.data.overview =",
+    );
+    expect(readGatewayServer).not.toContain(
+      "gatewayResponse.data.questionGroups =",
+    );
+    expect(readGatewayServer).not.toContain(
+      "gatewayResponse.data.questionAreas =",
+    );
+    expect(readGatewayServer).not.toContain("mergeReviewCandidates");
+  });
+
+  it("keeps the runtime materialization path outside the supplement module", () => {
+    expect(shadowServer).not.toContain("runtime-materialization");
+    expect(shadowServer).not.toContain("buildEntityFactsV2RuntimeMaterialization");
+    expect(shadowServer).toContain(
+      "mergeCrossResponsePromotedCompetitorsForReadLayer",
     );
   });
 
