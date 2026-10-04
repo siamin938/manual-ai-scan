@@ -52,6 +52,10 @@ import {
   type InternalObservationExecutionBlocker,
 } from "@/lib/internal-observation-execution.functions";
 import { reconcileInternalObservationPipeline } from "@/lib/internal-observation-reconciliation.functions";
+import {
+  getInternalObservationSchedulerDryRun,
+  type InternalObservationSchedulerBlocker,
+} from "@/lib/internal-observation-scheduler.functions";
 import { getPilotOpsAdminResult } from "@/lib/pilot-ops-admin-detail.functions";
 
 export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
@@ -152,6 +156,31 @@ function previewBlockerLabel(code: string | null): string {
   return code ? "기존 데이터 상태를 확인해 주세요." : "";
 }
 
+function schedulerBlockerLabel(code: InternalObservationSchedulerBlocker): string {
+  switch (code) {
+    case "CANDIDATE_DATA_INVALID":
+      return "후보 연결 정보 확인 필요";
+    case "BUSINESS_NOT_AVAILABLE":
+      return "업체 상태 확인 필요";
+    case "QUESTION_SET_NOT_AVAILABLE":
+      return "통합 질문 세트 확인 필요";
+    case "INVALID_QUESTION_CONTRACT":
+      return "24문항 계약 확인 필요";
+    case "SAME_CONDITION_RUN_ACTIVE":
+      return "동일 조건 Run 진행 중";
+    case "PROVIDER_NOT_READY":
+      return "Provider 준비 필요";
+    case "NO_MEASUREMENT_CREDIT":
+      return "측정권 부족";
+    case "DAILY_PIPELINE_RUN_LIMIT":
+      return "오늘 내부 실행 한도 초과";
+    case "DAILY_USAGE_LIMIT":
+      return "오늘 요청 한도 초과";
+    case "MONTHLY_USAGE_LIMIT":
+      return "월 예산 한도 초과";
+  }
+}
+
 function executionBlockerLabel(code: InternalObservationExecutionBlocker): string {
   switch (code) {
     case "ITEM_NOT_READY":
@@ -212,6 +241,7 @@ function InternalObservationPipelinePage() {
   const previewExecutionPlan = useServerFn(previewInternalObservationExecutionPlan);
   const approveExecution = useServerFn(approveInternalObservationExecution);
   const reconcilePipeline = useServerFn(reconcileInternalObservationPipeline);
+  const fetchSchedulerDryRun = useServerFn(getInternalObservationSchedulerDryRun);
   const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
 
   const [orgId, setOrgId] = useState("");
@@ -245,6 +275,14 @@ function InternalObservationPipelinePage() {
   });
 
   const overview = overviewQuery.data?.ok ? overviewQuery.data.overview : null;
+
+  const schedulerQuery = useQuery({
+    queryKey: ["internal-observation-scheduler-dry-run", orgId],
+    enabled: !!orgId,
+    retry: false,
+    refetchInterval: 15000,
+    queryFn: () => fetchSchedulerDryRun({ data: { orgId } }),
+  });
 
   const resultQuery = useQuery({
     queryKey: [
@@ -456,11 +494,11 @@ function InternalObservationPipelinePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">내부 데이터 수집</h1>
           <Badge variant="secondary">내부 운영자 전용</Badge>
-          <Badge variant="outline">Pipeline v0.3</Badge>
+          <Badge variant="outline">Pipeline v0.4 Dry-run</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          후보 등록·24문항 준비·건별 실행 승인 후 Run 완료와 Entity Facts v2 결과 준비까지 자동으로 동기화합니다.
-          실패한 Run을 자동 재시도하거나 새 측정을 만들지는 않습니다.
+          후보 등록부터 결과 준비까지의 파이프라인을 유지하면서, 오늘 자동 실행한다면 어떤 후보를 어떤 순서로 돌릴지 Dry-run으로 계산합니다.
+          Dry-run은 Run 생성·AI 호출·측정권 차감을 하지 않습니다.
         </p>
         <p className="text-xs text-muted-foreground">
           기준 시각 {formatSeoul(overview.generatedAt)}
@@ -501,6 +539,193 @@ function InternalObservationPipelinePage() {
           </CardContent>
         </Card>
       </section>
+
+      {schedulerQuery.data?.ok && (
+        <Card className="border-dashed">
+          <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-base">자동 스케줄 Dry-run</CardTitle>
+                <Badge variant="outline">실행 없음</Badge>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                오래 준비된 후보부터 순서대로 계산합니다. 이 계획을 보는 것만으로는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={schedulerQuery.isFetching}
+              onClick={() => schedulerQuery.refetch()}
+            >
+              {schedulerQuery.isFetching ? "계산 중…" : "Dry-run 다시 계산"}
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">오늘 실행 슬롯</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">
+                  {schedulerQuery.data.plan.pipelineRunsToday}/{schedulerQuery.data.plan.dailyRunLimit}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  남음 {schedulerQuery.data.plan.dailySlotsRemaining}곳
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">동시 실행</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">
+                  {schedulerQuery.data.plan.activeRunCount}/{schedulerQuery.data.plan.concurrentRunLimit}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  지금 시작 가능 {schedulerQuery.data.plan.dispatchSlotsNow}곳
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">측정권</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">
+                  {schedulerQuery.data.plan.creditBalance}회
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  계획 후 {schedulerQuery.data.plan.plannedCreditBalanceAfter}회
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">오늘 계획</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">
+                  {schedulerQuery.data.plan.plannedCandidateCount}곳
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  지금 dispatch {schedulerQuery.data.plan.dispatchNowCount}곳
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">계획 비용</p>
+                <p className="mt-2 text-lg font-semibold">
+                  {usd(schedulerQuery.data.plan.estimatedCostUsdTotal)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  최대 예약 {usd(schedulerQuery.data.plan.maxCostUsdTotal)}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-muted/10 p-4">
+              <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <p>
+                  정책 · <span className="font-medium">오래 준비된 후보 우선</span>
+                </p>
+                <p>
+                  자동 실행 ·{" "}
+                  <span className="font-medium">
+                    {schedulerQuery.data.plan.automaticExecutionEnabled ? "ON" : "OFF"}
+                  </span>
+                </p>
+                <p>
+                  요청량 ·{" "}
+                  <span className="font-medium tabular-nums">
+                    {schedulerQuery.data.plan.dailyRequestsUsed} →{" "}
+                    {schedulerQuery.data.plan.projectedDailyRequestsAfter}/
+                    {schedulerQuery.data.plan.dailyRequestLimit}
+                  </span>
+                </p>
+                <p>
+                  월 최대 ·{" "}
+                  <span className="font-medium tabular-nums">
+                    {usd(schedulerQuery.data.plan.projectedMonthlyCostUsdAfter)} /{" "}
+                    {usd(schedulerQuery.data.plan.monthlyBudgetUsd)}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {schedulerQuery.data.plan.candidates.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                현재 측정 준비 완료 상태의 후보가 없어 오늘 Dry-run 실행 계획은 비어 있습니다.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">순서</TableHead>
+                      <TableHead>후보 업체</TableHead>
+                      <TableHead>계획</TableHead>
+                      <TableHead>비용</TableHead>
+                      <TableHead>계획 후 상태</TableHead>
+                      <TableHead>제외 사유</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {schedulerQuery.data.plan.candidates.map((candidate) => (
+                      <TableRow key={candidate.itemId}>
+                        <TableCell className="align-top font-medium tabular-nums">
+                          {candidate.sequence ?? "-"}
+                        </TableCell>
+                        <TableCell className="min-w-52 align-top">
+                          <p className="font-medium">{candidate.businessName}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {candidate.region}
+                            {candidate.city ? ` ${candidate.city}` : ""} · {candidate.service}
+                          </p>
+                        </TableCell>
+                        <TableCell className="min-w-32 align-top">
+                          {candidate.planned ? (
+                            <div className="space-y-1">
+                              <Badge variant="secondary">오늘 계획</Badge>
+                              {candidate.dispatchNow && (
+                                <p className="text-xs text-muted-foreground">지금 시작 가능</p>
+                              )}
+                            </div>
+                          ) : (
+                            <Badge variant="outline">계획 제외</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="align-top text-sm">
+                          <p>{candidate.plannedJobs} jobs</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {usd(candidate.estimatedCostUsd)} · 최대 {usd(candidate.maxCostUsd)}
+                          </p>
+                        </TableCell>
+                        <TableCell className="min-w-40 align-top text-xs text-muted-foreground">
+                          {candidate.planned ? (
+                            <>
+                              <p>측정권 {candidate.creditBalanceAfter}회</p>
+                              <p className="mt-1">
+                                요청 {candidate.projectedDailyRequestsAfter}/
+                                {schedulerQuery.data.plan.dailyRequestLimit}
+                              </p>
+                            </>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell className="min-w-48 align-top">
+                          {candidate.blockers.length === 0 ? (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          ) : (
+                            <div className="space-y-1">
+                              {candidate.blockers.map((blocker) => (
+                                <p key={blocker} className="text-xs text-muted-foreground">
+                                  · {schedulerBlockerLabel(blocker)}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              Dry-run은 미래 자동 스케줄러의 선택 정책만 검증합니다. 자동 실행 OFF 상태에서는 계획된 후보도 측정되지 않습니다.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
