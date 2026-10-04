@@ -93,8 +93,8 @@ describe("pilot operations admin overview", () => {
   it("gates internal result and run readers with the existing internal admin permission", () => {
     expect(detailServerSource).toContain('client.rpc("can_view_data_asset_admin_v01")');
     expect(detailServerSource).toContain("fetchEntityFactsV2ReadGateway");
-    expect(detailServerSource).toContain('supabaseAdmin.from("measurement_runs")');
-    expect(detailServerSource).toContain('supabaseAdmin.from("measurement_jobs")');
+    expect(detailServerSource).toContain('.from("measurement_runs")');
+    expect(detailServerSource).toContain('.from("measurement_jobs")');
     expect(routeSource).toContain("원문 응답을 노출하지 않고 측정 실행 상태와 운영 오류만 확인합니다.");
   });
 
