@@ -79,15 +79,38 @@ function locationText(row: PilotOpsBusinessDTO): string {
 function PilotOpsPage() {
   const fetchOverview = useServerFn(getPilotOpsAdminOverview);
   const navigate = useNavigate();
-  const { activeOrgId } = useOrg();
+  const { activeOrgId, memberships, setActiveOrgId } = useOrg();
   const activeBusiness = useActiveTargetBusiness();
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [pendingNavigation, setPendingNavigation] = useState<{
+    orgId: string;
+    businessId: string;
+    target: "/dashboard" | "/questions" | "/runs" | "/runs/$runId";
+    runId?: string;
+  } | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchQuery(searchInput.trim()), 350);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
+
+  useEffect(() => {
+    if (!pendingNavigation || activeOrgId !== pendingNavigation.orgId) return;
+
+    activeBusiness.select(pendingNavigation.orgId, pendingNavigation.businessId);
+
+    if (pendingNavigation.target === "/runs/$runId" && pendingNavigation.runId) {
+      navigate({
+        to: "/runs/$runId",
+        params: { runId: pendingNavigation.runId },
+      });
+    } else {
+      navigate({ to: pendingNavigation.target as "/dashboard" | "/questions" | "/runs" });
+    }
+
+    setPendingNavigation(null);
+  }, [pendingNavigation, activeOrgId, activeBusiness, navigate]);
 
   const overviewQuery = useQuery({
     queryKey: ["pilot-ops-admin-overview", searchQuery],
@@ -126,13 +149,33 @@ function PilotOpsPage() {
     );
   }
 
+  const canOpenCustomerArea = (row: PilotOpsBusinessDTO) =>
+    memberships.some((membership) => membership.org_id === row.orgId);
+
   const openBusinessPage = (
     row: PilotOpsBusinessDTO,
-    target: "/dashboard" | "/questions" | "/runs",
+    target: "/dashboard" | "/questions" | "/runs" | "/runs/$runId",
+    runId?: string,
   ) => {
-    if (!activeOrgId || row.orgId !== activeOrgId) return;
-    activeBusiness.select(activeOrgId, row.businessId);
-    navigate({ to: target });
+    if (!canOpenCustomerArea(row)) return;
+
+    if (activeOrgId === row.orgId) {
+      activeBusiness.select(row.orgId, row.businessId);
+      if (target === "/runs/$runId" && runId) {
+        navigate({ to: "/runs/$runId", params: { runId } });
+      } else {
+        navigate({ to: target as "/dashboard" | "/questions" | "/runs" });
+      }
+      return;
+    }
+
+    setPendingNavigation({
+      orgId: row.orgId,
+      businessId: row.businessId,
+      target,
+      ...(runId ? { runId } : {}),
+    });
+    setActiveOrgId(row.orgId);
   };
 
   return (
@@ -217,17 +260,19 @@ function PilotOpsPage() {
                 <TableRow>
                   <TableHead>업체</TableHead>
                   <TableHead>현재 단계</TableHead>
-                  <TableHead>질문 준비</TableHead>
+                  <TableHead>질문</TableHead>
                   <TableHead>최근 측정</TableHead>
                   <TableHead>측정권</TableHead>
                   <TableHead>다음 작업</TableHead>
-                  <TableHead className="text-right">바로가기</TableHead>
+                  <TableHead className="sticky right-0 z-20 min-w-44 bg-card text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">
+                    바로가기
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {businesses.map((row) => (
                   <TableRow key={row.businessId}>
-                    <TableCell className="min-w-56 align-top">
+                    <TableCell className="min-w-40 align-top">
                       <p className="font-medium">{row.businessName}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {row.category} · {locationText(row)}
@@ -241,10 +286,10 @@ function PilotOpsPage() {
                         </p>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-36 align-top">
+                    <TableCell className="min-w-28 align-top">
                       <Badge variant={stageVariant(row.stage)}>{STAGE_LABELS[row.stage]}</Badge>
                     </TableCell>
-                    <TableCell className="min-w-40 align-top">
+                    <TableCell className="min-w-32 align-top">
                       {row.questionSetId ? (
                         <>
                           <p className="text-sm font-medium tabular-nums">
@@ -258,7 +303,7 @@ function PilotOpsPage() {
                         <p className="text-sm text-muted-foreground">통합 질문 세트 없음</p>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-48 align-top">
+                    <TableCell className="min-w-40 align-top">
                       {row.latestRunId ? (
                         <>
                           <div className="flex flex-wrap items-center gap-2">
@@ -283,17 +328,17 @@ function PilotOpsPage() {
                         {row.creditBalance}회
                       </Badge>
                     </TableCell>
-                    <TableCell className="min-w-48 align-top">
+                    <TableCell className="min-w-36 align-top">
                       <p className="text-sm font-medium">{row.nextAction}</p>
                       {row.stage === "result_ready" && (
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          고객 결과 확인 후 PDF 전달 또는 다음 동일 조건 측정을 안내합니다.
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          PDF 전달 후 재측정 시점 안내
                         </p>
                       )}
                     </TableCell>
-                    <TableCell className="min-w-44 align-top text-right">
+                    <TableCell className="sticky right-0 z-10 min-w-44 bg-card align-top text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">
                       <div className="flex flex-wrap justify-end gap-1.5">
-                        {row.orgId === activeOrgId && row.stage === "result_ready" && (
+                        {canOpenCustomerArea(row) && row.stage === "result_ready" && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -302,14 +347,18 @@ function PilotOpsPage() {
                             결과 보기
                           </Button>
                         )}
-                        {row.orgId === activeOrgId && row.latestRunId && (
-                          <Button asChild size="sm" variant="ghost">
-                            <Link to="/runs/$runId" params={{ runId: row.latestRunId }}>
-                              측정 보기
-                            </Link>
+                        {canOpenCustomerArea(row) && row.latestRunId && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              openBusinessPage(row, "/runs/$runId", row.latestRunId ?? undefined)
+                            }
+                          >
+                            측정 보기
                           </Button>
                         )}
-                        {row.orgId === activeOrgId &&
+                        {canOpenCustomerArea(row) &&
                           (row.stage === "questions_needed" || row.stage === "questions_review") && (
                             <Button
                               size="sm"
@@ -319,7 +368,7 @@ function PilotOpsPage() {
                               질문 관리
                             </Button>
                           )}
-                        {row.orgId === activeOrgId && row.stage === "first_measurement_needed" && (
+                        {canOpenCustomerArea(row) && row.stage === "first_measurement_needed" && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -339,9 +388,14 @@ function PilotOpsPage() {
                           </Button>
                         )}
                       </div>
-                      {row.orgId !== activeOrgId && (
+                      {!canOpenCustomerArea(row) && (
                         <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-                          고객 화면 바로가기는 현재 선택 조직에서만 열립니다.
+                          이 계정에 고객 조직 멤버십이 없어 고객 화면은 열 수 없습니다.
+                        </p>
+                      )}
+                      {pendingNavigation?.businessId === row.businessId && (
+                        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                          조직 전환 중…
                         </p>
                       )}
                     </TableCell>
