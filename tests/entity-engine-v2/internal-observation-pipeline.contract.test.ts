@@ -115,6 +115,14 @@ const unattendedExecutorMigration = readFileSync(
   "utf8",
 );
 
+const executorDeploymentStateMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20261004132500_internal_observation_executor_deployment_state_v07.sql",
+  ),
+  "utf8",
+);
+
 describe("internal observation pipeline v0.7 unattended executor", () => {
   it("is internal-only and defaults measurement execution to off", () => {
     expect(navSource).toContain(
@@ -579,6 +587,18 @@ describe("internal observation pipeline v0.7 unattended executor", () => {
     expect(unattendedExecutorSource).toContain(
       "Leave the pipeline measuring so reconciliation can settle the exact Run.",
     );
+  });
+
+  it("tracks executor deployment separately from activation readiness", () => {
+    expect(executorDeploymentStateMigration).toContain(
+      "scheduler_executor_deployed boolean not null default false",
+    );
+    expect(schedulerOperationsSource).toContain("executorDeployed");
+    expect(schedulerOperationsSource).toContain(
+      'settingsRes.data["scheduler_executor_deployed"] === true',
+    );
+    expect(routeSource).toContain("배포 완료 · QA 대기");
+    expect(routeSource).toContain("executor_ready");
   });
 
   it("adds unattended reconciliation with stale-claim fail-closed behavior and exact v2 readiness", () => {
