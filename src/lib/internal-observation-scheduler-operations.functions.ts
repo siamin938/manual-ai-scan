@@ -62,6 +62,7 @@ export type InternalObservationSchedulerActivationPlanDTO = {
   orgName: string;
   schedulerState: InternalObservationSchedulerState;
   executionEnabled: boolean;
+  executorDeployed: boolean;
   executorReady: boolean;
   schedulerActorConfigured: boolean;
   cronJobExists: boolean;
@@ -191,7 +192,7 @@ async function buildActivationPlan(args: {
     admin
       .from("internal_observation_pipeline_settings")
       .select(
-        "execution_enabled, scheduler_state, scheduler_executor_ready, scheduler_actor_user_id",
+        "execution_enabled, scheduler_state, scheduler_executor_deployed, scheduler_executor_ready, scheduler_actor_user_id",
       )
       .eq("org_id", args.orgId)
       .maybeSingle(),
@@ -212,6 +213,7 @@ async function buildActivationPlan(args: {
       ? schedulerStateRaw
       : "off";
   const executionEnabled = settingsRes.data["execution_enabled"] === true;
+  const executorDeployed = settingsRes.data["scheduler_executor_deployed"] === true;
   const executorReady = settingsRes.data["scheduler_executor_ready"] === true;
   const schedulerActorConfigured = !!str(
     settingsRes.data["scheduler_actor_user_id"],
@@ -233,6 +235,7 @@ async function buildActivationPlan(args: {
     orgId: args.orgId,
     schedulerState,
     executionEnabled,
+    executorDeployed,
     executorReady,
     schedulerActorConfigured,
     cronJobExists: cron.exists,
@@ -271,6 +274,7 @@ async function buildActivationPlan(args: {
     orgName: dryRun.orgName,
     schedulerState,
     executionEnabled,
+    executorDeployed,
     executorReady,
     schedulerActorConfigured,
     cronJobExists: cron.exists,
