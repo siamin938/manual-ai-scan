@@ -1,6 +1,6 @@
-# Internal Observation Pipeline v0.5 Guarded Scheduler
+# Internal Observation Pipeline v0.6 Scheduler Control Plane
 
-Status: v0.5 guarded scheduler implemented. The execution engine and atomic claim gate exist, but the automatic execution master switch remains OFF and no enable UI is exposed.
+Status: v0.6 scheduler control plane implemented. The master switch remains OFF, the recurring cron job exists but is inactive, and executor readiness remains false until the unattended worker is separately deployed and approved.
 
 ## Goal
 
@@ -282,6 +282,73 @@ The guarded scheduler never creates an immediate replacement Run and has no inte
 The `execution_enabled=false` path returns before claim and before scheduler metadata writes.
 There is intentionally no UI control in v0.5 for enabling automatic execution.
 
+## Scheduler operations v0.6
+
+v0.6 adds the operator control plane without enabling unattended measurement.
+
+Scheduler settings now expose:
+
+- `scheduler_state = off | paused | running`
+- `execution_enabled` as the hard execution fuse
+- `scheduler_executor_ready`
+- configured scheduler actor
+- activated/paused/stopped timestamps
+
+Database consistency requires `execution_enabled=true` only when `scheduler_state=running`.
+
+### Two-step activation
+
+Activation requires two explicit operator actions:
+
+1. Create an activation request from the current dry-run plan.
+2. Within 10 minutes, type the exact confirmation text `자동 실행 시작`.
+
+The request stores a SHA-256 plan hash and plan snapshot. Final confirmation recomputes the
+activation plan. Any change in credits, budget, usage, concurrency, candidate order, scheduler
+actor, cron schedule, or safety blockers invalidates the request.
+
+Activation is blocked when:
+
+- executor readiness is false
+- scheduler actor is missing
+- cron scaffold is missing
+- no candidate is currently planned
+- no dispatch slot is available
+- the current operator lacks a write role
+
+The current environment intentionally has `scheduler_executor_ready=false`.
+
+### Pause and stop
+
+`pause` and `stop` both:
+
+- set `execution_enabled=false`
+- deactivate the scheduler cron job
+- prevent the next candidate from being claimed
+- do not cancel a Run that is already in progress
+
+`paused` is resumable only through a new two-step activation request.
+`off` also cancels any pending activation request.
+
+### Cron scaffold
+
+The migration creates the permanent cron job:
+
+`internal-observation-scheduler-v06`
+
+Schedule:
+
+`*/2 * * * *`
+
+The job is created **inactive**. It targets the future
+`internal-observation-scheduler-tick` Edge Function using the existing Vault project URL,
+publishable key, and internal cron secret.
+
+The cron activation/deactivation RPC is service-role only.
+
+No Edge executor is deployed or marked ready by v0.6. Therefore the current control plane cannot
+turn unattended measurement on.
+
 ## Work / browser automation role
 
 Work is not the measurement engine.
@@ -352,17 +419,38 @@ Not enabled yet:
 - master-switch ON
 - automatic execution
 
-### v0.6 - scheduler operations
+### v0.6 - scheduler control plane
 
-Before enabling unattended execution:
-- add explicit operator approval workflow for switching ON
-- add hourly/daily trigger
+Implemented:
+- OFF / PAUSED / RUNNING state model
+- executor-readiness gate
+- permanent inactive two-minute cron scaffold
+- service-role-only cron activation control
+- two-step activation request with 10-minute expiry
+- exact confirmation phrase
+- activation plan hash drift protection
+- pause and stop semantics
+- current Run is never force-cancelled by pause/stop
+- activation audit events
+
+Still intentionally disabled:
+- executor Edge Function deployment
+- executor readiness
+- cron activation
+- master switch ON
+
+### v0.7 - unattended executor
+
+Before marking the executor ready:
+- deploy the internal scheduler tick Edge Function
+- authenticate it with the existing internal cron secret
+- reuse/extend the existing enqueue-run execution contract without weakening customer auth
 - stale claim recovery for process crashes
-- execution audit log
-- operator pause/stop semantics
-- remeasurement cadence
+- startup-failure policy that does not silently create replacement Runs
+- executor audit logs
+- run the first enabled scheduler cycle under explicit operator approval
 
-### v0.7 - candidate discovery
+### v0.8 - candidate discovery
 
 Add external/Work discovery into a separate review queue.
 Do not directly measure a browser-discovered entity before structured identity review.
