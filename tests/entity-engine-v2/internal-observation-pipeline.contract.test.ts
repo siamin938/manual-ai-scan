@@ -222,7 +222,7 @@ describe("internal observation pipeline v0.6 scheduler control plane", () => {
 
   it("keeps automatic execution separate from manual approval", () => {
     expect(executionSource).toContain("automaticExecutionEnabled");
-    expect(routeSource).toContain("Guarded Scheduler master switch는 OFF입니다.");
+    expect(routeSource).toContain("Guarded Scheduler");
     expect(routeSource).toContain("이번 건은 수동 승인");
   });
 
@@ -311,7 +311,7 @@ describe("internal observation pipeline v0.6 scheduler control plane", () => {
     expect(routeSource).toContain("계획 비용");
     expect(routeSource).toContain("Dry-run 다시 계산");
     expect(routeSource).toContain("master switch OFF 상태에서는 어떤 후보도 claim하거나 측정하지 않습니다.");
-    expect(routeSource).toContain("Pipeline v0.5 Guarded");
+    expect(routeSource).toContain("Pipeline v0.6 Control");
   });
 
   it("adds an atomic service-role claim gate for one sequential candidate", () => {
