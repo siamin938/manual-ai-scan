@@ -37,6 +37,21 @@ const schedulerOperationsSource = readFileSync(
   "utf8",
 );
 
+const unattendedExecutorSource = readFileSync(
+  resolve(process.cwd(), "supabase/functions/internal-observation-scheduler-tick/index.ts"),
+  "utf8",
+);
+
+const enqueueRunSource = readFileSync(
+  resolve(process.cwd(), "supabase/functions/enqueue-run/index.ts"),
+  "utf8",
+);
+
+const supabaseConfigSource = readFileSync(
+  resolve(process.cwd(), "supabase/config.toml"),
+  "utf8",
+);
+
 const navSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
   "utf8",
@@ -92,7 +107,15 @@ const schedulerOperationsMigration = readFileSync(
   "utf8",
 );
 
-describe("internal observation pipeline v0.6 scheduler control plane", () => {
+const unattendedExecutorMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20261004131500_internal_observation_executor_v07.sql",
+  ),
+  "utf8",
+);
+
+describe("internal observation pipeline v0.7 unattended executor", () => {
   it("is internal-only and defaults measurement execution to off", () => {
     expect(navSource).toContain(
       '{ to: "/internal-observation-pipeline", label: "내부 데이터 수집" }',
@@ -470,5 +493,103 @@ describe("internal observation pipeline v0.6 scheduler control plane", () => {
     expect(schedulerOperationsSource).toContain(
       "set_internal_observation_scheduler_cron_active_v06",
     );
+  });
+
+  it("adds a custom-secret unattended executor while leaving the platform JWT gate off", () => {
+    expect(supabaseConfigSource).toContain(
+      "[functions.internal-observation-scheduler-tick]",
+    );
+    expect(supabaseConfigSource).toContain(
+      "[functions.internal-observation-scheduler-tick]\nverify_jwt = false",
+    );
+    expect(unattendedExecutorSource).toContain("INTERNAL_CRON_SECRET");
+    expect(unattendedExecutorSource).toContain("x-internal-secret");
+    expect(unattendedExecutorSource).toContain("constantTimeEquals");
+    expect(unattendedExecutorSource).toContain('return json({ error: "FORBIDDEN" }, 403)');
+  });
+
+  it("keeps the unattended executor hard-gated by running state and executor readiness", () => {
+    expect(unattendedExecutorSource).toContain('.eq("execution_enabled", true)');
+    expect(unattendedExecutorSource).toContain('.eq("scheduler_state", "running")');
+    expect(unattendedExecutorSource).toContain('.eq("scheduler_executor_ready", true)');
+    expect(unattendedExecutorMigration).toContain("s.execution_enabled is distinct from true");
+    expect(unattendedExecutorMigration).toContain("s.scheduler_state <> 'running'");
+    expect(unattendedExecutorMigration).toContain(
+      "s.scheduler_executor_ready is distinct from true",
+    );
+  });
+
+  it("reconciles before claim and starts at most one oldest eligible candidate per org tick", () => {
+    expect(unattendedExecutorSource).toContain(
+      "reconcile_internal_observation_scheduler_v07",
+    );
+    expect(unattendedExecutorSource).toContain(
+      "claim_internal_observation_scheduler_candidate_v07",
+    );
+    expect(unattendedExecutorSource).toContain(
+      "create_internal_observation_scheduler_run_v07",
+    );
+    expect(unattendedExecutorMigration).toContain("for update of i skip locked");
+    expect(unattendedExecutorMigration).toContain(
+      "order by i.prepared_at asc nulls last,i.created_at asc,i.id asc",
+    );
+    expect(unattendedExecutorSource).not.toContain("setInterval");
+    expect(unattendedExecutorSource).not.toContain("setTimeout");
+  });
+
+  it("requires the same 24-question/provider/credit/usage/budget contract again at execution time", () => {
+    expect(unattendedExecutorMigration).toContain("v_question_count <> 24");
+    expect(unattendedExecutorMigration).toContain("v_intent_group_count <> 8");
+    expect(unattendedExecutorMigration).toContain("PROVIDER_NOT_READY");
+    expect(unattendedExecutorMigration).toContain("NO_MEASUREMENT_CREDIT");
+    expect(unattendedExecutorMigration).toContain("DAILY_USAGE_LIMIT");
+    expect(unattendedExecutorMigration).toContain("MONTHLY_USAGE_LIMIT");
+    expect(unattendedExecutorMigration).toContain("QUESTION_SET_NOT_NEWEST");
+  });
+
+  it("extends enqueue-run with a narrow internal scheduler scope without weakening the user path", () => {
+    expect(enqueueRunSource).toContain("internalSchedulerItemId");
+    expect(enqueueRunSource).toContain("internalSchedulerActorUserId");
+    expect(enqueueRunSource).toContain("INTERNAL_SCHEDULER_SCOPE_INVALID");
+    expect(enqueueRunSource).toContain("INTERNAL_SCHEDULER_NOT_READY");
+    expect(enqueueRunSource).toContain("measurement_approved_by");
+    expect(enqueueRunSource).toContain('measurement_data_origin !== "internal_observation"');
+    expect(enqueueRunSource).toContain('authorization?.startsWith("Bearer ")');
+    expect(enqueueRunSource).toContain("userClient.auth.getUser()");
+  });
+
+  it("never creates a replacement Run after unattended startup failure", () => {
+    expect(unattendedExecutorSource).toContain("markStartupFailure");
+    expect(unattendedExecutorSource).toContain(
+      "자동으로 replacement Run을 만들지 않습니다.",
+    );
+    expect(unattendedExecutorSource).toContain('status: "failed"');
+    expect(unattendedExecutorSource).toContain('status: "cancelled"');
+    expect(unattendedExecutorSource).not.toContain("while (true)");
+    expect(unattendedExecutorSource).not.toContain("retryRun");
+  });
+
+  it("keeps uncertain enqueue responses fail-safe by preserving existing jobs or progressed runs", () => {
+    expect(unattendedExecutorSource).toContain(
+      "SCHEDULER_ENQUEUE_RESPONSE_UNCERTAIN",
+    );
+    expect(unattendedExecutorSource).toContain(
+      '(count ?? 0) > 0 || (run && run.status !== "draft")',
+    );
+    expect(unattendedExecutorSource).toContain(
+      "Leave the pipeline measuring so reconciliation can settle the exact Run.",
+    );
+  });
+
+  it("adds unattended reconciliation with stale-claim fail-closed behavior and exact v2 readiness", () => {
+    expect(unattendedExecutorMigration).toContain("SCHEDULER_STALE_CLAIM");
+    expect(unattendedExecutorMigration).toContain("interval '5 minutes'");
+    expect(unattendedExecutorMigration).toContain("run_entity_fact_aggregates_v2");
+    expect(unattendedExecutorMigration).toContain("run_observed_source_aggregates_v2");
+    expect(unattendedExecutorMigration).toContain(
+      "run_competitor_source_clue_aggregates_v2",
+    );
+    expect(unattendedExecutorMigration).toContain("a.contract_ok=true");
+    expect(unattendedExecutorMigration).toContain("a.valid_measurement_count=24");
   });
 });
