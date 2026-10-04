@@ -617,11 +617,11 @@ function InternalObservationPipelinePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">내부 데이터 수집</h1>
           <Badge variant="secondary">내부 운영자 전용</Badge>
-          <Badge variant="outline">Pipeline v0.6 Control</Badge>
+          <Badge variant="outline">Pipeline v0.7 Executor</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          Guarded Scheduler의 활성화 승인·일시정지·중지 제어면까지 준비했습니다.
-          실행기 배포 전에는 activation Gate가 자동으로 차단됩니다.
+          Unattended Scheduler 실행기까지 구현했으며, 배포 상태와 실제 활성화 준비 Gate를 분리해 관리합니다.
+          executor_ready 승인 전에는 자동 실행을 활성화할 수 없습니다.
         </p>
         <p className="text-xs text-muted-foreground">
           기준 시각 {formatSeoul(overview.generatedAt)}
@@ -635,7 +635,8 @@ function InternalObservationPipelinePage() {
               Guarded Scheduler · {schedulerOps?.plan.schedulerState === "running" ? "RUNNING" : schedulerOps?.plan.schedulerState === "paused" ? "PAUSED" : "OFF"}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              현재 실행기 준비 Gate는 {schedulerOps?.plan.executorReady ? "통과" : "차단"} 상태입니다.
+              실행기 배포는 {schedulerOps?.plan.executorDeployed ? "완료" : "대기"}, 실제 자동 실행 준비 Gate는{" "}
+              {schedulerOps?.plan.executorReady ? "통과" : "차단"} 상태입니다.
               활성화되더라도 1곳 실행 → 완료·실패 정리 → 다음 1곳 순서만 허용합니다.
             </p>
           </div>
@@ -935,7 +936,11 @@ function InternalObservationPipelinePage() {
               <div className="rounded-lg border p-4">
                 <p className="text-xs text-muted-foreground">실행기</p>
                 <p className="mt-2 font-semibold">
-                  {schedulerOps.plan.executorReady ? "준비 완료" : "배포 대기"}
+                  {!schedulerOps.plan.executorDeployed
+                    ? "배포 대기"
+                    : schedulerOps.plan.executorReady
+                      ? "배포·QA 완료"
+                      : "배포 완료 · QA 대기"}
                 </p>
               </div>
               <div className="rounded-lg border p-4">
@@ -1019,8 +1024,8 @@ function InternalObservationPipelinePage() {
             )}
 
             <p className="text-[11px] leading-5 text-muted-foreground">
-              현재 v0.6에서는 실행기 배포 Gate가 닫혀 있어 자동 실행을 활성화할 수 없습니다.
-              Cron job도 비활성 상태로 생성되어 있습니다.
+              실행기 배포 여부와 별개로 executor_ready가 false인 동안 자동 실행 활성화는 차단됩니다.
+              Cron job도 최종 활성화 전까지 비활성 상태를 유지합니다.
             </p>
           </CardContent>
         </Card>
