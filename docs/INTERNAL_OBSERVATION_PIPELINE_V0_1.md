@@ -1,13 +1,13 @@
-# Internal Observation Pipeline v0.1
+# Internal Observation Pipeline v0.3
 
-Status: v0.2 implemented. Automatic recurring execution remains disabled; explicit per-item execution approval is available.
+Status: v0.3 implemented. Automatic recurring execution remains disabled; explicit per-item execution approval and terminal reconciliation are available.
 
 ## Goal
 
 Build CHABOIM's internal automotive observation dataset without mixing research records
 into customer organizations.
 
-v0.1.1 automates:
+v0.3 includes:
 
 1. operator-confirmed candidate intake
 2. idempotent candidate queueing
@@ -20,7 +20,11 @@ v0.1.1 automates:
 9. provider/credit readiness checks
 10. operator-visible queue state
 
-Preparation preview/prepare do **not** create a measurement run, enqueue jobs, or consume credits.\n\nv0.2 adds a separate execution-plan gate. Only an explicit per-item `측정 실행 승인` action may call the existing measurement path. Web discovery and recurring scheduling remain out of scope.
+Preparation preview/prepare do **not** create a measurement run, enqueue jobs, or consume credits.
+
+v0.2 added a separate execution-plan gate. Only an explicit per-item `측정 실행 승인` action may call the existing measurement path.
+
+v0.3 reconciles the linked Run to a terminal pipeline state and requires the exact Run to be readable through the canonical Entity Facts v2 gateway before declaring the item complete. Web discovery and recurring scheduling remain out of scope.
 
 ## Boundary
 
@@ -41,14 +45,18 @@ pending
       -> failed
 
 ready_to_measure
-  -> (future explicit execution gate)
+  -> explicit execution approval
       -> measuring
-      -> completed
+          -> postprocessing
+              -> completed
+          -> failed
 ```
+
+`postprocessing` means the Run has completed 24/24 with zero failed jobs but the exact linked Run is not yet readable through Entity Facts v2.
 
 `cancelled` is reserved for operator cancellation.
 
-The current implementation stops at `ready_to_measure`.
+No reconciliation path creates a replacement Run automatically.
 
 ## Candidate idempotency
 
@@ -180,7 +188,7 @@ The existing credit trigger remains the cost fuse. Internal automation must neve
 
 ## Existing systems reused
 
-v0.1 deliberately reuses:
+The pipeline deliberately reuses:
 
 - business normalization helpers
 - Unified Diagnostic v0.2 generator
@@ -220,11 +228,16 @@ Implemented:
 
 ### v0.3 - terminal reconciliation
 
-Next:
-- observe linked run terminal state
-- reconcile `measuring -> completed/failed`
-- expose failure/retry guidance without silently creating a second run
-- confirm Entity Facts v2 materialization/read readiness
+Implemented:
+- observe linked Run status on each bounded internal overview refresh
+- manual `상태 동기화` action
+- `measuring -> postprocessing -> completed` flow
+- terminal `failed` for cancelled/failed/incomplete Runs
+- exact 24/24 and failed=0 requirement
+- exact linked Run match through Entity Facts v2 read gateway
+- transient `NO_V2_DATA`/read-check errors stay retryable as postprocessing
+- completed items expose a read-only internal result summary
+- no automatic replacement Run or retry
 
 ### v0.4 - recurring scheduler
 
