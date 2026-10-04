@@ -1,11 +1,13 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { handleOptions, jsonResponse, readJsonBody } from "./_shared/http.ts";
-import { getProviderAutomationBlock, safeErrorMessage } from "./_shared/safety.ts";
+import { constantTimeEquals, getProviderAutomationBlock, safeErrorMessage } from "./_shared/safety.ts";
 import { getSupabaseRuntimeEnv } from "./_shared/supabase-env.ts";
 import type { ProviderName, ProviderSettingRow } from "./_shared/types.ts";
 
 interface EnqueueBody {
   runId?: string;
+  internalSchedulerItemId?: string;
+  internalSchedulerActorUserId?: string;
 }
 
 class AppError extends Error {
@@ -329,23 +331,9 @@ Deno.serve(async (request) => {
       throw new AppError("SERVER_NOT_CONFIGURED", "Supabase Edge Function secrets are incomplete.", 500);
     }
 
-    const authorization = request.headers.get("Authorization");
-    if (!authorization?.startsWith("Bearer ")) {
-      throw new AppError("AUTH_REQUIRED", "로그인이 필요합니다.", 401);
-    }
-
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authorization } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
     const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-
-    const { data: authData, error: authError } = await userClient.auth.getUser();
-    if (authError || !authData.user) {
-      throw new AppError("AUTH_INVALID", "유효한 로그인 세션이 아닙니다.", 401);
-    }
 
     const body = await readJsonBody<EnqueueBody>(request);
     const runId = body.runId?.trim();
@@ -353,21 +341,130 @@ Deno.serve(async (request) => {
       throw new AppError("INVALID_RUN_ID", "올바른 runId가 필요합니다.");
     }
 
-    const { data: run, error: runError } = await userClient
-      .from("measurement_runs")
-      .select("id,org_id,business_id,question_set_id,status,selected_providers,repetitions,max_cost_usd,scheduled_at,total_jobs,estimated_cost_usd,run_type,phase,experiment_id")
-      .eq("id", runId)
-      .single();
-    if (runError || !run) throw new AppError("RUN_NOT_FOUND", "실행을 찾을 수 없습니다.", 404);
+    const configuredInternalSecret = Deno.env.get("INTERNAL_CRON_SECRET") ?? "";
+    const suppliedInternalSecret = request.headers.get("x-internal-secret") ?? "";
+    const internalSchedulerMode =
+      configuredInternalSecret.length > 0 &&
+      constantTimeEquals(configuredInternalSecret, suppliedInternalSecret);
 
-    const { data: membership, error: membershipError } = await userClient
-      .from("organization_members")
-      .select("role")
-      .eq("org_id", run.org_id)
-      .eq("user_id", authData.user.id)
-      .single();
-    if (membershipError || !membership || !STAFF_ROLES.has(membership.role)) {
-      throw new AppError("FORBIDDEN", "측정 실행 권한이 없습니다.", 403);
+    let actorUserId: string;
+    let run: any;
+
+    if (internalSchedulerMode) {
+      const schedulerItemId = body.internalSchedulerItemId?.trim() ?? "";
+      const schedulerActorUserId = body.internalSchedulerActorUserId?.trim() ?? "";
+      if (!UUID_PATTERN.test(schedulerItemId) || !UUID_PATTERN.test(schedulerActorUserId)) {
+        throw new AppError("INTERNAL_SCHEDULER_SCOPE_INVALID", "내부 스케줄러 실행 범위가 올바르지 않습니다.", 403);
+      }
+
+      const { data: internalRun, error: internalRunError } = await serviceClient
+        .from("measurement_runs")
+        .select("id,org_id,business_id,question_set_id,status,selected_providers,repetitions,max_cost_usd,scheduled_at,total_jobs,estimated_cost_usd,run_type,phase,experiment_id,created_by,data_origin,diagnostic_scope")
+        .eq("id", runId)
+        .single();
+      if (internalRunError || !internalRun) {
+        throw new AppError("RUN_NOT_FOUND", "실행을 찾을 수 없습니다.", 404);
+      }
+
+      const { data: pipelineItem, error: pipelineError } = await serviceClient
+        .from("internal_observation_pipeline_items")
+        .select("id,org_id,business_id,question_set_id,run_id,status,measurement_approved_by")
+        .eq("id", schedulerItemId)
+        .maybeSingle();
+      if (
+        pipelineError ||
+        !pipelineItem ||
+        pipelineItem.org_id !== internalRun.org_id ||
+        pipelineItem.business_id !== internalRun.business_id ||
+        pipelineItem.question_set_id !== internalRun.question_set_id ||
+        pipelineItem.run_id !== internalRun.id ||
+        pipelineItem.status !== "measuring" ||
+        pipelineItem.measurement_approved_by !== schedulerActorUserId
+      ) {
+        throw new AppError("INTERNAL_SCHEDULER_SCOPE_INVALID", "내부 스케줄러 파이프라인 연결이 일치하지 않습니다.", 403);
+      }
+
+      const { data: schedulerSettings, error: schedulerSettingsError } = await serviceClient
+        .from("internal_observation_pipeline_settings")
+        .select("execution_enabled,scheduler_state,scheduler_executor_ready,scheduler_actor_user_id")
+        .eq("org_id", internalRun.org_id)
+        .maybeSingle();
+      if (
+        schedulerSettingsError ||
+        !schedulerSettings ||
+        schedulerSettings.execution_enabled !== true ||
+        schedulerSettings.scheduler_state !== "running" ||
+        schedulerSettings.scheduler_executor_ready !== true ||
+        schedulerSettings.scheduler_actor_user_id !== schedulerActorUserId
+      ) {
+        throw new AppError("INTERNAL_SCHEDULER_NOT_READY", "내부 스케줄러 실행 Gate가 닫혀 있습니다.", 403);
+      }
+
+      const { data: orgRow, error: orgError } = await serviceClient
+        .from("organizations")
+        .select("measurement_data_origin")
+        .eq("id", internalRun.org_id)
+        .maybeSingle();
+      if (
+        orgError ||
+        !orgRow ||
+        orgRow.measurement_data_origin !== "internal_observation" ||
+        internalRun.data_origin !== "internal_observation" ||
+        internalRun.diagnostic_scope !== "customer" ||
+        internalRun.run_type !== "audit" ||
+        internalRun.phase !== "standalone" ||
+        internalRun.created_by !== schedulerActorUserId
+      ) {
+        throw new AppError("INTERNAL_SCHEDULER_SCOPE_INVALID", "내부 스케줄러 Run 범위가 올바르지 않습니다.", 403);
+      }
+
+      const { data: membership, error: membershipError } = await serviceClient
+        .from("organization_members")
+        .select("role")
+        .eq("org_id", internalRun.org_id)
+        .eq("user_id", schedulerActorUserId)
+        .maybeSingle();
+      if (membershipError || !membership || !STAFF_ROLES.has(membership.role)) {
+        throw new AppError("FORBIDDEN", "측정 실행 권한이 없습니다.", 403);
+      }
+
+      run = internalRun;
+      actorUserId = schedulerActorUserId;
+    } else {
+      const authorization = request.headers.get("Authorization");
+      if (!authorization?.startsWith("Bearer ")) {
+        throw new AppError("AUTH_REQUIRED", "로그인이 필요합니다.", 401);
+      }
+
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authorization } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+
+      const { data: authData, error: authError } = await userClient.auth.getUser();
+      if (authError || !authData.user) {
+        throw new AppError("AUTH_INVALID", "유효한 로그인 세션이 아닙니다.", 401);
+      }
+
+      const { data: userRun, error: runError } = await userClient
+        .from("measurement_runs")
+        .select("id,org_id,business_id,question_set_id,status,selected_providers,repetitions,max_cost_usd,scheduled_at,total_jobs,estimated_cost_usd,run_type,phase,experiment_id")
+        .eq("id", runId)
+        .single();
+      if (runError || !userRun) throw new AppError("RUN_NOT_FOUND", "실행을 찾을 수 없습니다.", 404);
+
+      const { data: membership, error: membershipError } = await userClient
+        .from("organization_members")
+        .select("role")
+        .eq("org_id", userRun.org_id)
+        .eq("user_id", authData.user.id)
+        .single();
+      if (membershipError || !membership || !STAFF_ROLES.has(membership.role)) {
+        throw new AppError("FORBIDDEN", "측정 실행 권한이 없습니다.", 403);
+      }
+
+      run = userRun;
+      actorUserId = authData.user.id;
     }
 
     if (run.status !== "draft") {
@@ -680,7 +777,7 @@ Deno.serve(async (request) => {
             }
           : {}),
       },
-      created_by: authData.user.id,
+      created_by: actorUserId,
     });
 
     return jsonResponse({
