@@ -488,6 +488,8 @@ function InternalObservationPipelinePage() {
       ? executionPlanMutation.data.plan
       : null;
 
+  const schedulerPlan = schedulerQuery.data?.ok ? schedulerQuery.data.plan : null;
+
   return (
     <div className="space-y-6">
       <header className="space-y-2">
@@ -540,7 +542,7 @@ function InternalObservationPipelinePage() {
         </Card>
       </section>
 
-      {schedulerQuery.data?.ok && (
+      {schedulerPlan && (
         <Card className="border-dashed">
           <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -566,46 +568,46 @@ function InternalObservationPipelinePage() {
               <div className="rounded-lg border p-4">
                 <p className="text-xs text-muted-foreground">오늘 실행 슬롯</p>
                 <p className="mt-2 text-lg font-semibold tabular-nums">
-                  {schedulerQuery.data.plan.pipelineRunsToday}/{schedulerQuery.data.plan.dailyRunLimit}
+                  {schedulerPlan.pipelineRunsToday}/{schedulerPlan.dailyRunLimit}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  남음 {schedulerQuery.data.plan.dailySlotsRemaining}곳
+                  남음 {schedulerPlan.dailySlotsRemaining}곳
                 </p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-xs text-muted-foreground">동시 실행</p>
                 <p className="mt-2 text-lg font-semibold tabular-nums">
-                  {schedulerQuery.data.plan.activeRunCount}/{schedulerQuery.data.plan.concurrentRunLimit}
+                  {schedulerPlan.activeRunCount}/{schedulerPlan.concurrentRunLimit}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  지금 시작 가능 {schedulerQuery.data.plan.dispatchSlotsNow}곳
+                  지금 시작 가능 {schedulerPlan.dispatchSlotsNow}곳
                 </p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-xs text-muted-foreground">측정권</p>
                 <p className="mt-2 text-lg font-semibold tabular-nums">
-                  {schedulerQuery.data.plan.creditBalance}회
+                  {schedulerPlan.creditBalance}회
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  계획 후 {schedulerQuery.data.plan.plannedCreditBalanceAfter}회
+                  계획 후 {schedulerPlan.plannedCreditBalanceAfter}회
                 </p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-xs text-muted-foreground">오늘 계획</p>
                 <p className="mt-2 text-lg font-semibold tabular-nums">
-                  {schedulerQuery.data.plan.plannedCandidateCount}곳
+                  {schedulerPlan.plannedCandidateCount}곳
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  지금 dispatch {schedulerQuery.data.plan.dispatchNowCount}곳
+                  지금 dispatch {schedulerPlan.dispatchNowCount}곳
                 </p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-xs text-muted-foreground">계획 비용</p>
                 <p className="mt-2 text-lg font-semibold">
-                  {usd(schedulerQuery.data.plan.estimatedCostUsdTotal)}
+                  {usd(schedulerPlan.estimatedCostUsdTotal)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  최대 예약 {usd(schedulerQuery.data.plan.maxCostUsdTotal)}
+                  최대 예약 {usd(schedulerPlan.maxCostUsdTotal)}
                 </p>
               </div>
             </div>
@@ -618,28 +620,28 @@ function InternalObservationPipelinePage() {
                 <p>
                   자동 실행 ·{" "}
                   <span className="font-medium">
-                    {schedulerQuery.data.plan.automaticExecutionEnabled ? "ON" : "OFF"}
+                    {schedulerPlan.automaticExecutionEnabled ? "ON" : "OFF"}
                   </span>
                 </p>
                 <p>
                   요청량 ·{" "}
                   <span className="font-medium tabular-nums">
-                    {schedulerQuery.data.plan.dailyRequestsUsed} →{" "}
-                    {schedulerQuery.data.plan.projectedDailyRequestsAfter}/
-                    {schedulerQuery.data.plan.dailyRequestLimit}
+                    {schedulerPlan.dailyRequestsUsed} →{" "}
+                    {schedulerPlan.projectedDailyRequestsAfter}/
+                    {schedulerPlan.dailyRequestLimit}
                   </span>
                 </p>
                 <p>
                   월 최대 ·{" "}
                   <span className="font-medium tabular-nums">
-                    {usd(schedulerQuery.data.plan.projectedMonthlyCostUsdAfter)} /{" "}
-                    {usd(schedulerQuery.data.plan.monthlyBudgetUsd)}
+                    {usd(schedulerPlan.projectedMonthlyCostUsdAfter)} /{" "}
+                    {usd(schedulerPlan.monthlyBudgetUsd)}
                   </span>
                 </p>
               </div>
             </div>
 
-            {schedulerQuery.data.plan.candidates.length === 0 ? (
+            {schedulerPlan.candidates.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 현재 측정 준비 완료 상태의 후보가 없어 오늘 Dry-run 실행 계획은 비어 있습니다.
               </p>
@@ -657,7 +659,7 @@ function InternalObservationPipelinePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {schedulerQuery.data.plan.candidates.map((candidate) => (
+                    {schedulerPlan.candidates.map((candidate) => (
                       <TableRow key={candidate.itemId}>
                         <TableCell className="align-top font-medium tabular-nums">
                           {candidate.sequence ?? "-"}
@@ -693,7 +695,7 @@ function InternalObservationPipelinePage() {
                               <p>측정권 {candidate.creditBalanceAfter}회</p>
                               <p className="mt-1">
                                 요청 {candidate.projectedDailyRequestsAfter}/
-                                {schedulerQuery.data.plan.dailyRequestLimit}
+                                {schedulerPlan.dailyRequestLimit}
                               </p>
                             </>
                           ) : (
