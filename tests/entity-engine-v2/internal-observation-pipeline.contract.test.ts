@@ -17,6 +17,11 @@ const executionSource = readFileSync(
   "utf8",
 );
 
+const reconciliationSource = readFileSync(
+  resolve(process.cwd(), "src/lib/internal-observation-reconciliation.functions.ts"),
+  "utf8",
+);
+
 const navSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
   "utf8",
@@ -48,7 +53,15 @@ const prepareMigration = readFileSync(
   "utf8",
 );
 
-describe("internal observation pipeline v0.2", () => {
+const reconciliationMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20261004104000_internal_observation_reconciliation_v03.sql",
+  ),
+  "utf8",
+);
+
+describe("internal observation pipeline v0.3", () => {
   it("is internal-only and defaults measurement execution to off", () => {
     expect(navSource).toContain(
       '{ to: "/internal-observation-pipeline", label: "내부 데이터 수집" }',
@@ -180,5 +193,50 @@ describe("internal observation pipeline v0.2", () => {
     expect(executionSource).toContain("automaticExecutionEnabled");
     expect(routeSource).toContain("자동 반복 측정은 OFF");
     expect(routeSource).toContain("이번 건은 수동 승인");
+  });
+
+  it("adds a postprocessing state and exact-run Entity Facts v2 reconciliation", () => {
+    expect(reconciliationMigration).toContain("'postprocessing'");
+    expect(reconciliationMigration).toContain("entity_facts_ready_at");
+    expect(reconciliationMigration).toContain("terminal_at");
+    expect(reconciliationSource).toContain("fetchEntityFactsV2ReadGateway");
+    expect(reconciliationSource).toContain("gateway.data.scope.runId !== runId");
+    expect(reconciliationSource).toContain('status: "postprocessing"');
+    expect(reconciliationSource).toContain('status: "completed"');
+    expect(routeSource).toContain('postprocessing: "후처리 중"');
+  });
+
+  it("only completes a pipeline item after 24/24 success and exact Entity Facts v2 readiness", () => {
+    expect(reconciliationSource).toContain("totalJobs !== CUSTOMER_STANDARD_QUESTION_COUNT");
+    expect(reconciliationSource).toContain("completedJobs !== CUSTOMER_STANDARD_QUESTION_COUNT");
+    expect(reconciliationSource).toContain("failedJobs !== 0");
+    expect(reconciliationSource).toContain('"RUN_INCOMPLETE"');
+    expect(reconciliationSource).toContain('"ENTITY_FACTS_PENDING"');
+    expect(reconciliationSource).toContain('"ENTITY_FACTS_RUN_MISMATCH"');
+    expect(reconciliationSource).toContain("entity_facts_ready_at");
+  });
+
+  it("never auto-retries a failed measurement during reconciliation", () => {
+    expect(reconciliationSource).not.toContain("createCustomerMeasurementRun");
+    expect(reconciliationSource).not.toContain('functions.invoke("enqueue-run"');
+    expect(reconciliationSource).toContain("자동으로 새 Run을 만들지 않습니다.");
+    expect(routeSource).toContain("자동 재시도 없음");
+    expect(routeSource).toContain("(item.status === \"failed\" && !item.runId)");
+  });
+
+  it("reconciles automatically on bounded overview refresh and also supports manual sync", () => {
+    expect(serverSource).toContain("reconcileInternalObservationPipelineItems({ limit: 20 })");
+    expect(reconciliationSource).toContain("reconcileInternalObservationPipeline");
+    expect(routeSource).toContain("상태 동기화");
+    expect(routeSource).toContain("15초마다 측정 종료와 Entity Facts v2 준비 여부를 자동 확인");
+  });
+
+  it("exposes a read-only result summary only after completion", () => {
+    expect(routeSource).toContain("getPilotOpsAdminResult");
+    expect(routeSource).toContain('item.status === "completed"');
+    expect(routeSource).toContain("내부 수집 결과");
+    expect(routeSource).toContain("Entity Facts v2 결과를 읽기 전용으로 확인합니다.");
+    expect(routeSource).toContain("확정 노출");
+    expect(routeSource).toContain("함께 관찰된 업체");
   });
 });
