@@ -1,6 +1,6 @@
 # Internal Observation Pipeline v0.1
 
-Status: v0.1.1 implemented, measurement execution intentionally disabled.
+Status: v0.2 implemented. Automatic recurring execution remains disabled; explicit per-item execution approval is available.
 
 ## Goal
 
@@ -20,8 +20,7 @@ v0.1.1 automates:
 9. provider/credit readiness checks
 10. operator-visible queue state
 
-v0.1 does **not** create a measurement run, enqueue jobs, consume credits, crawl the web,
-or enable a recurring scheduler.
+Preparation preview/prepare do **not** create a measurement run, enqueue jobs, or consume credits.\n\nv0.2 adds a separate execution-plan gate. Only an explicit per-item `측정 실행 승인` action may call the existing measurement path. Web discovery and recurring scheduling remain out of scope.
 
 ## Boundary
 
@@ -141,30 +140,43 @@ After preparation, CHABOIM checks:
 A candidate may reach `ready_to_measure` while `execution_enabled = false`.
 That means the data contract is ready, not that AI execution is permitted.
 
-## Execution fuse
+## Execution gate v0.2
 
-`internal_observation_pipeline_settings.execution_enabled` defaults to `false`.
+`internal_observation_pipeline_settings.execution_enabled` still defaults to `false` and controls future unattended automation, not the explicit one-item approval flow.
 
-Additional future guardrails are already represented:
+Guardrails:
 
 - `daily_run_limit` default 5
 - `concurrent_run_limit` default 1
+- exact 24-question contract
+- OpenAI provider readiness
+- measurement credit >= 1
+- organization daily request allowance
+- organization monthly budget allowance
+- no active same-condition draft/queued/running run
+- current operator has owner/admin/analyst membership in the target internal organization
 
-Turning this setting on is not implemented in v0.1.
+Before any side effect, the operator opens an execution plan showing:
 
-Before automated execution is introduced, the execution layer must re-check:
+- planned jobs/provider/repetitions
+- estimated provider cost and internal max-cost reservation
+- credit balance before/after
+- daily requests current/projected/limit
+- monthly actual+reserved/projected/budget
+- pipeline daily executions
+- active/concurrent runs
+- same-condition active run status
+- all current blockers
 
-1. internal-observation organization
-2. provider readiness
-3. measurement credit
-4. daily request/monthly budget allowance
-5. daily pipeline run limit
-6. concurrent pipeline run limit
-7. no active same-condition run
-8. exact 24-question contract
-9. idempotent run/enqueue contract
+The plan receives a SHA-256 fingerprint over the execution-sensitive state. On `측정 실행 승인`, the server rebuilds the plan and requires an exact fingerprint match. A credit, budget, usage, concurrency, membership, question-set, or run-state change forces the operator to review a new plan.
 
-The existing credit trigger remains the cost fuse. Internal automation must not bypass it.
+The explicit approval path reuses `createCustomerMeasurementRun()`; it does not create a second enqueue implementation. Therefore existing customer measurement checks, `enqueue-run`, idempotency behavior, and the measurement-credit debit trigger remain the execution truth.
+
+The pipeline item is claimed into `measuring` before invoking the existing run path so double-clicks cannot create two approvals. If run startup fails, the item is returned to `ready_to_measure` and the approval fields are cleared.
+
+Automatic recurring execution remains OFF.
+
+The existing credit trigger remains the cost fuse. Internal automation must never bypass it.
 
 ## Existing systems reused
 
@@ -195,25 +207,24 @@ enter this pipeline.
 
 ## Next phases
 
-### v0.2 - execution approval and dry-run plan
+### v0.2 - execution approval gate
 
-Add an operator action that previews:
-- planned run
-- expected jobs
-- credit impact
-- current budget/limits
-- concurrency state
+Implemented:
+- read-only execution plan
+- credit/cost/budget/usage/concurrency/duplicate-run checks
+- execution-sensitive plan fingerprint
+- explicit per-item approval
+- existing customer measurement/enqueue path reuse
+- run id stored on the pipeline item
+- no recurring automatic schedule
 
-No automatic schedule yet.
+### v0.3 - terminal reconciliation
 
-### v0.3 - guarded measurement execution
-
-After explicit product approval:
-- create one internal observation standalone audit run
-- reuse existing enqueue/worker/postprocess path
-- preserve credit debit trigger
-- store run id on the pipeline item
-- reconcile terminal state back to `completed`/`failed`
+Next:
+- observe linked run terminal state
+- reconcile `measuring -> completed/failed`
+- expose failure/retry guidance without silently creating a second run
+- confirm Entity Facts v2 materialization/read readiness
 
 ### v0.4 - recurring scheduler
 
