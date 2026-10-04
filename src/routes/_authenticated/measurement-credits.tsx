@@ -142,6 +142,17 @@ function MeasurementCreditsPage() {
     },
   });
 
+  const availableOrgs = overviewQuery.data?.ok
+    ? overviewQuery.data.overview.organizations
+    : [];
+
+  useEffect(() => {
+    if (!requestedOrgId || selectedOrgId) return;
+    if (availableOrgs.some((org) => org.orgId === requestedOrgId)) {
+      setSelectedOrgId(requestedOrgId);
+    }
+  }, [requestedOrgId, selectedOrgId, availableOrgs]);
+
   if (overviewQuery.isPending && !overviewQuery.data) {
     return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
   }
@@ -156,14 +167,6 @@ function MeasurementCreditsPage() {
   }
 
   const orgs = overview.overview.organizations;
-
-  useEffect(() => {
-    if (!requestedOrgId || selectedOrgId) return;
-    if (orgs.some((org) => org.orgId === requestedOrgId)) {
-      setSelectedOrgId(requestedOrgId);
-    }
-  }, [requestedOrgId, selectedOrgId, orgs]);
-
   const selected = orgs.find((o) => o.orgId === selectedOrgId) ?? null;
   const parsedAmount = Number.parseInt(amount, 10);
   const amountValid = Number.isInteger(parsedAmount) && parsedAmount >= 1 && parsedAmount <= 100;
