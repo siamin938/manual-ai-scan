@@ -2,7 +2,9 @@
  * 고객용 standalone audit 측정 생성 (서버 전용).
  *
  * SECURITY CONTRACT
- * - 인증된 사용자 클라이언트(RLS)만 사용. service_role 미사용.
+ * - 일반 고객 경로는 인증된 사용자 클라이언트(RLS) + 조직 write-role을 요구한다.
+ * - 내부 자동 스케줄러는 internal_observation 조직 + 명시적 scheduler actor write-role 검증 후
+ *   동일한 측정 코어를 service-role client로 재사용한다.
  * - provider / 단가 / max_cost_usd / repetitions는 서버에서만 결정하고 DTO로 반환하지 않는다.
  * - 실패는 구조화된 에러코드만 반환하고 내부 설정명/SQL/비용을 노출하지 않는다.
  */
@@ -33,24 +35,53 @@ function fail(error: CustomerMeasurementErrorCode): CreateCustomerMeasurementRes
   return { ok: false, error };
 }
 
-export async function createCustomerMeasurementRun(args: {
+type MeasurementAuthorizationMode =
+  | "user_membership"
+  | "trusted_internal_scheduler";
+
+async function createStandaloneAuditMeasurementRun(args: {
   supabase: UserClient;
   userId: string;
   orgId: string;
   businessId: string;
   questionSetId: string;
   name?: string | null;
+  authorizationMode: MeasurementAuthorizationMode;
 }): Promise<CreateCustomerMeasurementResult> {
-  const { supabase, userId, orgId, businessId, questionSetId } = args;
+  const {
+    supabase,
+    userId,
+    orgId,
+    businessId,
+    questionSetId,
+    authorizationMode,
+  } = args;
 
-  // A) membership + write role
+  // A) authorization
   const { data: membership, error: memErr } = await supabase
     .from("organization_members")
     .select("role")
     .eq("org_id", orgId)
     .eq("user_id", userId)
     .maybeSingle();
-  if (memErr || !membership || !WRITE_ROLES.has(String(membership.role))) return fail("FORBIDDEN");
+  if (memErr || !membership || !WRITE_ROLES.has(String(membership.role))) {
+    return fail("FORBIDDEN");
+  }
+
+  if (authorizationMode === "trusted_internal_scheduler") {
+    const { data: schedulerOrg, error: schedulerOrgErr } = await supabase
+      .from("organizations")
+      .select("measurement_data_origin")
+      .eq("id", orgId)
+      .maybeSingle();
+    if (
+      schedulerOrgErr ||
+      !schedulerOrg ||
+      schedulerOrg.measurement_data_origin !== "internal_observation"
+    ) {
+      return fail("FORBIDDEN");
+    }
+  }
 
   // B) business scope
   const { data: business, error: bizErr } = await supabase
@@ -275,4 +306,37 @@ export async function createCustomerMeasurementRun(args: {
   }
 
   return { ok: true, runId, plannedJobs };
+}
+
+export async function createCustomerMeasurementRun(args: {
+  supabase: UserClient;
+  userId: string;
+  orgId: string;
+  businessId: string;
+  questionSetId: string;
+  name?: string | null;
+}): Promise<CreateCustomerMeasurementResult> {
+  return createStandaloneAuditMeasurementRun({
+    ...args,
+    authorizationMode: "user_membership",
+  });
+}
+
+export async function createInternalObservationScheduledMeasurementRun(args: {
+  supabase: UserClient;
+  schedulerActorUserId: string;
+  orgId: string;
+  businessId: string;
+  questionSetId: string;
+  name?: string | null;
+}): Promise<CreateCustomerMeasurementResult> {
+  return createStandaloneAuditMeasurementRun({
+    supabase: args.supabase,
+    userId: args.schedulerActorUserId,
+    orgId: args.orgId,
+    businessId: args.businessId,
+    questionSetId: args.questionSetId,
+    name: args.name,
+    authorizationMode: "trusted_internal_scheduler",
+  });
 }
