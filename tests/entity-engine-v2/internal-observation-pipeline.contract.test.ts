@@ -89,7 +89,7 @@ describe("internal observation pipeline v0.1", () => {
     expect(serverSource).not.toContain('functions.invoke("enqueue-run"');
     expect(serverSource).not.toContain('.from("measurement_runs").insert');
     expect(routeSource).toContain("실행 승인 대기");
-    expect(routeSource).toContain("Run 생성과 AI 호출은 수행하지 않습니다.");
+    expect(routeSource).toContain("Run 생성과 AI 호출은 하지 않습니다.");
   });
 
   it("checks provider and measurement credit readiness without consuming a credit", () => {
