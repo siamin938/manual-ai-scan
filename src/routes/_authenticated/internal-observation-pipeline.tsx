@@ -211,6 +211,8 @@ function InternalObservationPipelinePage() {
   const prepareCandidate = useServerFn(prepareInternalObservationCandidate);
   const previewExecutionPlan = useServerFn(previewInternalObservationExecutionPlan);
   const approveExecution = useServerFn(approveInternalObservationExecution);
+  const reconcilePipeline = useServerFn(reconcileInternalObservationPipeline);
+  const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
 
   const [orgId, setOrgId] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -228,6 +230,7 @@ function InternalObservationPipelinePage() {
   const [previewItemId, setPreviewItemId] = useState<string | null>(null);
   const [executionOpen, setExecutionOpen] = useState(false);
   const [executionItemId, setExecutionItemId] = useState<string | null>(null);
+  const [resultTarget, setResultTarget] = useState<InternalObservationPipelineItemDTO | null>(null);
 
   const service =
     serviceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
@@ -242,6 +245,23 @@ function InternalObservationPipelinePage() {
   });
 
   const overview = overviewQuery.data?.ok ? overviewQuery.data.overview : null;
+
+  const resultQuery = useQuery({
+    queryKey: [
+      "internal-observation-pipeline-result",
+      resultTarget?.orgId,
+      resultTarget?.businessId,
+    ],
+    enabled: !!resultTarget?.orgId && !!resultTarget?.businessId,
+    retry: false,
+    queryFn: () =>
+      fetchAdminResult({
+        data: {
+          orgId: resultTarget!.orgId,
+          businessId: resultTarget!.businessId!,
+        },
+      }),
+  });
 
   useEffect(() => {
     if (orgId || !overview?.organizations.length) return;
@@ -324,6 +344,25 @@ function InternalObservationPipelinePage() {
   const executionPlanMutation = useMutation({
     mutationFn: (itemId: string) => previewExecutionPlan({ data: { itemId } }),
     onError: () => toast.error("측정 실행 계획을 불러오지 못했습니다."),
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: () => reconcilePipeline({ data: {} }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("파이프라인 상태를 동기화하지 못했습니다.");
+        return;
+      }
+      if (res.completed > 0) {
+        toast.success(`완료 ${res.completed}건을 결과 준비 완료로 반영했습니다.`);
+      } else if (res.postprocessing > 0) {
+        toast.message(`후처리 대기 ${res.postprocessing}건을 확인했습니다.`);
+      } else {
+        toast.message("현재 파이프라인 상태를 확인했습니다.");
+      }
+      qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+    },
+    onError: () => toast.error("파이프라인 상태 동기화 중 오류가 발생했습니다."),
   });
 
   const approveExecutionMutation = useMutation({
