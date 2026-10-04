@@ -27,6 +27,11 @@ const schedulerSource = readFileSync(
   "utf8",
 );
 
+const guardedSchedulerSource = readFileSync(
+  resolve(process.cwd(), "src/lib/internal-observation-guarded-scheduler.functions.ts"),
+  "utf8",
+);
+
 const navSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
   "utf8",
@@ -66,7 +71,15 @@ const reconciliationMigration = readFileSync(
   "utf8",
 );
 
-describe("internal observation pipeline v0.4 dry-run", () => {
+const guardedSchedulerMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20261004114500_internal_observation_guarded_scheduler_v05.sql",
+  ),
+  "utf8",
+);
+
+describe("internal observation pipeline v0.5 guarded scheduler", () => {
   it("is internal-only and defaults measurement execution to off", () => {
     expect(navSource).toContain(
       '{ to: "/internal-observation-pipeline", label: "내부 데이터 수집" }',
@@ -284,7 +297,80 @@ describe("internal observation pipeline v0.4 dry-run", () => {
     expect(routeSource).toContain("지금 시작 가능");
     expect(routeSource).toContain("계획 비용");
     expect(routeSource).toContain("Dry-run 다시 계산");
-    expect(routeSource).toContain("자동 실행 OFF 상태에서는 계획된 후보도 측정되지 않습니다.");
-    expect(routeSource).toContain("Pipeline v0.4 Dry-run");
+    expect(routeSource).toContain("master switch OFF 상태에서는 어떤 후보도 claim하거나 측정하지 않습니다.");
+    expect(routeSource).toContain("Pipeline v0.5 Guarded");
+  });
+
+  it("adds an atomic service-role claim gate for one sequential candidate", () => {
+    expect(guardedSchedulerMigration).toContain(
+      "claim_internal_observation_scheduler_candidate_v05",
+    );
+    expect(guardedSchedulerMigration).toContain("for update skip locked");
+    expect(guardedSchedulerMigration).toContain(
+      "i.status in ('measuring','postprocessing')",
+    );
+    expect(guardedSchedulerMigration).toContain(
+      "r.status in ('draft','queued','running')",
+    );
+    expect(guardedSchedulerMigration).toContain("s.execution_enabled=true");
+    expect(guardedSchedulerMigration).toContain("s.scheduler_actor_user_id=p_actor_user_id");
+    expect(guardedSchedulerMigration).toContain("to service_role");
+    expect(guardedSchedulerMigration).toContain("revoke all");
+  });
+
+  it("keeps the master-switch-off tick side-effect free", () => {
+    expect(guardedSchedulerSource).toContain('reason: "MASTER_SWITCH_OFF"');
+    expect(guardedSchedulerSource).toContain(
+      "if (!executionEnabled)",
+    );
+    const offGate = guardedSchedulerSource.indexOf("if (!executionEnabled)");
+    const firstWrite = guardedSchedulerSource.indexOf("writeSchedulerResult", offGate);
+    const offReturn = guardedSchedulerSource.indexOf('reason: "MASTER_SWITCH_OFF"', offGate);
+    expect(offGate).toBeGreaterThan(-1);
+    expect(offReturn).toBeGreaterThan(offGate);
+    expect(firstWrite === -1 || offReturn < firstWrite).toBe(true);
+    expect(routeSource).not.toContain("자동 실행 켜기");
+    expect(routeSource).not.toContain("master switch ON");
+  });
+
+  it("reuses the exact measurement core and never creates a second enqueue path", () => {
+    expect(executionSource).toContain("createCustomerMeasurementRun");
+    expect(guardedSchedulerSource).toContain(
+      "createInternalObservationScheduledMeasurementRun",
+    );
+    expect(guardedSchedulerSource).not.toContain('functions.invoke("enqueue-run"');
+    expect(guardedSchedulerSource).not.toContain('.from("measurement_jobs").insert');
+    expect(guardedSchedulerSource).not.toContain('.from("measurement_runs").insert');
+    expect(guardedSchedulerSource).toContain(
+      "reconcileInternalObservationPipelineItems",
+    );
+  });
+
+  it("requires the dry-run first candidate to match the atomic claim", () => {
+    expect(guardedSchedulerSource).toContain(
+      "candidate.planned && candidate.dispatchNow",
+    );
+    expect(guardedSchedulerSource).toContain("itemId !== expected.itemId");
+    expect(guardedSchedulerSource).toContain('"SCHEDULER_PLAN_CHANGED"');
+    expect(guardedSchedulerSource).toContain("releaseClaim");
+  });
+
+  it("does not silently retry a failed guarded scheduler run", () => {
+    expect(guardedSchedulerSource).toContain('"RUN_START_FAILED"');
+    expect(guardedSchedulerSource).toContain(
+      "자동 재시도 Run은 만들지 않습니다.",
+    );
+    expect(guardedSchedulerSource).toContain('status: "ready_to_measure"');
+    expect(guardedSchedulerSource).not.toContain("setTimeout");
+    expect(guardedSchedulerSource).not.toContain("setInterval");
+  });
+
+  it("surfaces scheduler actor readiness without exposing an enable control", () => {
+    expect(schedulerSource).toContain("schedulerActorConfigured");
+    expect(schedulerSource).toContain("lastSchedulerTickAt");
+    expect(schedulerSource).toContain("lastSchedulerResult");
+    expect(routeSource).toContain("Scheduler actor");
+    expect(routeSource).toContain("ON 전환 UI도 아직 제공하지 않습니다.");
+    expect(routeSource).toContain("최근 자동 tick");
   });
 });
