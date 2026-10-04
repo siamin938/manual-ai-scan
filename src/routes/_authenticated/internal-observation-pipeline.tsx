@@ -496,11 +496,11 @@ function InternalObservationPipelinePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">내부 데이터 수집</h1>
           <Badge variant="secondary">내부 운영자 전용</Badge>
-          <Badge variant="outline">Pipeline v0.4 Dry-run</Badge>
+          <Badge variant="outline">Pipeline v0.5 Guarded</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          후보 등록부터 결과 준비까지의 파이프라인을 유지하면서, 오늘 자동 실행한다면 어떤 후보를 어떤 순서로 돌릴지 Dry-run으로 계산합니다.
-          Dry-run은 Run 생성·AI 호출·측정권 차감을 하지 않습니다.
+          Guarded Scheduler 엔진과 원자 claim Gate까지 준비되어 있습니다. 현재 master switch는 OFF이며,
+          Dry-run만으로 실행 순서·한도·비용을 검증합니다.
         </p>
         <p className="text-xs text-muted-foreground">
           기준 시각 {formatSeoul(overview.generatedAt)}
@@ -510,9 +510,10 @@ function InternalObservationPipelinePage() {
       <Card className="border-primary/25 bg-primary/[0.03]">
         <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-semibold">자동 측정 실행은 잠겨 있습니다.</p>
+            <p className="font-semibold">Guarded Scheduler master switch는 OFF입니다.</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              자동 반복 측정은 OFF입니다. 준비 완료 후보는 실행 계획을 확인한 뒤 건별 수동 승인으로만 측정할 수 있습니다.
+              엔진은 준비됐지만 자동 tick은 후보를 claim하지 않습니다. ON 전환 UI도 아직 제공하지 않습니다.
+              향후 켜더라도 1곳 실행 → 완료·실패 정리 → 다음 1곳 순서만 허용합니다.
             </p>
           </div>
           <Badge variant={selectedOrg?.executionEnabled ? "destructive" : "outline"} className="w-fit">
@@ -613,7 +614,7 @@ function InternalObservationPipelinePage() {
             </div>
 
             <div className="rounded-lg border bg-muted/10 p-4">
-              <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
                 <p>
                   정책 · <span className="font-medium">오래 준비된 후보 우선</span>
                 </p>
@@ -621,6 +622,12 @@ function InternalObservationPipelinePage() {
                   자동 실행 ·{" "}
                   <span className="font-medium">
                     {schedulerPlan.automaticExecutionEnabled ? "ON" : "OFF"}
+                  </span>
+                </p>
+                <p>
+                  Scheduler actor ·{" "}
+                  <span className="font-medium">
+                    {schedulerPlan.schedulerActorConfigured ? "설정됨" : "미설정"}
                   </span>
                 </p>
                 <p>
@@ -639,6 +646,12 @@ function InternalObservationPipelinePage() {
                   </span>
                 </p>
               </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                최근 자동 tick ·{" "}
+                {schedulerPlan.lastSchedulerTickAt
+                  ? `${formatSeoul(schedulerPlan.lastSchedulerTickAt)} · ${schedulerPlan.lastSchedulerResult ?? "-"}`
+                  : "아직 실행 없음"}
+              </p>
             </div>
 
             {schedulerPlan.candidates.length === 0 ? (
@@ -723,7 +736,8 @@ function InternalObservationPipelinePage() {
             )}
 
             <p className="text-[11px] leading-5 text-muted-foreground">
-              Dry-run은 미래 자동 스케줄러의 선택 정책만 검증합니다. 자동 실행 OFF 상태에서는 계획된 후보도 측정되지 않습니다.
+              v0.5 Guarded Scheduler는 동일한 Dry-run 순서를 사용하며, master switch OFF 상태에서는 어떤 후보도 claim하거나 측정하지 않습니다.
+              ON 이후에도 한 번에 1건만 원자적으로 claim하고 이전 Run이 완료·실패로 정리된 뒤에만 다음 후보를 시작합니다.
             </p>
           </CardContent>
         </Card>
