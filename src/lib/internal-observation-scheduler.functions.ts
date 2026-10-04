@@ -80,6 +80,9 @@ export type InternalObservationSchedulerDryRunDTO = {
   orgId: string;
   orgName: string;
   automaticExecutionEnabled: boolean;
+  schedulerActorConfigured: boolean;
+  lastSchedulerTickAt: string | null;
+  lastSchedulerResult: string | null;
   providerReady: boolean;
   creditBalance: number;
   dailyRunLimit: number;
@@ -183,7 +186,7 @@ export async function buildInternalObservationSchedulerDryRun(
       .maybeSingle(),
     admin
       .from("internal_observation_pipeline_settings")
-      .select("execution_enabled, daily_run_limit, concurrent_run_limit")
+      .select("execution_enabled, daily_run_limit, concurrent_run_limit, scheduler_actor_user_id, last_scheduler_tick_at, last_scheduler_result")
       .eq("org_id", orgId)
       .maybeSingle(),
     admin.rpc("get_org_usage", { p_org_id: orgId }),
@@ -244,6 +247,9 @@ export async function buildInternalObservationSchedulerDryRun(
 
   const settingsRow = isRecord(settingsRes.data) ? settingsRes.data : {};
   const automaticExecutionEnabled = settingsRow["execution_enabled"] === true;
+  const schedulerActorConfigured = !!str(settingsRow["scheduler_actor_user_id"]);
+  const lastSchedulerTickAt = str(settingsRow["last_scheduler_tick_at"]);
+  const lastSchedulerResult = str(settingsRow["last_scheduler_result"]);
   const dailyRunLimit = Math.max(1, Math.trunc(num(settingsRow["daily_run_limit"]) ?? 5));
   const concurrentRunLimit = Math.max(
     1,
@@ -514,6 +520,9 @@ export async function buildInternalObservationSchedulerDryRun(
     orgId,
     orgName,
     automaticExecutionEnabled,
+    schedulerActorConfigured,
+    lastSchedulerTickAt,
+    lastSchedulerResult,
     providerReady,
     creditBalance,
     dailyRunLimit,
