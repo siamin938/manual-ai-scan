@@ -19,6 +19,7 @@ import { Route as AuthenticatedDataAssetsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
 import { Route as AuthenticatedMeasurementCreditsRouteImport } from './routes/_authenticated/measurement-credits'
+import { Route as AuthenticatedPilotOpsRouteImport } from './routes/_authenticated/pilot-ops'
 import { Route as AuthenticatedProfileCoverageRouteImport } from './routes/_authenticated/profile-coverage'
 import { Route as AuthenticatedQuestionsRouteImport } from './routes/_authenticated/questions'
 import { Route as AuthenticatedExperimentsIndexRouteImport } from './routes/_authenticated/experiments.index'
@@ -79,6 +80,11 @@ const AuthenticatedMeasurementCreditsRoute =
     path: '/measurement-credits',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPilotOpsRoute = AuthenticatedPilotOpsRouteImport.update({
+  id: '/pilot-ops',
+  path: '/pilot-ops',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProfileCoverageRoute =
   AuthenticatedProfileCoverageRouteImport.update({
     id: '/profile-coverage',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
+  '/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -175,6 +182,7 @@ export interface FileRoutesById {
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
   '/_authenticated/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
+  '/_authenticated/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/_authenticated/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/_authenticated/questions': typeof AuthenticatedQuestionsRoute
   '/_authenticated/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -196,6 +204,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/manual-checks'
     | '/measurement-credits'
+    | '/pilot-ops'
     | '/profile-coverage'
     | '/questions'
     | '/experiments/$experimentId'
@@ -235,6 +244,7 @@ export interface FileRouteTypes {
     | '/_authenticated/insights'
     | '/_authenticated/manual-checks'
     | '/_authenticated/measurement-credits'
+    | '/_authenticated/pilot-ops'
     | '/_authenticated/profile-coverage'
     | '/_authenticated/questions'
     | '/_authenticated/experiments/$experimentId'
@@ -324,6 +334,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeasurementCreditsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/pilot-ops': {
+      id: '/_authenticated/pilot-ops'
+      path: '/pilot-ops'
+      fullPath: '/pilot-ops'
+      preLoaderRoute: typeof AuthenticatedPilotOpsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/profile-coverage': {
       id: '/_authenticated/profile-coverage'
       path: '/profile-coverage'
@@ -390,6 +407,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
   AuthenticatedMeasurementCreditsRoute: typeof AuthenticatedMeasurementCreditsRoute
+  AuthenticatedPilotOpsRoute: typeof AuthenticatedPilotOpsRoute
   AuthenticatedProfileCoverageRoute: typeof AuthenticatedProfileCoverageRoute
   AuthenticatedQuestionsRoute: typeof AuthenticatedQuestionsRoute
   AuthenticatedExperimentsExperimentIdRoute: typeof AuthenticatedExperimentsExperimentIdRoute
@@ -407,6 +425,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
   AuthenticatedMeasurementCreditsRoute: AuthenticatedMeasurementCreditsRoute,
+  AuthenticatedPilotOpsRoute: AuthenticatedPilotOpsRoute,
   AuthenticatedProfileCoverageRoute: AuthenticatedProfileCoverageRoute,
   AuthenticatedQuestionsRoute: AuthenticatedQuestionsRoute,
   AuthenticatedExperimentsExperimentIdRoute:
