@@ -46,6 +46,11 @@ import {
   type InternalObservationPipelineItemDTO,
   type InternalObservationPipelineStatus,
 } from "@/lib/internal-observation-pipeline.functions";
+import {
+  approveInternalObservationExecution,
+  previewInternalObservationExecutionPlan,
+  type InternalObservationExecutionBlocker,
+} from "@/lib/internal-observation-execution.functions";
 
 export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
   component: InternalObservationPipelinePage,
@@ -130,12 +135,51 @@ function previewBlockerLabel(code: string | null): string {
   return code ? "기존 데이터 상태를 확인해 주세요." : "";
 }
 
+function executionBlockerLabel(code: InternalObservationExecutionBlocker): string {
+  switch (code) {
+    case "ITEM_NOT_READY":
+      return "이 후보는 현재 측정 실행 승인 상태가 아닙니다.";
+    case "INTERNAL_OBSERVATION_ORG_REQUIRED":
+      return "내부 관찰 조직에서만 실행할 수 있습니다.";
+    case "BUSINESS_NOT_AVAILABLE":
+      return "대상 업체가 비활성 또는 사용할 수 없는 상태입니다.";
+    case "QUESTION_SET_NOT_AVAILABLE":
+      return "현재 통합 질문 세트를 사용할 수 없습니다.";
+    case "INVALID_QUESTION_CONTRACT":
+      return "통합 질문 세트가 24문항 계약과 일치하지 않습니다.";
+    case "PROVIDER_NOT_READY":
+      return "OpenAI Provider 자동 측정 설정을 확인해 주세요.";
+    case "NO_MEASUREMENT_CREDIT":
+      return "측정권이 없습니다.";
+    case "OPERATOR_MEMBERSHIP_REQUIRED":
+      return "현재 운영자 계정에 이 내부 조직의 측정 실행 권한이 없습니다.";
+    case "SAME_CONDITION_RUN_ACTIVE":
+      return "같은 업체·질문 세트의 진행 중 Run이 이미 있습니다.";
+    case "CONCURRENT_RUN_LIMIT":
+      return "현재 동시 실행 한도에 도달했습니다.";
+    case "DAILY_PIPELINE_RUN_LIMIT":
+      return "오늘 내부 파이프라인 실행 한도에 도달했습니다.";
+    case "DAILY_USAGE_LIMIT":
+      return "조직의 오늘 요청 한도를 초과합니다.";
+    case "MONTHLY_USAGE_LIMIT":
+      return "조직의 월 예산 한도를 초과합니다.";
+    case "PLAN_NOT_AVAILABLE":
+      return "실행 계획을 계산할 수 없습니다.";
+  }
+}
+
+function usd(value: number): string {
+  return `${value.toFixed(2)}`;
+}
+
 function InternalObservationPipelinePage() {
   const qc = useQueryClient();
   const fetchOverview = useServerFn(getInternalObservationPipelineOverview);
   const enqueueCandidate = useServerFn(enqueueInternalObservationCandidate);
   const previewCandidate = useServerFn(previewInternalObservationCandidate);
   const prepareCandidate = useServerFn(prepareInternalObservationCandidate);
+  const previewExecutionPlan = useServerFn(previewInternalObservationExecutionPlan);
+  const approveExecution = useServerFn(approveInternalObservationExecution);
 
   const [orgId, setOrgId] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -151,6 +195,8 @@ function InternalObservationPipelinePage() {
   const [sourceLabel, setSourceLabel] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewItemId, setPreviewItemId] = useState<string | null>(null);
+  const [executionOpen, setExecutionOpen] = useState(false);
+  const [executionItemId, setExecutionItemId] = useState<string | null>(null);
 
   const service =
     serviceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
@@ -244,11 +290,56 @@ function InternalObservationPipelinePage() {
     onError: () => toast.error("후보 준비 중 오류가 발생했습니다."),
   });
 
+  const executionPlanMutation = useMutation({
+    mutationFn: (itemId: string) => previewExecutionPlan({ data: { itemId } }),
+    onError: () => toast.error("측정 실행 계획을 불러오지 못했습니다."),
+  });
+
+  const approveExecutionMutation = useMutation({
+    mutationFn: (args: { itemId: string; planHash: string }) =>
+      approveExecution({ data: args }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        if (res.error === "PLAN_CHANGED" && res.plan) {
+          toast.warning("측정권·예산·실행 상태가 바뀌었습니다. 새 실행 계획을 다시 확인해 주세요.");
+          executionPlanMutation.reset();
+          executionPlanMutation.mutate(res.plan.itemId);
+          return;
+        }
+        if (res.error === "PLAN_BLOCKED") {
+          toast.error("현재 조건에서는 측정을 시작할 수 없습니다.");
+          return;
+        }
+        toast.error(
+          res.error === "RUN_START_FAILED"
+            ? "실행 승인 직후 조건이 바뀌어 측정을 시작하지 못했습니다."
+            : "측정을 시작하지 못했습니다.",
+        );
+        qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+        return;
+      }
+
+      toast.success(`측정을 시작했습니다. ${res.plannedJobs}개 Job이 준비됩니다.`);
+      setExecutionOpen(false);
+      setExecutionItemId(null);
+      executionPlanMutation.reset();
+      qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+    },
+    onError: () => toast.error("측정 실행 승인 중 오류가 발생했습니다."),
+  });
+
   const openPreview = (itemId: string) => {
     setPreviewItemId(itemId);
     setPreviewOpen(true);
     previewMutation.reset();
     previewMutation.mutate(itemId);
+  };
+
+  const openExecutionPlan = (itemId: string) => {
+    setExecutionItemId(itemId);
+    setExecutionOpen(true);
+    executionPlanMutation.reset();
+    executionPlanMutation.mutate(itemId);
   };
 
   if (overviewQuery.isLoading && !overviewQuery.data) {
@@ -283,17 +374,23 @@ function InternalObservationPipelinePage() {
       ? previewMutation.data.preview
       : null;
 
+  const executionPlan =
+    executionPlanMutation.data?.ok &&
+    executionItemId === executionPlanMutation.data.plan.itemId
+      ? executionPlanMutation.data.plan
+      : null;
+
   return (
     <div className="space-y-6">
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">내부 데이터 수집</h1>
           <Badge variant="secondary">내부 운영자 전용</Badge>
-          <Badge variant="outline">Pipeline v0.1.1</Badge>
+          <Badge variant="outline">Pipeline v0.2</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          후보를 등록하고 준비 미리보기를 확인한 뒤 내부 관찰용 업체와 통합 AI 진단 24문항까지 준비합니다.
-          현재 버전은 실제 AI 측정을 자동 실행하지 않습니다.
+          후보 등록과 24문항 준비 후 실행 계획을 확인하고, 운영자가 건별로 승인한 경우에만 실제 측정을 시작합니다.
+          자동 반복 실행은 계속 꺼져 있습니다.
         </p>
         <p className="text-xs text-muted-foreground">
           기준 시각 {formatSeoul(overview.generatedAt)}
@@ -305,7 +402,7 @@ function InternalObservationPipelinePage() {
           <div>
             <p className="font-semibold">자동 측정 실행은 잠겨 있습니다.</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              미리보기 확인 후 업체 등록·24문항 준비까지만 수행하며 Run 생성과 AI 호출은 하지 않습니다.
+              자동 반복 측정은 OFF입니다. 준비 완료 후보는 실행 계획을 확인한 뒤 건별 수동 승인으로만 측정할 수 있습니다.
             </p>
           </div>
           <Badge variant={selectedOrg?.executionEnabled ? "destructive" : "outline"} className="w-fit">
@@ -570,7 +667,17 @@ function InternalObservationPipelinePage() {
                         </Button>
                       )}
                       {item.status === "ready_to_measure" && (
-                        <Badge variant="outline">실행 승인 대기</Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={executionPlanMutation.isPending || approveExecutionMutation.isPending}
+                          onClick={() => openExecutionPlan(item.id)}
+                        >
+                          실행 계획 보기
+                        </Button>
+                      )}
+                      {item.status === "measuring" && item.runId && (
+                        <Badge variant="secondary">Run 연결됨</Badge>
                       )}
                     </TableCell>
                   </TableRow>
@@ -580,6 +687,186 @@ function InternalObservationPipelinePage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={executionOpen}
+        onOpenChange={(open) => {
+          if (approveExecutionMutation.isPending) return;
+          setExecutionOpen(open);
+          if (!open) {
+            setExecutionItemId(null);
+            executionPlanMutation.reset();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              측정 실행 계획{executionPlan ? ` · ${executionPlan.businessName}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              이 화면을 보는 것만으로는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.
+              마지막 승인 버튼을 눌렀을 때만 측정을 시작합니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {executionPlanMutation.isPending ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              측정권·예산·동시 실행·중복 Run 상태를 확인하는 중…
+            </p>
+          ) : !executionPlanMutation.data || !executionPlanMutation.data.ok || !executionPlan ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              실행 계획을 만들 수 없습니다. 파이프라인 상태를 다시 확인해 주세요.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">실행 규모</p>
+                  <p className="mt-2 text-lg font-semibold">{executionPlan.plannedJobs} jobs</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {executionPlan.provider} · 반복 {executionPlan.repetitions}회
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">예상 원가</p>
+                  <p className="mt-2 text-lg font-semibold">{usd(executionPlan.estimatedCostUsd)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    내부 최대 예약 {usd(executionPlan.maxCostUsd)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">측정권</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {executionPlan.creditBefore}회 → {executionPlan.creditAfter}회
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    실제 차감은 기존 Job 생성 트리거가 담당
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">자동 실행</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {executionPlan.automaticExecutionEnabled ? "ON" : "OFF"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    이번 건은 수동 승인
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">요청 한도</p>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">오늘 사용</span>
+                      <span className="tabular-nums">
+                        {executionPlan.dailyRequestsUsed}/{executionPlan.dailyRequestLimit}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">승인 후 예상</span>
+                      <span className="tabular-nums">
+                        {executionPlan.projectedDailyRequests}/{executionPlan.dailyRequestLimit}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">오늘 내부 실행</span>
+                      <span className="tabular-nums">
+                        {executionPlan.pipelineRunsToday}/{executionPlan.dailyPipelineRunLimit}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">예산·동시 실행</p>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">월 실제+예약</span>
+                      <span className="tabular-nums">
+                        {usd(executionPlan.monthlyActualCostUsd + executionPlan.monthlyReservedCostUsd)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">승인 후 최대</span>
+                      <span className="tabular-nums">
+                        {usd(executionPlan.projectedMonthlyCostUsd)} / {usd(executionPlan.monthlyBudgetUsd)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">진행 중 Run</span>
+                      <span className="tabular-nums">
+                        {executionPlan.activeRunCount}/{executionPlan.concurrentRunLimit}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <p className="text-sm font-semibold">실행 대상</p>
+                <p className="mt-2 text-sm">
+                  {executionPlan.businessName} · {executionPlan.questionSetName}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  동일 조건 active Run ·{" "}
+                  {executionPlan.sameConditionRun
+                    ? `${executionPlan.sameConditionRun.status} · ${executionPlan.sameConditionRun.runId}`
+                    : "없음"}
+                </p>
+              </div>
+
+              {executionPlan.blockers.length > 0 ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="text-sm font-semibold">실행 차단 조건</p>
+                  <div className="mt-2 space-y-1">
+                    {executionPlan.blockers.map((blocker) => (
+                      <p key={blocker} className="text-sm text-muted-foreground">
+                        · {executionBlockerLabel(blocker)}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-primary/25 bg-primary/[0.03] p-4">
+                  <p className="text-sm font-semibold">실행 가능</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    현재 측정권·예산·동시 실행·중복 Run 조건을 모두 통과했습니다.
+                    승인 시 서버가 조건을 다시 계산하고 동일한 경우에만 측정을 시작합니다.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={approveExecutionMutation.isPending}
+              onClick={() => setExecutionOpen(false)}
+            >
+              취소
+            </Button>
+            <Button
+              disabled={!executionPlan?.canApprove || approveExecutionMutation.isPending}
+              onClick={() => {
+                if (!executionPlan?.canApprove) return;
+                approveExecutionMutation.mutate({
+                  itemId: executionPlan.itemId,
+                  planHash: executionPlan.planHash,
+                });
+              }}
+            >
+              {approveExecutionMutation.isPending ? "승인 처리 중…" : "측정 실행 승인"}
+            </Button>
+          </DialogFooter>
+          <p className="text-center text-[11px] text-muted-foreground">
+            승인 직전에 계획 fingerprint를 재검증합니다. 조건이 바뀌면 실행하지 않고 새 계획을 요구합니다.
+          </p>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={previewOpen}
