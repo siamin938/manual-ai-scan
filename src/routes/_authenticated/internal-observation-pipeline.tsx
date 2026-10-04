@@ -617,11 +617,11 @@ function InternalObservationPipelinePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">내부 데이터 수집</h1>
           <Badge variant="secondary">내부 운영자 전용</Badge>
-          <Badge variant="outline">Pipeline v0.5 Guarded</Badge>
+          <Badge variant="outline">Pipeline v0.6 Control</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          Guarded Scheduler 엔진과 원자 claim Gate까지 준비되어 있습니다. 현재 master switch는 OFF이며,
-          Dry-run만으로 실행 순서·한도·비용을 검증합니다.
+          Guarded Scheduler의 활성화 승인·일시정지·중지 제어면까지 준비했습니다.
+          실행기 배포 전에는 activation Gate가 자동으로 차단됩니다.
         </p>
         <p className="text-xs text-muted-foreground">
           기준 시각 {formatSeoul(overview.generatedAt)}
@@ -631,10 +631,12 @@ function InternalObservationPipelinePage() {
       <Card className="border-primary/25 bg-primary/[0.03]">
         <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-semibold">Guarded Scheduler master switch는 OFF입니다.</p>
+            <p className="font-semibold">
+              Guarded Scheduler · {schedulerOps?.plan.schedulerState === "running" ? "RUNNING" : schedulerOps?.plan.schedulerState === "paused" ? "PAUSED" : "OFF"}
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              엔진은 준비됐지만 자동 tick은 후보를 claim하지 않습니다. ON 전환 UI도 아직 제공하지 않습니다.
-              향후 켜더라도 1곳 실행 → 완료·실패 정리 → 다음 1곳 순서만 허용합니다.
+              현재 실행기 준비 Gate는 {schedulerOps?.plan.executorReady ? "통과" : "차단"} 상태입니다.
+              활성화되더라도 1곳 실행 → 완료·실패 정리 → 다음 1곳 순서만 허용합니다.
             </p>
           </div>
           <Badge variant={selectedOrg?.executionEnabled ? "destructive" : "outline"} className="w-fit">
@@ -859,6 +861,166 @@ function InternalObservationPipelinePage() {
             <p className="text-[11px] leading-5 text-muted-foreground">
               v0.5 Guarded Scheduler는 동일한 Dry-run 순서를 사용하며, master switch OFF 상태에서는 어떤 후보도 claim하거나 측정하지 않습니다.
               ON 이후에도 한 번에 1건만 원자적으로 claim하고 이전 Run이 완료·실패로 정리된 뒤에만 다음 후보를 시작합니다.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {schedulerOps && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-base">자동 실행 제어</CardTitle>
+                  <Badge
+                    variant={
+                      schedulerOps.plan.schedulerState === "running"
+                        ? "default"
+                        : schedulerOps.plan.schedulerState === "paused"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    {schedulerOps.plan.schedulerState === "running"
+                      ? "RUNNING"
+                      : schedulerOps.plan.schedulerState === "paused"
+                        ? "PAUSED"
+                        : "OFF"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  활성화는 계획 고정 → 요청 생성 → 확인 문구 입력의 2단계를 모두 통과해야 합니다.
+                  일시정지·중지는 진행 중 Run을 강제로 취소하지 않고 다음 후보 시작만 막습니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {schedulerOps.plan.schedulerState === "running" ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={pauseSchedulerMutation.isPending}
+                      onClick={() => pauseSchedulerMutation.mutate()}
+                    >
+                      일시정지
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={stopSchedulerMutation.isPending}
+                      onClick={() => stopSchedulerMutation.mutate()}
+                    >
+                      자동 실행 중지
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={
+                      !schedulerOps.plan.canRequestActivation ||
+                      requestActivationMutation.isPending ||
+                      !!schedulerOps.pendingRequest
+                    }
+                    onClick={() => requestActivationMutation.mutate()}
+                  >
+                    활성화 요청 만들기
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">실행기</p>
+                <p className="mt-2 font-semibold">
+                  {schedulerOps.plan.executorReady ? "준비 완료" : "배포 대기"}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">Cron</p>
+                <p className="mt-2 font-semibold">
+                  {schedulerOps.plan.cronJobExists
+                    ? schedulerOps.plan.cronActive
+                      ? "활성"
+                      : "비활성"
+                    : "없음"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {schedulerOps.plan.cronSchedule ?? "-"}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">Scheduler actor</p>
+                <p className="mt-2 font-semibold">
+                  {schedulerOps.plan.schedulerActorConfigured ? "설정됨" : "미설정"}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">활성화 계획</p>
+                <p className="mt-2 font-semibold">
+                  오늘 {schedulerOps.plan.dryRun.plannedCandidateCount}곳 · 즉시{" "}
+                  {schedulerOps.plan.dryRun.dispatchNowCount}곳
+                </p>
+              </div>
+            </div>
+
+            {schedulerOps.plan.blockers.length > 0 && schedulerOps.plan.schedulerState !== "running" && (
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <p className="text-sm font-semibold">현재 활성화 차단 조건</p>
+                <div className="mt-2 space-y-1">
+                  {schedulerOps.plan.blockers.map((blocker) => (
+                    <p key={blocker} className="text-sm text-muted-foreground">
+                      · {activationBlockerLabel(blocker)}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {schedulerOps.pendingRequest && (
+              <div className="rounded-lg border border-primary/25 bg-primary/[0.03] p-4">
+                <p className="text-sm font-semibold">활성화 요청 생성됨</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  만료 {formatSeoul(schedulerOps.pendingRequest.expiresAt)} · 계획이 바뀌면 최종 활성화가 자동 거부됩니다.
+                </p>
+                {schedulerOps.pendingRequest.requestedByCurrentUser ? (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      value={activationConfirmation}
+                      onChange={(event) => setActivationConfirmation(event.target.value)}
+                      placeholder={schedulerOps.plan.confirmText}
+                      disabled={confirmActivationMutation.isPending}
+                    />
+                    <Button
+                      className="shrink-0"
+                      disabled={
+                        activationConfirmation.trim() !== schedulerOps.plan.confirmText ||
+                        confirmActivationMutation.isPending
+                      }
+                      onClick={() =>
+                        confirmActivationMutation.mutate(
+                          schedulerOps.pendingRequest!.requestId,
+                        )
+                      }
+                    >
+                      {confirmActivationMutation.isPending
+                        ? "최종 확인 중…"
+                        : "최종 활성화"}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    다른 운영자가 만든 요청입니다. 요청 생성자가 최종 확인해야 합니다.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              현재 v0.6에서는 실행기 배포 Gate가 닫혀 있어 자동 실행을 활성화할 수 없습니다.
+              Cron job도 비활성 상태로 생성되어 있습니다.
             </p>
           </CardContent>
         </Card>
