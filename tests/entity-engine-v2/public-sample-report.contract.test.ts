@@ -26,6 +26,11 @@ describe("public sample report productization", () => {
     expect(sampleSource).toContain("독립 웹 출처 A");
   });
 
+  it("does not expose the exact internal search-situation design", () => {
+    expect(sampleSource).toContain("다양한 고객 검색 상황");
+    expect(sampleSource).not.toContain("8개 검색 상황");
+  });
+
   it("shows the diagnostic story without changing measurement logic", () => {
     expect(sampleSource).toContain("24번 물어봤더니");
     expect(sampleSource).toContain("기준 검색 노출");
