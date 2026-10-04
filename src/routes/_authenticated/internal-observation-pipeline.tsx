@@ -169,7 +169,7 @@ function activationBlockerLabel(code: SchedulerActivationBlocker): string {
     case "STATE_ALREADY_RUNNING":
       return "이미 자동 실행 중입니다.";
     case "EXECUTOR_NOT_READY":
-      return "정기 실행기 배포가 아직 완료되지 않았습니다.";
+      return "자동 실행 준비 Gate가 아직 승인되지 않았습니다.";
     case "ACTOR_NOT_CONFIGURED":
       return "Scheduler actor 설정이 필요합니다.";
     case "CRON_NOT_AVAILABLE":
