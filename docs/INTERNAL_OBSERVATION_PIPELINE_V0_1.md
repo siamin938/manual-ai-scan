@@ -1,6 +1,6 @@
-# Internal Observation Pipeline v0.6 Scheduler Control Plane
+# Internal Observation Pipeline v0.7 Unattended Executor
 
-Status: v0.6 scheduler control plane implemented. The master switch remains OFF, the recurring cron job exists but is inactive, and executor readiness remains false until the unattended worker is separately deployed and approved.
+Status: v0.7 unattended executor implemented in code. Deployment and smoke-test state is tracked separately from executor readiness. The master switch remains OFF, cron remains inactive, and scheduler_executor_ready remains false until explicit operator approval.
 
 ## Goal
 
@@ -346,8 +346,81 @@ publishable key, and internal cron secret.
 
 The cron activation/deactivation RPC is service-role only.
 
-No Edge executor is deployed or marked ready by v0.6. Therefore the current control plane cannot
-turn unattended measurement on.
+Executor deployment and executor readiness are separate states. A deployed executor may still remain
+blocked by `scheduler_executor_ready=false`, which prevents activation and candidate claim.
+
+## Unattended executor v0.7
+
+v0.7 adds the internal `internal-observation-scheduler-tick` Edge Function.
+
+Authentication:
+
+- platform JWT verification is disabled for this internal endpoint
+- every request must provide the existing `x-internal-secret`
+- secret comparison is constant-time
+- the function uses service-role access only after the secret passes
+
+The executor processes at most one candidate per eligible organization per tick.
+
+Execution flow:
+
+1. Read only organizations where `execution_enabled=true`, `scheduler_state=running`, and
+   `scheduler_executor_ready=true`.
+2. Reconcile any previous `measuring/postprocessing` item.
+3. Re-read the execution fuse so pause/stop wins before claim.
+4. Atomically claim one oldest eligible `ready_to_measure` candidate.
+5. Re-check the exact Unified Diagnostic 24-question contract, OpenAI provider readiness,
+   measurement credit, daily request allowance, monthly budget, daily pipeline limit, write-role
+   scheduler actor, and absence of active standalone Runs.
+6. Create one draft internal-observation Run and atomically link it to the claimed pipeline item.
+7. Call the existing `enqueue-run` function using its narrow internal-scheduler authentication
+   branch.
+8. Existing `enqueue-run` remains the single job-generation path and the existing measurement
+   credit trigger remains the credit-debit truth.
+9. Existing measurement worker / postprocess / Entity Facts v2 watchdogs handle downstream work.
+10. A later scheduler tick reconciles the exact linked Run before another candidate may be claimed.
+
+### Enqueue-run internal branch
+
+The normal customer path remains unchanged: a user bearer token must validate with Auth and the
+user must have an organization write role.
+
+The internal scheduler path additionally requires:
+
+- valid `x-internal-secret`
+- exact pipeline item id
+- exact scheduler actor id
+- pipeline item = `measuring`
+- pipeline item linked to the exact Run
+- scheduler settings = running + enabled + executor ready
+- configured actor matches the supplied actor
+- actor still has a write role
+- organization and Run data origin = `internal_observation`
+- standalone customer diagnostic scope
+
+### Fail-closed startup policy
+
+If a process crash leaves a claimed item without a Run for five minutes, unattended reconciliation
+marks it failed with `SCHEDULER_STALE_CLAIM`. It does not release it for automatic retry.
+
+If Run creation fails after claim, the item becomes terminal failed.
+
+If enqueue returns an error:
+
+- when no Job exists and Run is still draft, the Run is cancelled and the item becomes failed
+- when Jobs exist or Run progressed beyond draft, the executor assumes the HTTP response may have
+  been lost and preserves the Run/item for reconciliation
+
+The executor never creates an immediate replacement Run and contains no retry loop.
+
+### Deployment versus readiness
+
+`scheduler_executor_deployed` records whether the Edge Function has been deployed and smoke-tested.
+
+`scheduler_executor_ready` is a separate activation gate and remains false until an operator
+explicitly approves the first enabled scheduler cycle.
+
+A deployed but not-ready executor cannot be activated through the v0.6 control plane.
 
 ## Work / browser automation role
 
@@ -434,23 +507,47 @@ Implemented:
 - activation audit events
 
 Still intentionally disabled:
-- executor Edge Function deployment
 - executor readiness
 - cron activation
 - master switch ON
 
 ### v0.7 - unattended executor
 
-Before marking the executor ready:
-- deploy the internal scheduler tick Edge Function
-- authenticate it with the existing internal cron secret
-- reuse/extend the existing enqueue-run execution contract without weakening customer auth
-- stale claim recovery for process crashes
-- startup-failure policy that does not silently create replacement Runs
-- executor audit logs
-- run the first enabled scheduler cycle under explicit operator approval
+Implemented in code:
+- internal scheduler tick Edge Function
+- existing internal cron-secret authentication
+- exact running/enabled/executor-ready gate
+- service-role-only v0.7 reconcile/claim/run RPCs
+- oldest-ready atomic claim
+- exact 24-question/provider/credit/usage/budget revalidation
+- narrow internal scheduler authentication added to existing enqueue-run
+- no second measurement-job generation path
+- stale-claim terminal failure
+- enqueue-response uncertainty preservation
+- no replacement Run retry loop
+- executor audit events
+- separate deployed/readiness state
 
-### v0.8 - candidate discovery
+Before marking the executor ready:
+- deploy/update executor and enqueue-run Edge Functions
+- smoke-test unauthorized requests
+- smoke-test authorized executor call while master switch is OFF
+- verify candidate/Run/credit counts remain unchanged
+- set only `scheduler_executor_deployed=true`
+- leave `scheduler_executor_ready=false`
+- review the first enabled cycle plan with the operator
+
+### v0.8 - first enabled scheduler cycle
+
+Only after explicit operator approval:
+- mark executor ready
+- create a fresh activation request
+- confirm the activation phrase
+- allow cron activation
+- watch the first candidate from claim through Entity Facts v2 completion
+- verify second candidate does not start before the first terminal state
+
+### v0.9 - candidate discovery
 
 Add external/Work discovery into a separate review queue.
 Do not directly measure a browser-discovered entity before structured identity review.
