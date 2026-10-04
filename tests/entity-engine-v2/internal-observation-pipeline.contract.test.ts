@@ -32,6 +32,11 @@ const guardedSchedulerSource = readFileSync(
   "utf8",
 );
 
+const schedulerOperationsSource = readFileSync(
+  resolve(process.cwd(), "src/lib/internal-observation-scheduler-operations.functions.ts"),
+  "utf8",
+);
+
 const navSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
   "utf8",
@@ -79,15 +84,23 @@ const guardedSchedulerMigration = readFileSync(
   "utf8",
 );
 
-describe("internal observation pipeline v0.5 guarded scheduler", () => {
+const schedulerOperationsMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20261004123000_internal_observation_scheduler_operations_v06.sql",
+  ),
+  "utf8",
+);
+
+describe("internal observation pipeline v0.6 scheduler control plane", () => {
   it("is internal-only and defaults measurement execution to off", () => {
     expect(navSource).toContain(
       '{ to: "/internal-observation-pipeline", label: "내부 데이터 수집" }',
     );
     expect(navSource).toContain("dataAssetAccess?.allowed");
     expect(schemaMigration).toContain("execution_enabled boolean not null default false");
-    expect(routeSource).toContain("Guarded Scheduler master switch는 OFF입니다.");
-    expect(routeSource).toContain("ON 전환 UI도 아직 제공하지 않습니다.");
+    expect(routeSource).toContain("Guarded Scheduler");
+    expect(routeSource).toContain("실행기 준비 Gate");
   });
 
   it("keeps the queue service-role only", () => {
@@ -365,12 +378,97 @@ describe("internal observation pipeline v0.5 guarded scheduler", () => {
     expect(guardedSchedulerSource).not.toContain("setInterval");
   });
 
-  it("surfaces scheduler actor readiness without exposing an enable control", () => {
+  it("surfaces scheduler actor readiness and guarded operations", () => {
     expect(schedulerSource).toContain("schedulerActorConfigured");
     expect(schedulerSource).toContain("lastSchedulerTickAt");
     expect(schedulerSource).toContain("lastSchedulerResult");
     expect(routeSource).toContain("Scheduler actor");
-    expect(routeSource).toContain("ON 전환 UI도 아직 제공하지 않습니다.");
     expect(routeSource).toContain("최근 자동 tick");
+    expect(routeSource).toContain("자동 실행 제어");
+  });
+
+  it("creates the recurring cron scaffold inactive and keeps executor readiness false", () => {
+    expect(schedulerOperationsMigration).toContain(
+      "scheduler_executor_ready boolean not null default false",
+    );
+    expect(schedulerOperationsMigration).toContain(
+      "'internal-observation-scheduler-v06'",
+    );
+    expect(schedulerOperationsMigration).toContain("'*/2 * * * *'");
+    expect(schedulerOperationsMigration).toContain(
+      "perform cron.alter_job(job_id => v_job_id, active => false)",
+    );
+    expect(schedulerOperationsMigration).toContain(
+      "scheduler_state text not null default 'off'",
+    );
+  });
+
+  it("requires scheduler state running and executor readiness before atomic claim", () => {
+    expect(schedulerOperationsMigration).toContain("s.execution_enabled=true");
+    expect(schedulerOperationsMigration).toContain("s.scheduler_state='running'");
+    expect(schedulerOperationsMigration).toContain("s.scheduler_executor_ready=true");
+    expect(schedulerOperationsMigration).toContain(
+      "s.scheduler_actor_user_id=p_actor_user_id",
+    );
+  });
+
+  it("uses a two-step activation request with an expiring plan hash", () => {
+    expect(schedulerOperationsSource).toContain(
+      'const ACTIVATION_CONFIRM_TEXT = "자동 실행 시작"',
+    );
+    expect(schedulerOperationsSource).toContain("ACTIVATION_TTL_MS");
+    expect(schedulerOperationsSource).toContain("planHash");
+    expect(schedulerOperationsSource).toContain("REQUEST_EXPIRED");
+    expect(schedulerOperationsSource).toContain("PLAN_CHANGED");
+    expect(schedulerOperationsSource).toContain(
+      "requestInternalObservationSchedulerActivation",
+    );
+    expect(schedulerOperationsSource).toContain(
+      "confirmInternalObservationSchedulerActivation",
+    );
+    expect(routeSource).toContain("활성화 요청 만들기");
+    expect(routeSource).toContain("최종 활성화");
+  });
+
+  it("blocks activation until the executor is explicitly marked ready", () => {
+    expect(schedulerOperationsSource).toContain('"EXECUTOR_NOT_READY"');
+    expect(schedulerOperationsSource).toContain(
+      'settingsRes.data["scheduler_executor_ready"] === true',
+    );
+    expect(routeSource).toContain("정기 실행기 배포가 아직 완료되지 않았습니다.");
+    expect(routeSource).toContain("실행기 배포 Gate가 닫혀 있어 자동 실행을 활성화할 수 없습니다.");
+  });
+
+  it("supports pause and stop without cancelling an active run", () => {
+    expect(schedulerOperationsSource).toContain(
+      "pauseInternalObservationScheduler",
+    );
+    expect(schedulerOperationsSource).toContain(
+      "stopInternalObservationScheduler",
+    );
+    expect(schedulerOperationsSource).toContain(
+      "activeRunsContinue: true",
+    );
+    expect(schedulerOperationsSource).not.toContain(
+      '.from("measurement_runs").update({ status: "cancelled"',
+    );
+    expect(routeSource).toContain("일시정지");
+    expect(routeSource).toContain("자동 실행 중지");
+    expect(routeSource).toContain("진행 중 Run을 강제로 취소하지 않고");
+  });
+
+  it("keeps activation cron control service-role only", () => {
+    expect(schedulerOperationsMigration).toContain(
+      "set_internal_observation_scheduler_cron_active_v06",
+    );
+    expect(schedulerOperationsMigration).toContain(
+      "grant execute on function public.set_internal_observation_scheduler_cron_active_v06(boolean) to service_role",
+    );
+    expect(schedulerOperationsMigration).toContain(
+      "revoke all on function public.set_internal_observation_scheduler_cron_active_v06(boolean) from authenticated",
+    );
+    expect(schedulerOperationsSource).toContain(
+      "set_internal_observation_scheduler_cron_active_v06",
+    );
   });
 });
