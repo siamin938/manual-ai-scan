@@ -51,6 +51,8 @@ import {
   previewInternalObservationExecutionPlan,
   type InternalObservationExecutionBlocker,
 } from "@/lib/internal-observation-execution.functions";
+import { reconcileInternalObservationPipeline } from "@/lib/internal-observation-reconciliation.functions";
+import { getPilotOpsAdminResult } from "@/lib/pilot-ops-admin-detail.functions";
 
 export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
   component: InternalObservationPipelinePage,
@@ -72,6 +74,7 @@ const STATUS_LABELS: Record<InternalObservationPipelineStatus, string> = {
   blocked: "확인 필요",
   failed: "준비 실패",
   measuring: "측정 중",
+  postprocessing: "후처리 중",
   completed: "완료",
   cancelled: "취소",
 };
@@ -80,7 +83,7 @@ function statusVariant(
   status: InternalObservationPipelineStatus,
 ): "default" | "secondary" | "outline" | "destructive" {
   if (status === "ready_to_measure" || status === "completed") return "default";
-  if (status === "preparing" || status === "measuring") return "secondary";
+  if (status === "preparing" || status === "measuring" || status === "postprocessing") return "secondary";
   if (status === "blocked" || status === "failed") return "destructive";
   return "outline";
 }
@@ -104,6 +107,20 @@ function errorLabel(code: string | null): string {
       return "기존 통합 질문 확인 필요";
     case "INVALID_QUESTION_CONTRACT":
       return "24문항 계약 확인 필요";
+    case "ENTITY_FACTS_PENDING":
+      return "Entity Facts v2 후처리 대기";
+    case "ENTITY_FACTS_CHECK_RETRY":
+      return "Entity Facts v2 재확인";
+    case "ENTITY_FACTS_INVALID":
+      return "Entity Facts v2 계약 확인 필요";
+    case "ENTITY_FACTS_RUN_MISMATCH":
+      return "대표 Run 불일치";
+    case "RUN_INCOMPLETE":
+      return "24/24 측정 계약 미충족";
+    case "RUN_FAILED":
+      return "Run 실패";
+    case "RUN_CANCELLED":
+      return "Run 취소";
     default:
       return code ?? "-";
   }
@@ -170,6 +187,20 @@ function executionBlockerLabel(code: InternalObservationExecutionBlocker): strin
 
 function usd(value: number): string {
   return `${value.toFixed(2)}`;
+}
+
+function metricCountText(
+  confirmed: number,
+  valid: number,
+  lowerPct: number | null,
+  upperPct: number | null,
+): string {
+  if (valid <= 0 || lowerPct === null || upperPct === null) return `${confirmed}/${valid}`;
+  const pctText =
+    lowerPct === upperPct
+      ? `${Math.round(lowerPct * 100) / 100}%`
+      : `${Math.round(lowerPct * 100) / 100}~${Math.round(upperPct * 100) / 100}%`;
+  return `${confirmed}/${valid} · ${pctText}`;
 }
 
 function InternalObservationPipelinePage() {
