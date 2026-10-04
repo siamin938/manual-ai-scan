@@ -736,7 +736,9 @@ function InternalObservationPipelinePage() {
                       {formatSeoul(item.createdAt)}
                     </TableCell>
                     <TableCell className="align-top text-right">
-                      {["pending", "blocked", "failed"].includes(item.status) && (
+                      {(item.status === "pending" ||
+                        item.status === "blocked" ||
+                        (item.status === "failed" && !item.runId)) && (
                         <Button
                           size="sm"
                           variant="outline"
