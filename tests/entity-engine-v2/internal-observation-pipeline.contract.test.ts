@@ -17,6 +17,16 @@ const navSource = readFileSync(
   "utf8",
 );
 
+const businessRouteSource = readFileSync(
+  resolve(process.cwd(), "src/routes/_authenticated/businesses.tsx"),
+  "utf8",
+);
+
+const optionSource = readFileSync(
+  resolve(process.cwd(), "src/lib/automotive-service-options.ts"),
+  "utf8",
+);
+
 const schemaMigration = readFileSync(
   resolve(
     process.cwd(),
@@ -88,5 +98,36 @@ describe("internal observation pipeline v0.1", () => {
     expect(serverSource).toContain('"NO_MEASUREMENT_CREDIT"');
     expect(serverSource).toContain('"PROVIDER_NOT_READY"');
     expect(serverSource).not.toContain("measurement_debit");
+  });
+
+  it("requires an operator preview before the UI exposes preparation", () => {
+    expect(serverSource).toContain("previewInternalObservationCandidate");
+    expect(serverSource).toContain("async function previewOne");
+    expect(routeSource).toContain("준비 미리보기");
+    expect(routeSource).toContain("아직 업체나 질문을 생성하지 않습니다.");
+    expect(routeSource).toContain("확인하고 준비");
+    expect(routeSource).toContain("이 단계에서는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.");
+    expect(routeSource).not.toContain("대기 후보 5건 준비");
+    expect(serverSource).not.toContain("preparePendingInternalObservationBatch");
+  });
+
+  it("previews reuse/create/block decisions and all 24 generated questions", () => {
+    expect(serverSource).toContain('businessAction: "create" | "reuse" | "blocked"');
+    expect(serverSource).toContain('questionSetAction: "create" | "reuse" | "blocked"');
+    expect(serverSource).toContain("existingQuestionCount");
+    expect(serverSource).toContain("questions: InternalObservationPreviewQuestionDTO[]");
+    expect(routeSource).toContain("생성 기준 24문항");
+    expect(routeSource).toContain("preview.questions.map");
+  });
+
+  it("reuses the same category list as business registration and standardizes internal services", () => {
+    expect(businessRouteSource).toContain("AUTOMOTIVE_CATEGORY_OPTIONS");
+    expect(routeSource).toContain("AUTOMOTIVE_CATEGORY_OPTIONS");
+    expect(routeSource).toContain("INTERNAL_OBSERVATION_SERVICE_OPTIONS");
+    expect(routeSource).toContain("INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION");
+    expect(optionSource).toContain('"PPF/랩핑"');
+    expect(optionSource).toContain('"신차패키지"');
+    expect(optionSource).toContain('"기타 직접 입력"');
+    expect(routeSource).toContain("측정권 {org.creditBalance}회");
   });
 });
