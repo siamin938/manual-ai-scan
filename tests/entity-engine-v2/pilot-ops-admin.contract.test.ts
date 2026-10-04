@@ -66,7 +66,7 @@ describe("pilot operations admin overview", () => {
     expect(routeSource).toContain("측정권");
     expect(routeSource).toContain("다음 작업");
     expect(routeSource).toContain("결과 전달 가능");
-    expect(routeSource).toContain("고객 결과 확인 후 PDF 전달");
+    expect(routeSource).toContain("PDF 전달 후 재측정 시점 안내");
   });
 
   it("adds safe operational shortcuts and only switches into organizations the operator belongs to", () => {
