@@ -106,6 +106,38 @@ export type PrepareInternalObservationCandidateResult =
       code?: string;
     };
 
+export type InternalObservationPreviewQuestionDTO = {
+  index: number;
+  promptText: string;
+  intentType: string;
+  region: string | null;
+  city: string | null;
+};
+
+export type InternalObservationCandidatePreviewDTO = {
+  itemId: string;
+  businessName: string;
+  businessAction: "create" | "reuse" | "blocked";
+  existingBusinessId: string | null;
+  existingBusinessName: string | null;
+  questionSetAction: "create" | "reuse" | "blocked";
+  existingQuestionSetId: string | null;
+  existingQuestionSetName: string | null;
+  existingQuestionCount: number | null;
+  canPrepare: boolean;
+  blockerCode: string | null;
+  readiness: InternalObservationPipelineReadiness;
+  questions: InternalObservationPreviewQuestionDTO[];
+};
+
+export type PreviewInternalObservationCandidateResult =
+  | { ok: true; preview: InternalObservationCandidatePreviewDTO }
+  | {
+      ok: false;
+      error: "FORBIDDEN" | "INVALID_INPUT" | "NOT_AVAILABLE";
+      code?: string;
+    };
+
 type LooseQuery = {
   select: (columns?: string) => LooseQuery;
   insert: (values: unknown) => LooseQuery;
@@ -416,6 +448,201 @@ function candidateIdempotencyKey(input: {
 
 function parseUrl(input: string | null | undefined): { ok: true; value: string | null } | { ok: false } {
   return normalizeOptionalPublicUrl(input);
+}
+
+async function previewOne(
+  itemId: string,
+): Promise<PreviewInternalObservationCandidateResult> {
+  const { data: raw, error } = await admin
+    .from("internal_observation_pipeline_items")
+    .select("*")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (error || !isRecord(raw)) {
+    return { ok: false, error: "NOT_AVAILABLE", code: "ITEM_NOT_FOUND" };
+  }
+
+  const orgId = str(raw["org_id"]);
+  const businessName = str(raw["business_name"]);
+  const category = str(raw["category"]);
+  const region = str(raw["region"]);
+  const city = nullableStr(raw["city"]);
+  const service = str(raw["service"]);
+  const brandModel = nullableStr(raw["brand_model"]);
+  const customerNeed = nullableStr(raw["customer_need"]);
+
+  if (
+    !orgId ||
+    !businessName ||
+    category === null ||
+    !region ||
+    city === undefined ||
+    !service ||
+    brandModel === undefined ||
+    customerNeed === undefined
+  ) {
+    return { ok: false, error: "INVALID_INPUT", code: "INVALID_ITEM" };
+  }
+
+  if (!(await loadEligibleInternalOrg(orgId))) {
+    return {
+      ok: false,
+      error: "INVALID_INPUT",
+      code: "INTERNAL_OBSERVATION_ORG_REQUIRED",
+    };
+  }
+
+  const candidates = buildUnifiedDiagnosticQuestionCandidates(
+    {
+      location: region,
+      service,
+      brandModel,
+      customerNeed,
+    },
+    businessName,
+    category,
+    city,
+  );
+
+  if (
+    candidates.length !== 24 ||
+    candidates.some((candidate) => candidate.containsBusinessName || !candidate.selected) ||
+    !hasUnifiedDiagnosticIntentShape(candidates.map((candidate) => candidate.intentType))
+  ) {
+    return {
+      ok: false,
+      error: "INVALID_INPUT",
+      code: "INVALID_QUESTION_CONTRACT",
+    };
+  }
+
+  const questions: InternalObservationPreviewQuestionDTO[] = candidates.map(
+    (candidate, index) => {
+      const location = resolveQuestionLocation(candidate.promptText, region, city);
+      return {
+        index: index + 1,
+        promptText: candidate.promptText,
+        intentType: candidate.intentType,
+        region: location.region,
+        city: location.city,
+      };
+    },
+  );
+
+  const { data: businessRowsRaw, error: businessError } = await admin
+    .from("businesses")
+    .select("id, name, active")
+    .eq("org_id", orgId)
+    .eq("is_client_business", true);
+
+  if (businessError) {
+    return { ok: false, error: "NOT_AVAILABLE", code: "BUSINESS_LOOKUP_FAILED" };
+  }
+
+  const businessRows = Array.isArray(businessRowsRaw) ? businessRowsRaw : [];
+  const existingBusiness =
+    businessRows.find((row) => {
+      if (!isRecord(row)) return false;
+      const name = str(row["name"]);
+      return !!name && businessNameIdentityKey(name) === businessNameIdentityKey(businessName);
+    }) ?? null;
+
+  const existingBusinessId =
+    existingBusiness && isRecord(existingBusiness) ? str(existingBusiness["id"]) : null;
+  const existingBusinessName =
+    existingBusiness && isRecord(existingBusiness) ? str(existingBusiness["name"]) : null;
+  const existingBusinessActive =
+    existingBusiness && isRecord(existingBusiness) ? existingBusiness["active"] === true : null;
+
+  let businessAction: InternalObservationCandidatePreviewDTO["businessAction"] =
+    existingBusinessId ? "reuse" : "create";
+  let questionSetAction: InternalObservationCandidatePreviewDTO["questionSetAction"] = "create";
+  let existingQuestionSetId: string | null = null;
+  let existingQuestionSetName: string | null = null;
+  let existingQuestionCount: number | null = null;
+  let blockerCode: string | null = null;
+
+  if (existingBusinessId && existingBusinessActive === false) {
+    businessAction = "blocked";
+    questionSetAction = "blocked";
+    blockerCode = "EXISTING_BUSINESS_INACTIVE";
+  }
+
+  if (existingBusinessId && !blockerCode) {
+    const { data: setRowsRaw, error: setError } = await admin
+      .from("question_sets")
+      .select("id, name, active, created_at")
+      .eq("org_id", orgId)
+      .eq("business_id", existingBusinessId)
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+
+    if (setError) {
+      return { ok: false, error: "NOT_AVAILABLE", code: "QUESTION_SET_LOOKUP_FAILED" };
+    }
+
+    const setRows = Array.isArray(setRowsRaw) ? setRowsRaw : [];
+    const unifiedSet =
+      setRows.find((row) => {
+        if (!isRecord(row)) return false;
+        const name = str(row["name"]);
+        return !!name && name.startsWith(UNIFIED_DIAGNOSTIC_SET_PREFIX);
+      }) ?? null;
+
+    if (unifiedSet && isRecord(unifiedSet)) {
+      existingQuestionSetId = str(unifiedSet["id"]);
+      existingQuestionSetName = str(unifiedSet["name"]);
+
+      if (existingQuestionSetId) {
+        const { data: questionRowsRaw, error: questionError } = await admin
+          .from("questions")
+          .select("intent_type, active")
+          .eq("question_set_id", existingQuestionSetId)
+          .eq("active", true);
+
+        if (questionError) {
+          return { ok: false, error: "NOT_AVAILABLE", code: "QUESTION_LOOKUP_FAILED" };
+        }
+
+        const questionRows = Array.isArray(questionRowsRaw) ? questionRowsRaw : [];
+        const intentTypes = questionRows
+          .map((row) => (isRecord(row) ? str(row["intent_type"]) : null))
+          .filter((intent): intent is string => !!intent);
+
+        existingQuestionCount = intentTypes.length;
+        if (
+          existingQuestionCount === 24 &&
+          hasUnifiedDiagnosticIntentShape(intentTypes)
+        ) {
+          questionSetAction = "reuse";
+        } else {
+          questionSetAction = "blocked";
+          blockerCode = "EXISTING_UNIFIED_SET_INVALID";
+        }
+      }
+    }
+  }
+
+  const readiness = await buildReadiness(orgId);
+  return {
+    ok: true,
+    preview: {
+      itemId,
+      businessName,
+      businessAction,
+      existingBusinessId,
+      existingBusinessName,
+      questionSetAction,
+      existingQuestionSetId,
+      existingQuestionSetName,
+      existingQuestionCount,
+      canPrepare: blockerCode === null,
+      blockerCode,
+      readiness,
+      questions,
+    },
+  };
 }
 
 async function prepareOne(
@@ -801,6 +1028,20 @@ export const enqueueInternalObservationCandidate = createServerFn({ method: "POS
     return { ok: true, itemId: str(insertedRaw["id"])!, idempotent: false };
   });
 
+export const previewInternalObservationCandidate = createServerFn({ method: "POST" })
+  .inputValidator((input: { itemId: string }) => {
+    if (!input || typeof input.itemId !== "string" || !UUID_RE.test(input.itemId.trim())) {
+      throw new Error("INVALID_INPUT");
+    }
+    return { itemId: input.itemId.trim().toLowerCase() };
+  })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }): Promise<PreviewInternalObservationCandidateResult> => {
+    const client = context.supabase as unknown as RpcCaller;
+    if (!(await isInternalAdmin(client))) return { ok: false, error: "FORBIDDEN" };
+    return previewOne(data.itemId);
+  });
+
 export const prepareInternalObservationCandidate = createServerFn({ method: "POST" })
   .inputValidator((input: { itemId: string }) => {
     if (!input || typeof input.itemId !== "string" || !UUID_RE.test(input.itemId.trim())) {
@@ -813,44 +1054,4 @@ export const prepareInternalObservationCandidate = createServerFn({ method: "POS
     const client = context.supabase as unknown as RpcCaller;
     if (!(await isInternalAdmin(client))) return { ok: false, error: "FORBIDDEN" };
     return prepareOne(data.itemId, context.userId);
-  });
-
-export const preparePendingInternalObservationBatch = createServerFn({ method: "POST" })
-  .inputValidator((input: { limit?: number } | undefined) => {
-    const raw = input?.limit ?? 5;
-    const limit = Number.isInteger(raw) ? Math.min(10, Math.max(1, raw)) : 5;
-    return { limit };
-  })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ data, context }) => {
-    const client = context.supabase as unknown as RpcCaller;
-    if (!(await isInternalAdmin(client))) {
-      return { ok: false as const, error: "FORBIDDEN" as const };
-    }
-
-    const { data: rows, error } = await admin
-      .from("internal_observation_pipeline_items")
-      .select("id")
-      .eq("status", "pending")
-      .order("created_at", { ascending: true })
-      .limit(data.limit);
-
-    if (error) return { ok: false as const, error: "NOT_AVAILABLE" as const };
-
-    const ids = (Array.isArray(rows) ? rows : [])
-      .map((row) => (isRecord(row) ? str(row["id"]) : null))
-      .filter((id): id is string => !!id);
-
-    const results = [];
-    for (const itemId of ids) {
-      results.push(await prepareOne(itemId, context.userId));
-    }
-
-    return {
-      ok: true as const,
-      processed: results.length,
-      ready: results.filter((result) => result.ok && result.status === "ready_to_measure").length,
-      blocked: results.filter((result) => result.ok && result.status === "blocked").length,
-      failed: results.filter((result) => !result.ok).length,
-    };
   });
