@@ -178,7 +178,7 @@ function SampleReportPage() {
             <CardHeader>
               <CardTitle className="text-xl">어떤 검색에서 보였나요?</CardTitle>
               <p className="text-sm leading-6 text-muted-foreground">
-                실제 진단에서는 8개 검색 상황을 묶어 노출이 확인된 질문군을 보여드립니다.
+                실제 진단에서는 다양한 고객 검색 상황을 묶어 노출이 확인된 질문군을 보여드립니다.
               </p>
             </CardHeader>
             <CardContent className="space-y-5">
