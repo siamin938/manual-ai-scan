@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
 import { useImeSafeForm } from "@/hooks/use-ime-safe-form";
+import { AUTOMOTIVE_CATEGORY_OPTIONS } from "@/lib/automotive-service-options";
 
 import {
   businessNameIdentityKey,
@@ -66,17 +67,7 @@ type Business = {
   active: boolean;
 };
 
-const CATEGORY_OPTIONS = [
-  "자동차 튜닝",
-  "자동차 정비/엔진오일",
-  "자동차 디테일링/세차",
-  "썬팅/신차패키지",
-  "PPF/랩핑",
-  "자동차 용품/전장",
-  "타이어/휠",
-  "렌터카/자동차 서비스",
-  "기타 자동차 서비스",
-] as const;
+const CATEGORY_OPTIONS = AUTOMOTIVE_CATEGORY_OPTIONS;
 
 /** 기존에 저장된 비표준 업종 값을 수정 화면에서 유지하기 위한 legacy 선택 상태. */
 const LEGACY_CATEGORY = "기존 업종 직접 입력";
