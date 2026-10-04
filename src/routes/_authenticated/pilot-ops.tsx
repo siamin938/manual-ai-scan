@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatSeoul } from "@/lib/format";
+import { useOrg } from "@/lib/org";
+import { useActiveTargetBusiness } from "@/lib/active-business";
 import {
   getPilotOpsAdminOverview,
   type PilotOpsBusinessDTO,
@@ -76,6 +78,9 @@ function locationText(row: PilotOpsBusinessDTO): string {
 
 function PilotOpsPage() {
   const fetchOverview = useServerFn(getPilotOpsAdminOverview);
+  const navigate = useNavigate();
+  const { activeOrgId } = useOrg();
+  const activeBusiness = useActiveTargetBusiness();
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -120,6 +125,15 @@ function PilotOpsPage() {
       </p>
     );
   }
+
+  const openBusinessPage = (
+    row: PilotOpsBusinessDTO,
+    target: "/dashboard" | "/questions" | "/runs",
+  ) => {
+    if (!activeOrgId || row.orgId !== activeOrgId) return;
+    activeBusiness.select(activeOrgId, row.businessId);
+    navigate({ to: target });
+  };
 
   return (
     <div className="space-y-6">
@@ -207,6 +221,7 @@ function PilotOpsPage() {
                   <TableHead>최근 측정</TableHead>
                   <TableHead>측정권</TableHead>
                   <TableHead>다음 작업</TableHead>
+                  <TableHead className="text-right">바로가기</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -273,6 +288,60 @@ function PilotOpsPage() {
                       {row.stage === "result_ready" && (
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
                           고객 결과 확인 후 PDF 전달 또는 다음 동일 조건 측정을 안내합니다.
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="min-w-44 align-top text-right">
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        {row.orgId === activeOrgId && row.stage === "result_ready" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openBusinessPage(row, "/dashboard")}
+                          >
+                            결과 보기
+                          </Button>
+                        )}
+                        {row.orgId === activeOrgId && row.latestRunId && (
+                          <Button asChild size="sm" variant="ghost">
+                            <Link to="/runs/$runId" params={{ runId: row.latestRunId }}>
+                              측정 보기
+                            </Link>
+                          </Button>
+                        )}
+                        {row.orgId === activeOrgId &&
+                          (row.stage === "questions_needed" || row.stage === "questions_review") && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openBusinessPage(row, "/questions")}
+                            >
+                              질문 관리
+                            </Button>
+                          )}
+                        {row.orgId === activeOrgId && row.stage === "first_measurement_needed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openBusinessPage(row, "/runs")}
+                          >
+                            측정 시작
+                          </Button>
+                        )}
+                        {row.creditBalance < 1 && (
+                          <Button asChild size="sm" variant="ghost">
+                            <Link
+                              to="/measurement-credits"
+                              search={{ org: row.orgId }}
+                            >
+                              측정권 지급
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                      {row.orgId !== activeOrgId && (
+                        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                          고객 화면 바로가기는 현재 선택 조직에서만 열립니다.
                         </p>
                       )}
                     </TableCell>
