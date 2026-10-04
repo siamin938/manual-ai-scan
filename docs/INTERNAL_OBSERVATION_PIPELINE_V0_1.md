@@ -1,22 +1,24 @@
 # Internal Observation Pipeline v0.1
 
-Status: implemented, measurement execution intentionally disabled.
+Status: v0.1.1 implemented, measurement execution intentionally disabled.
 
 ## Goal
 
 Build CHABOIM's internal automotive observation dataset without mixing research records
 into customer organizations.
 
-v0.1 automates:
+v0.1.1 automates:
 
 1. operator-confirmed candidate intake
 2. idempotent candidate queueing
-3. internal-observation organization guard
-4. target business reuse/registration
-5. deterministic Unified Diagnostic v0.2 question generation
-6. atomic reuse/creation of one valid 24-question set
-7. provider/credit readiness checks
-8. operator-visible queue state
+3. standardized automotive category/service selection
+4. read-only preparation preview before mutation
+5. internal-observation organization guard
+6. target business reuse/registration
+7. deterministic Unified Diagnostic v0.2 question generation
+8. atomic reuse/creation of one valid 24-question set
+9. provider/credit readiness checks
+10. operator-visible queue state
 
 v0.1 does **not** create a measurement run, enqueue jobs, consume credits, crawl the web,
 or enable a recurring scheduler.
@@ -62,6 +64,34 @@ The v0.1 idempotency surface is derived from:
 - customer need
 
 A repeated submission with the same surface reuses the existing queue item.
+
+## Preparation preview gate
+
+Before preparation, the operator must review a read-only preview.
+
+The preview shows:
+
+- whether the business will be created, reused, or blocked
+- whether the unified question set will be created, reused, or blocked
+- the current existing question count when a unified set exists
+- all 24 questions that would be generated from the candidate inputs
+- provider readiness
+- measurement-credit balance
+- current automatic-execution lock state
+
+The UI no longer offers batch preparation. Each candidate is previewed and confirmed individually.
+
+The preview does not create businesses, question sets, questions, measurement runs, jobs, or credit ledger entries.
+
+## Input standardization
+
+Internal candidates reuse the same automotive category options as the normal business-registration screen.
+
+Primary service uses a controlled automotive service list. A free-text value is accepted only
+through the explicit `기타 직접 입력` option.
+
+This prevents avoidable variations such as `PPF`, `피피에프`, and arbitrary category spelling
+from becoming the default internal research taxonomy.
 
 ## Business handling
 
