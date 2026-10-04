@@ -131,7 +131,7 @@ describe("internal observation pipeline v0.7 unattended executor", () => {
     expect(navSource).toContain("dataAssetAccess?.allowed");
     expect(schemaMigration).toContain("execution_enabled boolean not null default false");
     expect(routeSource).toContain("Guarded Scheduler");
-    expect(routeSource).toContain("실행기 준비 Gate");
+    expect(routeSource).toContain("실제 자동 실행 준비 Gate");
   });
 
   it("keeps the queue service-role only", () => {
