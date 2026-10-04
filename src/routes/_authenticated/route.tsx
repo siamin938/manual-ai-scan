@@ -37,6 +37,7 @@ const NAV = [
 
 const INTERNAL_NAV = [
   { to: "/pilot-ops", label: "파일럿 운영" },
+  { to: "/internal-observation-pipeline", label: "내부 데이터 수집" },
   { to: "/data-assets", label: "데이터 자산" },
   { to: "/measurement-credits", label: "측정권 관리" },
 ] as const;
