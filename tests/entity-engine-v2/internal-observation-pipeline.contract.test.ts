@@ -48,7 +48,7 @@ const prepareMigration = readFileSync(
   "utf8",
 );
 
-describe("internal observation pipeline v0.1", () => {
+describe("internal observation pipeline v0.2", () => {
   it("is internal-only and defaults measurement execution to off", () => {
     expect(navSource).toContain(
       '{ to: "/internal-observation-pipeline", label: "내부 데이터 수집" }',
@@ -56,7 +56,7 @@ describe("internal observation pipeline v0.1", () => {
     expect(navSource).toContain("dataAssetAccess?.allowed");
     expect(schemaMigration).toContain("execution_enabled boolean not null default false");
     expect(routeSource).toContain("자동 측정 실행은 잠겨 있습니다.");
-    expect(routeSource).toContain("실제 AI 측정을 자동 실행하지 않습니다.");
+    expect(routeSource).toContain("자동 반복 측정은 OFF");
   });
 
   it("keeps the queue service-role only", () => {
@@ -90,11 +90,11 @@ describe("internal observation pipeline v0.1", () => {
     expect(serverSource).toContain("candidateIdempotencyKey");
   });
 
-  it("stops before run creation or enqueue in v0.1", () => {
+  it("keeps preparation itself free of run creation or enqueue side effects", () => {
     expect(serverSource).not.toContain('functions.invoke("enqueue-run"');
     expect(serverSource).not.toContain('.from("measurement_runs").insert');
-    expect(routeSource).toContain("실행 승인 대기");
-    expect(routeSource).toContain("Run 생성과 AI 호출은 하지 않습니다.");
+    expect(routeSource).toContain("준비 미리보기");
+    expect(routeSource).toContain("이 단계에서는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.");
   });
 
   it("checks provider and measurement credit readiness without consuming a credit", () => {
