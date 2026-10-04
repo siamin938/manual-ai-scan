@@ -1,6 +1,6 @@
-# Internal Observation Pipeline v0.4 Dry-run
+# Internal Observation Pipeline v0.5 Guarded Scheduler
 
-Status: v0.4 dry-run implemented. Automatic recurring execution remains disabled; the system now calculates the scheduler plan without creating runs.
+Status: v0.5 guarded scheduler implemented. The execution engine and atomic claim gate exist, but the automatic execution master switch remains OFF and no enable UI is exposed.
 
 ## Goal
 
@@ -232,6 +232,56 @@ today-queue, not simultaneous execution.
 Automatic execution remains OFF. The planner is intentionally side-effect free and is suitable for
 verifying future scheduler policy before a cron/worker is allowed to execute anything.
 
+## Guarded scheduler v0.5
+
+v0.5 implements the execution engine behind the master switch while keeping that switch OFF.
+
+The scheduler settings now keep an explicit `scheduler_actor_user_id`. The actor must remain a
+write-role member (`owner/admin/analyst`) of the internal-observation organization.
+
+Candidate claim is performed by the service-role-only
+`claim_internal_observation_scheduler_candidate_v05()` RPC.
+
+The claim is fail-closed and atomic:
+
+- organization must be `internal_observation`
+- `execution_enabled=true`
+- supplied actor must exactly match the configured scheduler actor
+- actor must still have a write role
+- no pipeline item may be `measuring` or `postprocessing`
+- no standalone audit Run may be `draft/queued/running`
+- measurement credit must be >= 1
+- today's pipeline approvals must remain below `daily_run_limit`
+- exactly one oldest `ready_to_measure` item is selected with `FOR UPDATE SKIP LOCKED`
+
+Before claim, the guarded tick runs v0.3 reconciliation and recomputes the v0.4 Dry-run plan.
+After claim, the claimed item must still equal the first `planned && dispatchNow` Dry-run item.
+If it differs, the claim is released without creating a Run.
+
+The scheduler uses the same standalone audit measurement core as the customer/manual execution path.
+There is no second Run insert or enqueue implementation. The trusted scheduler mode is limited to
+`internal_observation` organizations and still requires the configured actor's write-role membership.
+
+Execution sequence when the master switch is eventually enabled:
+
+```
+scheduler tick
+  -> reconcile previous item
+  -> recompute dry-run
+  -> atomic claim exactly one oldest-ready item
+  -> re-run the existing measurement checks/core
+  -> link Run
+  -> wait
+  -> reconciliation reaches completed/failed
+  -> only a later tick may claim the next item
+```
+
+If Run startup fails, the claim returns to `ready_to_measure` with an error for operator review.
+The guarded scheduler never creates an immediate replacement Run and has no internal retry loop.
+
+The `execution_enabled=false` path returns before claim and before scheduler metadata writes.
+There is intentionally no UI control in v0.5 for enabling automatic execution.
+
 ## Work / browser automation role
 
 Work is not the measurement engine.
@@ -282,20 +332,37 @@ Implemented:
 - exact candidate contract and same-condition-run validation
 - no run/job/credit side effects
 
-### v0.5 - guarded recurring scheduler
+### v0.5 - guarded scheduler engine
 
-Only after the dry-run plan is validated with multiple real candidates:
-- hourly/daily worker
-- automatic execution master switch remains explicit
-- max daily runs
-- max concurrent runs
-- atomic candidate claim
-- stale claim recovery
-- no silent retry after a terminal failed run
-- remeasurement cadence
+Implemented:
+- explicit configured scheduler actor
+- service-role-only atomic oldest-ready claim
+- sequential one-item execution contract
+- v0.3 reconciliation before every guarded tick
+- v0.4 Dry-run plan match before execution
+- shared measurement core with customer/manual path
+- no second Run/enqueue implementation
+- claim release on startup failure
+- no internal retry loop
+- master switch OFF remains side-effect free
+- no enable UI
+
+Not enabled yet:
+- recurring cron/worker
+- master-switch ON
+- automatic execution
+
+### v0.6 - scheduler operations
+
+Before enabling unattended execution:
+- add explicit operator approval workflow for switching ON
+- add hourly/daily trigger
+- stale claim recovery for process crashes
 - execution audit log
+- operator pause/stop semantics
+- remeasurement cadence
 
-### v0.6 - candidate discovery
+### v0.7 - candidate discovery
 
 Add external/Work discovery into a separate review queue.
 Do not directly measure a browser-discovered entity before structured identity review.
