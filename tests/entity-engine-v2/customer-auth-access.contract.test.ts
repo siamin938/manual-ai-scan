@@ -25,6 +25,12 @@ describe("customer auth access contract", () => {
     );
   });
 
+  it("lets users return home from the auth brand without adding another button", () => {
+    expect(authSource).toContain('to="/"');
+    expect(authSource).toContain('aria-label="차보임 홈으로 이동"');
+    expect(authSource).toContain("hover:opacity-80");
+  });
+
   it("keeps password recovery available even while signup is closed", () => {
     expect(authSource).toContain("resetPasswordForEmail");
     expect(authSource).toContain('/auth?mode=recovery');
