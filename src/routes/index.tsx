@@ -213,7 +213,7 @@ function LandingPage() {
                   </Link>
                 </Button>
                 <Button asChild size="lg" variant="outline">
-                  <a href="#method">어떻게 분석하나요?</a>
+                  <Link to="/sample-report">샘플 진단 결과 보기</Link>
                 </Button>
               </div>
               <div className="mt-10 border-t border-border pt-4">
