@@ -86,8 +86,8 @@ describe("internal observation pipeline v0.5 guarded scheduler", () => {
     );
     expect(navSource).toContain("dataAssetAccess?.allowed");
     expect(schemaMigration).toContain("execution_enabled boolean not null default false");
-    expect(routeSource).toContain("자동 측정 실행은 잠겨 있습니다.");
-    expect(routeSource).toContain("자동 반복 측정은 OFF");
+    expect(routeSource).toContain("Guarded Scheduler master switch는 OFF입니다.");
+    expect(routeSource).toContain("ON 전환 UI도 아직 제공하지 않습니다.");
   });
 
   it("keeps the queue service-role only", () => {
@@ -209,7 +209,7 @@ describe("internal observation pipeline v0.5 guarded scheduler", () => {
 
   it("keeps automatic execution separate from manual approval", () => {
     expect(executionSource).toContain("automaticExecutionEnabled");
-    expect(routeSource).toContain("자동 반복 측정은 OFF");
+    expect(routeSource).toContain("Guarded Scheduler master switch는 OFF입니다.");
     expect(routeSource).toContain("이번 건은 수동 승인");
   });
 
