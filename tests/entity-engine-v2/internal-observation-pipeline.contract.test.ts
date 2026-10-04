@@ -12,6 +12,11 @@ const serverSource = readFileSync(
   "utf8",
 );
 
+const executionSource = readFileSync(
+  resolve(process.cwd(), "src/lib/internal-observation-execution.functions.ts"),
+  "utf8",
+);
+
 const navSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
   "utf8",
@@ -129,5 +134,51 @@ describe("internal observation pipeline v0.1", () => {
     expect(optionSource).toContain('"신차패키지"');
     expect(optionSource).toContain('"기타 직접 입력"');
     expect(routeSource).toContain("측정권 {org.creditBalance}회");
+  });
+
+  it("adds a read-only execution plan before any measurement side effect", () => {
+    expect(executionSource).toContain("previewInternalObservationExecutionPlan");
+    expect(executionSource).toContain("plannedJobs");
+    expect(executionSource).toContain("estimatedCostUsd");
+    expect(executionSource).toContain("creditBefore");
+    expect(executionSource).toContain("creditAfter");
+    expect(executionSource).toContain("projectedDailyRequests");
+    expect(executionSource).toContain("projectedMonthlyCostUsd");
+    expect(executionSource).toContain("sameConditionRun");
+    expect(routeSource).toContain("실행 계획 보기");
+    expect(routeSource).toContain("이 화면을 보는 것만으로는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.");
+  });
+
+  it("rechecks the plan fingerprint before explicit execution approval", () => {
+    expect(executionSource).toContain("plan.planHash !== data.planHash");
+    expect(executionSource).toContain('"PLAN_CHANGED"');
+    expect(executionSource).toContain("stableHash(fingerprint)");
+    expect(routeSource).toContain("측정 실행 승인");
+    expect(routeSource).toContain("계획 fingerprint를 재검증합니다");
+  });
+
+  it("reuses the existing customer measurement path instead of creating a second enqueue engine", () => {
+    expect(executionSource).toContain("createCustomerMeasurementRun");
+    expect(executionSource).not.toContain('functions.invoke("enqueue-run"');
+    expect(executionSource).not.toContain('.from("measurement_jobs").insert');
+    expect(executionSource).toContain('"SAME_CONDITION_RUN_ACTIVE"');
+    expect(executionSource).toContain('"CONCURRENT_RUN_LIMIT"');
+    expect(executionSource).toContain('"DAILY_PIPELINE_RUN_LIMIT"');
+    expect(executionSource).toContain("checkUsageAllowance");
+  });
+
+  it("locks the pipeline item during approval and rolls back the approval state when start fails", () => {
+    expect(executionSource).toContain('status: "measuring"');
+    expect(executionSource).toContain("measurement_approved_at");
+    expect(executionSource).toContain("measurement_approved_by");
+    expect(executionSource).toContain('status: "ready_to_measure"');
+    expect(executionSource).toContain("measurement_approved_at: null");
+    expect(executionSource).toContain("measurement_approved_by: null");
+  });
+
+  it("keeps automatic execution separate from manual approval", () => {
+    expect(executionSource).toContain("automaticExecutionEnabled");
+    expect(routeSource).toContain("자동 반복 측정은 OFF");
+    expect(routeSource).toContain("이번 건은 수동 승인");
   });
 });
