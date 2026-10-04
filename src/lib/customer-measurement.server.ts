@@ -336,7 +336,7 @@ export async function createInternalObservationScheduledMeasurementRun(args: {
     orgId: args.orgId,
     businessId: args.businessId,
     questionSetId: args.questionSetId,
-    name: args.name,
+    ...(args.name !== undefined ? { name: args.name } : {}),
     authorizationMode: "trusted_internal_scheduler",
   });
 }
