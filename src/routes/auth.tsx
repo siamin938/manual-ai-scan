@@ -1,5 +1,6 @@
 import {
   createFileRoute,
+  Link,
   redirect,
   useNavigate,
   type SearchSchemaInput,
@@ -166,14 +167,17 @@ function AuthPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="mb-6 text-center">
+        <Link
+          to="/"
+          aria-label="차보임 홈으로 이동"
+          className="group mb-6 block text-center outline-none transition-opacity hover:opacity-80 focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
+        >
           <h1 className="text-2xl font-semibold tracking-tight">차보임</h1>
           <p className="text-xs font-medium tracking-widest text-muted-foreground">CHABOIM</p>
           <p className="mt-1 text-sm text-muted-foreground">
             자동차 업체 AI 추천시장 분석
           </p>
-
-        </div>
+        </Link>
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">
