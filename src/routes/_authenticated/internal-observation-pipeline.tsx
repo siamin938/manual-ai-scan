@@ -783,6 +783,117 @@ function InternalObservationPipelinePage() {
         </CardContent>
       </Card>
 
+      <Dialog open={!!resultTarget} onOpenChange={(open) => !open && setResultTarget(null)}>
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              내부 수집 결과{resultTarget ? ` · ${resultTarget.businessName}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              완료된 파이프라인 Run의 Entity Facts v2 결과를 읽기 전용으로 확인합니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {resultQuery.isLoading ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">결과를 불러오는 중…</p>
+          ) : !resultQuery.data || !resultQuery.data.ok ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              완료 상태이지만 결과를 불러오지 못했습니다. 상태 동기화를 다시 실행해 주세요.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">확정 노출</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {metricCountText(
+                      resultQuery.data.data.overview.confirmedMentionCount,
+                      resultQuery.data.data.overview.validCount,
+                      resultQuery.data.data.overview.visibilityLowerBoundPct,
+                      resultQuery.data.data.overview.visibilityUpperBoundPct,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">상위 3곳</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {metricCountText(
+                      resultQuery.data.data.overview.confirmedTop3Count,
+                      resultQuery.data.data.overview.validCount,
+                      resultQuery.data.data.overview.top3LowerBoundPct,
+                      resultQuery.data.data.overview.top3UpperBoundPct,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">관찰 업체</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {resultQuery.data.data.competitors.length}곳
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">관련 출처</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {resultQuery.data.data.verifiedTargetCitationPages?.length ??
+                      resultQuery.data.data.targetSources.length}
+                    개
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium">{resultQuery.data.data.scope.runName}</p>
+                  <Badge variant="outline">
+                    {resultQuery.data.data.scope.completedJobs}/{resultQuery.data.data.scope.totalJobs}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatSeoul(resultQuery.data.data.scope.measuredAt)} · 실패{" "}
+                  {resultQuery.data.data.scope.failedJobs}
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">검색 상황</p>
+                  <div className="mt-3 space-y-2">
+                    {resultQuery.data.data.questionGroups.map((group) => (
+                      <div key={group.intentType} className="flex items-center justify-between gap-3 text-sm">
+                        <span>{intentLabel(group.intentType)}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {group.confirmedMentionCount}/{group.validCount}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">함께 관찰된 업체</p>
+                  <div className="mt-3 space-y-2">
+                    {resultQuery.data.data.competitors.slice(0, 5).map((competitor) => (
+                      <div key={competitor.name} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate">{competitor.name}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {competitor.responseCount}회
+                        </span>
+                      </div>
+                    ))}
+                    {resultQuery.data.data.competitors.length === 0 && (
+                      <p className="text-sm text-muted-foreground">확정 관찰 업체가 없습니다.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs leading-5 text-muted-foreground">
+                이 결과는 내부 데이터 축적용 관찰 결과입니다. 관찰 업체와 출처 연결은 인과관계를 의미하지 않습니다.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={executionOpen}
         onOpenChange={(open) => {
