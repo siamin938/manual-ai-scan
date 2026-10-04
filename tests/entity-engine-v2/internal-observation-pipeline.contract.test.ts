@@ -22,6 +22,11 @@ const reconciliationSource = readFileSync(
   "utf8",
 );
 
+const schedulerSource = readFileSync(
+  resolve(process.cwd(), "src/lib/internal-observation-scheduler.functions.ts"),
+  "utf8",
+);
+
 const navSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
   "utf8",
@@ -61,7 +66,7 @@ const reconciliationMigration = readFileSync(
   "utf8",
 );
 
-describe("internal observation pipeline v0.3", () => {
+describe("internal observation pipeline v0.4 dry-run", () => {
   it("is internal-only and defaults measurement execution to off", () => {
     expect(navSource).toContain(
       '{ to: "/internal-observation-pipeline", label: "내부 데이터 수집" }',
@@ -238,5 +243,48 @@ describe("internal observation pipeline v0.3", () => {
     expect(routeSource).toContain("Entity Facts v2 결과를 읽기 전용으로 확인합니다.");
     expect(routeSource).toContain("확정 노출");
     expect(routeSource).toContain("함께 관찰된 업체");
+  });
+
+  it("adds a read-only v0.4 scheduler dry-run with no execution side effects", () => {
+    expect(schedulerSource).toContain("getInternalObservationSchedulerDryRun");
+    expect(schedulerSource).toContain('"0.4-dry-run"');
+    expect(schedulerSource).toContain('dryRunOnly: true');
+    expect(schedulerSource).toContain('"oldest_ready_first"');
+    expect(schedulerSource).not.toContain("createCustomerMeasurementRun");
+    expect(schedulerSource).not.toContain('functions.invoke("enqueue-run"');
+    expect(schedulerSource).not.toContain(".insert(");
+    expect(schedulerSource).not.toContain(".update(");
+    expect(routeSource).toContain("자동 스케줄 Dry-run");
+    expect(routeSource).toContain("실행 없음");
+  });
+
+  it("simulates daily slots, concurrency, credits, requests, and budget cumulatively", () => {
+    expect(schedulerSource).toContain("dailySlotsRemaining");
+    expect(schedulerSource).toContain("dispatchSlotsNow");
+    expect(schedulerSource).toContain("simulatedCredit");
+    expect(schedulerSource).toContain("simulatedDailyRequests");
+    expect(schedulerSource).toContain("simulatedMonthlyCost");
+    expect(schedulerSource).toContain('"DAILY_PIPELINE_RUN_LIMIT"');
+    expect(schedulerSource).toContain('"NO_MEASUREMENT_CREDIT"');
+    expect(schedulerSource).toContain('"DAILY_USAGE_LIMIT"');
+    expect(schedulerSource).toContain('"MONTHLY_USAGE_LIMIT"');
+  });
+
+  it("keeps candidate selection deterministic and validates exact ready contracts", () => {
+    expect(schedulerSource).toContain('.eq("status", "ready_to_measure")');
+    expect(schedulerSource).toContain('.order("prepared_at", { ascending: true })');
+    expect(schedulerSource).toContain('.order("created_at", { ascending: true })');
+    expect(schedulerSource).toContain("CUSTOMER_STANDARD_QUESTION_COUNT");
+    expect(schedulerSource).toContain("hasUnifiedDiagnosticIntentShape");
+    expect(schedulerSource).toContain("SAME_CONDITION_RUN_ACTIVE");
+  });
+
+  it("shows scheduler plan totals without enabling recurring automation", () => {
+    expect(routeSource).toContain("오늘 실행 슬롯");
+    expect(routeSource).toContain("지금 시작 가능");
+    expect(routeSource).toContain("계획 비용");
+    expect(routeSource).toContain("Dry-run 다시 계산");
+    expect(routeSource).toContain("자동 실행 OFF 상태에서는 계획된 후보도 측정되지 않습니다.");
+    expect(routeSource).toContain("Pipeline v0.4 Dry-run");
   });
 });
