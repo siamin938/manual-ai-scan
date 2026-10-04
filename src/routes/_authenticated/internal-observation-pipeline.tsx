@@ -456,11 +456,11 @@ function InternalObservationPipelinePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">내부 데이터 수집</h1>
           <Badge variant="secondary">내부 운영자 전용</Badge>
-          <Badge variant="outline">Pipeline v0.2</Badge>
+          <Badge variant="outline">Pipeline v0.3</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          후보 등록과 24문항 준비 후 실행 계획을 확인하고, 운영자가 건별로 승인한 경우에만 실제 측정을 시작합니다.
-          자동 반복 실행은 계속 꺼져 있습니다.
+          후보 등록·24문항 준비·건별 실행 승인 후 Run 완료와 Entity Facts v2 결과 준비까지 자동으로 동기화합니다.
+          실패한 Run을 자동 재시도하거나 새 측정을 만들지는 않습니다.
         </p>
         <p className="text-xs text-muted-foreground">
           기준 시각 {formatSeoul(overview.generatedAt)}
@@ -662,11 +662,21 @@ function InternalObservationPipelinePage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">수집 파이프라인</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            안전을 위해 일괄 준비는 사용하지 않습니다. 각 후보의 미리보기를 확인한 뒤 개별 준비합니다.
-          </p>
+        <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <CardTitle className="text-base">수집 파이프라인</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              화면은 15초마다 측정 종료와 Entity Facts v2 준비 여부를 자동 확인합니다. 필요하면 수동으로 다시 동기화할 수 있습니다.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={reconcileMutation.isPending}
+            onClick={() => reconcileMutation.mutate()}
+          >
+            {reconcileMutation.isPending ? "동기화 중…" : "상태 동기화"}
+          </Button>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {overview.items.length === 0 ? (
@@ -747,7 +757,22 @@ function InternalObservationPipelinePage() {
                         </Button>
                       )}
                       {item.status === "measuring" && item.runId && (
-                        <Badge variant="secondary">Run 연결됨</Badge>
+                        <Badge variant="secondary">Run 진행 중</Badge>
+                      )}
+                      {item.status === "postprocessing" && item.runId && (
+                        <Badge variant="secondary">결과 후처리 중</Badge>
+                      )}
+                      {item.status === "completed" && item.businessId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setResultTarget(item)}
+                        >
+                          결과 보기
+                        </Button>
+                      )}
+                      {item.status === "failed" && (
+                        <Badge variant="destructive">자동 재시도 없음</Badge>
                       )}
                     </TableCell>
                   </TableRow>
