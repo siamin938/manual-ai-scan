@@ -40,18 +40,18 @@ const SEARCH_CONTEXTS = [
 
 const SAMPLE_COMPETITORS = [
   {
-    name: "비교 업체 A",
+    name: "경쟁업체 A",
     exposure: "5/8",
     top3: "4회",
     contexts: "5종",
-    source: "독립 웹 출처 A",
+    source: "독립 웹 출처 확인됨",
   },
   {
-    name: "비교 업체 B",
+    name: "경쟁업체 B",
     exposure: "4/8",
     top3: "0회",
     contexts: "4종",
-    source: "독립 웹 출처 B",
+    source: "독립 웹 출처 확인됨",
   },
 ] as const;
 
@@ -156,7 +156,7 @@ function SampleReportPage() {
             {
               icon: Building2,
               label: "가장 자주 함께 나온 업체",
-              value: "비교 업체 A",
+              value: "경쟁업체 A",
               note: "AI 답변에서 5건 관찰",
             },
           ].map((item) => (
@@ -253,7 +253,7 @@ function SampleReportPage() {
                 <div>
                   <p className="font-semibold">{item.name}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    기준 검색 {item.exposure} · Top3 {item.top3} · 검색 상황 {item.contexts}
+                    기준 검색 {item.exposure} · 상위 3곳 {item.top3} · 검색 상황 {item.contexts}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -268,8 +268,8 @@ function SampleReportPage() {
           </CardContent>
         </Card>
 
-        <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-          <Card>
+        <section className="grid items-start gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+          <Card className="self-start">
             <CardHeader>
               <CardTitle className="text-xl">확인된 출처 연결 차이</CardTitle>
             </CardHeader>
