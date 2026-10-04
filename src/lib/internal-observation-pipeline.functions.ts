@@ -13,6 +13,7 @@ import {
   UNIFIED_DIAGNOSTIC_SET_PREFIX,
 } from "@/lib/custom-question-suggestions";
 import { resolveQuestionLocation } from "@/lib/question-suggestions";
+import { reconcileInternalObservationPipelineItems } from "@/lib/internal-observation-reconciliation.functions";
 
 export type InternalObservationPipelineStatus =
   | "pending"
@@ -21,6 +22,7 @@ export type InternalObservationPipelineStatus =
   | "blocked"
   | "failed"
   | "measuring"
+  | "postprocessing"
   | "completed"
   | "cancelled";
 
@@ -172,6 +174,7 @@ const PIPELINE_STATUSES: InternalObservationPipelineStatus[] = [
   "blocked",
   "failed",
   "measuring",
+  "postprocessing",
   "completed",
   "cancelled",
 ];
@@ -847,6 +850,14 @@ export const getInternalObservationPipelineOverview = createServerFn({ method: "
   .handler(async ({ context }): Promise<InternalObservationPipelineOverviewResponse> => {
     const client = context.supabase as unknown as RpcCaller;
     if (!(await isInternalAdmin(client))) return { ok: false, error: "FORBIDDEN" };
+
+    // v0.3: each internal overview refresh performs bounded terminal reconciliation.
+    // It never creates a new run or retries a failed measurement.
+    try {
+      await reconcileInternalObservationPipelineItems({ limit: 20 });
+    } catch {
+      // Overview remains available even when reconciliation needs a later retry.
+    }
 
     const [orgRes, itemRes] = await Promise.all([
       admin
