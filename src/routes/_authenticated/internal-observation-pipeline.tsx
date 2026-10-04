@@ -56,6 +56,14 @@ import {
   getInternalObservationSchedulerDryRun,
   type InternalObservationSchedulerBlocker,
 } from "@/lib/internal-observation-scheduler.functions";
+import {
+  confirmInternalObservationSchedulerActivation,
+  getInternalObservationSchedulerOperations,
+  pauseInternalObservationScheduler,
+  requestInternalObservationSchedulerActivation,
+  stopInternalObservationScheduler,
+  type SchedulerActivationBlocker,
+} from "@/lib/internal-observation-scheduler-operations.functions";
 import { getPilotOpsAdminResult } from "@/lib/pilot-ops-admin-detail.functions";
 
 export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
@@ -156,6 +164,25 @@ function previewBlockerLabel(code: string | null): string {
   return code ? "기존 데이터 상태를 확인해 주세요." : "";
 }
 
+function activationBlockerLabel(code: SchedulerActivationBlocker): string {
+  switch (code) {
+    case "STATE_ALREADY_RUNNING":
+      return "이미 자동 실행 중입니다.";
+    case "EXECUTOR_NOT_READY":
+      return "정기 실행기 배포가 아직 완료되지 않았습니다.";
+    case "ACTOR_NOT_CONFIGURED":
+      return "Scheduler actor 설정이 필요합니다.";
+    case "CRON_NOT_AVAILABLE":
+      return "정기 tick Cron이 준비되지 않았습니다.";
+    case "NO_PLANNED_CANDIDATE":
+      return "현재 오늘 계획에 포함되는 후보가 없습니다.";
+    case "NO_DISPATCH_SLOT":
+      return "현재 즉시 실행 가능한 동시 실행 슬롯이 없습니다.";
+    case "OPERATOR_WRITE_ROLE_REQUIRED":
+      return "현재 운영자 계정에 이 내부 조직의 실행 권한이 없습니다.";
+  }
+}
+
 function schedulerBlockerLabel(code: InternalObservationSchedulerBlocker): string {
   switch (code) {
     case "CANDIDATE_DATA_INVALID":
@@ -242,6 +269,11 @@ function InternalObservationPipelinePage() {
   const approveExecution = useServerFn(approveInternalObservationExecution);
   const reconcilePipeline = useServerFn(reconcileInternalObservationPipeline);
   const fetchSchedulerDryRun = useServerFn(getInternalObservationSchedulerDryRun);
+  const fetchSchedulerOperations = useServerFn(getInternalObservationSchedulerOperations);
+  const requestSchedulerActivation = useServerFn(requestInternalObservationSchedulerActivation);
+  const confirmSchedulerActivation = useServerFn(confirmInternalObservationSchedulerActivation);
+  const pauseScheduler = useServerFn(pauseInternalObservationScheduler);
+  const stopScheduler = useServerFn(stopInternalObservationScheduler);
   const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
 
   const [orgId, setOrgId] = useState("");
@@ -261,6 +293,7 @@ function InternalObservationPipelinePage() {
   const [executionOpen, setExecutionOpen] = useState(false);
   const [executionItemId, setExecutionItemId] = useState<string | null>(null);
   const [resultTarget, setResultTarget] = useState<InternalObservationPipelineItemDTO | null>(null);
+  const [activationConfirmation, setActivationConfirmation] = useState("");
 
   const service =
     serviceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
@@ -282,6 +315,14 @@ function InternalObservationPipelinePage() {
     retry: false,
     refetchInterval: 15000,
     queryFn: () => fetchSchedulerDryRun({ data: { orgId } }),
+  });
+
+  const schedulerOpsQuery = useQuery({
+    queryKey: ["internal-observation-scheduler-operations", orgId],
+    enabled: !!orgId,
+    retry: false,
+    refetchInterval: 15000,
+    queryFn: () => fetchSchedulerOperations({ data: { orgId } }),
   });
 
   const resultQuery = useQuery({
@@ -382,6 +423,85 @@ function InternalObservationPipelinePage() {
   const executionPlanMutation = useMutation({
     mutationFn: (itemId: string) => previewExecutionPlan({ data: { itemId } }),
     onError: () => toast.error("측정 실행 계획을 불러오지 못했습니다."),
+  });
+
+  const requestActivationMutation = useMutation({
+    mutationFn: () => requestSchedulerActivation({ data: { orgId } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "PLAN_BLOCKED"
+            ? "현재 조건에서는 자동 실행 활성화를 요청할 수 없습니다."
+            : "활성화 요청을 만들지 못했습니다.",
+        );
+        schedulerOpsQuery.refetch();
+        return;
+      }
+      setActivationConfirmation("");
+      toast.success("활성화 요청을 만들었습니다. 10분 안에 최종 확인해 주세요.");
+      schedulerOpsQuery.refetch();
+    },
+    onError: () => toast.error("활성화 요청 중 오류가 발생했습니다."),
+  });
+
+  const confirmActivationMutation = useMutation({
+    mutationFn: (requestId: string) =>
+      confirmSchedulerActivation({
+        data: {
+          orgId,
+          requestId,
+          confirmation: activationConfirmation,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "PLAN_CHANGED"
+            ? "실행 조건이 바뀌었습니다. 활성화 계획을 다시 확인해 주세요."
+            : res.error === "INVALID_CONFIRMATION"
+              ? "확인 문구가 일치하지 않습니다."
+              : "자동 실행을 활성화하지 못했습니다.",
+        );
+        schedulerOpsQuery.refetch();
+        schedulerQuery.refetch();
+        return;
+      }
+      setActivationConfirmation("");
+      toast.success("Guarded Scheduler가 활성화되었습니다.");
+      schedulerOpsQuery.refetch();
+      schedulerQuery.refetch();
+      overviewQuery.refetch();
+    },
+    onError: () => toast.error("자동 실행 활성화 중 오류가 발생했습니다."),
+  });
+
+  const pauseSchedulerMutation = useMutation({
+    mutationFn: () => pauseScheduler({ data: { orgId } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("자동 실행을 일시정지하지 못했습니다.");
+        return;
+      }
+      toast.success("자동 실행을 일시정지했습니다. 진행 중인 Run은 취소하지 않습니다.");
+      schedulerOpsQuery.refetch();
+      schedulerQuery.refetch();
+    },
+    onError: () => toast.error("일시정지 중 오류가 발생했습니다."),
+  });
+
+  const stopSchedulerMutation = useMutation({
+    mutationFn: () => stopScheduler({ data: { orgId } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("자동 실행을 중지하지 못했습니다.");
+        return;
+      }
+      setActivationConfirmation("");
+      toast.success("자동 실행을 중지했습니다. 진행 중인 Run은 취소하지 않습니다.");
+      schedulerOpsQuery.refetch();
+      schedulerQuery.refetch();
+    },
+    onError: () => toast.error("자동 실행 중지 중 오류가 발생했습니다."),
   });
 
   const reconcileMutation = useMutation({
@@ -489,6 +609,7 @@ function InternalObservationPipelinePage() {
       : null;
 
   const schedulerPlan = schedulerQuery.data?.ok ? schedulerQuery.data.plan : null;
+  const schedulerOps = schedulerOpsQuery.data?.ok ? schedulerOpsQuery.data.data : null;
 
   return (
     <div className="space-y-6">
