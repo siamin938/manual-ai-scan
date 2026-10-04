@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -22,6 +29,10 @@ import {
   type PilotOpsBusinessDTO,
   type PilotOpsStage,
 } from "@/lib/pilot-ops-admin.functions";
+import {
+  getPilotOpsAdminResult,
+  getPilotOpsAdminRunDetail,
+} from "@/lib/pilot-ops-admin-detail.functions";
 
 export const Route = createFileRoute("/_authenticated/pilot-ops")({
   component: PilotOpsPage,
@@ -76,8 +87,19 @@ function locationText(row: PilotOpsBusinessDTO): string {
   return [row.region, row.city].filter(Boolean).join(" ") || "-";
 }
 
+function metricCountText(confirmed: number, valid: number, lowerPct: number | null, upperPct: number | null): string {
+  if (valid <= 0 || lowerPct === null || upperPct === null) return `${confirmed}/${valid}`;
+  const pctText =
+    lowerPct === upperPct
+      ? `${Math.round(lowerPct * 100) / 100}%`
+      : `${Math.round(lowerPct * 100) / 100}~${Math.round(upperPct * 100) / 100}%`;
+  return `${confirmed}/${valid} · ${pctText}`;
+}
+
 function PilotOpsPage() {
   const fetchOverview = useServerFn(getPilotOpsAdminOverview);
+  const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
+  const fetchAdminRunDetail = useServerFn(getPilotOpsAdminRunDetail);
   const navigate = useNavigate();
   const { activeOrgId, memberships, setActiveOrgId } = useOrg();
   const activeBusiness = useActiveTargetBusiness();
@@ -86,8 +108,12 @@ function PilotOpsPage() {
   const [pendingNavigation, setPendingNavigation] = useState<{
     orgId: string;
     businessId: string;
-    target: "/dashboard" | "/questions" | "/runs" | "/runs/$runId";
-    runId?: string;
+    target: "/questions" | "/runs";
+  } | null>(null);
+  const [resultTarget, setResultTarget] = useState<PilotOpsBusinessDTO | null>(null);
+  const [runTarget, setRunTarget] = useState<{
+    row: PilotOpsBusinessDTO;
+    runId: string;
   } | null>(null);
 
   useEffect(() => {
@@ -99,16 +125,7 @@ function PilotOpsPage() {
     if (!pendingNavigation || activeOrgId !== pendingNavigation.orgId) return;
 
     activeBusiness.select(pendingNavigation.orgId, pendingNavigation.businessId);
-
-    if (pendingNavigation.target === "/runs/$runId" && pendingNavigation.runId) {
-      navigate({
-        to: "/runs/$runId",
-        params: { runId: pendingNavigation.runId },
-      });
-    } else {
-      navigate({ to: pendingNavigation.target as "/dashboard" | "/questions" | "/runs" });
-    }
-
+    navigate({ to: pendingNavigation.target });
     setPendingNavigation(null);
   }, [pendingNavigation, activeOrgId, activeBusiness, navigate]);
 
@@ -117,6 +134,38 @@ function PilotOpsPage() {
     queryFn: () => fetchOverview({ data: { query: searchQuery } }),
     placeholderData: (previousData) => previousData,
     retry: false,
+  });
+
+  const resultQuery = useQuery({
+    queryKey: ["pilot-ops-admin-result", resultTarget?.orgId, resultTarget?.businessId],
+    enabled: !!resultTarget,
+    retry: false,
+    queryFn: () =>
+      fetchAdminResult({
+        data: {
+          orgId: resultTarget!.orgId,
+          businessId: resultTarget!.businessId,
+        },
+      }),
+  });
+
+  const runDetailQuery = useQuery({
+    queryKey: [
+      "pilot-ops-admin-run-detail",
+      runTarget?.row.orgId,
+      runTarget?.row.businessId,
+      runTarget?.runId,
+    ],
+    enabled: !!runTarget,
+    retry: false,
+    queryFn: () =>
+      fetchAdminRunDetail({
+        data: {
+          orgId: runTarget!.row.orgId,
+          businessId: runTarget!.row.businessId,
+          runId: runTarget!.runId,
+        },
+      }),
   });
 
   const overview = overviewQuery.data?.ok ? overviewQuery.data.overview : null;
@@ -154,18 +203,13 @@ function PilotOpsPage() {
 
   const openBusinessPage = (
     row: PilotOpsBusinessDTO,
-    target: "/dashboard" | "/questions" | "/runs" | "/runs/$runId",
-    runId?: string,
+    target: "/questions" | "/runs",
   ) => {
     if (!canOpenCustomerArea(row)) return;
 
     if (activeOrgId === row.orgId) {
       activeBusiness.select(row.orgId, row.businessId);
-      if (target === "/runs/$runId" && runId) {
-        navigate({ to: "/runs/$runId", params: { runId } });
-      } else {
-        navigate({ to: target as "/dashboard" | "/questions" | "/runs" });
-      }
+      navigate({ to: target });
       return;
     }
 
@@ -173,7 +217,6 @@ function PilotOpsPage() {
       orgId: row.orgId,
       businessId: row.businessId,
       target,
-      ...(runId ? { runId } : {}),
     });
     setActiveOrgId(row.orgId);
   };
@@ -338,22 +381,20 @@ function PilotOpsPage() {
                     </TableCell>
                     <TableCell className="sticky right-0 z-10 min-w-44 bg-card align-top text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">
                       <div className="flex flex-wrap justify-end gap-1.5">
-                        {canOpenCustomerArea(row) && row.stage === "result_ready" && (
+                        {row.stage === "result_ready" && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => openBusinessPage(row, "/dashboard")}
+                            onClick={() => setResultTarget(row)}
                           >
                             결과 보기
                           </Button>
                         )}
-                        {canOpenCustomerArea(row) && row.latestRunId && (
+                        {row.latestRunId && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() =>
-                              openBusinessPage(row, "/runs/$runId", row.latestRunId ?? undefined)
-                            }
+                            onClick={() => setRunTarget({ row, runId: row.latestRunId as string })}
                           >
                             측정 보기
                           </Button>
@@ -388,11 +429,14 @@ function PilotOpsPage() {
                           </Button>
                         )}
                       </div>
-                      {!canOpenCustomerArea(row) && (
-                        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-                          이 계정에 고객 조직 멤버십이 없어 고객 화면은 열 수 없습니다.
-                        </p>
-                      )}
+                      {!canOpenCustomerArea(row) &&
+                        (row.stage === "questions_needed" ||
+                          row.stage === "questions_review" ||
+                          row.stage === "first_measurement_needed") && (
+                          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                            질문 관리·측정 시작은 고객 조직 멤버십이 있어야 합니다.
+                          </p>
+                        )}
                       {pendingNavigation?.businessId === row.businessId && (
                         <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
                           조직 전환 중…
@@ -406,6 +450,265 @@ function PilotOpsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!resultTarget} onOpenChange={(open) => !open && setResultTarget(null)}>
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              내부 결과 보기{resultTarget ? ` · ${resultTarget.businessName}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              고객 조직 멤버십과 별개로 내부 운영자 권한에서 기존 Entity Facts v2 결과를 읽기 전용으로 확인합니다.
+            </DialogDescription>
+          </DialogHeader>
+          {resultQuery.isLoading ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">결과를 불러오는 중…</p>
+          ) : !resultQuery.data || !resultQuery.data.ok ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              결과를 불러올 수 없습니다. 최신 대표 진단과 v2 데이터 상태를 확인해 주세요.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">확정 노출</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {metricCountText(
+                      resultQuery.data.data.overview.confirmedMentionCount,
+                      resultQuery.data.data.overview.validCount,
+                      resultQuery.data.data.overview.visibilityLowerBoundPct,
+                      resultQuery.data.data.overview.visibilityUpperBoundPct,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">상위 3곳</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {metricCountText(
+                      resultQuery.data.data.overview.confirmedTop3Count,
+                      resultQuery.data.data.overview.validCount,
+                      resultQuery.data.data.overview.top3LowerBoundPct,
+                      resultQuery.data.data.overview.top3UpperBoundPct,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">관찰 업체</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {resultQuery.data.data.competitors.length}곳
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">관련 출처</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {resultQuery.data.data.verifiedTargetCitationPages?.length ??
+                      resultQuery.data.data.targetSources.length}
+                    개
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium">{resultQuery.data.data.scope.runName}</p>
+                  <Badge variant="outline">
+                    {resultQuery.data.data.scope.completedJobs}/{resultQuery.data.data.scope.totalJobs}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatSeoul(resultQuery.data.data.scope.measuredAt)} · 질문 세트{" "}
+                  {resultQuery.data.data.scope.questionSetName ?? "-"}
+                </p>
+              </div>
+
+              {resultQuery.data.data.broadSearchObservation && (
+                <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
+                  <p className="text-xs font-semibold text-primary">기준 검색 관찰</p>
+                  <p className="mt-2 text-sm font-medium">
+                    내 업체 {resultQuery.data.data.broadSearchObservation.targetConfirmedCount}/
+                    {resultQuery.data.data.broadSearchObservation.validCount}
+                  </p>
+                  {resultQuery.data.data.broadSearchObservation.repeatedCompetitors.length > 0 && (
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      반복 관찰 업체 ·{" "}
+                      {resultQuery.data.data.broadSearchObservation.repeatedCompetitors
+                        .slice(0, 3)
+                        .map((item) => `${item.name} ${item.responseCount}회`)
+                        .join(" · ")}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">검색 상황</p>
+                  <div className="mt-3 space-y-2">
+                    {resultQuery.data.data.questionGroups.map((group) => (
+                      <div key={group.intentType} className="flex items-center justify-between gap-3 text-sm">
+                        <span>{group.intentType}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {group.confirmedMentionCount}/{group.validCount}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">함께 관찰된 업체</p>
+                  <div className="mt-3 space-y-2">
+                    {resultQuery.data.data.competitors.slice(0, 5).map((competitor) => (
+                      <div key={competitor.name} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate">{competitor.name}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {competitor.responseCount}회
+                        </span>
+                      </div>
+                    ))}
+                    {resultQuery.data.data.competitors.length === 0 && (
+                      <p className="text-sm text-muted-foreground">확정 관찰 업체가 없습니다.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <p className="text-sm font-semibold">관련성이 확인된 출처</p>
+                <div className="mt-3 space-y-2">
+                  {(resultQuery.data.data.verifiedTargetCitationPages ?? []).slice(0, 5).map((source) => (
+                    <div key={source.sampleUrl} className="text-sm">
+                      <p className="font-medium">{source.title ?? source.domain}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {source.domain} · {source.responseCount}개 응답 · {source.basisLabel}
+                      </p>
+                    </div>
+                  ))}
+                  {(resultQuery.data.data.verifiedTargetCitationPages?.length ?? 0) === 0 &&
+                    resultQuery.data.data.targetSources.slice(0, 5).map((source) => (
+                      <div key={source.domain} className="flex items-center justify-between gap-3 text-sm">
+                        <span>{source.domain}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {source.responseCount}개 응답
+                        </span>
+                      </div>
+                    ))}
+                  {(resultQuery.data.data.verifiedTargetCitationPages?.length ?? 0) === 0 &&
+                    resultQuery.data.data.targetSources.length === 0 && (
+                      <p className="text-sm text-muted-foreground">확인된 대상 출처가 없습니다.</p>
+                    )}
+                </div>
+              </div>
+
+              <p className="text-xs leading-5 text-muted-foreground">
+                이 화면은 내부 운영 확인용입니다. 관찰 업체와 출처 연결은 인과관계를 의미하지 않습니다.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!runTarget} onOpenChange={(open) => !open && setRunTarget(null)}>
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              내부 측정 보기{runTarget ? ` · ${runTarget.row.businessName}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              원문 응답을 노출하지 않고 측정 실행 상태와 운영 오류만 확인합니다.
+            </DialogDescription>
+          </DialogHeader>
+          {runDetailQuery.isLoading ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">측정 정보를 불러오는 중…</p>
+          ) : !runDetailQuery.data || !runDetailQuery.data.ok ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              측정 정보를 불러올 수 없습니다.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              <div className="rounded-lg border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium">{runDetailQuery.data.detail.runName}</p>
+                  <Badge variant="outline">
+                    {runStatusLabel(runDetailQuery.data.detail.status)}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  질문 세트 · {runDetailQuery.data.detail.questionSetName ?? "-"}
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">진행</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {runDetailQuery.data.detail.completedJobs}/{runDetailQuery.data.detail.totalJobs}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">실패</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {runDetailQuery.data.detail.failedJobs}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">반복</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {runDetailQuery.data.detail.repetitions}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <p className="text-sm font-semibold">실행 정보</p>
+                <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                  <p>
+                    생성 · <span className="text-muted-foreground">{formatSeoul(runDetailQuery.data.detail.createdAt)}</span>
+                  </p>
+                  <p>
+                    시작 · <span className="text-muted-foreground">{formatSeoul(runDetailQuery.data.detail.startedAt)}</span>
+                  </p>
+                  <p>
+                    완료 · <span className="text-muted-foreground">{formatSeoul(runDetailQuery.data.detail.completedAt)}</span>
+                  </p>
+                  <p>
+                    Provider ·{" "}
+                    <span className="text-muted-foreground">
+                      {runDetailQuery.data.detail.selectedProviders.join(", ") || "-"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <p className="text-sm font-semibold">Job 상태</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Object.entries(runDetailQuery.data.detail.jobStatusCounts).map(([status, count]) => (
+                    <Badge key={status} variant="secondary">
+                      {status} {count}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {runDetailQuery.data.detail.failedJobSamples.length > 0 && (
+                <div className="rounded-lg border border-destructive/30 p-4">
+                  <p className="text-sm font-semibold">실패 샘플</p>
+                  <div className="mt-3 space-y-2">
+                    {runDetailQuery.data.detail.failedJobSamples.map((sample, index) => (
+                      <div key={`${sample.errorCode ?? "error"}-${index}`} className="text-xs">
+                        <p className="font-medium">{sample.errorCode ?? "오류"}</p>
+                        <p className="mt-0.5 text-muted-foreground">
+                          {sample.errorMessage ?? "상세 메시지 없음"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
