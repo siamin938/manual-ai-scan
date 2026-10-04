@@ -1,6 +1,6 @@
-# Internal Observation Pipeline v0.3
+# Internal Observation Pipeline v0.4 Dry-run
 
-Status: v0.3 implemented. Automatic recurring execution remains disabled; explicit per-item execution approval and terminal reconciliation are available.
+Status: v0.4 dry-run implemented. Automatic recurring execution remains disabled; the system now calculates the scheduler plan without creating runs.
 
 ## Goal
 
@@ -200,6 +200,38 @@ The pipeline deliberately reuses:
 
 It does not introduce a second visibility parser or a second diagnostic truth model.
 
+## Scheduler dry-run v0.4
+
+v0.4 adds a read-only scheduler planner. It does not create runs, enqueue jobs, update queue items, or consume credits.
+
+Selection policy is deterministic:
+
+1. only `ready_to_measure` candidates
+2. oldest `prepared_at` first
+3. `created_at` as the stable tie-breaker
+
+The dry-run evaluates the current internal organization state:
+
+- daily pipeline run limit and runs already approved today
+- active standalone runs and concurrent-run limit
+- current measurement-credit balance
+- current daily request usage/limit
+- current monthly actual+reserved cost/budget
+- provider readiness
+- exact 24-question Unified Diagnostic contract
+- active same-condition run conflicts
+
+The planner simulates candidates in order. A planned candidate consumes one simulated credit,
+24 simulated requests, one simulated daily pipeline slot, and its internal max-cost reservation.
+Later candidates are excluded when a simulated limit would be exceeded.
+
+`dispatchNow` is advisory only: it marks how many of today's planned candidates would fit in the
+currently available concurrent slots. The remaining planned candidates represent a sequential
+today-queue, not simultaneous execution.
+
+Automatic execution remains OFF. The planner is intentionally side-effect free and is suitable for
+verifying future scheduler policy before a cron/worker is allowed to execute anything.
+
 ## Work / browser automation role
 
 Work is not the measurement engine.
@@ -239,17 +271,31 @@ Implemented:
 - completed items expose a read-only internal result summary
 - no automatic replacement Run or retry
 
-### v0.4 - recurring scheduler
+### v0.4 - scheduler dry-run
 
-Only after v0.3 is stable:
-- hourly/daily queue worker
+Implemented:
+- read-only today-plan
+- deterministic oldest-ready-first ordering
+- cumulative credit/request/budget simulation
+- daily pipeline slot accounting
+- concurrent dispatch-now advisory
+- exact candidate contract and same-condition-run validation
+- no run/job/credit side effects
+
+### v0.5 - guarded recurring scheduler
+
+Only after the dry-run plan is validated with multiple real candidates:
+- hourly/daily worker
+- automatic execution master switch remains explicit
 - max daily runs
 - max concurrent runs
-- exponential retry
+- atomic candidate claim
 - stale claim recovery
+- no silent retry after a terminal failed run
 - remeasurement cadence
+- execution audit log
 
-### v0.5 - candidate discovery
+### v0.6 - candidate discovery
 
 Add external/Work discovery into a separate review queue.
 Do not directly measure a browser-discovered entity before structured identity review.
