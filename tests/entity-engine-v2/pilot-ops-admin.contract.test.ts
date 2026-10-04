@@ -12,6 +12,11 @@ const serverSource = readFileSync(
   "utf8",
 );
 
+const detailServerSource = readFileSync(
+  resolve(process.cwd(), "src/lib/pilot-ops-admin-detail.functions.ts"),
+  "utf8",
+);
+
 const navSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/route.tsx"),
   "utf8",
@@ -69,17 +74,28 @@ describe("pilot operations admin overview", () => {
     expect(routeSource).toContain("PDF 전달 후 재측정 시점 안내");
   });
 
-  it("adds safe operational shortcuts and only switches into organizations the operator belongs to", () => {
+  it("opens result and run details through internal admin readers while keeping customer actions membership-scoped", () => {
     expect(routeSource).toContain("결과 보기");
     expect(routeSource).toContain("측정 보기");
+    expect(routeSource).toContain("setResultTarget(row)");
+    expect(routeSource).toContain("setRunTarget({ row, runId: row.latestRunId as string })");
+    expect(routeSource).toContain("getPilotOpsAdminResult");
+    expect(routeSource).toContain("getPilotOpsAdminRunDetail");
     expect(routeSource).toContain("질문 관리");
     expect(routeSource).toContain("측정 시작");
-    expect(routeSource).toContain("측정권 지급");
     expect(routeSource).toContain("memberships.some");
     expect(routeSource).toContain("setActiveOrgId(row.orgId)");
-    expect(routeSource).toContain("activeBusiness.select(pendingNavigation.orgId, pendingNavigation.businessId)");
-    expect(routeSource).toContain("이 계정에 고객 조직 멤버십이 없어 고객 화면은 열 수 없습니다.");
+    expect(routeSource).toContain("질문 관리·측정 시작은 고객 조직 멤버십이 있어야 합니다.");
+    expect(routeSource).toContain("측정권 지급");
     expect(routeSource).toContain('search={{ org: row.orgId }}');
+  });
+
+  it("gates internal result and run readers with the existing internal admin permission", () => {
+    expect(detailServerSource).toContain('client.rpc("can_view_data_asset_admin_v01")');
+    expect(detailServerSource).toContain("fetchEntityFactsV2ReadGateway");
+    expect(detailServerSource).toContain('supabaseAdmin.from("measurement_runs")');
+    expect(detailServerSource).toContain('supabaseAdmin.from("measurement_jobs")');
+    expect(routeSource).toContain("원문 응답을 노출하지 않고 측정 실행 상태와 운영 오류만 확인합니다.");
   });
 
   it("keeps operational actions visible while horizontally scrolling", () => {
