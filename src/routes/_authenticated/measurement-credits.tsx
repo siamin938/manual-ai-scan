@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, type SearchSchemaInput } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -24,7 +24,14 @@ import {
   type CreditOrgDTO,
 } from "@/lib/measurement-credit-admin.functions";
 
+type MeasurementCreditsSearch = { org?: string };
+type MeasurementCreditsSearchInput = SearchSchemaInput & { org?: string };
+
 export const Route = createFileRoute("/_authenticated/measurement-credits")({
+  validateSearch: (search: MeasurementCreditsSearchInput): MeasurementCreditsSearch => {
+    const org = typeof search["org"] === "string" ? search["org"].trim() : "";
+    return org ? { org } : {};
+  },
   component: MeasurementCreditsPage,
   head: () => ({
     meta: [
@@ -70,6 +77,7 @@ function newReferenceKey(): string {
 }
 
 function MeasurementCreditsPage() {
+  const { org: requestedOrgId } = Route.useSearch();
   const queryClient = useQueryClient();
   const fetchOverview = useServerFn(getMeasurementCreditAdminOverview);
   const fetchLedger = useServerFn(getMeasurementCreditAdminLedger);
@@ -148,6 +156,14 @@ function MeasurementCreditsPage() {
   }
 
   const orgs = overview.overview.organizations;
+
+  useEffect(() => {
+    if (!requestedOrgId || selectedOrgId) return;
+    if (orgs.some((org) => org.orgId === requestedOrgId)) {
+      setSelectedOrgId(requestedOrgId);
+    }
+  }, [requestedOrgId, selectedOrgId, orgs]);
+
   const selected = orgs.find((o) => o.orgId === selectedOrgId) ?? null;
   const parsedAmount = Number.parseInt(amount, 10);
   const amountValid = Number.isInteger(parsedAmount) && parsedAmount >= 1 && parsedAmount <= 100;
