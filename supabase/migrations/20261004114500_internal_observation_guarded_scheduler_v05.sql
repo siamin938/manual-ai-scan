@@ -4,20 +4,25 @@ alter table public.internal_observation_pipeline_settings
   add column if not exists last_scheduler_result text;
 
 update public.internal_observation_pipeline_settings s
-set scheduler_actor_user_id = candidate.user_id,
+set scheduler_actor_user_id = (
+      select om.user_id
+      from public.organization_members om
+      where om.org_id=s.org_id
+        and om.role in ('owner'::public.app_role,'admin'::public.app_role,'analyst'::public.app_role)
+      order by case when om.role='owner'::public.app_role then 0
+                    when om.role='admin'::public.app_role then 1
+                    else 2 end,
+               om.created_at asc
+      limit 1
+    ),
     updated_at = now()
-from lateral (
-  select om.user_id
-  from public.organization_members om
-  where om.org_id=s.org_id
-    and om.role in ('owner'::public.app_role,'admin'::public.app_role,'analyst'::public.app_role)
-  order by case when om.role='owner'::public.app_role then 0
-                when om.role='admin'::public.app_role then 1
-                else 2 end,
-           om.created_at asc
-  limit 1
-) candidate
-where s.scheduler_actor_user_id is null;
+where s.scheduler_actor_user_id is null
+  and exists (
+    select 1
+    from public.organization_members om
+    where om.org_id=s.org_id
+      and om.role in ('owner'::public.app_role,'admin'::public.app_role,'analyst'::public.app_role)
+  );
 
 create or replace function public.claim_internal_observation_scheduler_candidate_v05(
   p_org_id uuid,
