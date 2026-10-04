@@ -69,15 +69,23 @@ describe("pilot operations admin overview", () => {
     expect(routeSource).toContain("고객 결과 확인 후 PDF 전달");
   });
 
-  it("adds safe operational shortcuts without bypassing organization boundaries", () => {
+  it("adds safe operational shortcuts and only switches into organizations the operator belongs to", () => {
     expect(routeSource).toContain("결과 보기");
     expect(routeSource).toContain("측정 보기");
     expect(routeSource).toContain("질문 관리");
     expect(routeSource).toContain("측정 시작");
     expect(routeSource).toContain("측정권 지급");
-    expect(routeSource).toContain("row.orgId === activeOrgId");
-    expect(routeSource).toContain("activeBusiness.select(activeOrgId, row.businessId)");
+    expect(routeSource).toContain("memberships.some");
+    expect(routeSource).toContain("setActiveOrgId(row.orgId)");
+    expect(routeSource).toContain("activeBusiness.select(pendingNavigation.orgId, pendingNavigation.businessId)");
+    expect(routeSource).toContain("이 계정에 고객 조직 멤버십이 없어 고객 화면은 열 수 없습니다.");
     expect(routeSource).toContain('search={{ org: row.orgId }}');
+  });
+
+  it("keeps operational actions visible while horizontally scrolling", () => {
+    expect(routeSource).toContain("sticky right-0 z-20");
+    expect(routeSource).toContain("sticky right-0 z-10");
+    expect(routeSource).toContain("PDF 전달 후 재측정 시점 안내");
   });
 
   it("preselects the requested organization on the internal credit page", () => {
