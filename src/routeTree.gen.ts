@@ -161,6 +161,7 @@ export interface FileRoutesByTo {
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
+  '/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -224,6 +225,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/manual-checks'
     | '/measurement-credits'
+    | '/pilot-ops'
     | '/profile-coverage'
     | '/questions'
     | '/experiments/$experimentId'
