@@ -342,7 +342,7 @@ describe("internal observation pipeline v0.7 unattended executor", () => {
     expect(routeSource).toContain("계획 비용");
     expect(routeSource).toContain("Dry-run 다시 계산");
     expect(routeSource).toContain("master switch OFF 상태에서는 어떤 후보도 claim하거나 측정하지 않습니다.");
-    expect(routeSource).toContain("Pipeline v0.6 Control");
+    expect(routeSource).toContain("Pipeline v0.7 Executor");
   });
 
   it("adds an atomic service-role claim gate for one sequential candidate", () => {
@@ -467,7 +467,7 @@ describe("internal observation pipeline v0.7 unattended executor", () => {
       'settingsRes.data["scheduler_executor_ready"] === true',
     );
     expect(routeSource).toContain("정기 실행기 배포가 아직 완료되지 않았습니다.");
-    expect(routeSource).toContain("실행기 배포 Gate가 닫혀 있어 자동 실행을 활성화할 수 없습니다.");
+    expect(routeSource).toContain("executor_ready가 false인 동안 자동 실행 활성화는 차단됩니다.");
   });
 
   it("supports pause and stop without cancelling an active run", () => {
