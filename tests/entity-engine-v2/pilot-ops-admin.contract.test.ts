@@ -17,6 +17,11 @@ const navSource = readFileSync(
   "utf8",
 );
 
+const creditRouteSource = readFileSync(
+  resolve(process.cwd(), "src/routes/_authenticated/measurement-credits.tsx"),
+  "utf8",
+);
+
 const migrationSource = readFileSync(
   resolve(
     process.cwd(),
@@ -62,5 +67,23 @@ describe("pilot operations admin overview", () => {
     expect(routeSource).toContain("다음 작업");
     expect(routeSource).toContain("결과 전달 가능");
     expect(routeSource).toContain("고객 결과 확인 후 PDF 전달");
+  });
+
+  it("adds safe operational shortcuts without bypassing organization boundaries", () => {
+    expect(routeSource).toContain("결과 보기");
+    expect(routeSource).toContain("측정 보기");
+    expect(routeSource).toContain("질문 관리");
+    expect(routeSource).toContain("측정 시작");
+    expect(routeSource).toContain("측정권 지급");
+    expect(routeSource).toContain("row.orgId === activeOrgId");
+    expect(routeSource).toContain("activeBusiness.select(activeOrgId, row.businessId)");
+    expect(routeSource).toContain('search={{ org: row.orgId }}');
+  });
+
+  it("preselects the requested organization on the internal credit page", () => {
+    expect(creditRouteSource).toContain('type MeasurementCreditsSearch = { org?: string }');
+    expect(creditRouteSource).toContain("Route.useSearch()");
+    expect(creditRouteSource).toContain("requestedOrgId");
+    expect(creditRouteSource).toContain("availableOrgs.some");
   });
 });
