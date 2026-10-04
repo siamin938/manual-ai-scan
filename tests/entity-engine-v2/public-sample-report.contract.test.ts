@@ -22,13 +22,22 @@ describe("public sample report productization", () => {
     expect(sampleSource).toContain("샘플 데이터 · 실제 고객 결과 아님");
     expect(sampleSource).toContain("실제 고객 측정 결과가 아닙니다");
     expect(sampleSource).toContain("샘플 오토케어");
-    expect(sampleSource).toContain("비교 업체 A");
-    expect(sampleSource).toContain("독립 웹 출처 A");
+    expect(sampleSource).toContain("경쟁업체 A");
+    expect(sampleSource).toContain("독립 웹 출처 확인됨");
+    expect(sampleSource).not.toContain("비교 업체 A");
+    expect(sampleSource).not.toContain("독립 웹 출처 A");
   });
 
   it("does not expose the exact internal search-situation design", () => {
     expect(sampleSource).toContain("다양한 고객 검색 상황");
     expect(sampleSource).not.toContain("8개 검색 상황");
+  });
+
+  it("uses customer-friendly public labels and compact comparison cards", () => {
+    expect(sampleSource).toContain("상위 3곳 {item.top3}");
+    expect(sampleSource).not.toContain("Top3 {item.top3}");
+    expect(sampleSource).toContain("grid items-start gap-5");
+    expect(sampleSource).toContain('<Card className="self-start">');
   });
 
   it("shows the diagnostic story without changing measurement logic", () => {
