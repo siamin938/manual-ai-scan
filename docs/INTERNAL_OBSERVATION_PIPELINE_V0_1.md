@@ -1,6 +1,6 @@
 # Internal Observation Pipeline v0.7 Unattended Executor
 
-Status: v0.7 unattended executor implemented in code. Deployment and smoke-test state is tracked separately from executor readiness. The master switch remains OFF, cron remains inactive, and scheduler_executor_ready remains false until explicit operator approval.
+Status: v0.7 unattended executor implemented, deployed, and smoke-tested while OFF. Deployment and executor readiness are tracked separately. The master switch remains OFF, cron remains inactive, and scheduler_executor_ready remains false until explicit operator approval.
 
 ## Goal
 
@@ -528,14 +528,21 @@ Implemented in code:
 - executor audit events
 - separate deployed/readiness state
 
+Deployment smoke test completed:
+- `internal-observation-scheduler-tick` deployed with custom internal-secret auth
+- unauthorized POST returned HTTP 403 `FORBIDDEN`
+- authorized POST while master switch OFF returned HTTP 200 with `eligibleOrgs=0`
+- no candidate was claimed
+- no Run was created
+- no measurement credit was consumed
+- `scheduler_executor_deployed=true`
+- `scheduler_executor_ready=false`
+- cron remains inactive
+
 Before marking the executor ready:
-- deploy/update executor and enqueue-run Edge Functions
-- smoke-test unauthorized requests
-- smoke-test authorized executor call while master switch is OFF
-- verify candidate/Run/credit counts remain unchanged
-- set only `scheduler_executor_deployed=true`
-- leave `scheduler_executor_ready=false`
 - review the first enabled cycle plan with the operator
+- explicitly approve executor readiness
+- create a fresh v0.6 activation request
 
 ### v0.8 - first enabled scheduler cycle
 
