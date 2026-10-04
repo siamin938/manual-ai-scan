@@ -23,6 +23,11 @@ verify_jwt = false
 [functions.process-measurement-job]
 verify_jwt = false
 
+# Internal guarded scheduler executor. It authenticates with x-internal-secret,
+# and DB gates require scheduler_state=running + execution_enabled + executor_ready.
+[functions.internal-observation-scheduler-tick]
+verify_jwt = false
+
 # Internal/controlled reparse endpoint. The body validates the supplied user JWT and org role.
 [functions.reparse-measurements]
 verify_jwt = false
