@@ -142,9 +142,16 @@ function collectSourceUrls(payload: unknown): Array<{
 
 function parseJsonText(text: string): RecordValue | null {
   const trimmed = text.trim();
-  const unfenced = trimmed
-    .replace(/^```(?:json)?\\s*/iu, "")
-    .replace(/\\s*```$/u, "");
+  let unfenced = trimmed;
+
+  if (unfenced.startsWith("```")) {
+    const firstNewline = unfenced.indexOf("\n");
+    unfenced = firstNewline >= 0 ? unfenced.slice(firstNewline + 1) : "";
+    if (unfenced.trimEnd().endsWith("```")) {
+      unfenced = unfenced.trimEnd().slice(0, -3).trim();
+    }
+  }
+
   try {
     const parsed = JSON.parse(unfenced) as unknown;
     return isRecord(parsed) ? parsed : null;
