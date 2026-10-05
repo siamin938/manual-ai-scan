@@ -344,13 +344,15 @@ describe("internal observation pipeline v0.7 unattended executor", () => {
     expect(schedulerSource).toContain("SAME_CONDITION_RUN_ACTIVE");
   });
 
-  it("shows scheduler plan totals without enabling recurring automation", () => {
+  it("shows scheduler plan totals while keeping the dry-run side-effect free", () => {
     expect(routeSource).toContain("오늘 실행 슬롯");
     expect(routeSource).toContain("지금 시작 가능");
     expect(routeSource).toContain("계획 비용");
     expect(routeSource).toContain("Dry-run 다시 계산");
-    expect(routeSource).toContain("master switch OFF 상태에서는 어떤 후보도 claim하거나 측정하지 않습니다.");
-    expect(routeSource).toContain("Pipeline v0.7 Executor");
+    expect(routeSource).toContain(
+      "이 계획을 보는 것만으로는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.",
+    );
+    expect(routeSource).toContain("Pipeline v0.8 Validated");
   });
 
   it("adds an atomic service-role claim gate for one sequential candidate", () => {
