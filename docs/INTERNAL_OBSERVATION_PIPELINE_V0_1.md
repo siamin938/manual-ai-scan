@@ -1,6 +1,6 @@
-# Internal Observation Pipeline v0.7 Unattended Executor
+# Internal Observation Pipeline v0.8 First Enabled Scheduler Cycle
 
-Status: v0.7 unattended executor implemented, deployed, and smoke-tested while OFF. Deployment and executor readiness are tracked separately. The master switch remains OFF, cron remains inactive, and scheduler_executor_ready remains false until explicit operator approval.
+Status: v0.8 first enabled scheduler cycle validated end-to-end on 2026-10-05. The unattended executor, two-step activation, sequential one-at-a-time dispatch, measurement credit debit, terminal reconciliation, and Entity Facts v2 completion path were exercised with three real internal-observation candidates. Two fail-closed QA defects were discovered and fixed without bypassing the existing safety gates. Final validation reached three completed candidates, zero active internal Runs, seven remaining measurement credits, scheduler RUNNING, cron active, and zero ready candidates at the validation snapshot.
 
 ## Goal
 
@@ -422,6 +422,381 @@ explicitly approves the first enabled scheduler cycle.
 
 A deployed but not-ready executor cannot be activated through the v0.6 control plane.
 
+## v0.8 first enabled scheduler cycle validation
+
+The first enabled unattended cycle was executed only after the operator explicitly:
+
+1. marked the deployed executor ready
+2. created a fresh activation request
+3. confirmed the exact phrase `자동 실행 시작`
+4. allowed the existing two-minute cron scaffold to become active
+
+### Pilot candidates
+
+The enabled-cycle order was deterministic and preserved oldest-ready-first policy:
+
+1. 온카케어
+2. 타이어365
+3. 씽카스게러지 안산점
+
+The intended contract was one active internal candidate at a time. A later candidate could not be claimed until the current item reached a terminal pipeline state through reconciliation.
+
+### QA defect 1 — ambiguous pipeline `run_id` reference
+
+The first live cron tick selected 온카케어, but Run creation failed before a Run was committed.
+
+Observed database error:
+
+`column reference "run_id" is ambiguous`
+
+The ambiguity was inside `create_internal_observation_scheduler_run_v07()`, where the pipeline update used an unqualified `run_id` reference while the PL/pgSQL function also exposed a `run_id` output column.
+
+Fail-closed behavior worked as designed:
+
+- 온카케어 became terminal failed
+- no measurement Run was created
+- no measurement Job was created
+- no measurement credit was consumed
+- no replacement Run was created
+- the scheduler was immediately paused before the next candidate could start
+
+Fix:
+
+- qualify the pipeline table as `i`
+- require `i.run_id is null`
+- add migration `20261005043117_fix_internal_observation_scheduler_run_id_ambiguity.sql`
+- add regression coverage to the internal observation contract test
+- validate the Run-creation function inside a transaction that was rolled back, proving the function could create/link a Run without leaving a real test Run behind
+
+After explicit operator retry approval, 온카케어 was returned to `ready_to_measure` and a fresh two-step activation request was used. The successful retry created exactly one Run, exactly 24 Jobs, and consumed exactly one credit.
+
+### Sequential dispatch proof
+
+The enabled retry demonstrated the scheduler's intended serialization:
+
+- 온카케어 started first
+- 타이어365 remained `ready_to_measure` with no Run while 온카케어 was active
+- 온카케어 reached 24/24, failed=0, and Entity Facts v2 ready before 타이어365 started
+- 타이어365 then started on a later cron tick
+- 씽카스게러지 안산점 remained `ready_to_measure` with no Run while 타이어365 was active
+- 타이어365 reached 24/24, failed=0, and Entity Facts v2 ready before 씽카스게러지 안산점 started
+- 씽카스게러지 안산점 then started on a later cron tick
+
+Measurement-credit transitions were exact:
+
+`10 -> 9 -> 8 -> 7`
+
+No candidate consumed more than one credit.
+
+### QA defect 2 — persisted canonical display versus brand-core key
+
+씽카스게러지 안산점 itself completed normally:
+
+- Run completed
+- total Jobs = 24
+- completed Jobs = 24
+- failed Jobs = 0
+- Entity Facts v2 aggregate existed
+- `contract_ok=true`
+- measurement_count = 24
+- valid_measurement_count = 24
+- observed-source aggregate existed
+- competitor-source-clue aggregate existed
+
+However, the pipeline was marked `ENTITY_FACTS_INVALID` by the customer read gateway.
+
+Root cause:
+
+The persisted canonicalization layer may intentionally merge a service-qualified display name into a shorter brand-core canonical key. In the observed failing case:
+
+- canonical key: `auto:원투랩핑`
+- persisted canonical display: `원투 랩핑 PPF`
+- persisted DB brand core: `원투랩핑`
+
+The read gateway previously required the normalized display surface to equal the auto-key suffix exactly, producing `원투랩핑ppf != 원투랩핑`, even though the database's canonicalization rule intentionally strips recognized trailing service terms such as PPF, film, wrapping, tinting, detailing, coating, and wash.
+
+Fix:
+
+- keep the auto-key suffix forbidden as a customer-visible fallback
+- keep weaker mention/alias evidence on the existing exact-surface rule
+- only for priority-1 persisted `canonical_display_name` evidence already bound to the exact stored canonical key, allow the same brand-core normalization contract used by `get_auto_business_brand_core_v01()`
+- add regression coverage proving:
+  - `auto:원투랩핑` + persisted `원투 랩핑 PPF` is accepted
+  - the same loose surface from weaker mention evidence is still rejected
+  - an unrelated persisted display name is still rejected
+
+The gateway fix was committed at `829c7b22520abb786a378205486bff8f25fd3366`.
+
+CI after the fix passed:
+
+- Entity Engine v2
+- Typecheck
+- Application tests
+- Edge regression
+- PostgreSQL retention/comparison regression
+- Production build
+
+Lovable preview synchronized to the same final commit and reported ready with no preview error.
+
+### No-remeasurement recovery
+
+씽카스게러지 안산점 was **not** remeasured.
+
+Before recovery, the exact existing Run was revalidated:
+
+- exact pipeline Run = newest completed representative unified-diagnostic Run
+- Run contract = completed 24/24, failed=0
+- exactly one matching Entity Facts v2 aggregate
+- aggregate = contract_ok, 24 measurements, 24 valid measurements
+- matching observed-source aggregate exists
+- matching competitor-source-clue aggregate exists
+
+The pipeline item was then changed from the false-negative `failed / ENTITY_FACTS_INVALID` state to `completed` using the same existing Run. An audit event records that this was a no-remeasurement recovery after the read-gateway validation fix.
+
+Measurement credits remained at 7.
+
+### v0.8 acceptance result
+
+PASS:
+
+- two-step activation required
+- plan hash matched at activation
+- cron remained inactive before confirmation
+- at most one candidate started per tick
+- no second candidate started before the previous item reached terminal completion
+- each successful candidate created exactly one Run
+- each successful Run created exactly 24 Jobs
+- each successful candidate consumed exactly one measurement credit
+- failed startup did not consume a credit
+- failed startup did not create a replacement Run
+- pause stopped future claims without cancelling active work
+- Entity Facts v2 exact-Run completion was required
+- false-negative postprocessing failure was recovered without remeasurement
+- all three pilot candidates ended completed
+
+Final validation snapshot:
+
+- 온카케어 = completed
+- 타이어365 = completed
+- 씽카스게러지 안산점 = completed
+- active internal Runs = 0
+- ready candidates = 0
+- measurement credits = 7
+- scheduler = RUNNING
+- cron = active
+
+The final scheduler/cron state is an operational snapshot, not a requirement for future development work. With zero ready candidates, no new measurement starts. Adding a new `ready_to_measure` candidate while the scheduler remains RUNNING makes it eligible for the next guarded tick.
+
+## v0.9 candidate discovery design
+
+v0.9 adds **candidate discovery**, not a second measurement engine.
+
+The boundary is strict:
+
+```
+public-web / Work discovery
+  -> discovery proposal
+  -> operator review
+  -> approved structured candidate
+  -> existing internal observation candidate intake
+  -> existing preview / preparation gates
+  -> ready_to_measure
+  -> existing guarded scheduler
+```
+
+A discovered entity must never jump directly from browser/Work output to measurement.
+
+### v0.9 goals
+
+1. reduce manual candidate research time
+2. preserve public evidence supporting why a business was proposed
+3. keep business identity review explicit
+4. reuse the existing internal-observation candidate preparation path
+5. prevent discovery automation from creating Runs, Jobs, or credit debits
+6. keep Work/browser automation replaceable and outside the measurement truth path
+
+### Discovery queue state model
+
+Proposed state machine:
+
+```
+discovered
+  -> needs_review
+      -> approved
+      -> rejected
+      -> duplicate
+      -> needs_identity_review
+
+approved
+  -> promoted_to_pipeline
+```
+
+`promoted_to_pipeline` means a structured proposal has been copied into the existing internal observation candidate intake surface. It does **not** mean the candidate has been prepared or measured.
+
+### Proposed discovery record
+
+A discovery record should remain separate from `internal_observation_pipeline_items`.
+
+Minimum proposed fields:
+
+- id
+- org_id
+- discovery_source = work | manual | web
+- discovery_batch_id
+- raw_name
+- proposed_canonical_name
+- category
+- service
+- region
+- city
+- website_url
+- public_profile_urls
+- source_evidence
+- discovered_at
+- review_status
+- reviewed_by
+- reviewed_at
+- rejection_reason
+- duplicate_business_id
+- promoted_pipeline_item_id
+- idempotency_fingerprint
+
+Raw discovery evidence must be retained for review, but only approved structured fields may cross into the existing pipeline.
+
+### Identity and duplicate gate
+
+Before approval, v0.9 should compare a proposal against:
+
+- existing internal-organization businesses
+- existing discovery proposals
+- existing pipeline candidates
+- normalized business name
+- region/city
+- known public domain/profile URLs
+
+The discovery layer may flag likely duplicates, but it must not auto-merge businesses.
+
+Branch ambiguity should route to `needs_identity_review`, especially when:
+
+- the same brand has multiple nearby branches
+- the same domain represents many branches
+- city/branch name is absent
+- the public evidence does not clearly identify one physical business
+
+### Operator review contract
+
+Approval should require explicit confirmation of at least:
+
+- canonical business name
+- category
+- primary service
+- broad region
+- city when applicable
+
+Helpful but not mandatory enrichment:
+
+- official/public website
+- Naver/public profile URL
+- brand/model specialization
+- short evidence note
+
+Approval still does not create a Run.
+
+After approval, promotion should call the **existing** candidate-intake/idempotency path rather than inserting a second preparation implementation.
+
+### Work/browser role
+
+Work may:
+
+- search public automotive businesses
+- collect public homepage/profile URLs
+- suggest category/service/region/city
+- attach short public evidence supporting the suggestion
+- identify possible duplicates for human review
+
+Work must not:
+
+- create a customer measurement Run
+- enqueue measurement Jobs
+- debit measurement credits
+- mark a discovery proposal ready to measure
+- choose a final business identity when evidence is ambiguous
+- bypass Unified Diagnostic v0.2 preparation
+
+### v0.9 sub-phases
+
+#### v0.9.1 — read-only discovery preview
+
+Start with no persistent mutation.
+
+Input:
+
+- target region/city
+- automotive category/service
+- optional brand/model focus
+- desired candidate count
+
+Output:
+
+- candidate proposals
+- public evidence URLs
+- normalized suggested fields
+- duplicate/identity warnings
+
+No business, question set, pipeline item, Run, Job, or credit mutation.
+
+#### v0.9.2 — persistent review queue
+
+Persist discovery proposals into a dedicated service-role-only table.
+
+Add:
+
+- idempotent discovery batches
+- operator review status
+- duplicate flags
+- evidence retention
+- audit events
+
+Still no automatic promotion to measurement.
+
+#### v0.9.3 — guarded promotion
+
+Allow an operator-approved discovery proposal to enter the existing internal candidate intake.
+
+Promotion must:
+
+- preserve the discovery-to-pipeline audit link
+- reuse current candidate idempotency
+- never rewrite an existing business automatically
+- stop on identity ambiguity
+- leave preparation and 24-question preview unchanged
+
+#### v0.9.4 — recurring discovery, still no recurring auto-approval
+
+Only after v0.9.1-v0.9.3 are validated:
+
+- allow a scheduled discovery batch
+- deduplicate against prior discovery batches
+- surface only new/changed candidates for review
+- do not auto-approve
+- do not auto-promote
+- do not auto-measure
+
+### v0.9 acceptance criteria
+
+v0.9 should not be considered complete until:
+
+- the same public business discovered twice becomes one review candidate or an explicit duplicate
+- an ambiguous branch never auto-merges
+- a rejected candidate never enters the measurement pipeline
+- approval alone does not create a Run
+- promotion reuses the existing candidate idempotency path
+- preparation still shows the existing 24-question preview
+- discovery evidence remains inspectable after promotion
+- Work/browser failure cannot alter scheduler state
+- discovery cannot consume measurement credits
+- no discovery code path can call `enqueue-run`
+
 ## Work / browser automation role
 
 Work is not the measurement engine.
@@ -546,15 +921,31 @@ Before marking the executor ready:
 
 ### v0.8 - first enabled scheduler cycle
 
-Only after explicit operator approval:
-- mark executor ready
-- create a fresh activation request
-- confirm the activation phrase
-- allow cron activation
-- watch the first candidate from claim through Entity Facts v2 completion
-- verify second candidate does not start before the first terminal state
+Validated:
+- executor readiness explicitly approved
+- fresh activation request + exact confirmation phrase
+- cron activation
+- first live startup failure remained fail-closed
+- ambiguous SQL `run_id` defect fixed and regression-tested
+- retry required explicit operator approval
+- oldest-ready sequential dispatch confirmed across three candidates
+- exact one Run / 24 Jobs / one credit per successful candidate
+- next candidate blocked until prior terminal completion
+- Entity Facts v2 false-negative read-gateway defect identified
+- persisted brand-core display validation generalized without business hardcoding
+- false-negative item recovered using the existing 24/24 Run without remeasurement
+- all three pilot candidates completed
+- credits ended at 7
 
 ### v0.9 - candidate discovery
 
-Add external/Work discovery into a separate review queue.
-Do not directly measure a browser-discovered entity before structured identity review.
+Designed:
+- separate discovery/review queue
+- public evidence retention
+- duplicate and branch-identity review gates
+- explicit operator approval
+- guarded promotion into the existing candidate-intake path
+- no direct measurement from browser/Work output
+- no discovery-triggered credit debit
+- no second enqueue/measurement engine
+- recurring discovery only after read-only preview, persistence, and guarded promotion are validated
