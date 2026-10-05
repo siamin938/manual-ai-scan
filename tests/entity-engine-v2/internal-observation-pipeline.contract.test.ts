@@ -123,6 +123,14 @@ const executorDeploymentStateMigration = readFileSync(
   "utf8",
 );
 
+const schedulerRunIdAmbiguityFixMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20261005043117_fix_internal_observation_scheduler_run_id_ambiguity.sql",
+  ),
+  "utf8",
+);
+
 describe("internal observation pipeline v0.7 unattended executor", () => {
   it("is internal-only and defaults measurement execution to off", () => {
     expect(navSource).toContain(
@@ -440,6 +448,16 @@ describe("internal observation pipeline v0.7 unattended executor", () => {
     expect(schedulerOperationsMigration).toContain("s.scheduler_executor_ready=true");
     expect(schedulerOperationsMigration).toContain(
       "s.scheduler_actor_user_id=p_actor_user_id",
+    );
+  });
+
+  it("qualifies pipeline run_id in the scheduler run creation hotfix", () => {
+    expect(schedulerRunIdAmbiguityFixMigration).toContain(
+      "update public.internal_observation_pipeline_items as i",
+    );
+    expect(schedulerRunIdAmbiguityFixMigration).toContain("and i.run_id is null");
+    expect(schedulerRunIdAmbiguityFixMigration).not.toContain(
+      "and run_id is null;",
     );
   });
 
