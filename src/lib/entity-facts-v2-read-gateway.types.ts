@@ -262,6 +262,25 @@ function normalizeCompetitorDisplaySurfaceWithoutCorporateMarker(
     .replace(/[^0-9a-z가-힣]/giu, "");
 }
 
+/**
+ * Mirrors the persisted canonicalization brand-core rule used by
+ * get_auto_business_brand_core_v01. This is intentionally used only for
+ * priority-1 canonical_display_name evidence that is already bound to the
+ * exact canonical_key in storage. Weaker mention/alias evidence remains
+ * exact-surface only.
+ */
+function normalizePersistedCanonicalBrandCoreSurface(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/(?:\(주\)|주식회사)/gu, "")
+    .replace(/[^0-9a-z가-힣]/giu, "")
+    .replace(
+      /(?:ppf|필름|랩핑|래핑|썬팅|틴팅|tinting|tint|wrapping|wrap|디테일링|코팅|세차)$/iu,
+      "",
+    );
+}
+
 function autoCanonicalSurface(value: string): string | null {
   const key = value.trim();
   if (!key.startsWith("auto:")) return null;
@@ -288,12 +307,18 @@ export function pickEntityFactsV2AutoCompetitorDisplayName(
     const normalizedWithoutCorporateMarker =
       normalizeCompetitorDisplaySurfaceWithoutCorporateMarker(label);
 
+    const persistedCanonicalBrandCore =
+      item.priority === 1
+        ? normalizePersistedCanonicalBrandCoreSurface(label)
+        : null;
+
     if (
       !label ||
       !Number.isInteger(item.priority) ||
       item.priority < 1 ||
       (normalizedLabel !== expectedSurface &&
-        normalizedWithoutCorporateMarker !== expectedSurface)
+        normalizedWithoutCorporateMarker !== expectedSurface &&
+        persistedCanonicalBrandCore !== expectedSurface)
     ) {
       continue;
     }
