@@ -20,6 +20,43 @@ type FunctionInvoker = {
   };
 };
 
+type LooseRecord = Record<string, unknown> & {
+  url?: unknown;
+  domain?: unknown;
+  title?: unknown;
+  note?: unknown;
+  duplicateStatus?: unknown;
+  name?: unknown;
+  category?: unknown;
+  service?: unknown;
+  region?: unknown;
+  city?: unknown;
+  websiteUrl?: unknown;
+  matchedExistingBusinessName?: unknown;
+  matchedPipelineBusinessName?: unknown;
+  publicProfileUrls?: unknown;
+  duplicateWarnings?: unknown;
+  evidence?: unknown;
+  version?: unknown;
+  readOnly?: unknown;
+  persisted?: unknown;
+  measurementSideEffects?: unknown;
+  measurementCreditDebited?: unknown;
+  provider?: unknown;
+  query?: unknown;
+  candidates?: unknown;
+  orgId?: unknown;
+  orgName?: unknown;
+  model?: unknown;
+  publicSourceCount?: unknown;
+  generatedAt?: unknown;
+  desiredCount?: unknown;
+  brandModel?: unknown;
+  ok?: unknown;
+  error?: unknown;
+  preview?: unknown;
+};
+
 export type InternalObservationDiscoveryDuplicateStatus =
   | "none"
   | "existing_business_exact"
@@ -82,7 +119,7 @@ export type GetInternalObservationDiscoveryPreviewResult =
         | "NOT_AVAILABLE";
     };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is LooseRecord {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
