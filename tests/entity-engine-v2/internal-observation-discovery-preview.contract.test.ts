@@ -60,6 +60,11 @@ describe("internal observation discovery preview v0.9.1", () => {
     expect(serverSource).toContain("can_view_data_asset_admin_v01");
   });
 
+  it("parses fenced JSON without invalid escaped-backtick regex literals", () => {
+    expect(edgeSource).toContain('unfenced.startsWith("```")');
+    expect(edgeSource).not.toContain("/^\\`\\`\\`");
+  });
+
   it("uses public web search and keeps only provider-observed evidence URLs", () => {
     expect(edgeSource).toContain('type: "web_search"');
     expect(edgeSource).toContain("search_context_size: \"medium\"");
