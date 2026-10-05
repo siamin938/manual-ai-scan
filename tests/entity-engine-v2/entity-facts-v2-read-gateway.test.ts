@@ -150,6 +150,36 @@ describe("Entity Facts v2 Read Gateway", () => {
     ).toBe("솔라가드 프리미엄 THE LX 일산동구점");
   });
 
+  it("accepts persisted canonical display names that match the stored brand core", () => {
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:원투랩핑",
+        [{ label: "원투 랩핑 PPF", priority: 1 }],
+      ),
+    ).toBe("원투 랩핑 PPF");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:원투랩핑",
+        [{ label: "(주) 원투 랩핑 PPF", priority: 1 }],
+      ),
+    ).toBe("(주) 원투 랩핑 PPF");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:원투랩핑",
+        [{ label: "원투 랩핑 PPF", priority: 3 }],
+      ),
+    ).toBeNull();
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:원투랩핑",
+        [{ label: "다른 업체 PPF", priority: 1 }],
+      ),
+    ).toBeNull();
+  });
+
   it("allows only standard Korean corporate markers around an exact auto competitor name", () => {
     expect(
       pickEntityFactsV2AutoCompetitorDisplayName(
