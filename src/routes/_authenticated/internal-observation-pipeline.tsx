@@ -65,6 +65,10 @@ import {
   type SchedulerActivationBlocker,
 } from "@/lib/internal-observation-scheduler-operations.functions";
 import { getPilotOpsAdminResult } from "@/lib/pilot-ops-admin-detail.functions";
+import {
+  getInternalObservationDiscoveryPreview,
+  type InternalObservationDiscoveryDuplicateStatus,
+} from "@/lib/internal-observation-discovery.functions";
 
 export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
   component: InternalObservationPipelinePage,
@@ -241,6 +245,29 @@ function executionBlockerLabel(code: InternalObservationExecutionBlocker): strin
   }
 }
 
+function discoveryDuplicateLabel(
+  status: InternalObservationDiscoveryDuplicateStatus,
+): string {
+  switch (status) {
+    case "existing_business_exact":
+      return "기존 업체 일치";
+    case "existing_pipeline_exact":
+      return "기존 후보 일치";
+    case "existing_domain_overlap":
+      return "공개 도메인 중복";
+    case "none":
+      return "신규 후보";
+  }
+}
+
+function discoveryDuplicateVariant(
+  status: InternalObservationDiscoveryDuplicateStatus,
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "none") return "outline";
+  if (status === "existing_domain_overlap") return "secondary";
+  return "destructive";
+}
+
 function usd(value: number): string {
   return `${value.toFixed(2)}`;
 }
@@ -275,6 +302,7 @@ function InternalObservationPipelinePage() {
   const pauseScheduler = useServerFn(pauseInternalObservationScheduler);
   const stopScheduler = useServerFn(stopInternalObservationScheduler);
   const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
+  const fetchDiscoveryPreview = useServerFn(getInternalObservationDiscoveryPreview);
 
   const [orgId, setOrgId] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -294,11 +322,23 @@ function InternalObservationPipelinePage() {
   const [executionItemId, setExecutionItemId] = useState<string | null>(null);
   const [resultTarget, setResultTarget] = useState<InternalObservationPipelineItemDTO | null>(null);
   const [activationConfirmation, setActivationConfirmation] = useState("");
+  const [discoveryCategory, setDiscoveryCategory] = useState("");
+  const [discoveryRegion, setDiscoveryRegion] = useState("");
+  const [discoveryCity, setDiscoveryCity] = useState("");
+  const [discoveryServiceSelect, setDiscoveryServiceSelect] = useState("");
+  const [discoveryServiceCustom, setDiscoveryServiceCustom] = useState("");
+  const [discoveryBrandModel, setDiscoveryBrandModel] = useState("");
+  const [discoveryDesiredCount, setDiscoveryDesiredCount] = useState("5");
 
   const service =
     serviceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
       ? serviceCustom.trim()
       : serviceSelect;
+
+  const discoveryService =
+    discoveryServiceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
+      ? discoveryServiceCustom.trim()
+      : discoveryServiceSelect;
 
   const overviewQuery = useQuery({
     queryKey: ["internal-observation-pipeline-overview"],
@@ -346,6 +386,37 @@ function InternalObservationPipelinePage() {
     if (orgId || !overview?.organizations.length) return;
     setOrgId(overview.organizations[0]!.orgId);
   }, [orgId, overview?.organizations]);
+
+  const discoveryMutation = useMutation({
+    mutationFn: () =>
+      fetchDiscoveryPreview({
+        data: {
+          orgId,
+          category: discoveryCategory,
+          service: discoveryService,
+          region: discoveryRegion,
+          city: discoveryCity || null,
+          brandModel: discoveryBrandModel || null,
+          desiredCount: Number(discoveryDesiredCount),
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "INVALID_INPUT"
+            ? "탐색 조건을 확인해 주세요."
+            : res.error === "FORBIDDEN"
+              ? "내부 Discovery Preview 권한이 없습니다."
+              : "공개 후보를 찾지 못했습니다.",
+        );
+        return;
+      }
+      toast.success(
+        `공개 후보 ${res.preview.candidates.length}곳을 읽기 전용으로 확인했습니다.`,
+      );
+    },
+    onError: () => toast.error("Discovery Preview 중 오류가 발생했습니다."),
+  });
 
   const enqueueMutation = useMutation({
     mutationFn: () =>
@@ -610,6 +681,19 @@ function InternalObservationPipelinePage() {
 
   const schedulerPlan = schedulerQuery.data?.ok ? schedulerQuery.data.plan : null;
   const schedulerOps = schedulerOpsQuery.data?.ok ? schedulerOpsQuery.data.data : null;
+  const discoveryPreview = discoveryMutation.data?.ok
+    ? discoveryMutation.data.preview
+    : null;
+  const discoveryCount = Number(discoveryDesiredCount);
+  const canDiscover =
+    !!orgId &&
+    discoveryCategory.trim().length > 0 &&
+    discoveryRegion.trim().length > 0 &&
+    discoveryService.trim().length > 0 &&
+    Number.isInteger(discoveryCount) &&
+    discoveryCount >= 1 &&
+    discoveryCount <= 8 &&
+    !discoveryMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -617,11 +701,12 @@ function InternalObservationPipelinePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">내부 데이터 수집</h1>
           <Badge variant="secondary">내부 운영자 전용</Badge>
-          <Badge variant="outline">Pipeline v0.7 Executor</Badge>
+          <Badge variant="outline">Pipeline v0.8 Validated</Badge>
+          <Badge variant="outline">Discovery v0.9.1 Preview</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          Unattended Scheduler 실행기까지 구현했으며, 배포 상태와 실제 활성화 준비 Gate를 분리해 관리합니다.
-          executor_ready 승인 전에는 자동 실행을 활성화할 수 없습니다.
+          v0.8 자동 순차 실행을 검증했고, v0.9.1에서는 공개 웹 후보를 저장 없이 미리 확인합니다.
+          Discovery Preview는 기존 측정·Scheduler 경로와 분리된 읽기 전용 단계입니다.
         </p>
         <p className="text-xs text-muted-foreground">
           기준 시각 {formatSeoul(overview.generatedAt)}
@@ -1030,6 +1115,227 @@ function InternalObservationPipelinePage() {
           </CardContent>
         </Card>
       )}
+
+      <Card className="border-dashed">
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base">공개 업체 Discovery Preview</CardTitle>
+            <Badge variant="outline">v0.9.1</Badge>
+            <Badge variant="secondary">읽기 전용</Badge>
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">
+            지역·서비스 조건으로 공개 웹에서 실제 업체 후보와 근거 URL을 찾습니다.
+            이 단계에서는 업체·후보·질문·Run·Job을 저장하지 않고 측정권도 차감하지 않습니다.
+            OpenAI 웹 검색 호출만 발생합니다.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label>내부 관찰 조직</Label>
+              <Select value={orgId} onValueChange={setOrgId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="조직 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {overview.organizations.map((org) => (
+                    <SelectItem key={org.orgId} value={org.orgId}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>업종</Label>
+              <Select value={discoveryCategory} onValueChange={setDiscoveryCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="업종 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUTOMOTIVE_CATEGORY_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>주력 서비스</Label>
+              <Select
+                value={discoveryServiceSelect}
+                onValueChange={(value) => {
+                  setDiscoveryServiceSelect(value);
+                  if (value !== INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION) {
+                    setDiscoveryServiceCustom("");
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="서비스 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INTERNAL_OBSERVATION_SERVICE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {discoveryServiceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION && (
+                <Input
+                  value={discoveryServiceCustom}
+                  onChange={(event) => setDiscoveryServiceCustom(event.target.value)}
+                  placeholder="서비스 직접 입력"
+                />
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="discovery-region">기준 지역</Label>
+              <Input
+                id="discovery-region"
+                value={discoveryRegion}
+                onChange={(event) => setDiscoveryRegion(event.target.value)}
+                placeholder="예: 경기"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="discovery-city">상세 지역 (선택)</Label>
+              <Input
+                id="discovery-city"
+                value={discoveryCity}
+                onChange={(event) => setDiscoveryCity(event.target.value)}
+                placeholder="예: 안산"
+              />
+            </div>
+
+            <div className="space-y-1.5 md:col-span-2">
+              <Label htmlFor="discovery-brand">브랜드·차종 포커스 (선택)</Label>
+              <Input
+                id="discovery-brand"
+                value={discoveryBrandModel}
+                onChange={(event) => setDiscoveryBrandModel(event.target.value)}
+                placeholder="예: 테슬라 모델Y / 수입차"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="discovery-count">후보 수</Label>
+              <Input
+                id="discovery-count"
+                type="number"
+                min={1}
+                max={8}
+                value={discoveryDesiredCount}
+                onChange={(event) => setDiscoveryDesiredCount(event.target.value)}
+              />
+            </div>
+
+            <div className="flex items-end">
+              <Button
+                className="w-full"
+                disabled={!canDiscover}
+                onClick={() => discoveryMutation.mutate()}
+              >
+                {discoveryMutation.isPending ? "공개 웹 탐색 중…" : "공개 후보 찾기"}
+              </Button>
+            </div>
+          </div>
+
+          {discoveryPreview && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">저장 0건</Badge>
+                <span>후보 {discoveryPreview.candidates.length}곳</span>
+                <span>· 공개 검색 근거 {discoveryPreview.publicSourceCount}개</span>
+                <span>· 측정권 차감 없음</span>
+              </div>
+
+              {discoveryPreview.candidates.length === 0 ? (
+                <p className="rounded-lg border p-5 text-sm text-muted-foreground">
+                  검증 가능한 공개 근거가 있는 후보를 찾지 못했습니다. 지역이나 서비스를 조금 넓혀 다시 확인해 주세요.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {discoveryPreview.candidates.map((candidate) => (
+                    <div
+                      key={`${candidate.name}|${candidate.websiteUrl ?? ""}`}
+                      className="rounded-lg border p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold">{candidate.name}</p>
+                            <Badge
+                              variant={discoveryDuplicateVariant(candidate.duplicateStatus)}
+                            >
+                              {discoveryDuplicateLabel(candidate.duplicateStatus)}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {candidate.category} · {candidate.region}
+                            {candidate.city ? ` ${candidate.city}` : ""} · {candidate.service}
+                          </p>
+                        </div>
+                        {candidate.websiteUrl && (
+                          <a
+                            href={candidate.websiteUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs underline underline-offset-4"
+                          >
+                            공개 사이트 보기
+                          </a>
+                        )}
+                      </div>
+
+                      {candidate.duplicateWarnings.length > 0 && (
+                        <div className="mt-3 rounded-md bg-muted/30 p-3">
+                          {candidate.duplicateWarnings.map((warning) => (
+                            <p key={warning} className="text-xs text-muted-foreground">
+                              · {warning}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs font-medium">공개 근거</p>
+                        {candidate.evidence.map((evidence) => (
+                          <div key={evidence.url} className="text-xs leading-5">
+                            <a
+                              href={evidence.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline underline-offset-4"
+                            >
+                              {evidence.title || evidence.domain}
+                            </a>
+                            {evidence.note && (
+                              <span className="ml-2 text-muted-foreground">
+                                {evidence.note}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+                        Preview 결과는 자동 등록하지 않습니다. 업체 identity와 지점 여부를 운영자가 확인한 뒤 기존 후보 등록 절차를 사용합니다.
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
