@@ -1,6 +1,6 @@
-# Internal Observation Pipeline v0.8 First Enabled Scheduler Cycle
+# Internal Observation Pipeline v0.9.1 Read-only Discovery Preview
 
-Status: v0.8 first enabled scheduler cycle validated end-to-end on 2026-10-05. The unattended executor, two-step activation, sequential one-at-a-time dispatch, measurement credit debit, terminal reconciliation, and Entity Facts v2 completion path were exercised with three real internal-observation candidates. Two fail-closed QA defects were discovered and fixed without bypassing the existing safety gates. Final validation reached three completed candidates, zero active internal Runs, seven remaining measurement credits, scheduler RUNNING, cron active, and zero ready candidates at the validation snapshot.
+Status: v0.8 first enabled scheduler cycle is validated end-to-end. v0.9.1 read-only public-web Discovery Preview is now implemented and deployed behind authenticated internal-operator access. Discovery Preview performs an OpenAI web-search call but does not persist discovery results, create businesses or pipeline items, prepare questions, create Runs/Jobs, or debit measurement credits. The deployed endpoint requires JWT authentication; an unauthenticated smoke request returned HTTP 401. Authenticated operator preview QA remains the next live validation step.
 
 ## Goal
 
@@ -727,23 +727,75 @@ Work must not:
 
 #### v0.9.1 — read-only discovery preview
 
-Start with no persistent mutation.
+Implemented and deployed.
 
 Input:
 
 - target region/city
 - automotive category/service
 - optional brand/model focus
-- desired candidate count
+- desired candidate count (1-8)
+
+Execution boundary:
+
+- authenticated internal operator only
+- internal-observation organization only
+- OpenAI Responses API web search
+- `store=false`
+- provider-observed web-search source URLs are collected from the response
+- a proposed evidence URL is accepted only when it matches a URL actually present in the provider search-source payload
+- candidates without any verified public evidence URL are dropped
+- existing business/pipeline names and public domains are read only for duplicate warnings
 
 Output:
 
 - candidate proposals
-- public evidence URLs
-- normalized suggested fields
-- duplicate/identity warnings
+- verified public evidence URLs
+- requested normalized category/service/region context
+- duplicate warnings:
+  - exact existing business
+  - exact existing pipeline candidate
+  - existing public-domain overlap
 
-No business, question set, pipeline item, Run, Job, or credit mutation.
+Safety:
+
+- discovery result persistence = false
+- business creation = 0
+- pipeline item creation = 0
+- question-set/question creation = 0
+- Run creation = 0
+- Job creation = 0
+- measurement-credit debit = 0
+- no `enqueue-run` path
+- Preview explicitly states that candidates are not auto-registered
+
+Implementation:
+
+- Edge Function: `internal-observation-discovery-preview`
+- server function: `getInternalObservationDiscoveryPreview`
+- UI: internal observation operations screen, `Discovery v0.9.1 Preview`
+- Edge platform auth: `verify_jwt=true`
+- function body also re-validates the user and internal organization write role
+
+Validation:
+
+- Entity Engine v2 CI: PASS
+- Typecheck: PASS
+- Application tests: PASS
+- Edge regression: PASS
+- PostgreSQL retention/comparison regression: PASS
+- Production build: PASS
+- Lovable preview synchronized and ready
+- deployed Edge Function: ACTIVE
+- unauthenticated POST smoke: HTTP 401 `UNAUTHORIZED_NO_AUTH_HEADER`
+
+Still required before calling v0.9.1 live-QA complete:
+
+- log in as an authorized internal operator
+- run one real Discovery Preview from the UI
+- verify returned businesses and evidence URLs manually
+- verify duplicate warnings against known internal businesses
+- confirm pipeline rows, Runs, Jobs, and credit balance remain unchanged
 
 #### v0.9.2 — persistent review queue
 
