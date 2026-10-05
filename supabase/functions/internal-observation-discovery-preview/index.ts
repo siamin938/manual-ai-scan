@@ -143,8 +143,8 @@ function collectSourceUrls(payload: unknown): Array<{
 function parseJsonText(text: string): RecordValue | null {
   const trimmed = text.trim();
   const unfenced = trimmed
-    .replace(/^\`\`\`(?:json)?\s*/iu, "")
-    .replace(/\s*\`\`\`$/u, "");
+    .replace(/^```(?:json)?\\s*/iu, "")
+    .replace(/\\s*```$/u, "");
   try {
     const parsed = JSON.parse(unfenced) as unknown;
     return isRecord(parsed) ? parsed : null;
