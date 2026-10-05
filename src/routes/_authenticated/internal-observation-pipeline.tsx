@@ -407,7 +407,9 @@ function InternalObservationPipelinePage() {
             ? "탐색 조건을 확인해 주세요."
             : res.error === "FORBIDDEN"
               ? "내부 Discovery Preview 권한이 없습니다."
-              : "공개 후보를 찾지 못했습니다.",
+              : res.error === "NOT_AVAILABLE"
+                ? "Discovery 응답 형식을 확인하지 못했습니다. 다시 시도해 주세요."
+                : "Discovery 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         );
         return;
       }
