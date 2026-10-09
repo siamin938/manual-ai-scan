@@ -1030,6 +1030,7 @@ function InternalObservationPipelinePage() {
   const discoverySchedules = discoveryRecurringOverview?.schedules ?? [];
   const discoveryRecentBatches = discoveryRecurringOverview?.recentBatches ?? [];
   const discoveryRecentChanges = discoveryRecurringOverview?.recentChanges ?? [];
+  const discoveryCount = Number(discoveryDesiredCount);
   const recurringHour = Number(recurringRunHourKst);
   const recurringWeekday = Number(recurringWeekdayIso);
   const canSaveRecurringSchedule =
@@ -1054,7 +1055,6 @@ function InternalObservationPipelinePage() {
     promotionReviewItemId === promotionPreviewMutation.data.plan.reviewItemId
       ? promotionPreviewMutation.data.plan
       : null;
-  const discoveryCount = Number(discoveryDesiredCount);
   const canDiscover =
     !!orgId &&
     discoveryCategory.trim().length > 0 &&
