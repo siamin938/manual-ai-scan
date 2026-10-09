@@ -67,8 +67,15 @@ import {
 import { getPilotOpsAdminResult } from "@/lib/pilot-ops-admin-detail.functions";
 import {
   getInternalObservationDiscoveryPreview,
+  type InternalObservationDiscoveryCandidateDTO,
   type InternalObservationDiscoveryDuplicateStatus,
 } from "@/lib/internal-observation-discovery.functions";
+import {
+  getInternalObservationDiscoveryReviewQueue,
+  saveInternalObservationDiscoveryCandidate,
+  updateInternalObservationDiscoveryReview,
+  type InternalObservationDiscoveryReviewStatus,
+} from "@/lib/internal-observation-discovery-review.functions";
 
 export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
   component: InternalObservationPipelinePage,
@@ -268,6 +275,32 @@ function discoveryDuplicateVariant(
   return "destructive";
 }
 
+function discoveryReviewLabel(
+  status: InternalObservationDiscoveryReviewStatus,
+): string {
+  switch (status) {
+    case "needs_review":
+      return "검토 대기";
+    case "approved":
+      return "승인";
+    case "rejected":
+      return "제외";
+    case "duplicate":
+      return "중복";
+    case "needs_identity_review":
+      return "지점 확인 필요";
+  }
+}
+
+function discoveryReviewVariant(
+  status: InternalObservationDiscoveryReviewStatus,
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "approved") return "default";
+  if (status === "needs_identity_review") return "secondary";
+  if (status === "rejected" || status === "duplicate") return "destructive";
+  return "outline";
+}
+
 function usd(value: number): string {
   return `${value.toFixed(2)}`;
 }
@@ -303,6 +336,15 @@ function InternalObservationPipelinePage() {
   const stopScheduler = useServerFn(stopInternalObservationScheduler);
   const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
   const fetchDiscoveryPreview = useServerFn(getInternalObservationDiscoveryPreview);
+  const fetchDiscoveryReviewQueue = useServerFn(
+    getInternalObservationDiscoveryReviewQueue,
+  );
+  const saveDiscoveryCandidate = useServerFn(
+    saveInternalObservationDiscoveryCandidate,
+  );
+  const updateDiscoveryReview = useServerFn(
+    updateInternalObservationDiscoveryReview,
+  );
 
   const [orgId, setOrgId] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -365,6 +407,14 @@ function InternalObservationPipelinePage() {
     queryFn: () => fetchSchedulerOperations({ data: { orgId } }),
   });
 
+  const discoveryReviewQuery = useQuery({
+    queryKey: ["internal-observation-discovery-review", orgId],
+    enabled: !!orgId,
+    retry: false,
+    refetchInterval: 15000,
+    queryFn: () => fetchDiscoveryReviewQueue({ data: { orgId } }),
+  });
+
   const resultQuery = useQuery({
     queryKey: [
       "internal-observation-pipeline-result",
@@ -418,6 +468,72 @@ function InternalObservationPipelinePage() {
       );
     },
     onError: () => toast.error("Discovery Preview 중 오류가 발생했습니다."),
+  });
+
+  const saveDiscoveryMutation = useMutation({
+    mutationFn: (candidate: InternalObservationDiscoveryCandidateDTO) => {
+      if (!discoveryPreview) {
+        throw new Error("DISCOVERY_PREVIEW_NOT_AVAILABLE");
+      }
+      return saveDiscoveryCandidate({
+        data: {
+          orgId,
+          previewGeneratedAt: discoveryPreview.generatedAt,
+          query: discoveryPreview.query,
+          candidate,
+        },
+      });
+    },
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "FORBIDDEN"
+            ? "Discovery Review Queue 저장 권한이 없습니다."
+            : res.error === "INVALID_INPUT"
+              ? "후보 데이터가 바뀌어 저장하지 못했습니다. 다시 탐색해 주세요."
+              : "검토 후보를 저장하지 못했습니다.",
+        );
+        return;
+      }
+      toast.success(
+        res.idempotent
+          ? "이미 저장된 후보의 공개 근거를 최신 상태로 갱신했습니다."
+          : "검토 후보로 저장했습니다.",
+      );
+      discoveryReviewQuery.refetch();
+    },
+    onError: () => toast.error("검토 후보 저장 중 오류가 발생했습니다."),
+  });
+
+  const updateDiscoveryReviewMutation = useMutation({
+    mutationFn: (args: {
+      itemId: string;
+      reviewStatus: InternalObservationDiscoveryReviewStatus;
+    }) =>
+      updateDiscoveryReview({
+        data: {
+          orgId,
+          itemId: args.itemId,
+          reviewStatus: args.reviewStatus,
+          reviewNote: null,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "ALREADY_PROMOTED"
+            ? "이미 기존 파이프라인으로 승격된 후보입니다."
+            : "검토 상태를 변경하지 못했습니다.",
+        );
+        discoveryReviewQuery.refetch();
+        return;
+      }
+      toast.success(
+        `${res.item.businessName} · ${discoveryReviewLabel(res.item.reviewStatus)}`,
+      );
+      discoveryReviewQuery.refetch();
+    },
+    onError: () => toast.error("검토 상태 변경 중 오류가 발생했습니다."),
   });
 
   const enqueueMutation = useMutation({
@@ -686,6 +802,17 @@ function InternalObservationPipelinePage() {
   const discoveryPreview = discoveryMutation.data?.ok
     ? discoveryMutation.data.preview
     : null;
+  const discoveryReviewItems = discoveryReviewQuery.data?.ok
+    ? discoveryReviewQuery.data.overview.items
+    : [];
+  const discoveryNeedsReviewCount = discoveryReviewItems.filter(
+    (item) =>
+      item.reviewStatus === "needs_review" ||
+      item.reviewStatus === "needs_identity_review",
+  ).length;
+  const discoveryApprovedCount = discoveryReviewItems.filter(
+    (item) => item.reviewStatus === "approved",
+  ).length;
   const discoveryCount = Number(discoveryDesiredCount);
   const canDiscover =
     !!orgId &&
@@ -705,10 +832,12 @@ function InternalObservationPipelinePage() {
           <Badge variant="secondary">내부 운영자 전용</Badge>
           <Badge variant="outline">Pipeline v0.8 Validated</Badge>
           <Badge variant="outline">Discovery v0.9.1 Preview</Badge>
+          <Badge variant="outline">v0.9.2 Review Queue</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          v0.8 자동 순차 실행을 검증했고, v0.9.1에서는 공개 웹 후보를 저장 없이 미리 확인합니다.
-          Discovery Preview는 기존 측정·Scheduler 경로와 분리된 읽기 전용 단계입니다.
+          v0.8 자동 순차 실행을 검증했고, 공개 웹 후보는 v0.9.1 Preview에서 찾은 뒤
+          v0.9.2 Review Queue에 선택적으로 저장·검토합니다. 승인해도 아직 측정 파이프라인으로
+          자동 승격하지 않습니다.
         </p>
         <p className="text-xs text-muted-foreground">
           기준 시각 {formatSeoul(overview.generatedAt)}
@@ -1252,7 +1381,10 @@ function InternalObservationPipelinePage() {
           {discoveryPreview && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline">저장 0건</Badge>
+                <Badge variant="outline">Preview 자체 저장 없음</Badge>
+                <Badge variant="secondary">
+                  Review Queue {discoveryReviewItems.length}건
+                </Badge>
                 <span>후보 {discoveryPreview.candidates.length}곳</span>
                 <span>· 공개 검색 근거 {discoveryPreview.publicSourceCount}개</span>
                 <span>· 측정권 차감 없음</span>
@@ -1284,16 +1416,29 @@ function InternalObservationPipelinePage() {
                             {candidate.city ? ` ${candidate.city}` : ""} · {candidate.service}
                           </p>
                         </div>
-                        {candidate.websiteUrl && (
-                          <a
-                            href={candidate.websiteUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs underline underline-offset-4"
+                        <div className="flex flex-wrap items-center gap-2">
+                          {candidate.websiteUrl && (
+                            <a
+                              href={candidate.websiteUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs underline underline-offset-4"
+                            >
+                              공개 사이트 보기
+                            </a>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={saveDiscoveryMutation.isPending}
+                            onClick={() => saveDiscoveryMutation.mutate(candidate)}
                           >
-                            공개 사이트 보기
-                          </a>
-                        )}
+                            {saveDiscoveryMutation.isPending &&
+                            saveDiscoveryMutation.variables?.name === candidate.name
+                              ? "저장 중…"
+                              : "검토 후보로 저장"}
+                          </Button>
+                        </div>
                       </div>
 
                       {candidate.duplicateWarnings.length > 0 && (
@@ -1328,7 +1473,8 @@ function InternalObservationPipelinePage() {
                       </div>
 
                       <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
-                        Preview 결과는 자동 등록하지 않습니다. 업체 identity와 지점 여부를 운영자가 확인한 뒤 기존 후보 등록 절차를 사용합니다.
+                        Preview 결과는 자동 등록하지 않습니다. 필요 후보만 Review Queue에 저장하고,
+                        승인 이후에도 v0.9.3 전까지 기존 측정 파이프라인으로 자동 이동하지 않습니다.
                       </p>
                     </div>
                   ))}
@@ -1336,6 +1482,164 @@ function InternalObservationPipelinePage() {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">Discovery Review Queue</CardTitle>
+              <Badge variant="outline">v0.9.2</Badge>
+              <Badge variant="secondary">측정 연결 없음</Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              공개 후보 중 저장한 업체만 검토합니다. 승인·제외·중복·지점 확인 필요 상태를
+              기록하지만, 승인만으로 업체 등록·24문항 준비·Run 생성·측정권 차감은 발생하지 않습니다.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={discoveryReviewQuery.isFetching}
+            onClick={() => discoveryReviewQuery.refetch()}
+          >
+            {discoveryReviewQuery.isFetching ? "불러오는 중…" : "Queue 새로고침"}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border p-4">
+              <p className="text-xs text-muted-foreground">전체 저장 후보</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums">
+                {discoveryReviewItems.length}곳
+              </p>
+            </div>
+            <div className="rounded-lg border p-4">
+              <p className="text-xs text-muted-foreground">검토 필요</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums">
+                {discoveryNeedsReviewCount}곳
+              </p>
+            </div>
+            <div className="rounded-lg border p-4">
+              <p className="text-xs text-muted-foreground">승인</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums">
+                {discoveryApprovedCount}곳
+              </p>
+            </div>
+          </div>
+
+          {discoveryReviewQuery.isLoading && !discoveryReviewQuery.data ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              검토 후보를 불러오는 중…
+            </p>
+          ) : discoveryReviewItems.length === 0 ? (
+            <p className="rounded-lg border py-8 text-center text-sm text-muted-foreground">
+              저장된 검토 후보가 없습니다. 위 Discovery Preview에서 필요한 업체만 저장해 주세요.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>후보 업체</TableHead>
+                    <TableHead>공개 근거</TableHead>
+                    <TableHead>중복 신호</TableHead>
+                    <TableHead>검토 상태</TableHead>
+                    <TableHead>최근 발견</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {discoveryReviewItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="min-w-56 align-top">
+                        <p className="font-medium">{item.businessName}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {item.category} · {item.region}
+                          {item.city ? ` ${item.city}` : ""} · {item.service}
+                        </p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          아직 기존 수집 파이프라인으로 승격되지 않음
+                        </p>
+                      </TableCell>
+                      <TableCell className="min-w-52 align-top">
+                        <p className="text-sm">
+                          검증 URL {item.sourceEvidence.length}개
+                        </p>
+                        {item.sourceEvidence[0] && (
+                          <a
+                            href={item.sourceEvidence[0].url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 block max-w-56 truncate text-xs underline underline-offset-4"
+                            title={item.sourceEvidence[0].title ?? item.sourceEvidence[0].url}
+                          >
+                            {item.sourceEvidence[0].title ??
+                              item.sourceEvidence[0].domain}
+                          </a>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-44 align-top">
+                        <Badge variant={discoveryDuplicateVariant(item.duplicateStatus)}>
+                          {discoveryDuplicateLabel(item.duplicateStatus)}
+                        </Badge>
+                        {item.duplicateWarnings.slice(0, 2).map((warning) => (
+                          <p
+                            key={warning}
+                            className="mt-1 text-[11px] leading-4 text-muted-foreground"
+                          >
+                            {warning}
+                          </p>
+                        ))}
+                      </TableCell>
+                      <TableCell className="min-w-48 align-top">
+                        <div className="space-y-2">
+                          <Badge variant={discoveryReviewVariant(item.reviewStatus)}>
+                            {discoveryReviewLabel(item.reviewStatus)}
+                          </Badge>
+                          <Select
+                            value={item.reviewStatus}
+                            disabled={
+                              updateDiscoveryReviewMutation.isPending ||
+                              item.promotedPipelineItemId !== null
+                            }
+                            onValueChange={(value) =>
+                              updateDiscoveryReviewMutation.mutate({
+                                itemId: item.id,
+                                reviewStatus:
+                                  value as InternalObservationDiscoveryReviewStatus,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="needs_review">검토 대기</SelectItem>
+                              <SelectItem value="approved">승인</SelectItem>
+                              <SelectItem value="rejected">제외</SelectItem>
+                              <SelectItem value="duplicate">중복</SelectItem>
+                              <SelectItem value="needs_identity_review">
+                                지점 확인 필요
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </TableCell>
+                      <TableCell className="min-w-36 align-top text-xs text-muted-foreground">
+                        {formatSeoul(item.lastSeenAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            v0.9.2의 ‘승인’은 검토 결과만 저장합니다. 기존 후보 등록·통합 24문항 준비로 넘기는
+            Guarded Promotion은 v0.9.3에서 별도로 구현합니다.
+          </p>
         </CardContent>
       </Card>
 
