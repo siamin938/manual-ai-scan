@@ -76,6 +76,11 @@ import {
   updateInternalObservationDiscoveryReview,
   type InternalObservationDiscoveryReviewStatus,
 } from "@/lib/internal-observation-discovery-review.functions";
+import {
+  confirmInternalObservationDiscoveryPromotion,
+  previewInternalObservationDiscoveryPromotion,
+  type InternalObservationDiscoveryPromotionBlocker,
+} from "@/lib/internal-observation-discovery-promotion.functions";
 
 export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
   component: InternalObservationPipelinePage,
@@ -301,6 +306,23 @@ function discoveryReviewVariant(
   return "outline";
 }
 
+function discoveryPromotionBlockerLabel(
+  blocker: InternalObservationDiscoveryPromotionBlocker,
+): string {
+  switch (blocker) {
+    case "REVIEW_NOT_APPROVED":
+      return "Review Queue에서 먼저 승인해야 합니다.";
+    case "ALREADY_PROMOTED":
+      return "이미 기존 수집 파이프라인으로 승격된 후보입니다.";
+    case "PUBLIC_EVIDENCE_MISSING":
+      return "검증된 공개 근거가 없어 승격할 수 없습니다.";
+    case "BUSINESS_IDENTITY_AMBIGUOUS":
+      return "같은 업체 identity와 일치하는 기존 업체가 여러 곳이라 확인이 필요합니다.";
+    case "EXISTING_BUSINESS_INACTIVE":
+      return "동일 업체가 비활성 상태라 자동 재활성화하지 않습니다.";
+  }
+}
+
 function usd(value: number): string {
   return `${value.toFixed(2)}`;
 }
@@ -345,6 +367,12 @@ function InternalObservationPipelinePage() {
   const updateDiscoveryReview = useServerFn(
     updateInternalObservationDiscoveryReview,
   );
+  const previewDiscoveryPromotion = useServerFn(
+    previewInternalObservationDiscoveryPromotion,
+  );
+  const confirmDiscoveryPromotion = useServerFn(
+    confirmInternalObservationDiscoveryPromotion,
+  );
 
   const [orgId, setOrgId] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -371,6 +399,10 @@ function InternalObservationPipelinePage() {
   const [discoveryServiceCustom, setDiscoveryServiceCustom] = useState("");
   const [discoveryBrandModel, setDiscoveryBrandModel] = useState("");
   const [discoveryDesiredCount, setDiscoveryDesiredCount] = useState("5");
+  const [promotionOpen, setPromotionOpen] = useState(false);
+  const [promotionReviewItemId, setPromotionReviewItemId] = useState<string | null>(
+    null,
+  );
 
   const service =
     serviceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
@@ -534,6 +566,63 @@ function InternalObservationPipelinePage() {
       discoveryReviewQuery.refetch();
     },
     onError: () => toast.error("검토 상태 변경 중 오류가 발생했습니다."),
+  });
+
+  const promotionPreviewMutation = useMutation({
+    mutationFn: (reviewItemId: string) =>
+      previewDiscoveryPromotion({
+        data: {
+          orgId,
+          reviewItemId,
+        },
+      }),
+    onError: () => toast.error("승격 미리보기를 불러오지 못했습니다."),
+  });
+
+  const confirmPromotionMutation = useMutation({
+    mutationFn: (args: {
+      reviewItemId: string;
+      planHash: string;
+      confirmation: string;
+    }) =>
+      confirmDiscoveryPromotion({
+        data: {
+          orgId,
+          reviewItemId: args.reviewItemId,
+          planHash: args.planHash,
+          confirmation: args.confirmation,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        if (res.error === "PLAN_CHANGED" && res.plan) {
+          toast.warning("후보 또는 기존 데이터 상태가 바뀌었습니다. 승격 계획을 다시 확인해 주세요.");
+          promotionPreviewMutation.reset();
+          promotionPreviewMutation.mutate(res.plan.reviewItemId);
+          return;
+        }
+        toast.error(
+          res.error === "PLAN_BLOCKED"
+            ? "현재 상태에서는 이 후보를 승격할 수 없습니다."
+            : res.error === "INVALID_CONFIRMATION"
+              ? "승격 확인이 올바르지 않습니다."
+              : "후보를 기존 수집 파이프라인으로 승격하지 못했습니다.",
+        );
+        return;
+      }
+
+      toast.success(
+        res.idempotent
+          ? "이미 존재하는 기존 수집 후보와 안전하게 연결했습니다."
+          : "기존 수집 파이프라인에 준비 대기 후보 1건을 생성했습니다.",
+      );
+      setPromotionOpen(false);
+      setPromotionReviewItemId(null);
+      promotionPreviewMutation.reset();
+      discoveryReviewQuery.refetch();
+      qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+    },
+    onError: () => toast.error("승격 처리 중 오류가 발생했습니다."),
   });
 
   const enqueueMutation = useMutation({
@@ -759,6 +848,13 @@ function InternalObservationPipelinePage() {
     executionPlanMutation.mutate(itemId);
   };
 
+  const openPromotionPreview = (reviewItemId: string) => {
+    setPromotionReviewItemId(reviewItemId);
+    setPromotionOpen(true);
+    promotionPreviewMutation.reset();
+    promotionPreviewMutation.mutate(reviewItemId);
+  };
+
   if (overviewQuery.isLoading && !overviewQuery.data) {
     return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
   }
@@ -813,6 +909,11 @@ function InternalObservationPipelinePage() {
   const discoveryApprovedCount = discoveryReviewItems.filter(
     (item) => item.reviewStatus === "approved",
   ).length;
+  const promotionPlan =
+    promotionPreviewMutation.data?.ok &&
+    promotionReviewItemId === promotionPreviewMutation.data.plan.reviewItemId
+      ? promotionPreviewMutation.data.plan
+      : null;
   const discoveryCount = Number(discoveryDesiredCount);
   const canDiscover =
     !!orgId &&
@@ -833,6 +934,7 @@ function InternalObservationPipelinePage() {
           <Badge variant="outline">Pipeline v0.8 Validated</Badge>
           <Badge variant="outline">Discovery v0.9.1 Preview</Badge>
           <Badge variant="outline">v0.9.2 Review Queue</Badge>
+          <Badge variant="outline">v0.9.3 Guarded Promotion</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
           v0.8 자동 순차 실행을 검증했고, 공개 웹 후보는 v0.9.1 Preview에서 찾은 뒤
@@ -1624,6 +1726,20 @@ function InternalObservationPipelinePage() {
                               </SelectItem>
                             </SelectContent>
                           </Select>
+
+                          {item.promotedPipelineItemId ? (
+                            <Badge variant="secondary">승격 완료</Badge>
+                          ) : item.reviewStatus === "approved" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full"
+                              disabled={promotionPreviewMutation.isPending}
+                              onClick={() => openPromotionPreview(item.id)}
+                            >
+                              승격 미리보기
+                            </Button>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="min-w-36 align-top text-xs text-muted-foreground">
@@ -1637,11 +1753,153 @@ function InternalObservationPipelinePage() {
           )}
 
           <p className="text-[11px] leading-5 text-muted-foreground">
-            v0.9.2의 ‘승인’은 검토 결과만 저장합니다. 기존 후보 등록·통합 24문항 준비로 넘기는
-            Guarded Promotion은 v0.9.3에서 별도로 구현합니다.
+            v0.9.2의 ‘승인’은 검토 결과만 저장합니다. v0.9.3 승격은 별도 미리보기와 명시적 확인을
+            거쳐 기존 수집 파이프라인의 준비 대기(pending) 후보까지만 생성합니다.
           </p>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={promotionOpen}
+        onOpenChange={(open) => {
+          setPromotionOpen(open);
+          if (!open) {
+            setPromotionReviewItemId(null);
+            promotionPreviewMutation.reset();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Discovery 후보 승격 미리보기</DialogTitle>
+            <DialogDescription>
+              최신 업체 identity와 기존 수집 후보를 다시 확인합니다. 승격해도 24문항 준비나
+              측정은 시작하지 않습니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {promotionPreviewMutation.isPending && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              최신 승격 조건을 확인하는 중…
+            </p>
+          )}
+
+          {promotionPreviewMutation.data &&
+            !promotionPreviewMutation.data.ok && (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                승격 계획을 불러오지 못했습니다.
+              </p>
+            )}
+
+          {promotionPlan && (
+            <div className="space-y-4">
+              <div className="rounded-lg border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">{promotionPlan.businessName}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {promotionPlan.category} · {promotionPlan.region}
+                      {promotionPlan.city ? ` ${promotionPlan.city}` : ""} ·{" "}
+                      {promotionPlan.service}
+                    </p>
+                  </div>
+                  <Badge variant={promotionPlan.canPromote ? "default" : "destructive"}>
+                    {promotionPlan.canPromote ? "승격 가능" : "확인 필요"}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">승격 결과</p>
+                  <p className="mt-2 font-semibold">
+                    {promotionPlan.action === "create_pending_candidate"
+                      ? "기존 수집 파이프라인에 pending 후보 생성"
+                      : "이미 존재하는 동일 후보와 연결"}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">공개 근거</p>
+                  <p className="mt-2 font-semibold tabular-nums">
+                    {promotionPlan.sourceEvidenceCount}개 URL
+                  </p>
+                </div>
+              </div>
+
+              {promotionPlan.existingBusiness && (
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="font-medium">기존 업체 identity 일치</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {promotionPlan.existingBusiness.name} ·{" "}
+                    {promotionPlan.existingBusiness.active ? "활성" : "비활성"}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    활성 업체 1곳과 정확히 일치하면 이후 기존 24문항 준비 단계에서 재사용 여부를
+                    다시 미리보기합니다.
+                  </p>
+                </div>
+              )}
+
+              {promotionPlan.existingPipelineItemId && (
+                <div className="rounded-lg bg-muted/30 p-4 text-sm">
+                  동일 조건의 기존 수집 후보가 있어 새 후보를 만들지 않고 기존 후보에 연결합니다.
+                </div>
+              )}
+
+              {promotionPlan.blockers.length > 0 && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="text-sm font-semibold text-destructive">승격 차단 조건</p>
+                  <div className="mt-2 space-y-1">
+                    {promotionPlan.blockers.map((blocker) => (
+                      <p key={blocker} className="text-xs text-destructive">
+                        · {discoveryPromotionBlockerLabel(blocker)}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg bg-muted/30 p-4 text-xs leading-5 text-muted-foreground">
+                <p>승격 시 측정권 차감: 없음</p>
+                <p>Run 생성: 없음 · Job 생성: 없음</p>
+                <p>통합 24문항 생성: 없음</p>
+                <p>
+                  승격 뒤 기존 ‘준비 미리보기 → 준비 실행’ 단계를 별도로 거쳐야
+                  ready_to_measure가 됩니다.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPromotionOpen(false)}
+              disabled={confirmPromotionMutation.isPending}
+            >
+              취소
+            </Button>
+            <Button
+              disabled={
+                !promotionPlan?.canPromote ||
+                confirmPromotionMutation.isPending
+              }
+              onClick={() => {
+                if (!promotionPlan) return;
+                confirmPromotionMutation.mutate({
+                  reviewItemId: promotionPlan.reviewItemId,
+                  planHash: promotionPlan.planHash,
+                  confirmation: promotionPlan.confirmationText,
+                });
+              }}
+            >
+              {confirmPromotionMutation.isPending
+                ? "승격 중…"
+                : "기존 파이프라인으로 승격"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
