@@ -1614,7 +1614,12 @@ function DashboardPage() {
                           이유만으로는 포함하지 않습니다.
                         </p>
                       </div>
-                      {!model.verifiedTargetCitationPages.available ? (
+                      {model.verifiedTargetCitationPages.status === "not_verified" ? (
+                        <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                          이 측정에서는 인용 페이지 관련성 검증이 실행되지 않았습니다. 최근 측정은
+                          측정 완료 후 자동으로 검증합니다.
+                        </p>
+                      ) : model.verifiedTargetCitationPages.status === "pending" ? (
                         <p className="rounded-md bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
                           인용 페이지의 내 업체 관련성을 확인 중입니다. 기존 노출률과 출처 판정에는
                           영향이 없습니다.
@@ -2228,9 +2233,11 @@ function DashboardSummary({
             icon={<FileCheck2 aria-hidden="true" />}
             label="내 업체 관련 페이지"
             value={
-              summary.verifiedPageCount === null
-                ? "확인 중"
-                : `${summary.verifiedPageCount}개`
+              summary.verifiedPageStatus === "not_verified"
+                ? "미검증"
+                : summary.verifiedPageStatus === "pending"
+                  ? "확인 중"
+                  : `${summary.verifiedPageCount ?? 0}개`
             }
             note="페이지 내용 기준 관련 확인"
           />
@@ -2454,7 +2461,12 @@ function DashboardSummary({
             <CardTitle className="text-xl">관련성이 확인된 출처</CardTitle>
           </CardHeader>
           <CardContent>
-            {summary.verifiedPageCount === null ? (
+            {summary.verifiedPageStatus === "not_verified" ? (
+              <p className="rounded-lg bg-muted/40 px-4 py-5 text-sm text-muted-foreground">
+                이 측정에서는 인용 페이지 관련성 검증이 실행되지 않았습니다. 최근 측정은 측정
+                완료 후 자동으로 검증합니다.
+              </p>
+            ) : summary.verifiedPageStatus === "pending" ? (
               <p className="rounded-lg bg-muted/40 px-4 py-5 text-sm text-muted-foreground">
                 인용 페이지의 내 업체 관련성을 확인 중입니다.
               </p>
