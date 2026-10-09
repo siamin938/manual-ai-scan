@@ -197,24 +197,66 @@ export async function fetchActionOpportunityEvidence(args: {
       a.domain.localeCompare(b.domain, "en")
     );
 
+  // Source examples use the same guarded link selection as the current-run
+  // references. An attribution with two incompatible URLs must not turn into
+  // an arbitrary "business page" link in the existing dashboard.
+  const highVisibilityByEntityDomain = new Map<
+    string,
+    {
+      sourceGroupKey: string;
+      entityName: string;
+      entitySurface: string;
+      domain: string;
+      candidates: CitationPageCandidate[];
+    }
+  >();
+  for (const row of normalized) {
+    if (row.sourceGroupKey === "other") continue;
+    if (!highVisibilityCompetitorSurfaces.has(row.entitySurface)) continue;
+    const key = `${row.sourceGroupKey}\u0000${row.entitySurface}\u0000${row.domain}`;
+    const bucket = highVisibilityByEntityDomain.get(key);
+    if (bucket) {
+      bucket.candidates.push({
+        url: row.url,
+        attributionLevel: row.attributionLevel,
+      });
+    } else {
+      highVisibilityByEntityDomain.set(key, {
+        sourceGroupKey: row.sourceGroupKey,
+        entityName: row.entityName,
+        entitySurface: row.entitySurface,
+        domain: row.domain,
+        candidates: [{
+          url: row.url,
+          attributionLevel: row.attributionLevel,
+        }],
+      });
+    }
+  }
+
   const highVisibilityExamples: ActionOpportunityEvidenceExample[] = [];
   const perGroup = new Map<string, number>();
   const highSeen = new Set<string>();
 
-  for (const row of normalized) {
-    if (row.sourceGroupKey === "other") continue;
-    if (!highVisibilityCompetitorSurfaces.has(row.entitySurface)) continue;
-    if ((perGroup.get(row.sourceGroupKey) ?? 0) >= 2) continue;
-    const key = `${row.sourceGroupKey}\u0000${row.entitySurface}`;
-    if (highSeen.has(key)) continue;
-    highSeen.add(key);
-    perGroup.set(row.sourceGroupKey, (perGroup.get(row.sourceGroupKey) ?? 0) + 1);
+  for (const bucket of highVisibilityByEntityDomain.values()) {
+    if ((perGroup.get(bucket.sourceGroupKey) ?? 0) >= 2) continue;
+    const entityKey = `${bucket.sourceGroupKey}\u0000${bucket.entitySurface}`;
+    if (highSeen.has(entityKey)) continue;
+    const page = selectSafeCitationPageForEntity(
+      bucket.entityName,
+      bucket.candidates,
+    );
+    if (!page) continue;
+    highSeen.add(entityKey);
+    perGroup.set(
+      bucket.sourceGroupKey,
+      (perGroup.get(bucket.sourceGroupKey) ?? 0) + 1,
+    );
     highVisibilityExamples.push({
-      sourceGroupKey: row.sourceGroupKey,
-      entityName: row.entityName,
-      domain: row.domain,
-      url: row.url,
-      attributionLevel: row.attributionLevel,
+      sourceGroupKey: bucket.sourceGroupKey,
+      entityName: bucket.entityName,
+      domain: bucket.domain,
+      ...page,
     });
   }
 
