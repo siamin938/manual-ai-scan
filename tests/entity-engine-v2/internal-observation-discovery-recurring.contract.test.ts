@@ -98,6 +98,16 @@ describe("internal observation recurring discovery v0.9.4", () => {
     );
   });
 
+  it("also reuses safe-name identity when public evidence URLs rotate", () => {
+    expect(workerSource).toContain("safeDiscoveryNameSurface");
+    expect(workerSource).toContain("findIdentityMatch");
+    expect(workerSource).toContain(
+      "safeDiscoveryNameSurface(clean(row.business_name, 140))",
+    );
+    expect(workerSource).toContain("clean(row.region, 100) === payload.region");
+    expect(workerSource).toContain("clean(row.service, 100) === payload.service");
+  });
+
   it("dedupes recurring results by exact public URL identity and ignores note wording drift", () => {
     expect(workerSource).toContain("findIdentityMatchByExactUrl");
     expect(workerSource).toContain("identityUrlsFromPayload");
