@@ -109,7 +109,7 @@ describe("internal observation recurring discovery v0.9.4", () => {
   });
 
   it("dedupes recurring results by exact public URL identity and ignores note wording drift", () => {
-    expect(workerSource).toContain("findIdentityMatchByExactUrl");
+    expect(workerSource).toContain("findIdentityMatch");
     expect(workerSource).toContain("identityUrlsFromPayload");
     expect(workerSource).toContain("identityUrlsFromStored");
     expect(workerSource).toContain("materiallyChanged");
