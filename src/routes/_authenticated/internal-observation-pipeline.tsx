@@ -31,7 +31,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { buildActionOpportunityV1Preview } from "@/lib/action-opportunity-v1.rules";
+import {
+  buildActionOpportunityV1Preview,
+  type ActionOpportunityV1Item,
+} from "@/lib/action-opportunity-v1.rules";
+import { splitActionOpportunityV1Items } from "@/lib/action-opportunity-v1.presentation";
 import { formatSeoul } from "@/lib/format";
 import { buildVerifiedTargetCitationPageSummary } from "@/lib/verified-target-citation-page-summary";
 import {
@@ -354,6 +358,90 @@ function metricCountText(
   return `${confirmed}/${valid} · ${pctText}`;
 }
 
+type ActionOpportunityV1AdminCitationLink = {
+  entityName: string;
+  url: string;
+};
+
+function ActionOpportunityV1AdminCard({
+  opportunity,
+  citationLinks,
+  citationPending,
+}: {
+  opportunity: ActionOpportunityV1Item;
+  citationLinks: readonly ActionOpportunityV1AdminCitationLink[];
+  citationPending: boolean;
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={opportunity.priority === "high" ? "default" : "secondary"}>
+          {opportunity.priority === "high" ? "우선 확인" : "검토"}
+        </Badge>
+        <p className="text-sm font-semibold leading-6 text-foreground">
+          {opportunity.title}
+        </p>
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">현재 관찰</p>
+        <p className="text-sm leading-6">{opportunity.observation}</p>
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">어떤 의미인가요?</p>
+        <p className="text-sm leading-6 text-foreground/80">{opportunity.whyItMatters}</p>
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">확인해 볼 항목</p>
+        <p className="text-sm leading-6 text-foreground/90">{opportunity.recommendedCheck}</p>
+      </div>
+      <div className="space-y-2 rounded-md border bg-background p-3">
+        <p className="text-sm font-semibold">실제 측정 근거</p>
+        {opportunity.evidence.map((evidence, index) => (
+          <div
+            key={evidence.label + index}
+            className="flex flex-wrap gap-x-2 text-sm leading-6"
+          >
+            <span className="shrink-0 text-muted-foreground">{evidence.label}</span>
+            <span className="font-medium break-words">{evidence.value}</span>
+          </div>
+        ))}
+      </div>
+      {opportunity.id === "competitor_source_difference" && (
+        <div className="space-y-2 rounded-md border bg-background p-3">
+          <p className="text-sm font-semibold">AI 답변에서 실제 인용된 페이지</p>
+          {citationPending ? (
+            <p className="text-sm text-muted-foreground">
+              동일 측정의 인용 페이지를 확인하는 중…
+            </p>
+          ) : citationLinks.length > 0 ? (
+            <div className="space-y-2">
+              {citationLinks.map((entity, index) => (
+                <a
+                  key={entity.url + index}
+                  href={entity.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-sm font-medium leading-6 text-primary underline underline-offset-2 break-all"
+                >
+                  인용 페이지 열기 · {entity.entityName} ↗
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              동일 대표 측정에서 연결된 인용 페이지 URL을 확인하지 못했습니다.
+            </p>
+          )}
+          <p className="text-xs leading-5 text-muted-foreground">
+            인용된 URL과 업체의 연결 관찰만 보여줍니다. 해당 업체의 공식 페이지나
+            노출 원인으로 검증된 것은 아닙니다.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InternalObservationPipelinePage() {
   const qc = useQueryClient();
   const fetchOverview = useServerFn(getInternalObservationPipelineOverview);
@@ -592,6 +680,20 @@ function InternalObservationPipelinePage() {
         },
       }),
   });
+
+  const actionOpportunityPresentation = actionOpportunityPreview
+    ? splitActionOpportunityV1Items(actionOpportunityPreview.items)
+    : { primary: [], additional: [] };
+  const qaCitationLinks: ActionOpportunityV1AdminCitationLink[] =
+    qaReferenceQuery.data?.ok
+      ? qaReferenceQuery.data.currentRunReferences.flatMap((source) =>
+          source.entities.map((entity) => ({
+            entityName: entity.entityName,
+            url: entity.url,
+          })),
+        )
+      : [];
+  const qaCitationPending = qaReferenceQuery.isPending || qaReferenceQuery.isFetching;
 
   useEffect(() => {
     if (orgId || !overview?.organizations.length) return;
@@ -2905,75 +3007,58 @@ function InternalObservationPipelinePage() {
                   <p className="text-xs text-muted-foreground">
                     현재 대표 Run만 사용 · {actionOpportunityPreview.runId}
                   </p>
-                  {actionOpportunityPreview.items.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      이 측정에서 확인할 수 있는 규칙 기반 항목이 없습니다.
+                  {actionOpportunityPresentation.primary.length === 0 ? (
+                    <p className="rounded-md border px-4 py-5 text-sm text-muted-foreground">
+                      이번 측정에서 규칙 기반으로 확인할 항목이 없습니다.
                     </p>
                   ) : (
                     <div className="space-y-3">
-                      {actionOpportunityPreview.items.map((opportunity) => (
-                        <div key={opportunity.id} className="space-y-3 rounded-lg border bg-muted/20 p-4">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant={opportunity.priority === "high" ? "default" : "secondary"}>
-                              {opportunity.priority === "high" ? "우선 확인" : "검토"}
-                            </Badge>
-                            <p className="text-sm font-semibold leading-6 text-foreground">{opportunity.title}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold">현재 관찰</p>
-                            <p className="text-sm leading-6">{opportunity.observation}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold">어떤 의미인가요?</p>
-                            <p className="text-sm leading-6 text-foreground/80">{opportunity.whyItMatters}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold">확인해 볼 항목</p>
-                            <p className="text-sm leading-6 text-foreground/90">{opportunity.recommendedCheck}</p>
-                          </div>
-                          <div className="space-y-2 rounded-md border bg-background p-3">
-                            <p className="text-sm font-semibold">실제 측정 근거</p>
-                            {opportunity.evidence.map((evidence, index) => (
-                              <div key={evidence.label + index} className="flex flex-wrap gap-x-2 text-sm leading-6">
-                                <span className="shrink-0 text-muted-foreground">{evidence.label}</span>
-                                <span className="font-medium break-words">{evidence.value}</span>
-                              </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold">
+                          먼저 살펴볼 항목 {actionOpportunityPresentation.primary.length}개
+                        </p>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          이번 측정의 관찰 내용을 순서대로 정리했습니다.
+                          AI 노출 개선 효과나 원인에 대한 순위는 아닙니다.
+                        </p>
+                      </div>
+                      {actionOpportunityPresentation.primary.map((opportunity) => (
+                        <ActionOpportunityV1AdminCard
+                          key={opportunity.id}
+                          opportunity={opportunity}
+                          citationLinks={qaCitationLinks}
+                          citationPending={qaCitationPending}
+                        />
+                      ))}
+                      {actionOpportunityPresentation.additional.length > 0 && (
+                        <details className="group rounded-lg border bg-background">
+                          <summary className="cursor-pointer list-none px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-sm font-semibold">
+                                그 밖에 확인할 관찰 {actionOpportunityPresentation.additional.length}개
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                펼쳐보기 ▾
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                              {actionOpportunityPresentation.additional
+                                .map((item) => item.title)
+                                .join(" · ")}
+                            </p>
+                          </summary>
+                          <div className="space-y-3 border-t px-3 py-3">
+                            {actionOpportunityPresentation.additional.map((opportunity) => (
+                              <ActionOpportunityV1AdminCard
+                                key={opportunity.id}
+                                opportunity={opportunity}
+                                citationLinks={qaCitationLinks}
+                                citationPending={qaCitationPending}
+                              />
                             ))}
                           </div>
-                          {opportunity.id === "competitor_source_difference" && (
-                            <div className="space-y-2 rounded-md border bg-background p-3">
-                              <p className="text-sm font-semibold">AI 답변에서 실제 인용된 페이지</p>
-                              {qaReferenceQuery.isPending || qaReferenceQuery.isFetching ? (
-                                <p className="text-sm text-muted-foreground">동일 측정의 인용 페이지를 확인하는 중…</p>
-                              ) : qaReferenceQuery.data?.ok &&
-                                qaReferenceQuery.data.currentRunReferences.length > 0 ? (
-                                <div className="space-y-2">
-                                  {qaReferenceQuery.data.currentRunReferences
-                                    .flatMap((source) => source.entities)
-                                    .map((entity, index) => (
-                                      <a
-                                        key={entity.url + index}
-                                        href={entity.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block text-sm font-medium leading-6 text-primary underline underline-offset-2 break-all"
-                                      >
-                                        인용 페이지 열기 · {entity.entityName} ↗
-                                      </a>
-                                    ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-muted-foreground">
-                                  동일 대표 측정에서 연결된 인용 페이지 URL을 확인하지 못했습니다.
-                                </p>
-                              )}
-                              <p className="text-xs leading-5 text-muted-foreground">
-                                인용된 URL과 업체의 연결 관찰만 보여줍니다. 해당 업체의 공식 페이지나 노출 원인으로 검증된 것은 아닙니다.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                        </details>
+                      )}
                     </div>
                   )}
                   <p className="text-xs leading-5 text-muted-foreground">
