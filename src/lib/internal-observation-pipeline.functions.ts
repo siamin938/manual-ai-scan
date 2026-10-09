@@ -918,125 +918,138 @@ export const getInternalObservationPipelineOverview = createServerFn({ method: "
     };
   });
 
-export const enqueueInternalObservationCandidate = createServerFn({ method: "POST" })
-  .inputValidator(
-    (input: {
-      orgId: string;
-      businessName: string;
-      aliases?: string[];
-      category: string;
-      region: string;
-      city?: string | null;
-      address?: string | null;
-      websiteUrl?: string | null;
-      naverPlaceUrl?: string | null;
-      googleMapsUrl?: string | null;
-      service: string;
-      brandModel?: string | null;
-      customerNeed?: string | null;
-      sourceLabel?: string | null;
-    }) => input,
-  )
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ data, context }): Promise<EnqueueInternalObservationCandidateResult> => {
-    const client = context.supabase as unknown as RpcCaller;
-    if (!(await isInternalAdmin(client))) return { ok: false, error: "FORBIDDEN" };
+export type EnqueueInternalObservationCandidateCoreInput = {
+  orgId: string;
+  businessName: string;
+  aliases?: string[];
+  category: string;
+  region: string;
+  city?: string | null;
+  address?: string | null;
+  websiteUrl?: string | null;
+  naverPlaceUrl?: string | null;
+  googleMapsUrl?: string | null;
+  service: string;
+  brandModel?: string | null;
+  customerNeed?: string | null;
+  sourceLabel?: string | null;
+};
 
-    const orgId = clean(data.orgId, 64).toLowerCase();
-    const businessName = normalizeBusinessName(data.businessName);
-    const aliases = normalizeAliasList(data.aliases ?? []);
-    const category = clean(data.category, 200);
-    const region = clean(data.region, 120);
-    const city = cleanOptional(data.city, 120);
-    const address = cleanOptional(data.address, 300);
-    const service = clean(data.service, 80);
-    const brandModel = cleanOptional(data.brandModel, 80);
-    const customerNeed = cleanOptional(data.customerNeed, 80);
-    const sourceLabel = cleanOptional(data.sourceLabel, 200);
+export async function enqueueInternalObservationCandidateCore(
+  data: EnqueueInternalObservationCandidateCoreInput,
+  createdBy: string,
+): Promise<EnqueueInternalObservationCandidateResult> {
+  const orgId = clean(data.orgId, 64).toLowerCase();
+  const businessName = normalizeBusinessName(data.businessName);
+  const aliases = normalizeAliasList(data.aliases ?? []);
+  const category = clean(data.category, 200);
+  const region = clean(data.region, 120);
+  const city = cleanOptional(data.city, 120);
+  const address = cleanOptional(data.address, 300);
+  const service = clean(data.service, 80);
+  const brandModel = cleanOptional(data.brandModel, 80);
+  const customerNeed = cleanOptional(data.customerNeed, 80);
+  const sourceLabel = cleanOptional(data.sourceLabel, 200);
 
-    if (
-      !UUID_RE.test(orgId) ||
-      !businessName ||
-      !category ||
-      !region ||
-      !service ||
-      businessName.length > 200
-    ) {
-      return { ok: false, error: "INVALID_INPUT" };
-    }
+  if (
+    !UUID_RE.test(orgId) ||
+    !businessName ||
+    !category ||
+    !region ||
+    !service ||
+    businessName.length > 200 ||
+    !UUID_RE.test(createdBy)
+  ) {
+    return { ok: false, error: "INVALID_INPUT" };
+  }
 
-    const website = parseUrl(data.websiteUrl);
-    const naver = parseUrl(data.naverPlaceUrl);
-    const google = parseUrl(data.googleMapsUrl);
-    if (!website.ok || !naver.ok || !google.ok) {
-      return { ok: false, error: "INVALID_INPUT" };
-    }
+  const website = parseUrl(data.websiteUrl);
+  const naver = parseUrl(data.naverPlaceUrl);
+  const google = parseUrl(data.googleMapsUrl);
+  if (!website.ok || !naver.ok || !google.ok) {
+    return { ok: false, error: "INVALID_INPUT" };
+  }
 
-    if (!(await loadEligibleInternalOrg(orgId))) return { ok: false, error: "INVALID_ORG" };
+  if (!(await loadEligibleInternalOrg(orgId))) {
+    return { ok: false, error: "INVALID_ORG" };
+  }
 
-    const idempotencyKey = candidateIdempotencyKey({
-      orgId,
-      businessName,
+  const idempotencyKey = candidateIdempotencyKey({
+    orgId,
+    businessName,
+    region,
+    city,
+    service,
+    brandModel,
+    customerNeed,
+  });
+
+  await admin
+    .from("internal_observation_pipeline_settings")
+    .upsert({ org_id: orgId }, { onConflict: "org_id", ignoreDuplicates: true });
+
+  const { data: existingRaw } = await admin
+    .from("internal_observation_pipeline_items")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+
+  if (isRecord(existingRaw) && str(existingRaw["id"])) {
+    return { ok: true, itemId: str(existingRaw["id"])!, idempotent: true };
+  }
+
+  const { data: insertedRaw, error } = await admin
+    .from("internal_observation_pipeline_items")
+    .insert({
+      org_id: orgId,
+      idempotency_key: idempotencyKey,
+      status: "pending",
+      business_name: businessName,
+      aliases,
+      category,
       region,
       city,
+      address,
+      website_url: website.value,
+      naver_place_url: naver.value,
+      google_maps_url: google.value,
       service,
-      brandModel,
-      customerNeed,
-    });
+      brand_model: brandModel,
+      customer_need: customerNeed,
+      source_label: sourceLabel,
+      created_by: createdBy,
+    })
+    .select("id")
+    .single();
 
-    await admin
-      .from("internal_observation_pipeline_settings")
-      .upsert({ org_id: orgId }, { onConflict: "org_id", ignoreDuplicates: true });
-
-    const { data: existingRaw } = await admin
+  if (error || !isRecord(insertedRaw) || !str(insertedRaw["id"])) {
+    const { data: racedRaw } = await admin
       .from("internal_observation_pipeline_items")
       .select("id")
       .eq("org_id", orgId)
       .eq("idempotency_key", idempotencyKey)
       .maybeSingle();
 
-    if (isRecord(existingRaw) && str(existingRaw["id"])) {
-      return { ok: true, itemId: str(existingRaw["id"])!, idempotent: true };
+    if (isRecord(racedRaw) && str(racedRaw["id"])) {
+      return { ok: true, itemId: str(racedRaw["id"])!, idempotent: true };
     }
+    return { ok: false, error: "NOT_AVAILABLE" };
+  }
 
-    const { data: insertedRaw, error } = await admin
-      .from("internal_observation_pipeline_items")
-      .insert({
-        org_id: orgId,
-        idempotency_key: idempotencyKey,
-        status: "pending",
-        business_name: businessName,
-        aliases,
-        category,
-        region,
-        city,
-        address,
-        website_url: website.value,
-        naver_place_url: naver.value,
-        google_maps_url: google.value,
-        service,
-        brand_model: brandModel,
-        customer_need: customerNeed,
-        source_label: sourceLabel,
-        created_by: context.userId,
-      })
-      .select("id")
-      .single();
+  return { ok: true, itemId: str(insertedRaw["id"])!, idempotent: false };
+}
 
-    if (error || !isRecord(insertedRaw) || !str(insertedRaw["id"])) {
-      const { data: racedRaw } = await admin
-        .from("internal_observation_pipeline_items")
-        .select("id")
-        .eq("org_id", orgId)
-        .eq("idempotency_key", idempotencyKey)
-        .maybeSingle();
-      if (isRecord(racedRaw) && str(racedRaw["id"])) {
-        return { ok: true, itemId: str(racedRaw["id"])!, idempotent: true };
-      }
-      return { ok: false, error: "NOT_AVAILABLE" };
-    }
+export const enqueueInternalObservationCandidate = createServerFn({ method: "POST" })
+  .inputValidator(
+    (input: EnqueueInternalObservationCandidateCoreInput) => input,
+  )
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ data, context }): Promise<EnqueueInternalObservationCandidateResult> => {
+    const client = context.supabase as unknown as RpcCaller;
+    if (!(await isInternalAdmin(client))) return { ok: false, error: "FORBIDDEN" };
 
-    return { ok: true, itemId: str(insertedRaw["id"])!, idempotent: false };
+    return enqueueInternalObservationCandidateCore(data, context.userId);
   });
 
 export const previewInternalObservationCandidate = createServerFn({ method: "POST" })
