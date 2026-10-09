@@ -186,6 +186,11 @@ export type EntityFactsV2ReadQuestionLocationDTO = {
   city: string | null;
 };
 
+export type EntityFactsV2ReadVerifiedTargetCitationPageStatus =
+  | "complete"
+  | "pending"
+  | "not_verified";
+
 export type EntityFactsV2ReadGatewayDTO = {
   gatewayVersion: typeof ENTITY_FACTS_V2_READ_GATEWAY_VERSION;
   generatedAt: string;
@@ -225,6 +230,13 @@ export type EntityFactsV2ReadGatewayDTO = {
    * concern the current target business. Advisory only; never changes v2 truth.
    */
   verifiedTargetCitationPages?: EntityFactsV2ReadVerifiedTargetCitationPageDTO[];
+  /**
+   * Lifecycle of page-level citation verification for this exact representative Run.
+   * - complete: verifier completed; rows may legitimately be empty
+   * - pending: verifier was triggered but has not completed yet
+   * - not_verified: this Run has no verifier trigger (typically a pre-feature legacy Run)
+   */
+  verifiedTargetCitationPageStatus?: EntityFactsV2ReadVerifiedTargetCitationPageStatus;
   observedSourcesStatus: EntityFactsV2ReadObservedSourcesStatus;
   observedSources: EntityFactsV2ReadObservedSourceDTO[];
 };
