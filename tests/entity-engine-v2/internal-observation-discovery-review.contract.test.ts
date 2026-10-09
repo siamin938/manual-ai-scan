@@ -111,7 +111,10 @@ describe("internal observation discovery review queue v0.9.2", () => {
       "승인만으로 업체 등록·24문항 준비·Run 생성·측정권 차감은 발생하지 않습니다.",
     );
     expect(routeSource).toContain(
-      "Guarded Promotion은 v0.9.3에서 별도로 구현합니다.",
+      "v0.9.3 승격은 별도 미리보기와 명시적 확인을",
+    );
+    expect(routeSource).toContain(
+      "기존 수집 파이프라인의 준비 대기(pending) 후보까지만 생성합니다.",
     );
   });
 });
