@@ -585,7 +585,9 @@ function InternalObservationPipelinePage() {
             ? "Discovery Review Queue 저장 권한이 없습니다."
             : res.error === "INVALID_INPUT"
               ? "후보 데이터가 바뀌어 저장하지 못했습니다. 다시 탐색해 주세요."
-              : "검토 후보를 저장하지 못했습니다.",
+              : res.error === "IDENTITY_AMBIGUOUS"
+                ? "같은 공개 URL과 연결된 기존 후보가 여러 개라 자동 병합하지 않았습니다."
+                : "검토 후보를 저장하지 못했습니다.",
         );
         return;
       }
