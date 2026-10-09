@@ -1,6 +1,7 @@
 import type {
   EntityFactsV2ReadGatewayDTO,
   EntityFactsV2ReadQuestionAreaDTO,
+  EntityFactsV2ReadVerifiedTargetCitationPageStatus,
 } from "./entity-facts-v2-read-gateway.types";
 import {
   buildEntityFactsV2OverviewViewModel,
@@ -247,6 +248,7 @@ export type EntityFactsV2DashboardCutoverModel = {
   };
   verifiedTargetCitationPages: {
     heading: "페이지 내용 기준 관련 확인";
+    status: EntityFactsV2ReadVerifiedTargetCitationPageStatus;
     available: boolean;
     rows: EntityFactsV2DashboardVerifiedTargetCitationPageRow[];
   };
@@ -464,6 +466,9 @@ export function buildEntityFactsV2DashboardCutoverModel(
     },
     verifiedTargetCitationPages: {
       heading: "페이지 내용 기준 관련 확인",
+      status:
+        dto.verifiedTargetCitationPageStatus ??
+        (dto.verifiedTargetCitationPages !== undefined ? "complete" : "pending"),
       available: dto.verifiedTargetCitationPages !== undefined,
       rows: verifiedTargetCitationPages,
     },
