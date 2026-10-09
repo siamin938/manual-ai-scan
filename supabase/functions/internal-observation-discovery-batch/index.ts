@@ -251,6 +251,169 @@ function canonicalStoredPayload(row: Obj) {
   });
 }
 
+function identityUrlKey(value: string): string | null {
+  const normalized = normalizeUrl(value);
+  return normalized ? normalized.toLowerCase() : null;
+}
+
+function identityUrlsFromPayload(payload: ReturnType<typeof canonicalCandidatePayload>): Set<string> {
+  return new Set(
+    [
+      payload.websiteUrl,
+      ...payload.publicProfileUrls,
+      ...payload.evidence.map((item) => item.url),
+    ]
+      .filter((value): value is string => !!value)
+      .map(identityUrlKey)
+      .filter((value): value is string => !!value),
+  );
+}
+
+function identityUrlsFromStored(row: Obj): Set<string> {
+  return identityUrlsFromPayload(canonicalStoredPayload(row));
+}
+
+function mergeStringUrls(existing: unknown, incoming: string[]): string[] {
+  const current = Array.isArray(existing)
+    ? existing.filter((value): value is string => typeof value === "string")
+    : [];
+  const byKey = new Map<string, string>();
+  for (const value of [...current, ...incoming]) {
+    const normalized = normalizeUrl(value);
+    const key = normalized ? normalized.toLowerCase() : null;
+    if (normalized && key) byKey.set(key, normalized);
+  }
+  return [...byKey.values()].slice(0, 10);
+}
+
+function mergeEvidence(existing: unknown, incoming: Array<{
+  url: string;
+  domain: string;
+  title: string | null;
+  note: string | null;
+}>): Array<{
+  url: string;
+  domain: string;
+  title: string | null;
+  note: string | null;
+}> {
+  const current = Array.isArray(existing)
+    ? existing.filter(isObj).map((item) => ({
+        url: clean(item.url, 1000),
+        domain: clean(item.domain, 255),
+        title: clean(item.title, 500) || null,
+        note: clean(item.note, 500) || null,
+      }))
+    : [];
+  const byKey = new Map<string, {
+    url: string;
+    domain: string;
+    title: string | null;
+    note: string | null;
+  }>();
+  for (const item of [...current, ...incoming]) {
+    const normalized = normalizeUrl(item.url);
+    const key = normalized ? normalized.toLowerCase() : null;
+    if (!normalized || !key) continue;
+    byKey.set(key, { ...item, url: normalized });
+  }
+  return [...byKey.values()].slice(0, 50);
+}
+
+function mergeWarnings(existing: unknown, incoming: string[]): string[] {
+  const current = Array.isArray(existing)
+    ? existing.filter((value): value is string => typeof value === "string")
+    : [];
+  return [...new Set([...current, ...incoming])].slice(0, 20);
+}
+
+function materiallyChanged(args: {
+  existing: Obj;
+  payload: ReturnType<typeof canonicalCandidatePayload>;
+  identityMatchedByUrl: boolean;
+}): boolean {
+  const { existing, payload, identityMatchedByUrl } = args;
+  const stored = canonicalStoredPayload(existing);
+
+  if (!identityMatchedByUrl && normalizeName(stored.businessName) !== normalizeName(payload.businessName)) {
+    return true;
+  }
+  if (stored.category !== payload.category) return true;
+  if (stored.service !== payload.service) return true;
+  if (stored.region !== payload.region) return true;
+  if ((stored.city ?? null) !== (payload.city ?? null)) return true;
+
+  if (
+    payload.websiteUrl &&
+    (!stored.websiteUrl ||
+      identityUrlKey(payload.websiteUrl) !== identityUrlKey(stored.websiteUrl))
+  ) {
+    return true;
+  }
+
+  const existingProfiles = new Set(
+    stored.publicProfileUrls
+      .map(identityUrlKey)
+      .filter((value): value is string => !!value),
+  );
+  if (
+    payload.publicProfileUrls.some((url) => {
+      const key = identityUrlKey(url);
+      return !!key && !existingProfiles.has(key);
+    })
+  ) {
+    return true;
+  }
+
+  const existingEvidenceUrls = new Set(
+    stored.evidence
+      .map((item) => identityUrlKey(item.url))
+      .filter((value): value is string => !!value),
+  );
+  if (
+    payload.evidence.some((item) => {
+      const key = identityUrlKey(item.url);
+      return !!key && !existingEvidenceUrls.has(key);
+    })
+  ) {
+    return true;
+  }
+
+  if (stored.duplicateStatus !== payload.duplicateStatus) return true;
+
+  if (
+    payload.matchedExistingBusinessName &&
+    payload.matchedExistingBusinessName !== stored.matchedExistingBusinessName
+  ) {
+    return true;
+  }
+
+  if (
+    payload.matchedPipelineBusinessName &&
+    payload.matchedPipelineBusinessName !== stored.matchedPipelineBusinessName
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function batchCandidateFingerprint(
+  payload: ReturnType<typeof canonicalCandidatePayload>,
+  canonicalBusinessName: string,
+): Promise<string> {
+  return sha256(
+    JSON.stringify({
+      businessName: normalizeName(canonicalBusinessName),
+      category: payload.category,
+      service: payload.service,
+      region: payload.region,
+      city: payload.city,
+      identityUrls: [...identityUrlsFromPayload(payload)].sort(),
+    }),
+  );
+}
+
 function kstParts(value: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Seoul",
@@ -777,6 +940,23 @@ Deno.serve(async (request) => {
       if (key) queueByKey.set(key, row);
     }
 
+    const findIdentityMatchByExactUrl = (
+      payload: ReturnType<typeof canonicalCandidatePayload>,
+    ): Obj | null => {
+      const incomingUrls = identityUrlsFromPayload(payload);
+      if (incomingUrls.size === 0) return null;
+
+      const matches = existingQueue.filter((row) => {
+        const storedUrls = identityUrlsFromStored(row);
+        return [...incomingUrls].some((url) => storedUrls.has(url));
+      });
+
+      if (matches.length > 1) {
+        throw new Error("REVIEW_QUEUE_IDENTITY_AMBIGUOUS");
+      }
+      return matches[0] ?? null;
+    };
+
     let newCount = 0;
     let changedCount = 0;
     let unchangedCount = 0;
@@ -792,12 +972,22 @@ Deno.serve(async (request) => {
         city: payload.city,
         service: payload.service,
       });
-      const candidateFingerprint = await sha256(JSON.stringify(payload));
-      const existing = queueByKey.get(key) ?? null;
+      let existing = queueByKey.get(key) ?? null;
+      let identityMatchedByUrl = false;
+      if (!existing) {
+        existing = findIdentityMatchByExactUrl(payload);
+        identityMatchedByUrl = !!existing;
+      }
+
       let classification: "new" | "changed" | "unchanged";
       let reviewCandidateId: string | null = null;
+      let candidateFingerprint: string;
 
       if (!existing) {
+        candidateFingerprint = await batchCandidateFingerprint(
+          payload,
+          payload.businessName,
+        );
         classification = "new";
         newCount += 1;
 
@@ -833,13 +1023,45 @@ Deno.serve(async (request) => {
 
         if (insertError || !inserted?.id) throw new Error("REVIEW_QUEUE_INSERT_FAILED");
         reviewCandidateId = String(inserted.id);
+        const insertedRow: Obj = {
+          ...payload,
+          id: reviewCandidateId,
+          idempotency_key: key,
+          business_name: payload.businessName,
+          website_url: payload.websiteUrl,
+          public_profile_urls: payload.publicProfileUrls,
+          source_evidence: payload.evidence,
+          duplicate_status: payload.duplicateStatus,
+          duplicate_warnings: payload.duplicateWarnings,
+          matched_existing_business_name: payload.matchedExistingBusinessName,
+          matched_pipeline_business_name: payload.matchedPipelineBusinessName,
+          review_status: "needs_review",
+          promoted_pipeline_item_id: null,
+          category: payload.category,
+          service: payload.service,
+          region: payload.region,
+          city: payload.city,
+        };
+        existingQueue.push(insertedRow);
+        queueByKey.set(key, insertedRow);
       } else {
         reviewCandidateId = clean(existing.id, 64);
-        const existingFingerprint = await sha256(
-          JSON.stringify(canonicalStoredPayload(existing)),
+        if (!reviewCandidateId) throw new Error("REVIEW_QUEUE_ID_INVALID");
+
+        const canonicalBusinessName =
+          clean(existing.business_name, 140) || payload.businessName;
+        candidateFingerprint = await batchCandidateFingerprint(
+          payload,
+          canonicalBusinessName,
         );
-        classification =
-          existingFingerprint === candidateFingerprint ? "unchanged" : "changed";
+
+        classification = materiallyChanged({
+          existing,
+          payload,
+          identityMatchedByUrl,
+        })
+          ? "changed"
+          : "unchanged";
 
         if (classification === "changed") changedCount += 1;
         else unchangedCount += 1;
@@ -851,20 +1073,36 @@ Deno.serve(async (request) => {
           !promoted &&
           ["approved", "rejected", "duplicate"].includes(previousStatus);
 
+        const existingWebsiteUrl =
+          clean(existing.website_url, 1000) || null;
+        const mergedProfiles = mergeStringUrls(
+          existing.public_profile_urls,
+          payload.publicProfileUrls,
+        );
+        const mergedEvidence = mergeEvidence(
+          existing.source_evidence,
+          payload.evidence,
+        );
+        const mergedDuplicateWarnings = mergeWarnings(
+          existing.duplicate_warnings,
+          payload.duplicateWarnings,
+        );
+
         const updatePayload: Obj = {
-          business_name: payload.businessName,
-          category: payload.category,
-          service: payload.service,
-          region: payload.region,
-          city: payload.city,
-          website_url: payload.websiteUrl,
-          public_profile_urls: payload.publicProfileUrls,
-          source_evidence: payload.evidence,
+          website_url: existingWebsiteUrl ?? payload.websiteUrl,
+          public_profile_urls: mergedProfiles,
+          source_evidence: mergedEvidence,
           discovery_query: querySnapshot,
           duplicate_status: payload.duplicateStatus,
-          duplicate_warnings: payload.duplicateWarnings,
-          matched_existing_business_name: payload.matchedExistingBusinessName,
-          matched_pipeline_business_name: payload.matchedPipelineBusinessName,
+          duplicate_warnings: mergedDuplicateWarnings,
+          matched_existing_business_name:
+            payload.matchedExistingBusinessName ??
+            clean(existing.matched_existing_business_name, 140) ??
+            null,
+          matched_pipeline_business_name:
+            payload.matchedPipelineBusinessName ??
+            clean(existing.matched_pipeline_business_name, 140) ??
+            null,
           preview_generated_at: new Date().toISOString(),
           last_seen_at: new Date().toISOString(),
         };
@@ -890,7 +1128,10 @@ Deno.serve(async (request) => {
           review_candidate_id: reviewCandidateId,
           classification,
           candidate_fingerprint: candidateFingerprint,
-          business_name: payload.businessName,
+          business_name:
+            existing && clean(existing.business_name, 140)
+              ? clean(existing.business_name, 140)
+              : payload.businessName,
           candidate_snapshot: payload,
         });
 
