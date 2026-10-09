@@ -364,6 +364,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(model.verifiedTargetCitationPages.heading).toBe(
       "페이지 내용 기준 관련 확인",
     );
+    expect(model.verifiedTargetCitationPages.status).toBe("complete");
     expect(model.verifiedTargetCitationPages.available).toBe(true);
     expect(model.verifiedTargetCitationPages.rows).toEqual([
       {
