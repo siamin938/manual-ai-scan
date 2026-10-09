@@ -865,6 +865,8 @@ export async function fetchEntityFactsV2ReadGateway(args: {
     verifiedTargetMeasurementIds.size ===
       gatewayResponse.data.overview.confirmedMentionCount
   ) {
+    gatewayResponse.data.verifiedTargetCitationPageStatus = "pending";
+
     const { data: verifiedPageCompletedEvent, error: verifiedPageEventError } =
       await supabaseAdmin
         .from("system_events")
@@ -883,6 +885,28 @@ export async function fetchEntityFactsV2ReadGateway(args: {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+
+    if (!verifiedPageEventError && !verifiedPageCompletedEvent) {
+      const { data: verifiedPageTriggeredEvent, error: verifiedPageTriggeredError } =
+        await supabaseAdmin
+          .from("system_events")
+          .select("id")
+          .eq("org_id", orgId)
+          .eq("run_id", run.id)
+          .eq("event_type", "citation_page_entity_verification_triggered")
+          .eq(
+            "metadata->>verifier_version",
+            ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION,
+          )
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+      if (!verifiedPageTriggeredError) {
+        gatewayResponse.data.verifiedTargetCitationPageStatus =
+          verifiedPageTriggeredEvent ? "pending" : "not_verified";
+      }
+    }
 
     if (!verifiedPageEventError && verifiedPageCompletedEvent) {
       const { data: verifiedPageRows, error: verifiedPageError } =
@@ -982,6 +1006,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
         gatewayResponse.data.verifiedTargetCitationPages =
           verifiedTargetCitationPages;
+        gatewayResponse.data.verifiedTargetCitationPageStatus = "complete";
       }
     }
   }
