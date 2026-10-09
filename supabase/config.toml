@@ -62,3 +62,9 @@ verify_jwt = true
 # Read-only: no business/pipeline/run/job/credit mutation.
 [functions.internal-observation-discovery-preview]
 verify_jwt = true
+
+# v0.9.4 recurring discovery worker. Manual runs authenticate a user bearer JWT;
+# scheduled runs authenticate with x-internal-secret. The body validates the
+# internal-observation organization and configured actor. No measurement side effects.
+[functions.internal-observation-discovery-batch]
+verify_jwt = false
