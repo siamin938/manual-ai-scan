@@ -30,7 +30,7 @@ export type InternalObservationDiscoveryReviewItemDTO = {
   id: string;
   orgId: string;
   reviewStatus: InternalObservationDiscoveryReviewStatus;
-  discoverySource: "web_preview" | "manual" | "work";
+  discoverySource: "web_preview" | "scheduled_web" | "manual" | "work";
   businessName: string;
   category: string;
   service: string;
@@ -343,6 +343,7 @@ function parseItem(value: unknown): InternalObservationDiscoveryReviewItemDTO | 
     !reviewStatus ||
     !REVIEW_STATUSES.includes(reviewStatus as InternalObservationDiscoveryReviewStatus) ||
     (discoverySource !== "web_preview" &&
+      discoverySource !== "scheduled_web" &&
       discoverySource !== "manual" &&
       discoverySource !== "work") ||
     !businessName ||
