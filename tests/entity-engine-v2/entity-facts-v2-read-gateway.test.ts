@@ -607,6 +607,16 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).toContain("verifiedPageError");
     expect(serverSource).toContain("verifiedTargetPageBasisLabel");
     expect(serverSource).toContain("verifiedPageCompletedEvent");
+    expect(serverSource).toContain("verifiedPageTriggeredEvent");
+    expect(serverSource).toContain(
+      '"citation_page_entity_verification_triggered"',
+    );
+    expect(serverSource).toContain(
+      'verifiedPageTriggeredEvent ? "pending" : "not_verified"',
+    );
+    expect(serverSource).toContain(
+      'verifiedTargetCitationPageStatus = "complete"',
+    );
     expect(serverSource).toContain(
       '"metadata->>materialization_id"',
     );
