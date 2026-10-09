@@ -122,6 +122,15 @@ describe("internal observation recurring discovery v0.9.4", () => {
     expect(workerSource).not.toContain('functions.invoke("enqueue-run"');
   });
 
+  it("reuses the latest persisted discovery query after a page refresh", () => {
+    expect(routeSource).toContain("latestDiscoveryReviewQuery");
+    expect(routeSource).toContain("recurringDiscoveryQuery");
+    expect(routeSource).toContain("최근 Review Queue 조건");
+    expect(routeSource).toContain(
+      "Review Queue의 가장 최근 Discovery 조건을 자동으로 재사용합니다.",
+    );
+  });
+
   it("keeps profile eligibility separate from the global cron gate", () => {
     expect(serverSource).toContain("enabled: false");
     expect(serverSource).toContain(
