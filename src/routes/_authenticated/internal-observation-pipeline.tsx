@@ -66,6 +66,7 @@ import {
   type SchedulerActivationBlocker,
 } from "@/lib/internal-observation-scheduler-operations.functions";
 import { getPilotOpsAdminResult } from "@/lib/pilot-ops-admin-detail.functions";
+import { searchActionOpportunityV1QaBusinesses } from "@/lib/action-opportunity-v1.qa.functions";
 import {
   getInternalObservationDiscoveryPreview,
   type InternalObservationDiscoveryCandidateDTO,
@@ -365,6 +366,7 @@ function InternalObservationPipelinePage() {
   const pauseScheduler = useServerFn(pauseInternalObservationScheduler);
   const stopScheduler = useServerFn(stopInternalObservationScheduler);
   const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
+  const searchQaBusinesses = useServerFn(searchActionOpportunityV1QaBusinesses);
   const fetchDiscoveryPreview = useServerFn(getInternalObservationDiscoveryPreview);
   const fetchDiscoveryReviewQueue = useServerFn(
     getInternalObservationDiscoveryReviewQueue,
@@ -410,7 +412,10 @@ function InternalObservationPipelinePage() {
   const [previewItemId, setPreviewItemId] = useState<string | null>(null);
   const [executionOpen, setExecutionOpen] = useState(false);
   const [executionItemId, setExecutionItemId] = useState<string | null>(null);
-  const [resultTarget, setResultTarget] = useState<InternalObservationPipelineItemDTO | null>(null);
+  const [resultTarget, setResultTarget] = useState<
+    Pick<InternalObservationPipelineItemDTO, "orgId" | "businessId" | "businessName" | "runId"> | null
+  >(null);
+  const [qaBusinessSearch, setQaBusinessSearch] = useState("");
   const [activationConfirmation, setActivationConfirmation] = useState("");
   const [discoveryCategory, setDiscoveryCategory] = useState("");
   const [discoveryRegion, setDiscoveryRegion] = useState("");
@@ -510,6 +515,19 @@ function InternalObservationPipelinePage() {
     queryFn: () => fetchDiscoveryRecurringOverview({ data: { orgId } }),
   });
 
+  const qaBusinessQuery = useQuery({
+    queryKey: ["action-opportunity-v1-qa-businesses", orgId, qaBusinessSearch.trim()],
+    enabled: !!orgId && qaBusinessSearch.trim().length >= 2,
+    retry: false,
+    queryFn: () =>
+      searchQaBusinesses({
+        data: { orgId, query: qaBusinessSearch.trim() },
+      }),
+  });
+  const qaBusinesses = qaBusinessQuery.data?.ok
+    ? qaBusinessQuery.data.businesses
+    : [];
+
   const resultQuery = useQuery({
     queryKey: [
       "internal-observation-pipeline-result",
@@ -527,9 +545,16 @@ function InternalObservationPipelinePage() {
       }),
   });
 
-  const actionOpportunityPreview = resultQuery.data?.ok
-    ? buildActionOpportunityV1Preview(resultQuery.data.data)
-    : null;
+  // The pipeline row may reference an older Run than the current gateway
+  // representative. In that case, never label newer facts as this row's QA.
+  const actionOpportunityRunMismatch =
+    resultQuery.data?.ok === true &&
+    !!resultTarget?.runId &&
+    resultTarget.runId !== resultQuery.data.data.scope.runId;
+  const actionOpportunityPreview =
+    resultQuery.data?.ok && !actionOpportunityRunMismatch
+      ? buildActionOpportunityV1Preview(resultQuery.data.data)
+      : null;
 
   useEffect(() => {
     if (orgId || !overview?.organizations.length) return;
@@ -2542,6 +2567,68 @@ function InternalObservationPipelinePage() {
       </Card>
 
       <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Action Opportunity v1.0 · 내부 실측 QA</CardTitle>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            수집 파이프라인 목록에 없는 기존 업체도 이름으로 검색해 대표 Run의 분석 결과를
+            읽기 전용으로 검수합니다. 고객 화면 미노출 · 새 측정 및 측정권 차감 없음
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Label htmlFor="action-opportunity-v1-qa-search">기존 업체 검색</Label>
+          <Input
+            id="action-opportunity-v1-qa-search"
+            value={qaBusinessSearch}
+            onChange={(event) => setQaBusinessSearch(event.target.value)}
+            placeholder="업체명 두 글자 이상 입력 (예: 카스페이스)"
+          />
+          {qaBusinessSearch.trim().length < 2 ? (
+            <p className="text-xs text-muted-foreground">
+              내부 관찰 조직을 선택한 후 업체명을 검색해 주세요.
+            </p>
+          ) : qaBusinessQuery.isPending ? (
+            <p className="text-xs text-muted-foreground">기존 업체 검색 중…</p>
+          ) : !qaBusinessQuery.data || !qaBusinessQuery.data.ok ? (
+            <p className="text-xs text-muted-foreground">
+              업체 목록을 불러오지 못했습니다. 운영자 권한과 선택 조직을 확인해 주세요.
+            </p>
+          ) : qaBusinesses.length === 0 ? (
+            <p className="text-xs text-muted-foreground">일치하는 활성 업체가 없습니다.</p>
+          ) : (
+            <div className="space-y-2">
+              {qaBusinesses.map((business) => (
+                <div
+                  key={business.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{business.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {[business.category, business.region, business.city].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setResultTarget({
+                        orgId,
+                        businessId: business.id,
+                        businessName: business.name,
+                        runId: null,
+                      })
+                    }
+                  >
+                    분석 미리보기
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <CardTitle className="text-base">수집 파이프라인</CardTitle>
@@ -2768,6 +2855,12 @@ function InternalObservationPipelinePage() {
                 </div>
               </div>
 
+              {actionOpportunityRunMismatch && (
+                <p className="rounded-md border p-3 text-sm text-muted-foreground">
+                  선택한 파이프라인 Run과 현재 대표 Run이 다릅니다. 잘못된 측정 결과가
+                  이 항목의 근거로 표시되지 않도록 v1.0 미리보기를 숨겼습니다.
+                </p>
+              )}
               {actionOpportunityPreview && (
                 <section className="space-y-3 rounded-lg border p-4">
                   <div className="flex flex-wrap items-center gap-2">

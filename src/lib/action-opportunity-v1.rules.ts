@@ -156,6 +156,7 @@ export function buildActionOpportunityV1Preview(
 
   // 'complete + zero' must never be conflated with pending or not_verified.
   if (
+    observed > 0 &&
     dto.verifiedTargetCitationPageStatus === "complete" &&
     dto.verifiedTargetCitationPages !== undefined &&
     dto.verifiedTargetCitationPages.length === 0

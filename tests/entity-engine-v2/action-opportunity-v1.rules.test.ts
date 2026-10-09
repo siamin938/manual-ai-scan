@@ -178,6 +178,97 @@ describe("Action Opportunity v1.0 internal deterministic dry-run", () => {
     expect(ids(dto)).not.toContain("competitor_source_difference");
   });
 
+  it("does not mistake a zero-exposure Run for a citation page opportunity", () => {
+    const dto = fixture(0, 0);
+    dto.verifiedTargetCitationPageStatus = "complete";
+    dto.verifiedTargetCitationPages = [];
+    expect(ids(dto)).toEqual(["zero_confirmed_visibility"]);
+  });
+
+  it("reproduces current completed 카스페이스 contrast without leaking earlier Runs", () => {
+    const dto = fixture(0, 16);
+    dto.business.name = "카스페이스 구로점";
+    dto.competitors = [{
+      name: "퀀텀팩토리 서초점",
+      responseCount: 6,
+      questionCount: 6,
+      intentCount: 6,
+      top3ResponseCount: 6,
+    }];
+    dto.verifiedTargetCitationPageStatus = "complete";
+    dto.verifiedTargetCitationPages = Array.from({ length: 5 }, (_, index) => ({
+      domain: "example.test",
+      title: null,
+      responseCount: 1,
+      citationCount: 1,
+      sampleUrl: "https://example.test/" + index,
+      confidence: "high" as const,
+      basisLabel: "검증 완료",
+    }));
+    dto.observedSourcesStatus = "available";
+    dto.observedSources = [{
+      domain: "carcarescenter.com",
+      responseCount: 5,
+      targetResponseCount: 0,
+      competitorResponseCount: 5,
+      clueResponseCount: 0,
+      evidence: "confirmed",
+      linkedEntities: [{
+        name: "퀀텀팩토리 서초점",
+        isTarget: false,
+        responseCount: 5,
+        evidence: "confirmed",
+      }],
+    }];
+    const result = buildActionOpportunityV1Preview(dto);
+    expect(result.items.map((row) => row.id)).toEqual([
+      "core_exposure_gap",
+      "repeated_competitor",
+      "competitor_source_difference",
+    ]);
+    expect(result.items[1]?.observation).toContain("6개 답변");
+    expect(result.items[2]?.observation).toContain("carcarescenter.com");
+  });
+
+  it("reproduces current completed 씽카스게러지 contrast without causal wording", () => {
+    const dto = fixture(0, 3);
+    dto.business.name = "씽카스게러지 안산점";
+    dto.competitors = [{
+      name: "원투 랩핑 PPF",
+      responseCount: 4,
+      questionCount: 4,
+      intentCount: 4,
+      top3ResponseCount: 4,
+    }];
+    dto.verifiedTargetCitationPageStatus = "complete";
+    dto.verifiedTargetCitationPages = [];
+    dto.observedSourcesStatus = "available";
+    dto.observedSources = [{
+      domain: "daangn.com",
+      responseCount: 6,
+      targetResponseCount: 0,
+      competitorResponseCount: 6,
+      clueResponseCount: 0,
+      evidence: "confirmed",
+      linkedEntities: [{
+        name: "원투 랩핑 PPF",
+        isTarget: false,
+        responseCount: 4,
+        evidence: "confirmed",
+      }],
+    }];
+    const result = buildActionOpportunityV1Preview(dto);
+    expect(result.items.map((row) => row.id)).toEqual([
+      "core_exposure_gap",
+      "verified_citation_page_gap",
+      "repeated_competitor",
+      "competitor_source_difference",
+    ]);
+    expect(result.items[1]?.observation).toContain("0개");
+    expect(result.items[3]?.observation).toContain("daangn.com");
+    expect(JSON.stringify(result)).not.toMatch(/노출이 증가합니다|원인입니다|보장합니다/);
+  });
+
   it("remains pure, stable, and scoped to one representative run", () => {
     const dto = fixture(0, 3);
     const unchanged = JSON.stringify(dto);
