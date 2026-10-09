@@ -86,8 +86,9 @@ describe("internal observation recurring discovery v0.9.4", () => {
       "classification in ('new','changed','unchanged')",
     );
     expect(workerSource).toContain('"new" | "changed" | "unchanged"');
+    expect(workerSource).toContain("materiallyChanged({");
     expect(workerSource).toContain(
-      'existingFingerprint === candidateFingerprint ? "unchanged" : "changed"',
+      '? "changed"\n          : "unchanged"',
     );
     expect(workerSource).toContain("newCount += 1");
     expect(workerSource).toContain("changedCount += 1");
@@ -126,7 +127,10 @@ describe("internal observation recurring discovery v0.9.4", () => {
     expect(workerSource).toContain("measurement_credit_debited: false");
 
     expect(workerSource).not.toContain('review_status: "approved"');
-    expect(workerSource).not.toContain("promoted_pipeline_item_id:");
+    expect(workerSource).not.toContain("promoted_pipeline_item_id: reviewCandidateId");
+    expect(workerSource).not.toContain(
+      '.update({ promoted_pipeline_item_id:',
+    );
     expect(workerSource).not.toContain("prepareInternalObservationCandidate");
     expect(workerSource).not.toContain('.from("measurement_runs").insert');
     expect(workerSource).not.toContain('.from("measurement_jobs").insert');
