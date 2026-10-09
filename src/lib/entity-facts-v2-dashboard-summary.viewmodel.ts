@@ -60,6 +60,8 @@ export type EntityFactsV2DashboardSummaryViewModel = {
   visibility: DashboardSummaryMetric;
   top3: DashboardSummaryMetric;
   heroVariant: DashboardSummaryHeroVariant;
+  verifiedPageStatus:
+    EntityFactsV2DashboardCutoverModel["verifiedTargetCitationPages"]["status"];
   verifiedPageCount: number | null;
   competitorCount: number;
   topCompetitor: { name: string; responseCount: number } | null;
@@ -218,6 +220,7 @@ export function buildEntityFactsV2DashboardSummaryViewModel(args: {
     visibility,
     top3,
     heroVariant: heroVariantFor(visibility, top3),
+    verifiedPageStatus: model.verifiedTargetCitationPages.status,
     verifiedPageCount: model.verifiedTargetCitationPages.available
       ? model.verifiedTargetCitationPages.rows.length
       : null,
