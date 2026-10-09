@@ -806,7 +806,7 @@ Deno.serve(async (request) => {
           .insert({
             org_id: orgId,
             review_status: "needs_review",
-            discovery_source: "web_preview",
+            discovery_source: triggerSource === "scheduled" ? "scheduled_web" : "web_preview",
             idempotency_key: key,
             business_name: payload.businessName,
             category: payload.category,
