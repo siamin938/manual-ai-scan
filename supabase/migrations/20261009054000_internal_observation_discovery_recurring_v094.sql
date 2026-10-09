@@ -166,9 +166,10 @@ begin
     $cmd$
   );
 
-  update cron.job
-  set active=false
-  where jobname='internal-observation-discovery-scheduler-v094';
+  perform cron.alter_job(
+    (select jobid from cron.job where jobname='internal-observation-discovery-scheduler-v094' limit 1),
+    active := false
+  );
 end $$;
 
 comment on table public.internal_observation_discovery_schedules is
