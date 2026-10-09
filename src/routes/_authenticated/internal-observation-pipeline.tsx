@@ -471,6 +471,36 @@ function InternalObservationPipelinePage() {
     queryFn: () => fetchDiscoveryReviewQueue({ data: { orgId } }),
   });
 
+  const latestDiscoveryReviewQuery = (() => {
+    if (!discoveryReviewQuery.data?.ok) return null;
+    const latest = [...discoveryReviewQuery.data.overview.items].sort((a, b) =>
+      b.lastSeenAt.localeCompare(a.lastSeenAt),
+    )[0];
+    return latest?.discoveryQuery ?? null;
+  })();
+
+  const hasCurrentDiscoveryQuery =
+    discoveryCategory.trim().length > 0 &&
+    discoveryRegion.trim().length > 0 &&
+    discoveryService.trim().length > 0;
+
+  const recurringDiscoveryQuery = hasCurrentDiscoveryQuery
+    ? {
+        category: discoveryCategory.trim(),
+        service: discoveryService.trim(),
+        region: discoveryRegion.trim(),
+        city: discoveryCity.trim() || null,
+        brandModel: discoveryBrandModel.trim() || null,
+        desiredCount: Number(discoveryDesiredCount),
+      }
+    : latestDiscoveryReviewQuery;
+
+  const recurringDiscoveryQuerySource = hasCurrentDiscoveryQuery
+    ? "현재 Discovery 입력"
+    : latestDiscoveryReviewQuery
+      ? "최근 Review Queue 조건"
+      : null;
+
   const discoveryRecurringQuery = useQuery({
     queryKey: ["internal-observation-discovery-recurring", orgId],
     enabled: !!orgId,
@@ -658,17 +688,20 @@ function InternalObservationPipelinePage() {
   });
 
   const saveDiscoveryScheduleMutation = useMutation({
-    mutationFn: () =>
-      saveDiscoverySchedule({
+    mutationFn: () => {
+      if (!recurringDiscoveryQuery) {
+        throw new Error("RECURRING_DISCOVERY_QUERY_NOT_AVAILABLE");
+      }
+      return saveDiscoverySchedule({
         data: {
           orgId,
           name: recurringName,
-          category: discoveryCategory,
-          service: discoveryService,
-          region: discoveryRegion,
-          city: discoveryCity || null,
-          brandModel: discoveryBrandModel || null,
-          desiredCount: Number(discoveryDesiredCount),
+          category: recurringDiscoveryQuery.category,
+          service: recurringDiscoveryQuery.service,
+          region: recurringDiscoveryQuery.region,
+          city: recurringDiscoveryQuery.city,
+          brandModel: recurringDiscoveryQuery.brandModel,
+          desiredCount: recurringDiscoveryQuery.desiredCount,
           cadence: recurringCadence,
           runHourKst: Number(recurringRunHourKst),
           weekdayIso:
@@ -676,7 +709,8 @@ function InternalObservationPipelinePage() {
               ? Number(recurringWeekdayIso)
               : null,
         },
-      }),
+      });
+    },
     onSuccess: (res) => {
       if (!res.ok) {
         toast.error("반복 Discovery 프로필을 저장하지 못했습니다.");
@@ -1033,15 +1067,18 @@ function InternalObservationPipelinePage() {
   const discoveryCount = Number(discoveryDesiredCount);
   const recurringHour = Number(recurringRunHourKst);
   const recurringWeekday = Number(recurringWeekdayIso);
+  const recurringDesiredCount =
+    recurringDiscoveryQuery?.desiredCount ?? Number.NaN;
   const canSaveRecurringSchedule =
     !!orgId &&
     recurringName.trim().length > 0 &&
-    discoveryCategory.trim().length > 0 &&
-    discoveryRegion.trim().length > 0 &&
-    discoveryService.trim().length > 0 &&
-    Number.isInteger(discoveryCount) &&
-    discoveryCount >= 1 &&
-    discoveryCount <= 8 &&
+    !!recurringDiscoveryQuery &&
+    recurringDiscoveryQuery.category.trim().length > 0 &&
+    recurringDiscoveryQuery.region.trim().length > 0 &&
+    recurringDiscoveryQuery.service.trim().length > 0 &&
+    Number.isInteger(recurringDesiredCount) &&
+    recurringDesiredCount >= 1 &&
+    recurringDesiredCount <= 8 &&
     Number.isInteger(recurringHour) &&
     recurringHour >= 0 &&
     recurringHour <= 23 &&
@@ -2078,7 +2115,8 @@ function InternalObservationPipelinePage() {
           <div className="rounded-lg border bg-muted/20 p-4">
             <p className="text-sm font-semibold">반복 탐색 프로필 만들기</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              위 Discovery Preview에 입력한 업종·서비스·지역 조건을 사용합니다.
+              현재 Discovery 입력이 있으면 그 조건을 사용하고, 페이지 새로고침 등으로 입력이
+              비어 있으면 Review Queue의 가장 최근 Discovery 조건을 자동으로 재사용합니다.
               프로필은 자동 실행 OFF로 저장되며, 먼저 수동 1회 실행으로 결과를 검증합니다.
             </p>
 
@@ -2148,11 +2186,22 @@ function InternalObservationPipelinePage() {
             </div>
 
             <div className="mt-3 rounded-md bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
-              현재 조건 · {discoveryCategory || "업종 미선택"} ·{" "}
-              {discoveryRegion || "지역 미입력"}
-              {discoveryCity ? ` ${discoveryCity}` : ""} ·{" "}
-              {discoveryService || "서비스 미선택"} · 후보{" "}
-              {discoveryDesiredCount || "0"}곳
+              {recurringDiscoveryQuery ? (
+                <>
+                  {recurringDiscoveryQuerySource} · {recurringDiscoveryQuery.category} ·{" "}
+                  {recurringDiscoveryQuery.region}
+                  {recurringDiscoveryQuery.city
+                    ? ` ${recurringDiscoveryQuery.city}`
+                    : ""}{" "}
+                  · {recurringDiscoveryQuery.service} · 후보{" "}
+                  {recurringDiscoveryQuery.desiredCount}곳
+                </>
+              ) : (
+                <>
+                  반복 탐색 조건 없음 · 위 Discovery Preview를 실행하거나 Review Queue에 저장된
+                  후보가 있어야 합니다.
+                </>
+              )}
             </div>
 
             <Button
