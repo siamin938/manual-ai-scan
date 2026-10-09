@@ -98,6 +98,13 @@ export type RunInternalObservationDiscoveryScheduleNowResult =
         | "DISCOVERY_FAILED";
     };
 
+export type SetInternalObservationDiscoveryScheduleEnabledResult =
+  | { ok: true; schedule: InternalObservationDiscoveryScheduleDTO }
+  | {
+      ok: false;
+      error: "FORBIDDEN" | "INVALID_INPUT" | "NOT_AVAILABLE";
+    };
+
 type LooseQuery = {
   select: (columns?: string) => LooseQuery;
   insert: (values: unknown) => LooseQuery;
@@ -797,5 +804,74 @@ export const runInternalObservationDiscoveryScheduleNow = createServerFn({
         unchangedCount,
         publicSourceCount,
       };
+    },
+  );
+
+
+export const setInternalObservationDiscoveryScheduleEnabled = createServerFn({
+  method: "POST",
+})
+  .inputValidator(
+    (input: { orgId: string; scheduleId: string; enabled: boolean }) => {
+      const orgId = clean(input?.orgId, 64).toLowerCase();
+      const scheduleId = clean(input?.scheduleId, 64).toLowerCase();
+      if (
+        !UUID_RE.test(orgId) ||
+        !UUID_RE.test(scheduleId) ||
+        typeof input?.enabled !== "boolean"
+      ) {
+        throw new Error("INVALID_INPUT");
+      }
+      return { orgId, scheduleId, enabled: input.enabled };
+    },
+  )
+  .middleware([requireSupabaseAuth])
+  .handler(
+    async ({
+      data,
+      context,
+    }): Promise<SetInternalObservationDiscoveryScheduleEnabledResult> => {
+      const client = context.supabase as unknown as RpcCaller;
+      if (
+        !(await isInternalAdmin(client)) ||
+        !(await canOperateOrg(data.orgId, context.userId))
+      ) {
+        return { ok: false, error: "FORBIDDEN" };
+      }
+
+      const { data: updatedRaw, error } = await admin
+        .from("internal_observation_discovery_schedules")
+        .update({
+          enabled: data.enabled,
+          actor_user_id: context.userId,
+          updated_by: context.userId,
+        })
+        .eq("id", data.scheduleId)
+        .eq("org_id", data.orgId)
+        .select(SCHEDULE_SELECT)
+        .single();
+
+      if (error) return { ok: false, error: "NOT_AVAILABLE" };
+      const schedule = parseSchedule(updatedRaw);
+      if (!schedule) return { ok: false, error: "NOT_AVAILABLE" };
+
+      await admin.from("system_events").insert({
+        org_id: data.orgId,
+        run_id: null,
+        event_type: "internal_discovery_schedule_enabled_changed",
+        severity: "info",
+        message:
+          "Recurring discovery profile eligibility changed without changing the global cron gate.",
+        metadata: {
+          discovery_version: "0.9.4",
+          schedule_id: schedule.id,
+          enabled: schedule.enabled,
+          actor_user_id: context.userId,
+          global_cron_changed: false,
+          measurement_side_effects: false,
+        },
+      });
+
+      return { ok: true, schedule };
     },
   );
