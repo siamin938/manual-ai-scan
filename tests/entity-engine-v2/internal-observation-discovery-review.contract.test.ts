@@ -59,6 +59,17 @@ describe("internal observation discovery review queue v0.9.2", () => {
     expect(serverSource).toContain("canOperateOrg");
   });
 
+  it("reuses one review candidate for safe-name variants in the same region and service", () => {
+    expect(serverSource).toContain("safeDiscoveryNameSurface");
+    expect(serverSource).toContain("safeNameMatches");
+    expect(serverSource).toContain(
+      "existingRegion === data.candidate.region",
+    );
+    expect(serverSource).toContain(
+      "existingService === data.candidate.service",
+    );
+  });
+
   it("reuses one review candidate when exact public evidence URLs identify the same business", () => {
     expect(serverSource).toContain("identityUrlsFromValues");
     expect(serverSource).toContain("identityUrlsFromStoredRow");
