@@ -1,6 +1,6 @@
-# Internal Observation Pipeline v0.9.3 Guarded Discovery Promotion
+# Internal Observation Pipeline v0.9.4 Recurring Discovery
 
-Status: v0.8 unattended sequential measurement is validated. v0.9.1 public-web Discovery Preview and v0.9.2 persistent Review Queue have both passed live operator QA. v0.9.3 Guarded Promotion is implemented with a fresh promotion plan hash, latest identity/idempotency re-checks, explicit operator confirmation, and reuse of the exact existing candidate-intake core. Promotion is bounded to creating or linking an existing `pending` internal observation candidate; it does not prepare questions, create Runs/Jobs, or debit measurement credits. No real Discovery candidate has been promoted yet; the first live promotion remains an explicit operator QA step.
+Status: v0.8 unattended sequential measurement is validated. v0.9.1 public-web Discovery Preview, v0.9.2 persistent Review Queue, and v0.9.3 Guarded Promotion have passed live operator QA through one real 카포먼스 promotion into an existing-pipeline `pending` candidate, stopping before preparation. v0.9.4 Recurring Discovery infrastructure is implemented with disabled-by-default profiles, manual one-shot batch execution, new/changed/unchanged classification, persistent batch history, and an hourly global cron scaffold that remains OFF. No recurring paid web-search call is active until a separate explicit operator approval turns on the global cron gate.
 
 ## Goal
 
@@ -921,14 +921,93 @@ or an idempotent existing-candidate link, and stop before preparation.
 
 #### v0.9.4 — recurring discovery, still no recurring auto-approval
 
-Only after v0.9.1-v0.9.3 are validated:
+Implemented with the global recurring gate OFF.
 
-- allow a scheduled discovery batch
-- deduplicate against prior discovery batches
-- surface only new/changed candidates for review
-- do not auto-approve
-- do not auto-promote
-- do not auto-measure
+Storage:
+
+- `internal_observation_discovery_schedules`
+- `internal_observation_discovery_batches`
+- `internal_observation_discovery_batch_items`
+
+A schedule stores:
+
+- region/city
+- automotive category/service
+- optional brand/model focus
+- desired candidate count
+- daily or weekly cadence
+- KST execution hour
+- configured actor
+- enabled/eligible state
+- last batch status
+
+A saved profile is disabled by default.
+
+The UI supports:
+
+- save a recurring-discovery profile from the current Discovery query
+- mark a profile as eligible/ineligible for future recurring execution
+- manually execute one batch for QA
+- inspect recent batch result counts
+- inspect recently new/changed candidate names
+- see the separate global cron-gate state
+
+Batch behavior:
+
+1. run the public-web candidate search
+2. validate provider-observed evidence URLs
+3. compare each result to the persistent Review Queue
+4. classify each candidate as:
+   - `new`
+   - `changed`
+   - `unchanged`
+5. insert new candidates as `needs_review`
+6. refresh evidence for existing candidates
+7. if an unpromoted previously reviewed candidate materially changes, return it to `needs_review`
+8. never change a promoted candidate's review decision automatically
+9. retain per-batch snapshots and counts
+
+Recurring source is tagged `scheduled_web` separately from manual `web_preview`.
+
+The global cron scaffold:
+
+- job: `internal-observation-discovery-scheduler-v094`
+- cadence: hourly due-check
+- actual candidate-profile cadence is evaluated in KST
+- global job is created **inactive**
+- service-role-only getter/setter RPCs separate implementation from activation
+
+Current live state after implementation:
+
+- global recurring cron = OFF
+- saved recurring profiles = 0
+- recurring batches = 0
+- paid recurring web-search calls = 0
+- Review Queue remains unchanged
+- 카포먼스 remains `pending`, not prepared
+- measurement credits remain unchanged
+
+Safety:
+
+- no auto-approval
+- no auto-promotion
+- no business creation
+- no question preparation
+- no Run/Job creation
+- no measurement-credit debit
+- no measurement scheduler state mutation
+- profile eligibility does not change the global cron gate
+- manual `지금 1회 실행` is the only v0.9.4 paid search path before global-gate approval
+
+Next live QA:
+
+1. save one recurring profile using the already tested 안산 PPF conditions
+2. keep the global gate OFF
+3. manually run the profile once
+4. verify new/changed/unchanged counts
+5. verify Review Queue changes only
+6. verify no pipeline/Run/credit side effects
+7. only after that decide whether to enable recurring execution
 
 ### v0.9 acceptance criteria
 
