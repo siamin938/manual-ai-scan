@@ -65,9 +65,11 @@ describe("internal observation discovery review queue v0.9.2", () => {
     expect(serverSource).toContain("identityMatches.length > 1");
     expect(serverSource).toContain('"IDENTITY_AMBIGUOUS"');
     expect(serverSource).toContain("mergeEvidence");
-    expect(serverSource).not.toContain(
-      "business_name: data.candidate.businessName,\n            category: data.candidate.category",
+    expect(serverSource).toContain(
+      "website_url: existingWebsiteUrl ?? data.candidate.websiteUrl",
     );
+    expect(serverSource).toContain("mergedSourceEvidence");
+    expect(serverSource).toContain("mergedPublicProfileUrls");
   });
 
   it("is idempotent for the same reviewed business surface", () => {
