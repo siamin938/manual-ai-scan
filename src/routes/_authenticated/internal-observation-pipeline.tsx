@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { buildActionOpportunityV1Preview } from "@/lib/action-opportunity-v1.rules";
 import { formatSeoul } from "@/lib/format";
 import {
   AUTOMOTIVE_CATEGORY_OPTIONS,
@@ -525,6 +526,10 @@ function InternalObservationPipelinePage() {
         },
       }),
   });
+
+  const actionOpportunityPreview = resultQuery.data?.ok
+    ? buildActionOpportunityV1Preview(resultQuery.data.data)
+    : null;
 
   useEffect(() => {
     if (orgId || !overview?.organizations.length) return;
@@ -2762,6 +2767,49 @@ function InternalObservationPipelinePage() {
                   </div>
                 </div>
               </div>
+
+              {actionOpportunityPreview && (
+                <section className="space-y-3 rounded-lg border p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">Action Opportunity v1.0</p>
+                    <Badge variant="outline">내부 dry-run · 고객 화면 미노출</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    현재 대표 Run만 사용 · {actionOpportunityPreview.runId}
+                  </p>
+                  {actionOpportunityPreview.items.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      이 측정에서 확인할 수 있는 규칙 기반 항목이 없습니다.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {actionOpportunityPreview.items.map((opportunity) => (
+                        <div key={opportunity.id} className="space-y-2 rounded-md bg-muted/30 p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={opportunity.priority === "high" ? "default" : "secondary"}>
+                              {opportunity.priority === "high" ? "우선 확인" : "검토"}
+                            </Badge>
+                            <p className="text-sm font-semibold">{opportunity.title}</p>
+                          </div>
+                          <p className="text-sm">{opportunity.observation}</p>
+                          <p className="text-xs text-muted-foreground">
+                            <strong>왜 확인하나</strong> · {opportunity.whyItMatters}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            <strong>확인할 항목</strong> · {opportunity.recommendedCheck}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            <strong>근거</strong> · {opportunity.evidence.map((row) => row.label + " " + row.value).join(" · ")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {actionOpportunityPreview.disclaimer}
+                  </p>
+                </section>
+              )}
 
               <p className="text-xs leading-5 text-muted-foreground">
                 이 결과는 내부 데이터 축적용 관찰 결과입니다. 관찰 업체와 출처 연결은 인과관계를 의미하지 않습니다.
