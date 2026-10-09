@@ -204,6 +204,13 @@ function domainFromUrl(value: string): string | null {
   }
 }
 
+function safeDiscoveryNameSurface(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z가-힣]/giu, "");
+}
+
 function identityUrlKey(value: string): string | null {
   try {
     const url = new URL(value);
@@ -732,20 +739,43 @@ export const saveInternalObservationDiscoveryCandidate = createServerFn({
           evidence: data.candidate.evidence,
         });
 
-        const identityMatches = (Array.isArray(queueRowsRaw) ? queueRowsRaw : [])
-          .filter(isRecord)
-          .filter((row) => {
-            const existingIdentityUrls = identityUrlsFromStoredRow(row);
-            return [...incomingIdentityUrls].some((url) =>
-              existingIdentityUrls.has(url),
-            );
-          });
+        const queueRows = (Array.isArray(queueRowsRaw) ? queueRowsRaw : [])
+          .filter(isRecord);
+
+        const identityMatches = queueRows.filter((row) => {
+          const existingIdentityUrls = identityUrlsFromStoredRow(row);
+          return [...incomingIdentityUrls].some((url) =>
+            existingIdentityUrls.has(url),
+          );
+        });
 
         if (identityMatches.length > 1) {
           return { ok: false, error: "IDENTITY_AMBIGUOUS" };
         }
         if (identityMatches.length === 1) {
           existingRaw = identityMatches[0];
+        } else {
+          const incomingNameSurface = safeDiscoveryNameSurface(
+            data.candidate.businessName,
+          );
+          const safeNameMatches = queueRows.filter((row) => {
+            const existingName = str(row["business_name"]);
+            const existingRegion = str(row["region"]);
+            const existingService = str(row["service"]);
+            return (
+              !!existingName &&
+              safeDiscoveryNameSurface(existingName) === incomingNameSurface &&
+              existingRegion === data.candidate.region &&
+              existingService === data.candidate.service
+            );
+          });
+
+          if (safeNameMatches.length > 1) {
+            return { ok: false, error: "IDENTITY_AMBIGUOUS" };
+          }
+          if (safeNameMatches.length === 1) {
+            existingRaw = safeNameMatches[0];
+          }
         }
       }
 
