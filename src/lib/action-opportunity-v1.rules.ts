@@ -232,8 +232,8 @@ export function buildActionOpportunityV1Preview(
       priority: "review",
       title: "반복 관찰된 다른 업체의 등장 상황을 확인하세요",
       observation:
-        "이번 측정의 " + total + "개 유효 답변 중 " +
-        repeated.responseCount + "개에서 " + repeated.name + "이(가) 관찰됐습니다.",
+        "이번 측정에서 반복 관찰된 업체는 " + repeated.name + "입니다. " +
+        total + "개 유효 답변 중 " + repeated.responseCount + "개에 등장했습니다.",
       whyItMatters: "동일한 질문 세트 내에서 반복적으로 관찰된 업체를 구분할 수 있습니다. 경쟁 우위나 노출 원인을 증명하는 지표는 아닙니다.",
       recommendedCheck:
         "해당 업체가 반복 등장한 질문이나 인용 출처가 있는지 확인하고, 내 업체가 등장한 질문·출처와 비교해보세요.",

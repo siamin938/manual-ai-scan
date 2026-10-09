@@ -91,7 +91,7 @@ describe("Action Opportunity v1.0 internal deterministic dry-run", () => {
     expect(ids(dto)).toContain("core_exposure_gap");
     const item = result.items.find((row) => row.id === "core_exposure_gap")!;
     expect(item.priority).toBe("high");
-    expect(item.observation).toContain("8건에서는 확정 노출이 0건");
+    expect(item.observation).toContain("기준 검색 8개 답변에서는 확정 노출이 확인되지 않았습니다");
     expect(item.evidence).toContainEqual({ label: "맞춤 검색 확정", value: "16/16" });
     expect(item.evidence).toContainEqual({
       label: "기준 검색 질문 예",
@@ -231,7 +231,7 @@ describe("Action Opportunity v1.0 internal deterministic dry-run", () => {
       "repeated_competitor",
       "competitor_source_difference",
     ]);
-    expect(result.items[1]?.observation).toContain("6개 답변");
+    expect(result.items[1]?.observation).toContain("6개에 등장했습니다");
     expect(result.items[2]?.observation).toContain("carcarescenter.com");
   });
 
