@@ -1,6 +1,6 @@
-# Internal Observation Pipeline v0.9.1 Read-only Discovery Preview
+# Internal Observation Pipeline v0.9.3 Guarded Discovery Promotion
 
-Status: v0.8 first enabled scheduler cycle is validated end-to-end. v0.9.1 read-only public-web Discovery Preview is now implemented and deployed behind authenticated internal-operator access. Discovery Preview performs an OpenAI web-search call but does not persist discovery results, create businesses or pipeline items, prepare questions, create Runs/Jobs, or debit measurement credits. The deployed endpoint requires JWT authentication; an unauthenticated smoke request returned HTTP 401. Authenticated operator preview QA remains the next live validation step.
+Status: v0.8 unattended sequential measurement is validated. v0.9.1 public-web Discovery Preview and v0.9.2 persistent Review Queue have both passed live operator QA. v0.9.3 Guarded Promotion is implemented with a fresh promotion plan hash, latest identity/idempotency re-checks, explicit operator confirmation, and reuse of the exact existing candidate-intake core. Promotion is bounded to creating or linking an existing `pending` internal observation candidate; it does not prepare questions, create Runs/Jobs, or debit measurement credits. No real Discovery candidate has been promoted yet; the first live promotion remains an explicit operator QA step.
 
 ## Goal
 
@@ -857,15 +857,67 @@ A separately persisted discovery-batch object is intentionally deferred until re
 
 #### v0.9.3 — guarded promotion
 
-Allow an operator-approved discovery proposal to enter the existing internal candidate intake.
+Implemented; first real operator promotion still pending QA.
 
-Promotion must:
+The manual candidate intake path and Discovery promotion both call the same shared
+`enqueueInternalObservationCandidateCore()`. v0.9.3 does not maintain a second insert path.
 
-- preserve the discovery-to-pipeline audit link
-- reuse current candidate idempotency
-- never rewrite an existing business automatically
-- stop on identity ambiguity
-- leave preparation and 24-question preview unchanged
+Promotion flow:
+
+1. Review Queue item must be `approved`
+2. operator opens `승격 미리보기`
+3. server recalculates a fresh plan from current DB state
+4. plan rechecks:
+   - review status
+   - existing promotion link
+   - retained public evidence
+   - exact existing-business identity collisions
+   - inactive exact business matches
+   - existing candidate idempotency
+5. server returns a SHA-256 plan hash and exact action:
+   - `create_pending_candidate`
+   - or `link_existing_candidate`
+6. operator explicitly presses `기존 파이프라인으로 승격`
+7. confirmation request recalculates the plan and requires the same hash
+8. existing candidate-intake core creates/reuses the candidate
+9. Review Queue row records the immutable pipeline link
+
+Promotion metadata:
+
+- `promoted_pipeline_item_id`
+- `promoted_at`
+- `promoted_by`
+- unique promoted-pipeline-item index
+- audit event `internal_discovery_candidate_promoted`
+
+Promotion blockers:
+
+- `REVIEW_NOT_APPROVED`
+- `ALREADY_PROMOTED`
+- `PUBLIC_EVIDENCE_MISSING`
+- `BUSINESS_IDENTITY_AMBIGUOUS`
+- `EXISTING_BUSINESS_INACTIVE`
+
+Safety boundary:
+
+- resulting new candidate status = `pending`
+- no business is created during promotion
+- no question set/question is created during promotion
+- no preparation function is called
+- no `ready_to_measure` mutation occurs
+- no Run is created
+- no Job is created
+- no measurement credit is debited
+- no `enqueue-run` path is reachable
+- existing `준비 미리보기 -> 준비 실행` remains a separate operator step
+
+A rollback-only database smoke validated that the promotion metadata contract accepts an approved
+Review Queue item linked to a `pending` candidate with no Run/question-set/measurement approval,
+then rolls both mutations back. After rollback the real 카포먼스 Review Queue item remained
+unpromoted and the credit balance remained unchanged.
+
+The first live QA should promote only **카포먼스 안산직영점**, verify exactly one pending candidate
+or an idempotent existing-candidate link, and stop before preparation.
 
 #### v0.9.4 — recurring discovery, still no recurring auto-approval
 
