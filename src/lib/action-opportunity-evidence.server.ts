@@ -79,6 +79,10 @@ export async function fetchActionOpportunityEvidence(args: {
   orgId: string;
   businessId: string;
   highVisibilityThresholdPct: number;
+  /** Admin QA may pin evidence to its exact displayed representative Run. */
+  expectedRunId?: string;
+  /** Admin QA may narrow the source comparison to one observed domain. */
+  focusDomain?: string;
 }): Promise<ActionOpportunityEvidenceResult> {
   const empty: ActionOpportunityEvidenceResult = {
     highVisibilityExamples: [],
@@ -119,7 +123,10 @@ export async function fetchActionOpportunityEvidence(args: {
         (source) =>
           source.evidence !== "clue" &&
           source.targetResponseCount === 0 &&
-          source.competitorResponseCount > 0,
+          source.competitorResponseCount > 0 &&
+          (!args.focusDomain ||
+            source.domain.toLowerCase().replace(/^www\./u, "") ===
+              args.focusDomain.trim().toLowerCase().replace(/^www\./u, "")),
       )
       .map((source) => [
         source.domain.toLowerCase().replace(/^www\./, ""),
@@ -140,7 +147,9 @@ export async function fetchActionOpportunityEvidence(args: {
   // Evidence must use the exact representative run already validated by the
   // dashboard read gateway. Do not independently pick another "latest" run.
   const sourceRunId = gateway.data.scope.runId;
-
+  if (args.expectedRunId && args.expectedRunId !== sourceRunId) {
+    return empty;
+  }
   const { data: rows, error } = await supabaseAdmin
     .from("measurement_citation_attributions_actionable_v2")
     .select("canonical_key, canonical_display_name, citation_url, domain, attribution_level")

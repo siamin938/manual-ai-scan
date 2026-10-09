@@ -94,6 +94,19 @@ export function buildActionOpportunityV1Preview(
       })
     : null;
 
+  const coreQuestionIds = new Set(
+    (dto.questionLocations ?? [])
+      .filter((question) => question.city === null)
+      .map((question) => question.questionId),
+  );
+  const coreExample = dto.questionAreas.find(
+    (question) =>
+      coreQuestionIds.has(question.questionId) &&
+      question.validCount > 0 &&
+      question.confirmedMentionCount === 0 &&
+      question.unresolvedTargetCount === 0,
+  )?.questionText;
+
   // Never label an incomplete or uncertain Core scope as an absent exposure.
   if (
     layer &&
@@ -111,16 +124,18 @@ export function buildActionOpportunityV1Preview(
       priority: "high",
       title: "넓은 지역 기준 검색 노출을 우선 확인하세요",
       observation:
-        "상세 지역 검색 " + layer.custom.confirmedCount + "/" +
-        layer.custom.validCount + "건에서는 확정 노출됐지만, 넓은 지역 기준 검색 8건에서는 확정 노출이 0건이었습니다.",
+        "맞춤 검색 유효 답변 " + layer.custom.validCount + "개 중 " +
+        layer.custom.confirmedCount + "개에서 내 업체가 확정 노출됐습니다. " +
+        "반면 기준 검색 8개 답변에서는 확정 노출이 확인되지 않았습니다.",
       whyItMatters: fullyLocal
         ? "상세 지역 검색 16건 모두에 등장한 반면 넓은 지역 검색에서는 등장하지 않은 패턴입니다."
         : "이번 측정의 확정 노출이 상세 지역 검색에 집중되어 있습니다.",
       recommendedCheck:
-        "공식 홈페이지와 공개 업체 프로필에서 실제 서비스 가능 지역과 핵심 서비스 설명이 일관되게 확인되는지 점검해보세요.",
+        "기준 검색과 맞춤 검색의 실제 질문을 비교하고, 공식 홈페이지·공개 프로필에 서비스 가능 지역과 주요 서비스가 일관되게 기재되어 있는지 확인해보세요.",
       evidence: [
         { label: "기준 검색 확정", value: "0/8" },
         { label: "맞춤 검색 확정", value: layer.custom.confirmedCount + "/" + layer.custom.validCount },
+        ...(coreExample ? [{ label: "기준 검색 질문 예", value: coreExample }] : []),
       ],
       confidence: "high",
     });
@@ -217,11 +232,11 @@ export function buildActionOpportunityV1Preview(
       priority: "review",
       title: "반복 관찰된 다른 업체의 등장 상황을 확인하세요",
       observation:
-        "이번 측정에서 " + repeated.name + " 업체가 " +
-        repeated.responseCount + "개 답변에 반복 관찰됐습니다.",
+        "이번 측정의 " + total + "개 유효 답변 중 " +
+        repeated.responseCount + "개에서 " + repeated.name + "이(가) 관찰됐습니다.",
       whyItMatters: "동일한 질문 세트 내에서 반복적으로 관찰된 업체를 구분할 수 있습니다. 경쟁 우위나 노출 원인을 증명하는 지표는 아닙니다.",
       recommendedCheck:
-        "해당 업체가 등장한 검색 질문과 확인 가능한 인용 출처를 내 업체의 관찰 결과와 나란히 비교해보세요.",
+        "해당 업체가 반복 등장한 질문이나 인용 출처가 있는지 확인하고, 내 업체가 등장한 질문·출처와 비교해보세요.",
       evidence: [
         { label: "관찰 업체", value: repeated.name },
         { label: "등장 답변", value: repeated.responseCount + "/" + total },
@@ -269,7 +284,7 @@ export function buildActionOpportunityV1Preview(
       whyItMatters:
         "현재 대표 Run의 동일 출처에서 업체별 연결 여부에 차이가 관찰됐습니다. 특정 출처가 노출을 만든 원인이라는 뜻은 아닙니다.",
       recommendedCheck:
-        "해당 도메인에서 실제 인용된 페이지와 공개 업체 정보를 확인해 어떤 업체와 연결되어 있는지 직접 비교해보세요.",
+        "이번 측정에서 실제 인용된 페이지를 열어 어떤 업체가 등장하는지 확인하고, 내 업체 공개 정보와 비교해보세요.",
       evidence: [
         { label: "출처", value: competitorOnlySource.domain },
         { label: "다른 업체 연결 답변", value: String(competitorOnlySource.competitorResponseCount) },

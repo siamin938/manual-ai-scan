@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  fetchActionOpportunityEvidence,
+  type CurrentRunSourceReference,
+} from "@/lib/action-opportunity-evidence.server";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -94,4 +98,82 @@ export const searchActionOpportunityV1QaBusinesses = createServerFn({
         city: row.city,
       })),
     };
+  });
+
+
+export type ActionOpportunityV1QaReferencesResult =
+  | { ok: true; currentRunReferences: CurrentRunSourceReference[] }
+  | { ok: false; error: "FORBIDDEN" | "NOT_AVAILABLE" };
+
+/**
+ * Existing citation-page evidence; never performs a new web search or Run.
+ * Exact source_run_id must equal the currently displayed representative Run.
+ * Only enabled for an authenticated internal operations administrator.
+ */
+export const getActionOpportunityV1QaReferences = createServerFn({
+  method: "POST",
+})
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: {
+    orgId: string;
+    businessId: string;
+    runId: string;
+    sourceDomain: string;
+  }) => {
+    if (
+      !input ||
+      !UUID_RE.test(input.orgId?.trim() ?? "") ||
+      !UUID_RE.test(input.businessId?.trim() ?? "") ||
+      !UUID_RE.test(input.runId?.trim() ?? "") ||
+      typeof input.sourceDomain !== "string"
+    ) {
+      throw new Error("INVALID_REQUEST");
+    }
+    const sourceDomain = input.sourceDomain.trim().toLowerCase().replace(/^www\./u, "");
+    if (
+      sourceDomain.length > 253 ||
+      !/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/u.test(sourceDomain)
+    ) {
+      throw new Error("INVALID_REQUEST");
+    }
+    return {
+      orgId: input.orgId.trim().toLowerCase(),
+      businessId: input.businessId.trim().toLowerCase(),
+      runId: input.runId.trim().toLowerCase(),
+      sourceDomain,
+    };
+  })
+  .handler(async ({ data, context }): Promise<ActionOpportunityV1QaReferencesResult> => {
+    const client = context.supabase as unknown as RpcCaller;
+    const permission = await client.rpc("can_view_data_asset_admin_v01");
+    if (permission.error || permission.data !== true) {
+      return { ok: false, error: "FORBIDDEN" };
+    }
+
+    const { data: org, error: orgError } = await supabaseAdmin
+      .from("organizations")
+      .select("id")
+      .eq("id", data.orgId)
+      .eq("measurement_data_origin", "internal_observation")
+      .maybeSingle();
+    if (orgError) return { ok: false, error: "NOT_AVAILABLE" };
+    if (!org) return { ok: false, error: "FORBIDDEN" };
+
+    try {
+      const evidence = await fetchActionOpportunityEvidence({
+        orgId: data.orgId,
+        businessId: data.businessId,
+        highVisibilityThresholdPct: 0,
+        expectedRunId: data.runId,
+        focusDomain: data.sourceDomain,
+      });
+      return {
+        ok: true,
+        currentRunReferences: evidence.currentRunReferences.filter(
+          (source) => source.domain === data.sourceDomain,
+        ),
+      };
+    } catch {
+      return { ok: false, error: "NOT_AVAILABLE" };
+    }
   });

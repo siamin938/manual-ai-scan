@@ -93,6 +93,11 @@ describe("Action Opportunity v1.0 internal deterministic dry-run", () => {
     expect(item.priority).toBe("high");
     expect(item.observation).toContain("8건에서는 확정 노출이 0건");
     expect(item.evidence).toContainEqual({ label: "맞춤 검색 확정", value: "16/16" });
+    expect(item.evidence).toContainEqual({
+      label: "기준 검색 질문 예",
+      value: "측정 질문 1",
+    });
+    expect(item.observation).toContain("기준 검색 8개 답변에서는 확정 노출이 확인되지 않았습니다");
     expect(item.scope.runId).toBe(dto.scope.runId);
     expect(result.mode).toBe("internal_dry_run");
   });

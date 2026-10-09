@@ -66,7 +66,10 @@ import {
   type SchedulerActivationBlocker,
 } from "@/lib/internal-observation-scheduler-operations.functions";
 import { getPilotOpsAdminResult } from "@/lib/pilot-ops-admin-detail.functions";
-import { searchActionOpportunityV1QaBusinesses } from "@/lib/action-opportunity-v1.qa.functions";
+import {
+  searchActionOpportunityV1QaBusinesses,
+  getActionOpportunityV1QaReferences,
+} from "@/lib/action-opportunity-v1.qa.functions";
 import {
   getInternalObservationDiscoveryPreview,
   type InternalObservationDiscoveryCandidateDTO,
@@ -367,6 +370,7 @@ function InternalObservationPipelinePage() {
   const stopScheduler = useServerFn(stopInternalObservationScheduler);
   const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
   const searchQaBusinesses = useServerFn(searchActionOpportunityV1QaBusinesses);
+  const fetchQaReferences = useServerFn(getActionOpportunityV1QaReferences);
   const fetchDiscoveryPreview = useServerFn(getInternalObservationDiscoveryPreview);
   const fetchDiscoveryReviewQueue = useServerFn(
     getInternalObservationDiscoveryReviewQueue,
@@ -555,6 +559,34 @@ function InternalObservationPipelinePage() {
     resultQuery.data?.ok && !actionOpportunityRunMismatch
       ? buildActionOpportunityV1Preview(resultQuery.data.data)
       : null;
+
+  const comparisonSourceDomain = actionOpportunityPreview?.items
+    .find((opportunity) => opportunity.id === "competitor_source_difference")
+    ?.evidence.find((row) => row.label === "출처")?.value ?? null;
+  const qaReferenceQuery = useQuery({
+    queryKey: [
+      "action-opportunity-v1-qa-references",
+      resultTarget?.orgId,
+      resultTarget?.businessId,
+      actionOpportunityPreview?.runId,
+      comparisonSourceDomain,
+    ],
+    enabled:
+      !!resultTarget?.orgId &&
+      !!resultTarget?.businessId &&
+      !!actionOpportunityPreview?.runId &&
+      !!comparisonSourceDomain,
+    retry: false,
+    queryFn: () =>
+      fetchQaReferences({
+        data: {
+          orgId: resultTarget!.orgId,
+          businessId: resultTarget!.businessId!,
+          runId: actionOpportunityPreview!.runId,
+          sourceDomain: comparisonSourceDomain!,
+        },
+      }),
+  });
 
   useEffect(() => {
     if (orgId || !overview?.organizations.length) return;
@@ -2877,23 +2909,66 @@ function InternalObservationPipelinePage() {
                   ) : (
                     <div className="space-y-3">
                       {actionOpportunityPreview.items.map((opportunity) => (
-                        <div key={opportunity.id} className="space-y-2 rounded-md bg-muted/30 p-3">
+                        <div key={opportunity.id} className="space-y-3 rounded-lg border bg-muted/20 p-4">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge variant={opportunity.priority === "high" ? "default" : "secondary"}>
                               {opportunity.priority === "high" ? "우선 확인" : "검토"}
                             </Badge>
-                            <p className="text-sm font-semibold">{opportunity.title}</p>
+                            <p className="text-sm font-semibold leading-6 text-foreground">{opportunity.title}</p>
                           </div>
-                          <p className="text-sm">{opportunity.observation}</p>
-                          <p className="text-xs text-muted-foreground">
-                            <strong>왜 확인하나</strong> · {opportunity.whyItMatters}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            <strong>확인할 항목</strong> · {opportunity.recommendedCheck}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            <strong>근거</strong> · {opportunity.evidence.map((row) => row.label + " " + row.value).join(" · ")}
-                          </p>
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold">현재 관찰</p>
+                            <p className="text-sm leading-6">{opportunity.observation}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold">어떤 의미인가요?</p>
+                            <p className="text-sm leading-6 text-foreground/80">{opportunity.whyItMatters}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold">확인해 볼 항목</p>
+                            <p className="text-sm leading-6 text-foreground/90">{opportunity.recommendedCheck}</p>
+                          </div>
+                          <div className="space-y-2 rounded-md border bg-background p-3">
+                            <p className="text-sm font-semibold">실제 측정 근거</p>
+                            {opportunity.evidence.map((evidence, index) => (
+                              <div key={evidence.label + index} className="flex flex-wrap gap-x-2 text-sm leading-6">
+                                <span className="shrink-0 text-muted-foreground">{evidence.label}</span>
+                                <span className="font-medium break-words">{evidence.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {opportunity.id === "competitor_source_difference" && (
+                            <div className="space-y-2 rounded-md border bg-background p-3">
+                              <p className="text-sm font-semibold">AI 답변에서 실제 인용된 페이지</p>
+                              {qaReferenceQuery.isPending || qaReferenceQuery.isFetching ? (
+                                <p className="text-sm text-muted-foreground">동일 측정의 인용 페이지를 확인하는 중…</p>
+                              ) : qaReferenceQuery.data?.ok &&
+                                qaReferenceQuery.data.currentRunReferences.length > 0 ? (
+                                <div className="space-y-2">
+                                  {qaReferenceQuery.data.currentRunReferences
+                                    .flatMap((source) => source.entities)
+                                    .map((entity, index) => (
+                                      <a
+                                        key={entity.url + index}
+                                        href={entity.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block text-sm font-medium leading-6 text-primary underline underline-offset-2 break-all"
+                                      >
+                                        인용 페이지 열기 · {entity.entityName} ↗
+                                      </a>
+                                    ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">
+                                  동일 대표 측정에서 연결된 인용 페이지 URL을 확인하지 못했습니다.
+                                </p>
+                              )}
+                              <p className="text-xs leading-5 text-muted-foreground">
+                                인용된 URL과 업체의 연결 관찰만 보여줍니다. 해당 업체의 공식 페이지나 노출 원인으로 검증된 것은 아닙니다.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
