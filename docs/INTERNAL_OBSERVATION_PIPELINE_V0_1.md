@@ -999,15 +999,51 @@ Safety:
 - profile eligibility does not change the global cron gate
 - manual `지금 1회 실행` is the only v0.9.4 paid search path before global-gate approval
 
-Next live QA:
+Live QA completed with the global gate OFF.
 
-1. save one recurring profile using the already tested 안산 PPF conditions
-2. keep the global gate OFF
-3. manually run the profile once
-4. verify new/changed/unchanged counts
-5. verify Review Queue changes only
-6. verify no pipeline/Run/credit side effects
-7. only after that decide whether to enable recurring execution
+First manual recurring batch:
+
+- query: PPF/랩핑 · 경기 안산 · PPF · 5 candidates
+- trigger: manual one-shot
+- provider search sources: 31
+- initial worker classification: new 4 / changed 1 / unchanged 0
+- measurement credits unchanged
+- no ready_to_measure item
+- no active internal Run
+- no auto-approval or auto-promotion
+
+The first batch exposed two recurring-identity quality defects before auto-repeat activation:
+
+1. `퍼스트랩` was treated as new even though `퍼스트랩 랩핑PPF` already existed and both
+   shared the exact public URL `https://tv.naver.com/firstwrap`.
+2. `어보브 경기 안산 단원점(오토챔프마트점)` was treated as new even though the existing
+   `어보브썬팅 경기 안산 단원점` row used the exact same official store URL
+   `https://abovetint.co.kr/shop?id=1726`.
+
+Hardening:
+
+- exact public URL overlap is now a high-confidence discovery identity signal
+- one exact-URL match reuses the existing Review Queue candidate
+- multiple exact-URL matches fail closed as `IDENTITY_AMBIGUOUS`
+- reviewed canonical business names are preserved instead of being replaced by search-label drift
+- public profile/evidence URLs are merged rather than discarded
+- recurring `changed` classification ignores title/note wording drift
+- missing previously known evidence in one search does not count as a change
+- genuinely new evidence URLs or structural/duplicate-state changes still count as `changed`
+
+The QA batch was reconciled with an audit event:
+
+- corrected: new 2 / changed 1 / unchanged 2
+- new: 원투 랩핑 PPF, 보헤미안퍼포먼스
+- changed: 엘세븐 카팩토리 안산본사 (a genuinely new public evidence URL was added)
+- unchanged identity aliases: 퍼스트랩 랩핑PPF, 어보브썬팅 경기 안산 단원점
+- duplicate QA queue rows were merged back into the existing canonical review rows
+- Review Queue total after reconciliation: 6
+- measurement credits unchanged
+- pipeline/Run state unchanged
+
+The recurring worker was redeployed after the identity hardening and all regression CI passed.
+The global recurring cron remains OFF.
 
 ### v0.9 acceptance criteria
 
