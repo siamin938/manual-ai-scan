@@ -79,7 +79,11 @@ export type SaveInternalObservationDiscoveryCandidateResult =
     }
   | {
       ok: false;
-      error: "FORBIDDEN" | "INVALID_INPUT" | "NOT_AVAILABLE";
+      error:
+        | "FORBIDDEN"
+        | "INVALID_INPUT"
+        | "IDENTITY_AMBIGUOUS"
+        | "NOT_AVAILABLE";
     };
 
 export type UpdateInternalObservationDiscoveryReviewResult =
@@ -198,6 +202,54 @@ function domainFromUrl(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+function identityUrlKey(value: string): string | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    url.hash = "";
+    url.hostname = url.hostname.toLowerCase();
+    return url.toString().replace(/\/$/u, "");
+  } catch {
+    return null;
+  }
+}
+
+function identityUrlsFromValues(args: {
+  websiteUrl: string | null;
+  publicProfileUrls: string[];
+  evidence: InternalObservationDiscoveryReviewEvidenceDTO[];
+}): Set<string> {
+  return new Set(
+    [
+      args.websiteUrl,
+      ...args.publicProfileUrls,
+      ...args.evidence.map((item) => item.url),
+    ]
+      .filter((value): value is string => !!value)
+      .map(identityUrlKey)
+      .filter((value): value is string => !!value),
+  );
+}
+
+function identityUrlsFromStoredRow(row: Record<string, unknown>): Set<string> {
+  const websiteUrl = nullableStr(row["website_url"]) ?? null;
+  const publicProfileUrls = normalizePublicUrls(row["public_profile_urls"]) ?? [];
+  const evidence = parseEvidenceInput(row["source_evidence"]) ?? [];
+  return identityUrlsFromValues({ websiteUrl, publicProfileUrls, evidence });
+}
+
+function mergeEvidence(
+  existing: InternalObservationDiscoveryReviewEvidenceDTO[],
+  incoming: InternalObservationDiscoveryReviewEvidenceDTO[],
+): InternalObservationDiscoveryReviewEvidenceDTO[] {
+  const byUrl = new Map<string, InternalObservationDiscoveryReviewEvidenceDTO>();
+  for (const item of [...existing, ...incoming]) {
+    const key = identityUrlKey(item.url) ?? item.url;
+    byUrl.set(key, item);
+  }
+  return [...byUrl.values()].slice(0, 50);
 }
 
 function parseEvidenceInput(
@@ -654,7 +706,7 @@ export const saveInternalObservationDiscoveryCandidate = createServerFn({
         service: data.candidate.service,
       });
 
-      const { data: existingRaw, error: existingError } = await admin
+      const { data: exactRaw, error: existingError } = await admin
         .from("internal_observation_discovery_candidates")
         .select(ITEM_SELECT)
         .eq("org_id", data.orgId)
@@ -663,23 +715,70 @@ export const saveInternalObservationDiscoveryCandidate = createServerFn({
 
       if (existingError) return { ok: false, error: "NOT_AVAILABLE" };
 
+      let existingRaw: unknown = exactRaw;
+
+      if (!isRecord(existingRaw)) {
+        const { data: queueRowsRaw, error: queueError } = await admin
+          .from("internal_observation_discovery_candidates")
+          .select(ITEM_SELECT)
+          .eq("org_id", data.orgId)
+          .limit(500);
+
+        if (queueError) return { ok: false, error: "NOT_AVAILABLE" };
+
+        const incomingIdentityUrls = identityUrlsFromValues({
+          websiteUrl: data.candidate.websiteUrl,
+          publicProfileUrls: data.candidate.publicProfileUrls,
+          evidence: data.candidate.evidence,
+        });
+
+        const identityMatches = (Array.isArray(queueRowsRaw) ? queueRowsRaw : [])
+          .filter(isRecord)
+          .filter((row) => {
+            const existingIdentityUrls = identityUrlsFromStoredRow(row);
+            return [...incomingIdentityUrls].some((url) =>
+              existingIdentityUrls.has(url),
+            );
+          });
+
+        if (identityMatches.length > 1) {
+          return { ok: false, error: "IDENTITY_AMBIGUOUS" };
+        }
+        if (identityMatches.length === 1) {
+          existingRaw = identityMatches[0];
+        }
+      }
+
       const now = new Date().toISOString();
       let savedRaw: unknown;
       let idempotent = false;
 
       if (isRecord(existingRaw)) {
         idempotent = true;
+        const existingWebsiteUrl =
+          nullableStr(existingRaw["website_url"]) ?? null;
+        const existingPublicProfileUrls =
+          normalizePublicUrls(existingRaw["public_profile_urls"]) ?? [];
+        const existingEvidence =
+          parseEvidenceInput(existingRaw["source_evidence"]) ?? [];
+
+        const mergedPublicProfileUrls = [
+          ...new Set([
+            ...existingPublicProfileUrls,
+            ...data.candidate.publicProfileUrls,
+          ]),
+        ].slice(0, 10);
+        const mergedSourceEvidence = mergeEvidence(
+          existingEvidence,
+          data.candidate.evidence,
+        );
+
         const { data: updatedRaw, error: updateError } = await admin
           .from("internal_observation_discovery_candidates")
           .update({
-            business_name: data.candidate.businessName,
-            category: data.candidate.category,
-            service: data.candidate.service,
-            region: data.candidate.region,
-            city: data.candidate.city,
-            website_url: data.candidate.websiteUrl,
-            public_profile_urls: data.candidate.publicProfileUrls,
-            source_evidence: data.candidate.evidence,
+            website_url: existingWebsiteUrl ?? data.candidate.websiteUrl,
+            public_profile_urls: mergedPublicProfileUrls,
+            source_evidence: mergedSourceEvidence,
             discovery_query: data.query,
             duplicate_status: data.candidate.duplicateStatus,
             duplicate_warnings: data.candidate.duplicateWarnings,
