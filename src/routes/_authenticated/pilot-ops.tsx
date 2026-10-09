@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatSeoul } from "@/lib/format";
+import { buildVerifiedTargetCitationPageSummary } from "@/lib/verified-target-citation-page-summary";
 import { useOrg } from "@/lib/org";
 import { useActiveTargetBusiness } from "@/lib/active-business";
 import {
@@ -148,6 +149,10 @@ function PilotOpsPage() {
         },
       }),
   });
+
+  const verifiedPageSummary = resultQuery.data?.ok
+    ? buildVerifiedTargetCitationPageSummary(resultQuery.data.data)
+    : null;
 
   const runDetailQuery = useQuery({
     queryKey: [
@@ -499,11 +504,9 @@ function PilotOpsPage() {
                   </p>
                 </div>
                 <div className="rounded-lg border p-4">
-                  <p className="text-xs text-muted-foreground">관련 출처</p>
+                  <p className="text-xs text-muted-foreground">내 업체 관련 페이지</p>
                   <p className="mt-2 text-lg font-semibold">
-                    {resultQuery.data.data.verifiedTargetCitationPages?.length ??
-                      resultQuery.data.data.targetSources.length}
-                    개
+                    {verifiedPageSummary?.label ?? "미검증"}
                   </p>
                 </div>
               </div>
@@ -573,30 +576,46 @@ function PilotOpsPage() {
               </div>
 
               <div className="rounded-lg border p-4">
-                <p className="text-sm font-semibold">관련성이 확인된 출처</p>
+                <p className="text-sm font-semibold">내 업체 관련 인용 페이지</p>
                 <div className="mt-3 space-y-2">
-                  {(resultQuery.data.data.verifiedTargetCitationPages ?? []).slice(0, 5).map((source) => (
-                    <div key={source.sampleUrl} className="text-sm">
-                      <p className="font-medium">{source.title ?? source.domain}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {source.domain} · {source.responseCount}개 응답 · {source.basisLabel}
+                  {verifiedPageSummary?.status === "complete" ? (
+                    (resultQuery.data.data.verifiedTargetCitationPages?.length ?? 0) > 0 ? (
+                      (resultQuery.data.data.verifiedTargetCitationPages ?? []).slice(0, 5).map((page) => (
+                        <div key={page.sampleUrl} className="text-sm">
+                          <p className="font-medium">{page.title ?? page.domain}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {page.domain} · {page.responseCount}개 응답 · {page.basisLabel}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        페이지 검증은 완료됐지만 현재 업체 관련성이 확정된 인용 페이지는 0개입니다.
                       </p>
-                    </div>
-                  ))}
-                  {(resultQuery.data.data.verifiedTargetCitationPages?.length ?? 0) === 0 &&
-                    resultQuery.data.data.targetSources.slice(0, 5).map((source) => (
-                      <div key={source.domain} className="flex items-center justify-between gap-3 text-sm">
+                    )
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {verifiedPageSummary?.status === "pending"
+                        ? "현재 대표 측정의 인용 페이지 관련성을 확인 중입니다."
+                        : "현재 대표 측정의 인용 페이지 관련성은 미검증 상태입니다."}
+                    </p>
+                  )}
+                </div>
+                {resultQuery.data.data.targetSources.length > 0 && (
+                  <div className="mt-4 space-y-2 border-t pt-3">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      별도 관찰: 업체 연결 출처 (페이지 내용 검증과 다름)
+                    </p>
+                    {resultQuery.data.data.targetSources.slice(0, 5).map((source) => (
+                      <div key={source.domain} className="flex justify-between gap-3 text-sm">
                         <span>{source.domain}</span>
                         <span className="tabular-nums text-muted-foreground">
                           {source.responseCount}개 응답
                         </span>
                       </div>
                     ))}
-                  {(resultQuery.data.data.verifiedTargetCitationPages?.length ?? 0) === 0 &&
-                    resultQuery.data.data.targetSources.length === 0 && (
-                      <p className="text-sm text-muted-foreground">확인된 대상 출처가 없습니다.</p>
-                    )}
-                </div>
+                  </div>
+                )}
               </div>
 
               <p className="text-xs leading-5 text-muted-foreground">

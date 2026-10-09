@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { buildActionOpportunityV1Preview } from "@/lib/action-opportunity-v1.rules";
 import { formatSeoul } from "@/lib/format";
+import { buildVerifiedTargetCitationPageSummary } from "@/lib/verified-target-citation-page-summary";
 import {
   AUTOMOTIVE_CATEGORY_OPTIONS,
   INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION,
@@ -548,6 +549,10 @@ function InternalObservationPipelinePage() {
         },
       }),
   });
+
+  const verifiedPageSummary = resultQuery.data?.ok
+    ? buildVerifiedTargetCitationPageSummary(resultQuery.data.data)
+    : null;
 
   // The pipeline row may reference an older Run than the current gateway
   // representative. In that case, never label newer facts as this row's QA.
@@ -2833,11 +2838,9 @@ function InternalObservationPipelinePage() {
                   </p>
                 </div>
                 <div className="rounded-lg border p-4">
-                  <p className="text-xs text-muted-foreground">관련 출처</p>
+                  <p className="text-xs text-muted-foreground">내 업체 관련 페이지</p>
                   <p className="mt-2 text-lg font-semibold">
-                    {resultQuery.data.data.verifiedTargetCitationPages?.length ??
-                      resultQuery.data.data.targetSources.length}
-                    개
+                    {verifiedPageSummary?.label ?? "미검증"}
                   </p>
                 </div>
               </div>
