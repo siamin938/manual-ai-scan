@@ -37,6 +37,13 @@ function normalizeName(value: string): string {
     .toLocaleLowerCase("en-US");
 }
 
+function safeDiscoveryNameSurface(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z가-힣]/giu, "");
+}
+
 function readSecret(name: string): string {
   const raw = Deno.env.get(name)?.trim() ?? "";
   if (!raw) return "";
@@ -940,21 +947,36 @@ Deno.serve(async (request) => {
       if (key) queueByKey.set(key, row);
     }
 
-    const findIdentityMatchByExactUrl = (
+    const findIdentityMatch = (
       payload: ReturnType<typeof canonicalCandidatePayload>,
     ): Obj | null => {
       const incomingUrls = identityUrlsFromPayload(payload);
-      if (incomingUrls.size === 0) return null;
+      if (incomingUrls.size > 0) {
+        const urlMatches = existingQueue.filter((row) => {
+          const storedUrls = identityUrlsFromStored(row);
+          return [...incomingUrls].some((url) => storedUrls.has(url));
+        });
 
-      const matches = existingQueue.filter((row) => {
-        const storedUrls = identityUrlsFromStored(row);
-        return [...incomingUrls].some((url) => storedUrls.has(url));
+        if (urlMatches.length > 1) {
+          throw new Error("REVIEW_QUEUE_IDENTITY_AMBIGUOUS");
+        }
+        if (urlMatches.length === 1) return urlMatches[0];
+      }
+
+      const incomingNameSurface = safeDiscoveryNameSurface(payload.businessName);
+      const safeNameMatches = existingQueue.filter((row) => {
+        return (
+          safeDiscoveryNameSurface(clean(row.business_name, 140)) ===
+            incomingNameSurface &&
+          clean(row.region, 100) === payload.region &&
+          clean(row.service, 100) === payload.service
+        );
       });
 
-      if (matches.length > 1) {
+      if (safeNameMatches.length > 1) {
         throw new Error("REVIEW_QUEUE_IDENTITY_AMBIGUOUS");
       }
-      return matches[0] ?? null;
+      return safeNameMatches[0] ?? null;
     };
 
     let newCount = 0;
@@ -975,8 +997,14 @@ Deno.serve(async (request) => {
       let existing = queueByKey.get(key) ?? null;
       let identityMatchedByUrl = false;
       if (!existing) {
-        existing = findIdentityMatchByExactUrl(payload);
-        identityMatchedByUrl = !!existing;
+        existing = findIdentityMatch(payload);
+        if (existing) {
+          const incomingUrls = identityUrlsFromPayload(payload);
+          const storedUrls = identityUrlsFromStored(existing);
+          identityMatchedByUrl = [...incomingUrls].some((url) =>
+            storedUrls.has(url),
+          );
+        }
       }
 
       let classification: "new" | "changed" | "unchanged";
