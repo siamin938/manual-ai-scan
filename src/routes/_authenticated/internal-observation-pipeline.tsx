@@ -3038,7 +3038,8 @@ function InternalObservationPipelinePage() {
                                 그 밖에 확인할 관찰 {actionOpportunityPresentation.additional.length}개
                               </span>
                               <span className="text-sm text-muted-foreground">
-                                펼쳐보기 ▾
+                                <span className="group-open:hidden">펼쳐보기 ▾</span>
+                                <span className="hidden group-open:inline">접기 ▴</span>
                               </span>
                             </div>
                             <p className="mt-1 text-xs leading-5 text-muted-foreground">

@@ -74,6 +74,9 @@ describe("Action Opportunity v1.0 internal preview presentation", () => {
     expect(route).toContain("actionOpportunityPresentation.additional.map");
     expect(route).toContain("<details");
     expect(route).toContain("그 밖에 확인할 관찰");
+    expect(route).toContain('className="group-open:hidden">펼쳐보기 ▾');
+    expect(route).toContain('className="hidden group-open:inline">접기 ▴');
+    expect(route).toContain('className="group rounded-lg border bg-background"');
     expect(route).toContain("ActionOpportunityV1AdminCard");
     expect(route).toContain("실제 인용된 페이지");
     expect(customer).not.toContain("splitActionOpportunityV1Items");
