@@ -81,7 +81,8 @@ describe("internal observation discovery preview v0.9.1", () => {
     expect(edgeSource).toContain('"existing_domain_overlap"');
     expect(edgeSource).not.toContain("auto-merge");
     expect(routeSource).toContain("Preview 결과는 자동 등록하지 않습니다.");
-    expect(routeSource).toContain("기존 후보 등록 절차를 사용합니다.");
+    expect(routeSource).toContain("Preview 결과는 자동 등록하지 않습니다.");
+    expect(routeSource).toContain("v0.9.3 전까지 기존 측정 파이프라인으로 자동 이동하지 않습니다.");
   });
 
   it("exposes the read-only preview through the internal operations UI", () => {
@@ -90,7 +91,7 @@ describe("internal observation discovery preview v0.9.1", () => {
     );
     expect(routeSource).toContain("Discovery v0.9.1 Preview");
     expect(routeSource).toContain("공개 업체 Discovery Preview");
-    expect(routeSource).toContain("저장 0건");
+    expect(routeSource).toContain("Preview 자체 저장 없음");
     expect(routeSource).toContain("측정권 차감 없음");
     expect(routeSource).toContain("OpenAI 웹 검색 호출만 발생합니다.");
   });
