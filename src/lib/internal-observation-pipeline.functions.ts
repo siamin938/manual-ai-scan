@@ -449,6 +449,18 @@ function candidateIdempotencyKey(input: {
   ].join("|");
 }
 
+export function buildInternalObservationCandidateIdempotencyKey(input: {
+  orgId: string;
+  businessName: string;
+  region: string;
+  city: string | null;
+  service: string;
+  brandModel: string | null;
+  customerNeed: string | null;
+}): string {
+  return candidateIdempotencyKey(input);
+}
+
 function parseUrl(input: string | null | undefined): { ok: true; value: string | null } | { ok: false } {
   return normalizeOptionalPublicUrl(input);
 }
