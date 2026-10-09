@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { fetchEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.server";
+import { selectSafeCitationPageForEntity, type CitationPageCandidate } from "@/lib/action-opportunity-citation-selection";
 
 export type ActionOpportunityEvidenceExample = {
   sourceGroupKey: string;
@@ -227,8 +228,7 @@ export async function fetchActionOpportunityEvidence(args: {
         string,
         {
           entityName: string;
-          url: string;
-          attributionLevel: "direct" | "section";
+          candidates: CitationPageCandidate[];
         }
       >;
     }
@@ -251,34 +251,49 @@ export async function fetchActionOpportunityEvidence(args: {
     }
 
     const existing = group.entities.get(row.entitySurface);
-    if (
-      !existing ||
-      (existing.attributionLevel === "section" &&
-        row.attributionLevel === "direct")
-    ) {
-      group.entities.set(row.entitySurface, {
-        entityName: row.entityName,
+    if (existing) {
+      existing.candidates.push({
         url: row.url,
         attributionLevel: row.attributionLevel,
+      });
+    } else {
+      group.entities.set(row.entitySurface, {
+        entityName: row.entityName,
+        candidates: [{
+          url: row.url,
+          attributionLevel: row.attributionLevel,
+        }],
       });
     }
   }
 
   const currentRunReferences = [...groupedReferences.values()]
-    .map((group) => ({
-      sourceGroupKey: group.sourceGroupKey,
-      domain: group.domain,
-      responseCount: group.responseCount,
-      entityCount: group.entities.size,
-      entities: [...group.entities.values()]
+    .map((group) => {
+      const safeEntities = [...group.entities.values()]
+        .map((entity) => {
+          const page = selectSafeCitationPageForEntity(
+            entity.entityName,
+            entity.candidates,
+          );
+          return page
+            ? { entityName: entity.entityName, ...page }
+            : null;
+        })
+        .filter((entity): entity is NonNullable<typeof entity> => entity !== null)
         .sort(
           (a, b) =>
             (a.attributionLevel === "direct" ? 0 : 1) -
               (b.attributionLevel === "direct" ? 0 : 1) ||
             a.entityName.localeCompare(b.entityName, "ko"),
-        )
-        .slice(0, 3),
-    }))
+        );
+      return {
+        sourceGroupKey: group.sourceGroupKey,
+        domain: group.domain,
+        responseCount: group.responseCount,
+        entityCount: safeEntities.length,
+        entities: safeEntities.slice(0, 3),
+      };
+    })
     .filter((group) => group.entityCount > 0)
     .sort(
       (a, b) =>

@@ -37,6 +37,8 @@ describe("Action Opportunity v1.0 internal-only QA search contract", () => {
     expect(searchSource).toContain("can_view_data_asset_admin_v01");
     expect(evidenceSource).toContain("args.expectedRunId !== sourceRunId");
     expect(evidenceSource).toContain('.eq("source_run_id", sourceRunId)');
+    expect(evidenceSource).toContain("selectSafeCitationPageForEntity");
+    expect(evidenceSource).toContain("entityCount: safeEntities.length");
     expect(evidenceSource).toContain('["direct", "section"]');
     expect(internalRoute).toContain("qaReferenceQuery");
     expect(internalRoute).toContain("AI 답변에서 실제 인용된 페이지");
