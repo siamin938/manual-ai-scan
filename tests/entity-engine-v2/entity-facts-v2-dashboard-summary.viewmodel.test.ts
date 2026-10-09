@@ -45,6 +45,7 @@ function makeModel(): EntityFactsV2DashboardCutoverModel {
     targetExposureCitationSources: { heading: "함께 인용된 전체 출처", available: true, rows: [] },
     verifiedTargetCitationPages: {
       heading: "페이지 내용 기준 관련 확인",
+      status: "complete",
       available: true,
       rows: [
         { domain: "one.example", title: "첫 페이지", responseCount: 2, citationCount: 2, sampleUrl: "https://one.example/a", confidence: "high", basisLabel: "확인" },
@@ -253,11 +254,29 @@ describe("entity facts v2 dashboard summary view model", () => {
     expect(summary.heroVariant).toBe("visible_no_top3");
   });
 
+  it("preserves legacy unverified page state instead of calling it pending", () => {
+    const model = makeModel();
+    model.verifiedTargetCitationPages.status = "not_verified";
+    model.verifiedTargetCitationPages.available = false;
+    model.verifiedTargetCitationPages.rows = [];
+
+    const summary = buildEntityFactsV2DashboardSummaryViewModel({
+      model,
+      unifiedLayerSummary: null,
+      actionOpportunityModel: null,
+    });
+
+    expect(summary.verifiedPageStatus).toBe("not_verified");
+    expect(summary.verifiedPageCount).toBeNull();
+    expect(summary.verifiedPages).toEqual([]);
+  });
+
   it("does not turn unavailable values into zero", () => {
     const model = makeModel();
     model.metricCards.visibility = metric(0, 0, null);
     model.metricCards.top3 = metric(0, 0, null);
     model.verifiedTargetCitationPages.available = false;
+    model.verifiedTargetCitationPages.status = "pending";
 
     const summary = buildEntityFactsV2DashboardSummaryViewModel({
       model,
@@ -268,6 +287,7 @@ describe("entity facts v2 dashboard summary view model", () => {
     expect(summary.visibility).toEqual({ count: null, total: null, pct: null });
     expect(summary.top3).toEqual({ count: null, total: null, pct: null });
     expect(summary.heroVariant).toBe("unavailable");
+    expect(summary.verifiedPageStatus).toBe("pending");
     expect(summary.verifiedPageCount).toBeNull();
     expect(summary.searchScopes).toBeNull();
     expect(summary.searchScopeObservation).toBeNull();
