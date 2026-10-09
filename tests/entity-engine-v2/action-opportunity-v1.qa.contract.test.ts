@@ -38,7 +38,7 @@ describe("Action Opportunity v1.0 internal-only QA search contract", () => {
     expect(evidenceSource).toContain("args.expectedRunId !== sourceRunId");
     expect(evidenceSource).toContain('.eq("source_run_id", sourceRunId)');
     expect(evidenceSource).toContain("selectSafeCitationPageForEntity");
-    expect(evidenceSource.match(/selectSafeCitationPageForEntity\\(/g)?.length).toBe(2);
+    expect(evidenceSource.match(/selectSafeCitationPageForEntity\(/g)?.length).toBe(2);
     expect(evidenceSource).toContain("entityCount: safeEntities.length");
     expect(evidenceSource).toContain('["direct", "section"]');
     expect(internalRoute).toContain("qaReferenceQuery");
