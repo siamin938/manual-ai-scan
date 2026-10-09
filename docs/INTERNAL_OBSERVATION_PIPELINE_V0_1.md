@@ -799,17 +799,61 @@ Still required before calling v0.9.1 live-QA complete:
 
 #### v0.9.2 — persistent review queue
 
-Persist discovery proposals into a dedicated service-role-only table.
+Implemented.
 
-Add:
+Discovery Preview results remain non-persistent by default. An operator must explicitly click
+`검토 후보로 저장` for a candidate to enter the persistent review queue.
 
-- idempotent discovery batches
-- operator review status
-- duplicate flags
-- evidence retention
-- audit events
+Storage:
 
-Still no automatic promotion to measurement.
+- dedicated table: `internal_observation_discovery_candidates`
+- RLS enabled
+- authenticated/anon direct table privileges revoked
+- service-role server functions only
+- candidate-level idempotency key across org + business identity + region/city + service
+- repeated discovery refreshes the same review item instead of creating a second row
+- public evidence URLs and discovery query context retained
+- duplicate signals retained without auto-merging
+- future `promoted_pipeline_item_id` reserved for v0.9.3 and remains null in v0.9.2
+
+Operator review states:
+
+- `needs_review` — 검토 대기
+- `approved` — 승인
+- `rejected` — 제외
+- `duplicate` — 중복
+- `needs_identity_review` — 지점 확인 필요
+
+The UI exposes a separate **Discovery Review Queue** with:
+
+- explicit per-candidate save from the read-only preview
+- evidence count and first public evidence link
+- duplicate warning badges
+- operator-controlled review status
+- queue counts for total / needs review / approved
+
+Safety boundary:
+
+- saving a review candidate does not create or update a business
+- review approval does not create a pipeline item
+- review approval does not prepare Unified Diagnostic questions
+- review approval does not create a Run or Job
+- review approval does not debit a measurement credit
+- no discovery-review code path calls `enqueue-run`
+- no automatic promotion exists
+
+Audit events:
+
+- `internal_discovery_candidate_saved`
+- `internal_discovery_candidate_seen_again`
+- `internal_discovery_review_status_changed`
+
+Database smoke validation was executed inside a rollback transaction and confirmed that
+`needs_review -> approved` satisfies the review metadata contract while
+`promoted_pipeline_item_id` remains null.
+
+A separately persisted discovery-batch object is intentionally deferred until recurring discovery
+(v0.9.4). v0.9.2 persists only operator-selected candidates plus their preview query/evidence context.
 
 #### v0.9.3 — guarded promotion
 
