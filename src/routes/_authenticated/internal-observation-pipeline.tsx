@@ -81,6 +81,13 @@ import {
   previewInternalObservationDiscoveryPromotion,
   type InternalObservationDiscoveryPromotionBlocker,
 } from "@/lib/internal-observation-discovery-promotion.functions";
+import {
+  getInternalObservationDiscoveryRecurringOverview,
+  runInternalObservationDiscoveryScheduleNow,
+  saveInternalObservationDiscoverySchedule,
+  setInternalObservationDiscoveryScheduleEnabled,
+  type InternalObservationDiscoveryCadence,
+} from "@/lib/internal-observation-discovery-recurring.functions";
 
 export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
   component: InternalObservationPipelinePage,
@@ -373,6 +380,18 @@ function InternalObservationPipelinePage() {
   const confirmDiscoveryPromotion = useServerFn(
     confirmInternalObservationDiscoveryPromotion,
   );
+  const fetchDiscoveryRecurringOverview = useServerFn(
+    getInternalObservationDiscoveryRecurringOverview,
+  );
+  const saveDiscoverySchedule = useServerFn(
+    saveInternalObservationDiscoverySchedule,
+  );
+  const runDiscoveryScheduleNow = useServerFn(
+    runInternalObservationDiscoveryScheduleNow,
+  );
+  const setDiscoveryScheduleEnabled = useServerFn(
+    setInternalObservationDiscoveryScheduleEnabled,
+  );
 
   const [orgId, setOrgId] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -403,6 +422,11 @@ function InternalObservationPipelinePage() {
   const [promotionReviewItemId, setPromotionReviewItemId] = useState<string | null>(
     null,
   );
+  const [recurringName, setRecurringName] = useState("");
+  const [recurringCadence, setRecurringCadence] =
+    useState<InternalObservationDiscoveryCadence>("weekly");
+  const [recurringRunHourKst, setRecurringRunHourKst] = useState("9");
+  const [recurringWeekdayIso, setRecurringWeekdayIso] = useState("1");
 
   const service =
     serviceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
@@ -445,6 +469,14 @@ function InternalObservationPipelinePage() {
     retry: false,
     refetchInterval: 15000,
     queryFn: () => fetchDiscoveryReviewQueue({ data: { orgId } }),
+  });
+
+  const discoveryRecurringQuery = useQuery({
+    queryKey: ["internal-observation-discovery-recurring", orgId],
+    enabled: !!orgId,
+    retry: false,
+    refetchInterval: 15000,
+    queryFn: () => fetchDiscoveryRecurringOverview({ data: { orgId } }),
   });
 
   const resultQuery = useQuery({
@@ -623,6 +655,89 @@ function InternalObservationPipelinePage() {
       qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
     },
     onError: () => toast.error("승격 처리 중 오류가 발생했습니다."),
+  });
+
+  const saveDiscoveryScheduleMutation = useMutation({
+    mutationFn: () =>
+      saveDiscoverySchedule({
+        data: {
+          orgId,
+          name: recurringName,
+          category: discoveryCategory,
+          service: discoveryService,
+          region: discoveryRegion,
+          city: discoveryCity || null,
+          brandModel: discoveryBrandModel || null,
+          desiredCount: Number(discoveryDesiredCount),
+          cadence: recurringCadence,
+          runHourKst: Number(recurringRunHourKst),
+          weekdayIso:
+            recurringCadence === "weekly"
+              ? Number(recurringWeekdayIso)
+              : null,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("반복 Discovery 프로필을 저장하지 못했습니다.");
+        return;
+      }
+      toast.success(
+        res.idempotent
+          ? "같은 반복 탐색 조건의 프로필을 갱신했습니다."
+          : "반복 Discovery 프로필을 자동 실행 OFF 상태로 저장했습니다.",
+      );
+      setRecurringName("");
+      discoveryRecurringQuery.refetch();
+    },
+    onError: () => toast.error("반복 Discovery 프로필 저장 중 오류가 발생했습니다."),
+  });
+
+  const runDiscoveryScheduleNowMutation = useMutation({
+    mutationFn: (scheduleId: string) =>
+      runDiscoveryScheduleNow({
+        data: {
+          orgId,
+          scheduleId,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("Discovery 배치를 실행하지 못했습니다.");
+        discoveryRecurringQuery.refetch();
+        return;
+      }
+      toast.success(
+        `탐색 완료 · 신규 ${res.newCount}곳 · 변경 ${res.changedCount}곳 · 동일 ${res.unchangedCount}곳`,
+      );
+      discoveryRecurringQuery.refetch();
+      discoveryReviewQuery.refetch();
+    },
+    onError: () => toast.error("Discovery 배치 실행 중 오류가 발생했습니다."),
+  });
+
+  const setDiscoveryScheduleEnabledMutation = useMutation({
+    mutationFn: (args: { scheduleId: string; enabled: boolean }) =>
+      setDiscoveryScheduleEnabled({
+        data: {
+          orgId,
+          scheduleId: args.scheduleId,
+          enabled: args.enabled,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("반복 대상 상태를 변경하지 못했습니다.");
+        return;
+      }
+      toast.success(
+        res.schedule.enabled
+          ? "반복 탐색 대상으로 표시했습니다. 글로벌 자동 반복 Gate는 별도입니다."
+          : "반복 탐색 대상에서 제외했습니다.",
+      );
+      discoveryRecurringQuery.refetch();
+    },
+    onError: () => toast.error("반복 대상 상태 변경 중 오류가 발생했습니다."),
   });
 
   const enqueueMutation = useMutation({
@@ -909,6 +1024,31 @@ function InternalObservationPipelinePage() {
   const discoveryApprovedCount = discoveryReviewItems.filter(
     (item) => item.reviewStatus === "approved",
   ).length;
+  const discoveryRecurringOverview = discoveryRecurringQuery.data?.ok
+    ? discoveryRecurringQuery.data.overview
+    : null;
+  const discoverySchedules = discoveryRecurringOverview?.schedules ?? [];
+  const discoveryRecentBatches = discoveryRecurringOverview?.recentBatches ?? [];
+  const discoveryRecentChanges = discoveryRecurringOverview?.recentChanges ?? [];
+  const recurringHour = Number(recurringRunHourKst);
+  const recurringWeekday = Number(recurringWeekdayIso);
+  const canSaveRecurringSchedule =
+    !!orgId &&
+    recurringName.trim().length > 0 &&
+    discoveryCategory.trim().length > 0 &&
+    discoveryRegion.trim().length > 0 &&
+    discoveryService.trim().length > 0 &&
+    Number.isInteger(discoveryCount) &&
+    discoveryCount >= 1 &&
+    discoveryCount <= 8 &&
+    Number.isInteger(recurringHour) &&
+    recurringHour >= 0 &&
+    recurringHour <= 23 &&
+    (recurringCadence === "daily" ||
+      (Number.isInteger(recurringWeekday) &&
+        recurringWeekday >= 1 &&
+        recurringWeekday <= 7)) &&
+    !saveDiscoveryScheduleMutation.isPending;
   const promotionPlan =
     promotionPreviewMutation.data?.ok &&
     promotionReviewItemId === promotionPreviewMutation.data.plan.reviewItemId
@@ -935,6 +1075,7 @@ function InternalObservationPipelinePage() {
           <Badge variant="outline">Discovery v0.9.1 Preview</Badge>
           <Badge variant="outline">v0.9.2 Review Queue</Badge>
           <Badge variant="outline">v0.9.3 Guarded Promotion</Badge>
+          <Badge variant="outline">v0.9.4 Recurring Discovery</Badge>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
           v0.8 자동 순차 실행을 검증했고, 공개 웹 후보는 v0.9.1 Preview에서 찾은 뒤
@@ -1900,6 +2041,290 @@ function InternalObservationPipelinePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Card className="border-dashed">
+        <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">Recurring Discovery</CardTitle>
+              <Badge variant="outline">v0.9.4</Badge>
+              <Badge
+                variant={
+                  discoveryRecurringOverview?.globalCron.active
+                    ? "destructive"
+                    : "secondary"
+                }
+              >
+                글로벌 자동 반복{" "}
+                {discoveryRecurringOverview?.globalCron.active ? "ON" : "OFF"}
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              같은 지역·서비스를 반복 탐색해 신규·변경·동일 후보를 구분합니다.
+              신규·변경 후보는 Review Queue에만 반영하며 자동 승인·자동 승격·자동 측정은 하지 않습니다.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={discoveryRecurringQuery.isFetching}
+            onClick={() => discoveryRecurringQuery.refetch()}
+          >
+            {discoveryRecurringQuery.isFetching ? "확인 중…" : "반복 탐색 상태 새로고침"}
+          </Button>
+        </CardHeader>
+
+        <CardContent className="space-y-5">
+          <div className="rounded-lg border bg-muted/20 p-4">
+            <p className="text-sm font-semibold">반복 탐색 프로필 만들기</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              위 Discovery Preview에 입력한 업종·서비스·지역 조건을 사용합니다.
+              프로필은 자동 실행 OFF로 저장되며, 먼저 수동 1회 실행으로 결과를 검증합니다.
+            </p>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="space-y-1.5 xl:col-span-2">
+                <Label htmlFor="recurring-name">프로필 이름</Label>
+                <Input
+                  id="recurring-name"
+                  value={recurringName}
+                  onChange={(event) => setRecurringName(event.target.value)}
+                  placeholder="예: 안산 PPF 주간 후보 탐색"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>주기</Label>
+                <Select
+                  value={recurringCadence}
+                  onValueChange={(value) =>
+                    setRecurringCadence(value as InternalObservationDiscoveryCadence)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">매일</SelectItem>
+                    <SelectItem value="weekly">매주</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {recurringCadence === "weekly" && (
+                <div className="space-y-1.5">
+                  <Label>요일</Label>
+                  <Select
+                    value={recurringWeekdayIso}
+                    onValueChange={setRecurringWeekdayIso}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">월요일</SelectItem>
+                      <SelectItem value="2">화요일</SelectItem>
+                      <SelectItem value="3">수요일</SelectItem>
+                      <SelectItem value="4">목요일</SelectItem>
+                      <SelectItem value="5">금요일</SelectItem>
+                      <SelectItem value="6">토요일</SelectItem>
+                      <SelectItem value="7">일요일</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="recurring-hour">실행 시각(KST)</Label>
+                <Input
+                  id="recurring-hour"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={recurringRunHourKst}
+                  onChange={(event) => setRecurringRunHourKst(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-md bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
+              현재 조건 · {discoveryCategory || "업종 미선택"} ·{" "}
+              {discoveryRegion || "지역 미입력"}
+              {discoveryCity ? ` ${discoveryCity}` : ""} ·{" "}
+              {discoveryService || "서비스 미선택"} · 후보{" "}
+              {discoveryDesiredCount || "0"}곳
+            </div>
+
+            <Button
+              className="mt-3"
+              variant="outline"
+              disabled={!canSaveRecurringSchedule}
+              onClick={() => saveDiscoveryScheduleMutation.mutate()}
+            >
+              {saveDiscoveryScheduleMutation.isPending
+                ? "프로필 저장 중…"
+                : "반복 탐색 프로필 저장 · 자동 OFF"}
+            </Button>
+          </div>
+
+          {discoverySchedules.length === 0 ? (
+            <p className="rounded-lg border py-8 text-center text-sm text-muted-foreground">
+              저장된 반복 탐색 프로필이 없습니다.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>탐색 프로필</TableHead>
+                    <TableHead>주기</TableHead>
+                    <TableHead>반복 대상</TableHead>
+                    <TableHead>최근 결과</TableHead>
+                    <TableHead>작업</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {discoverySchedules.map((schedule) => (
+                    <TableRow key={schedule.id}>
+                      <TableCell className="min-w-60 align-top">
+                        <p className="font-medium">{schedule.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {schedule.category} · {schedule.region}
+                          {schedule.city ? ` ${schedule.city}` : ""} ·{" "}
+                          {schedule.service} · 후보 {schedule.desiredCount}곳
+                        </p>
+                      </TableCell>
+                      <TableCell className="min-w-32 align-top text-sm">
+                        {schedule.cadence === "daily"
+                          ? `매일 ${schedule.runHourKst}시`
+                          : `매주 ${["", "월", "화", "수", "목", "금", "토", "일"][schedule.weekdayIso ?? 0]}요일 ${schedule.runHourKst}시`}
+                      </TableCell>
+                      <TableCell className="min-w-32 align-top">
+                        <Badge variant={schedule.enabled ? "default" : "outline"}>
+                          {schedule.enabled ? "대상 포함" : "대상 제외"}
+                        </Badge>
+                        {!discoveryRecurringOverview?.globalCron.active && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            글로벌 Gate OFF
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-40 align-top text-xs text-muted-foreground">
+                        {schedule.lastCompletedAt
+                          ? formatSeoul(schedule.lastCompletedAt)
+                          : "아직 실행 없음"}
+                        {schedule.lastStatus && (
+                          <p className="mt-1">
+                            {schedule.lastStatus === "completed" ? "완료" : "실패"}
+                            {schedule.lastErrorCode
+                              ? ` · ${schedule.lastErrorCode}`
+                              : ""}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-44 align-top">
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={runDiscoveryScheduleNowMutation.isPending}
+                            onClick={() =>
+                              runDiscoveryScheduleNowMutation.mutate(schedule.id)
+                            }
+                          >
+                            {runDiscoveryScheduleNowMutation.isPending &&
+                            runDiscoveryScheduleNowMutation.variables === schedule.id
+                              ? "탐색 중…"
+                              : "지금 1회 실행"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={setDiscoveryScheduleEnabledMutation.isPending}
+                            onClick={() =>
+                              setDiscoveryScheduleEnabledMutation.mutate({
+                                scheduleId: schedule.id,
+                                enabled: !schedule.enabled,
+                              })
+                            }
+                          >
+                            {schedule.enabled ? "반복 대상 제외" : "반복 대상 포함"}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {discoveryRecentBatches.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">최근 Discovery 배치</p>
+              <div className="grid gap-2 md:grid-cols-2">
+                {discoveryRecentBatches.slice(0, 6).map((batch) => (
+                  <div key={batch.id} className="rounded-lg border p-3 text-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium">
+                        {batch.triggerSource === "manual" ? "수동 1회" : "예약 실행"}
+                      </span>
+                      <Badge
+                        variant={
+                          batch.status === "completed"
+                            ? "outline"
+                            : batch.status === "failed"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {batch.status === "completed"
+                          ? "완료"
+                          : batch.status === "failed"
+                            ? "실패"
+                            : "진행 중"}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-muted-foreground">
+                      {formatSeoul(batch.startedAt)}
+                    </p>
+                    {batch.status === "completed" && (
+                      <p className="mt-1">
+                        신규 {batch.newCount ?? 0} · 변경{" "}
+                        {batch.changedCount ?? 0} · 동일{" "}
+                        {batch.unchangedCount ?? 0}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {discoveryRecentChanges.length > 0 && (
+            <div className="rounded-lg border p-4">
+              <p className="text-sm font-semibold">최근 신규·변경 후보</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {discoveryRecentChanges.slice(0, 12).map((change) => (
+                  <Badge
+                    key={`${change.batchId}|${change.businessName}`}
+                    variant={change.classification === "new" ? "default" : "secondary"}
+                  >
+                    {change.classification === "new" ? "신규" : "변경"} ·{" "}
+                    {change.businessName}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            글로벌 자동 반복 Cron은 현재 별도 Gate입니다. 프로필을 ‘반복 대상 포함’으로 바꿔도
+            글로벌 Gate가 OFF이면 자동 웹 검색은 실행되지 않습니다. 수동 ‘지금 1회 실행’만
+            OpenAI 웹 검색 호출을 발생시킵니다.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
