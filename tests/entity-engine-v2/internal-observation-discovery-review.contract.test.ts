@@ -59,6 +59,17 @@ describe("internal observation discovery review queue v0.9.2", () => {
     expect(serverSource).toContain("canOperateOrg");
   });
 
+  it("reuses one review candidate when exact public evidence URLs identify the same business", () => {
+    expect(serverSource).toContain("identityUrlsFromValues");
+    expect(serverSource).toContain("identityUrlsFromStoredRow");
+    expect(serverSource).toContain("identityMatches.length > 1");
+    expect(serverSource).toContain('"IDENTITY_AMBIGUOUS"');
+    expect(serverSource).toContain("mergeEvidence");
+    expect(serverSource).not.toContain(
+      "business_name: data.candidate.businessName,\n            category: data.candidate.category",
+    );
+  });
+
   it("is idempotent for the same reviewed business surface", () => {
     expect(serverSource).toContain('"v0.9.2"');
     expect(serverSource).toContain("reviewIdempotencyKey");
