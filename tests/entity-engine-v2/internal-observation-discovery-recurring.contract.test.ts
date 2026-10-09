@@ -97,6 +97,20 @@ describe("internal observation recurring discovery v0.9.4", () => {
     );
   });
 
+  it("dedupes recurring results by exact public URL identity and ignores note wording drift", () => {
+    expect(workerSource).toContain("findIdentityMatchByExactUrl");
+    expect(workerSource).toContain("identityUrlsFromPayload");
+    expect(workerSource).toContain("identityUrlsFromStored");
+    expect(workerSource).toContain("materiallyChanged");
+    expect(workerSource).toContain("payload.evidence.some");
+    expect(workerSource).not.toContain(
+      "existingFingerprint === candidateFingerprint ? \"unchanged\" : \"changed\"",
+    );
+    expect(workerSource).not.toContain(
+      "JSON.stringify(canonicalStoredPayload(existing))",
+    );
+  });
+
   it("surfaces changed unpromoted decisions for review without touching promoted rows", () => {
     expect(workerSource).toContain("resetForReview");
     expect(workerSource).toContain('updatePayload.review_status = "needs_review"');
