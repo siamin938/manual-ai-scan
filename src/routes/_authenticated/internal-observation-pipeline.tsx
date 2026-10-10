@@ -36,6 +36,8 @@ import {
   type ActionOpportunityV1Item,
 } from "@/lib/action-opportunity-v1.rules";
 import { splitActionOpportunityV1Items } from "@/lib/action-opportunity-v1.presentation";
+import { buildCustomerPreviewV1Model } from "@/lib/action-opportunity-v1.customer-preview.viewmodel";
+import { ActionOpportunityV1CustomerPreview } from "@/components/action-opportunity-v1-customer-preview";
 import { formatSeoul } from "@/lib/format";
 import { buildVerifiedTargetCitationPageSummary } from "@/lib/verified-target-citation-page-summary";
 import {
@@ -508,6 +510,7 @@ function InternalObservationPipelinePage() {
   const [resultTarget, setResultTarget] = useState<
     Pick<InternalObservationPipelineItemDTO, "orgId" | "businessId" | "businessName" | "runId"> | null
   >(null);
+  const [resultDisplayMode, setResultDisplayMode] = useState<"operator" | "customer">("operator");
   const [qaBusinessSearch, setQaBusinessSearch] = useState("");
   const [activationConfirmation, setActivationConfirmation] = useState("");
   const [discoveryCategory, setDiscoveryCategory] = useState("");
@@ -684,6 +687,10 @@ function InternalObservationPipelinePage() {
   const actionOpportunityPresentation = actionOpportunityPreview
     ? splitActionOpportunityV1Items(actionOpportunityPreview.items)
     : { primary: [], additional: [] };
+  const customerPreviewModel =
+    resultQuery.data?.ok && actionOpportunityPreview
+      ? buildCustomerPreviewV1Model(resultQuery.data.data, actionOpportunityPreview)
+      : null;
   const qaCitationLinks: ActionOpportunityV1AdminCitationLink[] =
     qaReferenceQuery.data?.ok
       ? qaReferenceQuery.data.currentRunReferences.flatMap((source) =>
@@ -2749,16 +2756,32 @@ function InternalObservationPipelinePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() =>
+                    onClick={() => {
+                      setResultDisplayMode("operator");
                       setResultTarget({
                         orgId,
                         businessId: business.id,
                         businessName: business.name,
                         runId: null,
-                      })
-                    }
+                      });
+                    }}
                   >
                     분석 미리보기
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setResultDisplayMode("customer");
+                      setResultTarget({
+                        orgId,
+                        businessId: business.id,
+                        businessName: business.name,
+                        runId: null,
+                      });
+                    }}
+                  >
+                    고객 화면 미리보기
                   </Button>
                 </div>
               ))}
@@ -2891,7 +2914,15 @@ function InternalObservationPipelinePage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!resultTarget} onOpenChange={(open) => !open && setResultTarget(null)}>
+      <Dialog
+        open={!!resultTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResultTarget(null);
+            setResultDisplayMode("operator");
+          }
+        }}
+      >
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
@@ -2902,12 +2933,50 @@ function InternalObservationPipelinePage() {
             </DialogDescription>
           </DialogHeader>
 
+          <div
+            role="group"
+            aria-label="비공개 미리보기 모드 전환"
+            className="flex flex-wrap gap-2 rounded-lg border bg-muted/30 p-2"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={resultDisplayMode === "operator" ? "default" : "outline"}
+              aria-pressed={resultDisplayMode === "operator"}
+              onClick={() => setResultDisplayMode("operator")}
+            >
+              운영자 분석
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={resultDisplayMode === "customer" ? "default" : "outline"}
+              aria-pressed={resultDisplayMode === "customer"}
+              onClick={() => setResultDisplayMode("customer")}
+            >
+              고객 화면 미리보기
+            </Button>
+          </div>
+
           {resultQuery.isLoading ? (
             <p className="py-10 text-center text-sm text-muted-foreground">결과를 불러오는 중…</p>
           ) : !resultQuery.data || !resultQuery.data.ok ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               완료 상태이지만 결과를 불러오지 못했습니다. 상태 동기화를 다시 실행해 주세요.
             </p>
+          ) : resultDisplayMode === "customer" ? (
+            customerPreviewModel ? (
+              <ActionOpportunityV1CustomerPreview
+                model={customerPreviewModel}
+                citedPages={qaCitationLinks}
+                citedPagesLoading={qaCitationPending}
+              />
+            ) : (
+              <p className="rounded-lg border p-5 text-sm leading-6 text-muted-foreground">
+                동일한 대표 측정의 분석 결과가 확인되지 않아 고객 화면을 미리 표시하지 않습니다.
+                운영자 분석에서 측정 범위를 확인해 주세요.
+              </p>
+            )
           ) : (
             <div className="space-y-5">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
