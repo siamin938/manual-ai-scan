@@ -64,7 +64,7 @@ describe("plain Korean question-type labels and AI-answer counts", () => {
   });
 });
 
-describe("10-second owner summary uses only existing exact observation values", () {
+describe("10-second owner summary uses only existing exact observation values", () => {
   it("shows 3/24, core 0/8, custom 3/16 without expanding into four cards", () => {
     const s = fake();
     expect(compactSummaryCount(s.visibility)).toBe("3/24");
