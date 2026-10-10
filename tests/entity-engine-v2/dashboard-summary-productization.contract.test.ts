@@ -37,11 +37,27 @@ describe("dashboard owner productization layer", () => {
   it("keeps the ten-second summary to three KPIs and no more than two fact statements", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
     expect(dashboardSource).toContain('compactSummarySearchScopes(summary)');
-    expect(dashboardSource).toContain("이번 측정에서 주목할 점");
+    expect(dashboardSource).toContain("어떤 검색에서 보였나요?");
+    expect(dashboardSource).toContain("함께 관찰된 업체");
+    expect(dashboardSource).toContain("summary.searchContexts.slice(0, 3)");
+    expect(dashboardSource).toContain("summary.competitorCount");
+    expect(dashboardSource).toContain("가장 자주 관찰된 업체");
+    expect(dashboardSource).toContain("이번 측정에서 확인할 ");
+    expect(dashboardSource).toContain("{item.recommendedCheck}");
     expect(dashboardSource).toContain("상세 분석 보기");
     expect(dashboardSource).not.toContain("이번 측정에서 대신 확인된 내용");
     expect(dashboardSource).not.toContain("같은 기준 검색에서 반복 확인된 다른 업체");
     expect(dashboardSource).not.toContain('SummaryKpiCard');
+  });
+
+  it("preserves the prominent original owner hero and exactly two compact info cards", () => {
+    expect(dashboardSource).toContain('aria-label="이번 측정의 검색 상황과 관찰 업체"');
+    expect(dashboardSource).toContain('className="grid gap-3 md:grid-cols-2"');
+    expect(dashboardSource).toContain("이번 측정에서 확정 노출된 검색 상황이 없습니다.");
+    expect(dashboardSource).toContain("이번 측정에서 관찰된 다른 업체");
+    expect(dashboardSource).not.toContain("{item.evidence}");
+    expect(dashboardSource).toContain('summary.heroVariant === "visible_top3"');
+    expect(dashboardSource).toContain('<BarChart3 aria-hidden="true" />');
   });
 
   it("retains detailed evidence, scope comparisons and non-causal disclaimers", () => {

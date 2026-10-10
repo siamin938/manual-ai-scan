@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, BarChart3, Printer } from "lucide-react";
+import { ArrowRight, BarChart3, Printer, Search, Users } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -2352,8 +2352,79 @@ function DashboardSummary({
         )}
       </div>
 
+      <div className="grid gap-3 md:grid-cols-2" aria-label="이번 측정의 검색 상황과 관찰 업체">
+        <div className="rounded-xl border bg-card p-4 sm:p-5">
+          <div className="flex items-center gap-2">
+            <Search className="size-4 text-muted-foreground" aria-hidden="true" />
+            <h3 className="text-sm font-semibold">어떤 검색에서 보였나요?</h3>
+          </div>
+          {summary.searchContexts.length > 0 ? (
+            <dl className="mt-3 space-y-2.5">
+              {summary.searchContexts.slice(0, 3).map((context) => (
+                <div
+                  key={context.intentType}
+                  className="flex items-baseline justify-between gap-3 text-sm"
+                >
+                  <dt className="min-w-0 text-muted-foreground">
+                    {intentLabel(context.intentType)}
+                  </dt>
+                  <dd className="shrink-0 font-semibold tabular-nums">
+                    {context.confirmedCount}/{context.validCount}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              {summary.visibility.count === 0
+                ? "이번 측정에서 확정 노출된 검색 상황이 없습니다."
+                : "검색 상황별 확정 결과를 확인할 수 없습니다."}
+            </p>
+          )}
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            확정 노출이 확인된 검색 상황 최대 3개만 표시합니다.
+          </p>
+        </div>
+
+        <div className="rounded-xl border bg-card p-4 sm:p-5">
+          <div className="flex items-center gap-2">
+            <Users className="size-4 text-muted-foreground" aria-hidden="true" />
+            <h3 className="text-sm font-semibold">
+              {summary.visibility.count === 0
+                ? "이번 측정에서 관찰된 다른 업체"
+                : "함께 관찰된 업체"}
+            </h3>
+          </div>
+          <p className="mt-3 text-2xl font-semibold tabular-nums">
+            {summary.competitorCount}곳
+          </p>
+          {summary.topCompetitor ? (
+            <div className="mt-2 space-y-0.5">
+              <p className="text-xs text-muted-foreground">가장 자주 관찰된 업체</p>
+              <p className="text-sm font-semibold break-words">{summary.topCompetitor.name}</p>
+              <p className="text-xs leading-5 text-muted-foreground">
+                {summary.visibility.total !== null
+                  ? String(summary.visibility.total) + "개 답변 중 "
+                  : "이번 측정에서 "}
+                {summary.topCompetitor.responseCount}개에서 관찰
+              </p>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {summary.competitorCount === 0
+                ? "이번 측정에서 별도로 확인된 다른 업체가 없습니다."
+                : "반복 관찰 업체의 상세 정보는 상세 분석에서 확인할 수 있습니다."}
+            </p>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-xl border bg-card p-4 sm:p-5">
-        <h3 className="font-semibold">이번 측정에서 주목할 점</h3>
+        <h3 className="font-semibold">
+          {observations.length > 0
+            ? "이번 측정에서 확인할 " + observations.length + "가지"
+            : "이번 측정에서 확인할 내용"}
+        </h3>
         {observations.length === 0 ? (
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             지금 확인 가능한 결과에는 별도로 강조할 관찰 항목이 없습니다.
@@ -2364,8 +2435,8 @@ function DashboardSummary({
             {observations.map((item) => (
               <div key={item.id} className="py-3 first:pt-0 last:pb-0">
                 <p className="text-sm font-semibold leading-6">{item.title}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {item.evidence}
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {item.recommendedCheck}
                 </p>
               </div>
             ))}

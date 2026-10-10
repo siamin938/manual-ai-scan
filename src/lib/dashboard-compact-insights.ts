@@ -14,6 +14,7 @@ export type CompactSummaryInsight = {
     | "verified_page_present";
   title: string;
   evidence: string;
+  recommendedCheck: string;
 };
 
 export type CompactSummarySource = Pick<
@@ -63,6 +64,7 @@ export function buildCompactSummaryInsights(
       id: "zero_confirmed",
       title: "이번 측정에서 내 업체의 확정 노출이 0건입니다",
       evidence: String(total) + "개 유효 답변 기준입니다. 전체 AI 검색에서 보이지 않는다는 뜻은 아닙니다.",
+      recommendedCheck: "공식 홈페이지와 공개 프로필의 업체명·지점명·서비스·지역 표기를 비교해 보세요.",
     });
   } else if (
     scopes &&
@@ -75,6 +77,7 @@ export function buildCompactSummaryInsights(
       evidence:
         "기준 검색 0/8 · 맞춤 검색 " +
         scopes.custom.confirmedCount + "/16",
+      recommendedCheck: "공식 홈페이지와 공개 프로필의 서비스 가능 지역·주력 서비스가 일관되게 안내되는지 확인해 보세요.",
     });
   }
 
@@ -87,6 +90,7 @@ export function buildCompactSummaryInsights(
       id: "verified_page_zero",
       title: "인용된 페이지 중 내 업체 관련성 확정 0개",
       evidence: "이번 측정에서 인용된 페이지 검증 완료 기준입니다.",
+      recommendedCheck: "실제 인용 페이지와 공식 채널의 업체명·지점·서비스 표기를 대조해 보세요.",
     });
   }
 
@@ -97,6 +101,7 @@ export function buildCompactSummaryInsights(
       evidence:
         summary.topCompetitor.name + " · " +
         summary.topCompetitor.responseCount + "/" + total + "개 답변",
+      recommendedCheck: "반복 관찰된 업체의 검색 질문과 인용 출처를 내 업체의 관찰 결과와 비교해 보세요.",
     });
   }
 
@@ -110,6 +115,7 @@ export function buildCompactSummaryInsights(
       title: "내 업체의 상위 3곳 확정 노출은 0건입니다",
       evidence: "확정 노출 " + visibility + "/" + total +
         " · 상위 3곳 확정 0/" + summary.top3.total,
+      recommendedCheck: "내 업체가 등장한 질문에서 상위 3곳에 확인된 업체를 함께 비교해 보세요.",
     });
   }
 
@@ -123,6 +129,7 @@ export function buildCompactSummaryInsights(
       id: "verified_page_present",
       title: "내 업체 관련 인용 페이지가 확인됐습니다",
       evidence: "이번 측정에서 관련성 확정 " + summary.verifiedPageCount + "개",
+      recommendedCheck: "관련성이 확인된 인용 페이지에서 업체명·지점·서비스 정보가 정확하게 안내되는지 확인해 보세요.",
     });
   }
 

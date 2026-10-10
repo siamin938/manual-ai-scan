@@ -45,11 +45,15 @@ describe("10-second owner summary uses only existing exact observation values", 
     expect(items.map(x => x.id)).toEqual(["broad_scope_gap", "verified_page_zero"]);
     expect(items[0]?.evidence).toContain("0/8");
     expect(items[0]?.evidence).toContain("3/16");
+    expect(items[0]?.recommendedCheck).toContain("서비스 가능 지역");
+    expect(items[1]?.recommendedCheck).toContain("실제 인용 페이지");
   });
 
   it("keeps 카스페이스 pattern truthful without duplicating page and competitor sections", () => {
     const s = fake({ visibility: 16, core: 0, custom: 16, pages: 5, competitor: "퀀텀팩토리 서초점", competitorCount: 6 });
-    expect(buildCompactSummaryInsights(s).map(x=>x.id)).toEqual(["broad_scope_gap", "repeated_competitor"]);
+    const items = buildCompactSummaryInsights(s);
+    expect(items.map(x=>x.id)).toEqual(["broad_scope_gap", "repeated_competitor"]);
+    expect(items[1]?.recommendedCheck).toContain("검색 질문");
   });
 
   it("zero visibility is not overstated as global unavailability", () => {
@@ -57,6 +61,7 @@ describe("10-second owner summary uses only existing exact observation values", 
     const items = buildCompactSummaryInsights(s);
     expect(items.map(x=>x.id)).toEqual(["zero_confirmed", "repeated_competitor"]);
     expect(items[0]?.evidence).toContain("전체 AI 검색에서 보이지 않는다는 뜻은 아닙니다");
+    expect(items[0]?.recommendedCheck).toContain("공식 홈페이지");
   });
 
   it("fails closed for missing or incomplete Core and Custom scopes", () => {
@@ -88,11 +93,22 @@ describe("10-second owner summary uses only existing exact observation values", 
     expect(one).toHaveLength(0);
   });
 
+  it("keeps source evidence but avoids repeating ratio strings in the recommended checks", () => {
+    const s = fake({ visibility: 16, core: 0, custom: 16, pages: 5, competitor: "퀀텀팩토리 서초점", competitorCount: 6 });
+    const items = buildCompactSummaryInsights(s);
+    expect(items).toHaveLength(2);
+    expect(items[0]?.evidence).toContain("0/8");
+    expect(items[0]?.recommendedCheck).not.toMatch(/16\/24|0\/8|16\/16/);
+  });
+
   it("keeps input unchanged and does not manufacture causal attribution", () => {
     const s = fake();
     const before = JSON.stringify(s);
     expect(buildCompactSummaryInsights(s)).toEqual(buildCompactSummaryInsights(s));
     expect(JSON.stringify(s)).toBe(before);
-    expect(JSON.stringify(buildCompactSummaryInsights(s))).not.toMatch(/원인입니다|개선됩니다|보장합니다/);
+    const items = buildCompactSummaryInsights(s);
+    expect(items.every((item) => item.recommendedCheck.trim().length > 0)).toBe(true);
+    expect(items).toHaveLength(2);
+    expect(JSON.stringify(items)).not.toMatch(/원인입니다|개선됩니다|보장합니다/);
   });
 });
