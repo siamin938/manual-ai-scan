@@ -36,7 +36,7 @@ function OwnerOpportunityCard({
       </div>
 
       <details className="group/evidence mt-4 rounded-lg border">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
           <span className="group-open/evidence:hidden">판단 근거 살펴보기 ▾</span>
           <span className="hidden group-open/evidence:inline">근거 접기 ▴</span>
         </summary>
@@ -162,7 +162,7 @@ export function ActionOpportunityV1CustomerPreview({
 
       {model.additional.length > 0 && (
         <details className="group/extra rounded-xl border bg-background">
-          <summary className="cursor-pointer px-4 py-4 sm:px-5">
+          <summary className="cursor-pointer list-none px-4 py-4 sm:px-5 [&::-webkit-details-marker]:hidden">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-sm font-semibold">
                 다른 관찰 {model.additional.length}개도 확인하기
