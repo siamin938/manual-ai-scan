@@ -14,51 +14,40 @@ const stylesSource = readFileSync(
 
 describe("dashboard owner productization layer", () => {
   it("keeps Top3 as supporting context while promoting broad-search visibility in the summary KPIs", () => {
-    expect(dashboardSource).toContain('label="기준 검색 노출"');
+    expect(dashboardSource).toContain('scopes ? "기준 검색" : "상위 3곳 확정"');
+    expect(dashboardSource).toContain('scopes ? "맞춤 검색" : "내 업체 관련 페이지"');
+    expect(dashboardSource).toContain("compactSummaryCount(summary.visibility)");
     expect(dashboardSource).not.toContain('label="상위 3곳에 나온 답변"');
-    expect(dashboardSource).toContain("<strong className=\"text-primary\">상위 3곳</strong>");
+    expect(dashboardSource).toContain("summary.top3");
     expect(dashboardSource).toContain('label="확정 상위 3곳 노출률"');
   });
 
-  it("keeps zero-visibility value useful without changing diagnostic truth", () => {
-    expect(dashboardSource).toContain("이번 측정에서 대신 확인된 내용");
-    expect(dashboardSource).toContain("가장 자주 함께 나온 업체");
-    expect(dashboardSource).toContain("이번 측정에서 자주 나온 업체");
-    expect(dashboardSource).not.toContain("검증 대상 없음");
-    expect(dashboardSource).toContain("이번 측정에서 확인된 다른 업체");
-    expect(dashboardSource).toContain("확인된 출처 연결 차이");
-    expect(dashboardSource).toContain('summary.heroVariant === "not_visible"');
-    expect(dashboardSource).toContain('summary.heroVariant !== "not_visible"');
+  it("keeps the ten-second summary to three KPIs and no more than two fact statements", () => {
+    expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
+    expect(dashboardSource).toContain('compactSummarySearchScopes(summary)');
+    expect(dashboardSource).toContain("이번 측정에서 주목할 점");
+    expect(dashboardSource).toContain("근거와 확인 항목은 상세 분석에서 보기");
+    expect(dashboardSource).not.toContain("이번 측정에서 대신 확인된 내용");
+    expect(dashboardSource).not.toContain("같은 기준 검색에서 반복 확인된 다른 업체");
+    expect(dashboardSource).not.toContain('SummaryKpiCard');
   });
 
-  it("hides the verified sources card and widens opportunities in the zero-visibility state", () => {
+  it("retains detailed evidence, scope comparisons and non-causal disclaimers", () => {
+    expect(dashboardSource).toContain("UnifiedDiagnosticLayerSummaryCard");
+    expect(dashboardSource).toContain("ActionOpportunitySection");
+    expect(dashboardSource).toContain("ComparisonCard model={comparisonModel}");
+    expect(dashboardSource).toContain("model.verifiedTargetCitationPages");
+    expect(dashboardSource).toContain("SearchContextChart");
+    expect(dashboardSource).toContain("METHODOLOGY");
     expect(dashboardSource).toContain(
-      "0% 노출 상태에서는 관련성이 확인된 출처 카드를 숨기고 우선 확인 항목을 전체 폭으로 표시합니다.",
-    );
-    expect(dashboardSource).toContain(
-      'summary.heroVariant === "not_visible"\n            ? "grid gap-5"\n            : "grid gap-5 lg:grid-cols-2"',
-    );
-    expect(dashboardSource).toContain('summary.heroVariant !== "not_visible" && (');
-  });
-
-  it("shows the broad-versus-detail observation without causal wording", () => {
-    expect(dashboardSource).toContain("이번 측정에서 확인된 검색 범위 차이");
-    expect(dashboardSource).toContain("summary.searchScopeObservation.headline");
-    expect(dashboardSource).toContain("summary.searchScopeObservation.evidence");
-    expect(dashboardSource).toContain("같은 기준 검색에서 반복 확인된 다른 업체");
-    expect(dashboardSource).toContain("summary.searchScopeObservation.repeatedCompetitors");
-    expect(dashboardSource).toContain("독립 웹 ·");
-    expect(dashboardSource).toContain(
-      "특정 출처가 AI 노출의 원인임을 의미하지 않습니다.",
+      "관찰 결과의 차이는 특정 업체·출처가 노출에 영향을 준 원인이나 개선 효과를 의미하지 않습니다.",
     );
   });
 
-  it("reuses comparison v2 for repeat confirmation instead of inventing a score", () => {
-    expect(dashboardSource).toContain("재측정 확인");
-    expect(dashboardSource).toContain("comparison.compactSummary");
-    expect(dashboardSource).toContain("질문 결과 일치");
-    expect(dashboardSource).toContain("새로 확인된 질문");
-    expect(dashboardSource).toContain("별도의 신뢰도 점수나 노출 원인을 의미하지 않습니다.");
+  it("preserves comparison v2 in detailed analysis instead of a duplicate summary card", () => {
+    expect(dashboardSource).toContain('<ComparisonCard model={comparisonModel}');
+    expect(dashboardSource).toContain("buildEntityFactsV2ComparisonViewModel");
+    expect(dashboardSource).not.toContain("comparison.compactSummary");
   });
 
   it("supports customer report printing without changing measurement data", () => {
@@ -81,6 +70,8 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("대상 업체 · {model.businessName}");
     expect(dashboardSource).toContain("report-section print-avoid-break");
     expect(dashboardSource).toContain("no-print flex flex-col items-center");
+    expect(dashboardSource).toContain('className="no-print max-h-[90vh] overflow-y-auto sm:max-w-4xl"');
+    expect(dashboardSource).toContain("<DialogContent");
   });
 
   it("lets long detail tables flow across PDF pages without splitting individual rows", () => {
@@ -99,13 +90,10 @@ describe("dashboard owner productization layer", () => {
     );
   });
 
-  it("explains the measurement method without changing the engine", () => {
-    expect(dashboardSource).toContain("측정 기준 보기");
-    expect(dashboardSource).toContain("8개 검색 상황을 3문항씩, 총 24문항");
-    expect(dashboardSource).toContain("애매한");
-    expect(dashboardSource).toContain("임의로 노출로 올리지 않습니다.");
-    expect(dashboardSource).toContain(
-      "실제 검색량, 시장 점유율 또는",
-    );
+  it("keeps method details in the detailed report rather than the ten-second summary", () => {
+    expect(dashboardSource).toContain('<p className="report-kicker">METHODOLOGY</p>');
+    expect(dashboardSource).toContain("최근 측정의 메인 노출률은 내 업체로 확정된 응답만 계산합니다.");
+    expect(dashboardSource).toContain("이전 측정 비교는 같은 질문과 측정 조건");
+    expect(dashboardSource).not.toContain("측정 기준 보기");
   });
 });

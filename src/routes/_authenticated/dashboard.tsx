@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
   createFileRoute,
   Link,
@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, BarChart3, Building2, FileCheck2, Printer, Search } from "lucide-react";
+import { ArrowRight, Printer } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -30,7 +30,6 @@ import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.
 import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-read-gateway.dashboard-cutover";
 import {
   buildEntityFactsV2DashboardSummaryViewModel,
-  type DashboardSummaryMetric,
   type EntityFactsV2DashboardSummaryViewModel,
 } from "@/lib/entity-facts-v2-dashboard-summary.viewmodel";
 import { getEntityFactsV2Comparison } from "@/lib/entity-facts-v2-comparison.functions";
@@ -59,7 +58,14 @@ import { BusinessSelector, useClientBusinessSelection } from "@/components/busin
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import {
+  buildCompactSummaryInsights,
+  compactSummaryCount,
+  compactSummarySearchScopes,
+} from "@/lib/dashboard-compact-insights";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -1245,18 +1251,23 @@ function DashboardPage() {
         </div>
       </div>
 
-      {privateV1AdminAllowed && privateV1Selected && (
-        <section
+      <Dialog
+        open={privateV1AdminAllowed && privateV1Selected}
+        onOpenChange={(open) => {
+          if (!open) setPrivatePreviewSelection(null);
+        }}
+      >
+        <DialogContent
           id="dashboard-action-v1-private-preview"
-          className="no-print space-y-4 rounded-xl border border-dashed border-primary/40 bg-muted/20 p-4 sm:p-6"
-          aria-label="관리자 전용 Action Opportunity v1.0 비공개 검수"
+          className="no-print max-h-[90vh] overflow-y-auto sm:max-w-4xl"
         >
-          <div className="space-y-1">
-            <p className="text-sm font-semibold">관리자 전용 · v1.0 고객 화면 구성 검수</p>
-            <p className="text-xs leading-5 text-muted-foreground">
-              현재 선택한 업체의 고객용 카드 배치를 검수합니다. 기존 고객 대시보드와 인쇄·PDF에는 표시되지 않습니다.
-            </p>
-          </div>
+          <DialogHeader>
+            <DialogTitle>관리자 전용 · v1.0 고객 화면 구성 검수</DialogTitle>
+            <DialogDescription>
+              현재 선택한 업체의 고객용 카드 배치를 검수합니다.
+              정식 고객 대시보드와 인쇄·PDF에는 표시되지 않습니다.
+            </DialogDescription>
+          </DialogHeader>
           {privateV1PreviewQuery.isPending || privateV1PreviewQuery.isFetching ? (
             <p className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">
               현재 대표 측정의 비공개 미리보기를 불러오는 중입니다.
@@ -1270,11 +1281,11 @@ function DashboardPage() {
           ) : (
             <p className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">
               현재 업체·대표 측정에 맞는 비공개 검수 자료를 불러올 수 없습니다.
-              권한이나 Run이 변경됐다면 화면을 다시 확인해 주세요.
+              권한이나 대표 Run이 변경됐다면 다시 확인해 주세요.
             </p>
           )}
-        </section>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {!businessId && !businesses.isLoading && (
         <Card>
@@ -1383,8 +1394,6 @@ function DashboardPage() {
       {dto && model && summaryModel && view === "summary" && (
         <DashboardSummary
           summary={summaryModel}
-          comparison={comparisonModel}
-          intentLabelFor={intentLabel}
           onShowDetail={() => setDashboardView("detail")}
         />
       )}
@@ -2250,534 +2259,107 @@ function DashboardPage() {
   );
 }
 
-function summaryCountText(metric: DashboardSummaryMetric): string {
-  return metric.count === null ? "확인 중" : `${metric.count}건`;
-}
-
-function summaryMetricNote(metric: DashboardSummaryMetric): string {
-  if (metric.total === null || metric.pct === null) return "확인 가능한 결과를 준비하고 있습니다.";
-  return `${metric.total}개 답변 중 · ${pctRange(metric.pct, metric.pct)}`;
-}
-
 function DashboardSummary({
   summary,
-  comparison,
-  intentLabelFor,
   onShowDetail,
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
-  comparison: ReturnType<typeof buildEntityFactsV2ComparisonViewModel> | null;
-  intentLabelFor: (intentType: string) => string;
   onShowDetail: () => void;
 }) {
-  const hasHeroCounts =
-    summary.visibility.total !== null &&
-    summary.visibility.count !== null &&
-    summary.top3.count !== null;
-  const scopeLabels = {
-    custom: "상세 검색",
-    core: "기준 검색",
-    overall: "전체",
-  } as const;
-  const coreScope = summary.searchScopes?.find((scope) => scope.kind === "core") ?? null;
+  const scopes = compactSummarySearchScopes(summary);
+  const observations = buildCompactSummaryInsights(summary);
+  const hasCount = summary.visibility.count !== null && summary.visibility.total !== null;
+  const pageLabel =
+    summary.verifiedPageStatus === "pending"
+      ? "확인 중"
+      : summary.verifiedPageStatus === "not_verified"
+        ? "미검증"
+        : summary.verifiedPageCount === null
+          ? "확인 불가"
+          : String(summary.verifiedPageCount) + "개";
 
   return (
-    <section className="space-y-6" aria-label="사장님용 10초 요약">
-      <div className="rounded-xl border border-primary/20 bg-accent/70 px-5 py-6 sm:px-7 sm:py-7">
-        <div className="flex items-start gap-4">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BarChart3 aria-hidden="true" />
+    <section className="space-y-4" aria-label="사장님용 10초 요약">
+      <div className="rounded-xl border border-primary/25 bg-accent/55 p-5 sm:p-6">
+        <p className="text-xs font-semibold text-primary">이번 측정 한눈에 보기</p>
+        <h2 className="mt-2 text-xl font-semibold leading-8 sm:text-2xl">
+          {hasCount
+            ? String(summary.visibility.total) + "개 질문 중 " +
+              String(summary.visibility.count) + "개에서 내 업체가 확인됐습니다."
+            : "이번 측정의 확정 노출을 확인하고 있습니다."}
+        </h2>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          이번 진단 질문에서 내 업체로 확정된 AI 답변만 집계한 결과입니다.
+        </p>
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
+            <p className="text-xs text-muted-foreground">확정 노출</p>
+            <p className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
+              {compactSummaryCount(summary.visibility)}
+            </p>
           </div>
-          <div className="min-w-0">
-            {summary.heroVariant === "visible_top3" && hasHeroCounts ? (
-              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
-                {summary.visibility.total}번 물어봤더니 내 업체는{" "}
-                <strong className="text-primary">{summary.visibility.count}번</strong> 나왔고, 그중{" "}
-                <strong className="text-primary">{summary.top3.count}번</strong>은{" "}
-                <strong className="text-primary">상위 3곳</strong> 안에 나왔습니다.
-              </p>
-            ) : summary.heroVariant === "visible_no_top3" && hasHeroCounts ? (
-              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
-                {summary.visibility.total}번 중 내 업체는{" "}
-                <strong className="text-primary">{summary.visibility.count}번</strong> 나왔지만,{" "}
-                <strong className="text-primary">상위 3곳</strong>에서는 아직 확인되지 않았습니다.
-              </p>
-            ) : summary.heroVariant === "not_visible" && hasHeroCounts ? (
-              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
-                {summary.visibility.total}번 물어봤지만 이번 측정에서는{" "}
-                <strong className="text-primary">내 업체가 확인되지 않았습니다.</strong>
-              </p>
-            ) : (
-              <p className="text-xl font-semibold leading-8 sm:text-2xl">
-                이번 측정의 핵심 결과를 확인하고 있습니다.
-              </p>
-            )}
-            <p className="mt-2 text-sm text-muted-foreground">
-              이번 측정 기준 · AI 답변 {summary.visibility.total ?? "확인 중"}건 분석
+          <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
+            <p className="text-xs text-muted-foreground">
+              {scopes ? "기준 검색" : "상위 3곳 확정"}
+            </p>
+            <p className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
+              {scopes
+                ? String(scopes.core.confirmedCount) + "/" + String(scopes.core.validCount)
+                : compactSummaryCount(summary.top3)}
+            </p>
+          </div>
+          <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
+            <p className="text-xs text-muted-foreground">
+              {scopes ? "맞춤 검색" : "내 업체 관련 페이지"}
+            </p>
+            <p className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
+              {scopes
+                ? String(scopes.custom.confirmedCount) + "/" + String(scopes.custom.validCount)
+                : pageLabel}
             </p>
           </div>
         </div>
-      </div>
-
-      <div
-        className={
-          summary.heroVariant === "not_visible"
-            ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-            : "grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-        }
-      >
-        <SummaryKpiCard
-          icon={<BarChart3 aria-hidden="true" />}
-          label="내 업체가 나온 답변"
-          value={summaryCountText(summary.visibility)}
-          note={summaryMetricNote(summary.visibility)}
-          highlight
-        />
-        <SummaryKpiCard
-          icon={<Search aria-hidden="true" />}
-          label="기준 검색 노출"
-          value={coreScope ? `${coreScope.confirmedCount}/${coreScope.validCount}` : "확인 불가"}
-          note={
-            coreScope
-              ? `넓은 지역 · 주력 서비스 · ${coreScope.confirmedPct === null ? "비율 확인 불가" : pctRange(coreScope.confirmedPct, coreScope.confirmedPct)}`
-              : "이번 측정은 기준 검색을 분리해 표시할 수 없습니다."
-          }
-        />
-        {summary.heroVariant !== "not_visible" && (
-          <SummaryKpiCard
-            icon={<FileCheck2 aria-hidden="true" />}
-            label="내 업체 관련 페이지"
-            value={
-              summary.verifiedPageStatus === "not_verified"
-                ? "미검증"
-                : summary.verifiedPageStatus === "pending"
-                  ? "확인 중"
-                  : `${summary.verifiedPageCount ?? 0}개`
-            }
-            note="페이지 내용 기준 관련 확인"
-          />
-        )}
-        <SummaryKpiCard
-          icon={<Building2 aria-hidden="true" />}
-          label={
-            summary.heroVariant === "not_visible"
-              ? "이번 측정에서 자주 나온 업체"
-              : "가장 자주 함께 나온 업체"
-          }
-          value={summary.topCompetitor?.name ?? "확인된 업체 없음"}
-          note={
-            summary.topCompetitor
-              ? `AI 답변에서 ${summary.topCompetitor.responseCount}건 관찰`
-              : "이번 측정에서 함께 확인된 업체가 없습니다."
-          }
-          compact
-        />
-      </div>
-
-      {summary.heroVariant === "not_visible" && (
-        <Card className="report-section border-primary/20 bg-primary/[0.02]">
-          <CardHeader>
-            <CardTitle className="text-xl">이번 측정에서 대신 확인된 내용</CardTitle>
-            <p className="text-sm leading-6 text-muted-foreground">
-              내 업체가 나오지 않았더라도 이번 24개 질문에서 어떤 업체와 출처 연결 차이가
-              반복 관찰됐는지 확인할 수 있습니다.
-            </p>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs font-medium text-muted-foreground">
-                이번 측정에서 확인된 다른 업체
-              </p>
-              <p className="mt-2 font-semibold tabular-nums">
-                {summary.competitorCount}곳
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                이번 24개 질문의 AI 답변에서 업체로 확인된 항목입니다.
-              </p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-xs font-medium text-muted-foreground">
-                확인할 출처 연결 차이
-              </p>
-              <p className="mt-2 font-semibold">
-                {summary.opportunities.length > 0
-                  ? `${summary.opportunities.length}개 확인`
-                  : "근거가 충분한 차이 없음"}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {summary.opportunities.length > 0
-                  ? "아래 ‘확인된 출처 연결 차이’에서 관찰 근거를 확인할 수 있습니다."
-                  : "현재 데이터에서는 반복된 출처 연결 차이를 보여줄 근거가 충분하지 않습니다."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div
-        className={
-          summary.heroVariant === "not_visible" ? "grid gap-5" : "grid gap-5 lg:grid-cols-2"
-        }
-      >
-        {summary.heroVariant !== "not_visible" && (
-          <Card className="report-section print-avoid-break">
-            <CardHeader>
-              <CardTitle className="text-xl">어떤 검색에서 보였나요?</CardTitle>
-            <p className="text-sm leading-6 text-muted-foreground">
-              이번 측정에서 실제로 확인된 검색 상황만 요약했습니다.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {summary.searchContexts.length === 0 ? (
-              <p className="rounded-lg bg-muted/40 px-4 py-5 text-sm text-muted-foreground">
-                이번 측정에서 확정 노출이 확인된 검색 상황이 없습니다.
-              </p>
-            ) : (
-              <div className="space-y-5">
-                {summary.searchContexts.map((context) => (
-                  <div key={context.intentType}>
-                    <div className="mb-2 flex items-center justify-between gap-4 text-sm">
-                      <span className="font-medium">{intentLabelFor(context.intentType)}</span>
-                      <span className="shrink-0 tabular-nums text-muted-foreground">
-                        {context.confirmedCount}/{context.validCount}
-                      </span>
-                    </div>
-                    <Progress value={percentOf(context.confirmedCount, context.validCount)} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-          </Card>
-        )}
-
-        <Card className="report-section">
-          <CardHeader>
-            <CardTitle className="text-xl">검색 범위 요약</CardTitle>
-            <p className="text-sm leading-6 text-muted-foreground">
-              같은 측정 안에서 확인된 상세 검색과 기준 검색을 나눠 보여드립니다.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {summary.searchScopes === null ? (
-              <p className="rounded-lg bg-muted/40 px-4 py-5 text-sm text-muted-foreground">
-                이번 측정은 검색 범위를 안전하게 나눠 표시할 수 없습니다.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                <div className="divide-y rounded-lg border px-4">
-                  {summary.searchScopes.map((scope) => (
-                    <div key={scope.kind} className="flex items-center justify-between gap-4 py-3">
-                      <span className="text-sm font-medium">{scopeLabels[scope.kind]}</span>
-                      <span className="text-sm font-semibold tabular-nums">
-                        {scope.confirmedCount}/{scope.validCount}
-                        <span className="ml-2 font-normal text-muted-foreground">
-                          {scope.confirmedPct === null ? "–" : pctRange(scope.confirmedPct, scope.confirmedPct)}
-                        </span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                {summary.searchScopeObservation && (
-                  <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
-                    <p className="text-xs font-semibold text-primary">이번 측정에서 확인된 검색 범위 차이</p>
-                    <p className="mt-2 text-sm font-semibold leading-6">
-                      {summary.searchScopeObservation.headline}
-                    </p>
-                    {summary.searchScopeObservation.evidence && (
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        {summary.searchScopeObservation.evidence}
-                      </p>
-                    )}
-                    {summary.searchScopeObservation.repeatedCompetitors.length > 0 && (
-                      <div className="mt-4 space-y-2 border-t border-primary/10 pt-3">
-                        <p className="text-xs font-semibold text-foreground">
-                          같은 기준 검색에서 반복 확인된 다른 업체
-                        </p>
-                        <div className="grid gap-2">
-                          {summary.searchScopeObservation.repeatedCompetitors.map((competitor) => (
-                            <div
-                              key={competitor.name}
-                              className="flex flex-col gap-1 rounded-md border bg-card px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium">{competitor.name}</p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                  기준 검색 {competitor.responseCount}/
-                                  {summary.searchScopes?.find((scope) => scope.kind === "core")?.validCount ?? "–"}
-                                  {" · "}Top3 {competitor.top3ResponseCount}회
-                                  {" · "}검색 상황 {competitor.intentCount}종
-                                </p>
-                              </div>
-                              <p className="shrink-0 text-xs text-muted-foreground">
-                                {competitor.independentSourceDomain
-                                  ? `독립 웹 · ${competitor.independentSourceDomain}`
-                                  : "독립 웹 출처 연결 미확인"}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                      같은 기준 검색에서 함께 관찰된 사실을 요약한 것이며, 특정 출처가 AI 노출의 원인임을 의미하지 않습니다.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 0% 노출 상태에서는 관련성이 확인된 출처 카드를 숨기고 우선 확인 항목을 전체 폭으로 표시합니다. */}
-      <div
-        className={
-          summary.heroVariant === "not_visible"
-            ? "grid gap-5"
-            : "grid gap-5 lg:grid-cols-2"
-        }
-      >
-        <Card className="report-section">
-          <CardHeader>
-            <CardTitle className="text-xl">확인된 출처 연결 차이</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {summary.opportunities.length === 0 ? (
-              <p className="rounded-lg bg-muted/40 px-4 py-5 text-sm text-muted-foreground">
-                현재 데이터에서는 근거가 충분한 출처 연결 차이가 확인되지 않았습니다.
-              </p>
-            ) : (
-              <ol className="space-y-3">
-                {summary.opportunities.map((item) => (
-                  <li key={item.rank} className="flex gap-3 rounded-lg border p-4">
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground">
-                      {item.rank}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold leading-6">{item.title}</p>
-                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                        {item.observation}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-            <p className="text-xs leading-5 text-muted-foreground">
-              이 차이는 관찰 결과이며, 특정 작업이 노출 상승을 보장하는 것은 아닙니다.
-            </p>
-          </CardContent>
-        </Card>
-
-        {summary.heroVariant !== "not_visible" && (
-        <Card className="report-section">
-          <CardHeader>
-            <CardTitle className="text-xl">관련성이 확인된 출처</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {summary.verifiedPageStatus === "not_verified" ? (
-              <p className="rounded-lg bg-muted/40 px-4 py-5 text-sm text-muted-foreground">
-                이 측정에서는 인용 페이지 관련성 검증이 실행되지 않았습니다. 최근 측정은 측정
-                완료 후 자동으로 검증합니다.
-              </p>
-            ) : summary.verifiedPageStatus === "pending" ? (
-              <p className="rounded-lg bg-muted/40 px-4 py-5 text-sm text-muted-foreground">
-                인용 페이지의 내 업체 관련성을 확인 중입니다.
-              </p>
-            ) : summary.verifiedPages.length === 0 ? (
-              <p className="rounded-lg bg-muted/40 px-4 py-5 text-sm text-muted-foreground">
-                이번 측정에서는 관련성이 확인된 인용 페이지가 없습니다.
-              </p>
-            ) : (
-              <div className="divide-y">
-                {summary.verifiedPages.map((page) => (
-                  <div key={page.sampleUrl} className="py-3 first:pt-0 last:pb-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">{siteDisplayName(page.domain)}</p>
-                        <p className="truncate text-sm text-muted-foreground" title={page.title ?? undefined}>
-                          {page.title ?? "페이지 제목 미확인"}
-                        </p>
-                        <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-                          {page.responseCount}/{summary.visibility.count ?? "–"} 확정 노출건
-                        </p>
-                      </div>
-                      <a
-                        href={page.sampleUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="shrink-0 text-sm font-medium text-primary underline-offset-4 hover:underline"
-                      >
-                        관련 페이지 보기 ↗
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        )}
-      </div>
-
-      <Card className="report-section">
-        <CardHeader>
-          <CardTitle className="text-xl">재측정 확인</CardTitle>
-          <p className="text-sm leading-6 text-muted-foreground">
-            같은 질문과 측정 조건이 확인된 결과끼리만 비교합니다.
+        {!scopes && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            이번 측정은 기준·맞춤 검색을 안전하게 분리할 수 없어 다른 확정 지표를 표시합니다.
           </p>
-        </CardHeader>
-        <CardContent>
-          {comparison?.comparisonAvailable && comparison.compactSummary ? (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg border bg-muted/15 p-4">
-                  <p className="text-xs font-medium text-muted-foreground">이전 측정</p>
-                  <p className="mt-2 text-2xl font-semibold tabular-nums">
-                    {comparison.compactSummary.previousConfirmedCount}/
-                    {comparison.compactSummary.validCount}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-primary/25 bg-primary/[0.03] p-4">
-                  <p className="text-xs font-medium text-muted-foreground">이번 측정</p>
-                  <p className="mt-2 text-2xl font-semibold tabular-nums text-primary">
-                    {comparison.compactSummary.currentConfirmedCount}/
-                    {comparison.compactSummary.validCount}
-                  </p>
-                </div>
-                <div className="rounded-lg border bg-muted/15 p-4">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    질문 결과 일치
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold tabular-nums">
-                    {comparison.compactSummary.sameQuestionResultCount === null
-                      ? "–"
-                      : `${comparison.compactSummary.sameQuestionResultCount}/${comparison.compactSummary.validCount}`}
-                  </p>
-                </div>
-              </div>
-              {comparison.compactSummary.newlyConfirmedQuestionCount !== null &&
-                comparison.compactSummary.noLongerConfirmedQuestionCount !== null && (
-                  <p className="text-sm">
-                    새로 확인된 질문{" "}
-                    <span className="font-semibold tabular-nums">
-                      {comparison.compactSummary.newlyConfirmedQuestionCount}개
-                    </span>
-                    {" · "}
-                    이전에는 확인됐지만 이번에는 확인되지 않은 질문{" "}
-                    <span className="font-semibold tabular-nums">
-                      {comparison.compactSummary.noLongerConfirmedQuestionCount}개
-                    </span>
-                  </p>
-                )}
-              <p className="text-xs leading-5 text-muted-foreground">
-                질문 결과 일치는 같은 질문에서 내 업체의 확정 노출 여부가 같았다는 뜻입니다.
-                별도의 신뢰도 점수나 노출 원인을 의미하지 않습니다.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-lg bg-muted/30 px-4 py-4">
-              <p className="text-sm font-semibold">
-                {comparison?.heading ?? "동일 조건 재측정 전입니다"}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {comparison?.description ??
-                  "같은 질문과 측정 조건으로 다시 측정하면 질문별 일치와 변화를 비교할 수 있습니다."}
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
-      <details className="group rounded-xl border bg-card">
-        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold">
-          측정 기준 보기
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            왜 이 숫자가 나왔는지
-          </span>
-        </summary>
-        <div className="border-t px-5 py-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <p className="text-sm font-semibold">질문 구성</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {summary.searchScopes && summary.visibility.total === 24
-                  ? "표준 통합 진단은 지역·추천·서비스·후기·신뢰·비교·가격·탐색 8개 검색 상황을 3문항씩, 총 24문항으로 확인합니다."
-                  : "현재 저장된 진단 질문을 같은 측정 조건으로 실행해 결과를 집계합니다."}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold">확정 노출</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                AI 답변 안에서 현재 업체로 확정 확인된 경우만 노출 건수에 포함합니다. 애매한
-                경우를 임의로 노출로 올리지 않습니다.
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold">상위 3곳</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                AI 답변에서 업체로 확인된 항목 중 내 업체의 위치가 3위 이내로 확인된 경우만
-                집계합니다.
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold">비율의 의미</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                이 비율은 이번 진단 질문 안에서 확인된 결과이며 실제 검색량, 시장 점유율 또는
-                전체 AI 이용자의 노출 비율을 의미하지 않습니다.
-              </p>
-            </div>
+      <div className="rounded-xl border bg-card p-4 sm:p-5">
+        <h3 className="font-semibold">이번 측정에서 주목할 점</h3>
+        {observations.length === 0 ? (
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            지금 확인 가능한 결과에는 별도로 강조할 관찰 항목이 없습니다.
+            자세한 데이터와 확인 항목은 상세 분석에서 확인할 수 있습니다.
+          </p>
+        ) : (
+          <div className="mt-3 divide-y">
+            {observations.map((item) => (
+              <div key={item.id} className="py-3 first:pt-0 last:pb-0">
+                <p className="text-sm font-semibold leading-6">{item.title}</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  {item.evidence}
+                </p>
+              </div>
+            ))}
           </div>
-        </div>
-      </details>
+        )}
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">
+          관찰 결과의 차이는 특정 업체·출처가 노출에 영향을 준 원인이나 개선 효과를 의미하지 않습니다.
+        </p>
+      </div>
 
       <div className="no-print flex flex-col items-center gap-2 pt-2 text-center">
         <Button type="button" size="lg" onClick={onShowDetail}>
-          상세 분석 보기 <ArrowRight aria-hidden="true" />
+          근거와 확인 항목은 상세 분석에서 보기
+          <ArrowRight aria-hidden="true" />
         </Button>
         <p className="text-xs text-muted-foreground">
-          이 화면은 자세한 분석을 쉽게 요약한 버전입니다.
+          검색 상황·인용 페이지·경쟁업체·재측정 비교를 자세히 확인할 수 있습니다.
         </p>
       </div>
     </section>
-  );
-}
-
-function SummaryKpiCard({
-  icon,
-  label,
-  value,
-  note,
-  highlight = false,
-  compact = false,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  note: string;
-  highlight?: boolean;
-  compact?: boolean;
-}) {
-  return (
-    <Card className={highlight ? "report-section border-primary/35" : "report-section"}>
-      <CardContent className="p-5">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <span className="[&_svg]:size-4">{icon}</span>
-          <p className="text-sm font-medium">{label}</p>
-        </div>
-        <p
-          className={
-            compact
-              ? "mt-4 line-clamp-2 min-h-14 text-xl font-bold leading-7"
-              : "mt-4 text-3xl font-bold leading-none tabular-nums"
-          }
-        >
-          {value}
-        </p>
-        <p className="mt-3 min-h-10 text-xs leading-5 text-muted-foreground">{note}</p>
-      </CardContent>
-    </Card>
   );
 }
 
