@@ -3,6 +3,8 @@ import {
   buildCompactSummaryInsights,
   compactSummaryCount,
   compactSummarySearchScopes,
+  ownerSearchContextLabel,
+  ownerSearchContextAnswerText,
   type CompactSummarySource,
 } from "../../src/lib/dashboard-compact-insights";
 
@@ -35,7 +37,34 @@ function fake(args: {
   };
 }
 
-describe("10-second owner summary uses only existing exact observation values", () => {
+describe("plain Korean question-type labels and AI-answer counts", () => {
+  it("turns all eight original intent IDs into understandable customer categories", () => {
+    expect(ownerSearchContextLabel("comparison")).toBe("업체 비교");
+    expect(ownerSearchContextLabel("discovery")).toBe("업체 찾아보기");
+    expect(ownerSearchContextLabel("local")).toBe("지역에서 업체 찾기");
+    expect(ownerSearchContextLabel("recommendation")).toBe("업체 추천");
+    expect(ownerSearchContextLabel("service")).toBe("시공·서비스 문의");
+    expect(ownerSearchContextLabel("review_quality")).toBe("업체 후기·평판");
+    expect(ownerSearchContextLabel("trust")).toBe("전문성·신뢰도 확인");
+    expect(ownerSearchContextLabel("price_value")).toBe("가격·가성비 비교");
+  });
+
+  it("clarifies that 2/3 means two confirmed answers out of three, not rank two", () => {
+    expect(ownerSearchContextAnswerText(2, 3)).toBe("3개 답변 중 2개에서 등장");
+    expect(ownerSearchContextAnswerText(1, 3)).toBe("3개 답변 중 1개에서 등장");
+    expect(ownerSearchContextAnswerText(0, 3)).toBe("3개 답변 중 0개에서 등장");
+    expect(ownerSearchContextAnswerText(3, 3)).toBe("3개 답변 중 3개에서 등장");
+  });
+
+  it("does not manufacture answer counts for invalid or future categories", () => {
+    expect(ownerSearchContextAnswerText(1, 0)).toBe("확인 가능한 답변 없음");
+    expect(ownerSearchContextAnswerText(4, 3)).toBe("확인 가능한 답변 없음");
+    expect(ownerSearchContextAnswerText(-1, 3)).toBe("확인 가능한 답변 없음");
+    expect(ownerSearchContextLabel("future-type")).toBe("기타 검색 질문");
+  });
+});
+
+describe("10-second owner summary uses only existing exact observation values", () {
   it("shows 3/24, core 0/8, custom 3/16 without expanding into four cards", () => {
     const s = fake();
     expect(compactSummaryCount(s.visibility)).toBe("3/24");

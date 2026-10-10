@@ -27,6 +27,32 @@ export type CompactSummarySource = Pick<
   | "verifiedPageStatus"
 >;
 
+/**
+ * Simplified labels for compact summary only. Retain original intent IDs and
+ * canonical labels throughout detailed reporting and the measurement engine.
+ */
+const OWNER_INTENT_LABELS: Record<string, string> = {
+  comparison: "업체 비교",
+  discovery: "업체 찾아보기",
+  local: "지역에서 업체 찾기",
+  recommendation: "업체 추천",
+  service: "시공·서비스 문의",
+  review_quality: "업체 후기·평판",
+  trust: "전문성·신뢰도 확인",
+  price_value: "가격·가성비 비교",
+};
+
+export function ownerSearchContextLabel(intent: string): string {
+  return OWNER_INTENT_LABELS[intent] ?? "기타 검색 질문";
+}
+
+/** Count valid AI answers in this intent, not an ordinal search rank. */
+export function ownerSearchContextAnswerText(confirmed: number, valid: number): string {
+  return valid > 0 && confirmed >= 0 && confirmed <= valid
+    ? valid + "개 답변 중 " + confirmed + "개에서 등장"
+    : "확인 가능한 답변 없음";
+}
+
 export function compactSummaryCount(metric: DashboardSummaryMetric): string {
   return metric.count === null || metric.total === null
     ? "확인 불가"

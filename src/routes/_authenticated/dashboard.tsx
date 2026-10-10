@@ -62,6 +62,8 @@ import {
   buildCompactSummaryInsights,
   compactSummaryCount,
   compactSummarySearchScopes,
+  ownerSearchContextLabel,
+  ownerSearchContextAnswerText,
 } from "@/lib/dashboard-compact-insights";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -2362,33 +2364,57 @@ function DashboardSummary({
         <div className="rounded-xl border bg-card p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <Search className="size-4 text-muted-foreground" aria-hidden="true" />
-            <h3 className="text-sm font-semibold">어떤 검색에서 보였나요?</h3>
+            <h3 className="text-sm font-semibold">어떤 질문에서 내 업체가 나왔나요?</h3>
           </div>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            질문 종류별 AI 답변에서 내 업체가 등장한 횟수입니다.
+          </p>
           {summary.searchContexts.length > 0 ? (
-            <dl className="mt-3 space-y-2.5">
+            <dl className="mt-3 space-y-3">
               {summary.searchContexts.slice(0, 3).map((context) => (
-                <div
-                  key={context.intentType}
-                  className="flex items-baseline justify-between gap-3 text-sm"
-                >
-                  <dt className="min-w-0 text-muted-foreground">
-                    {intentLabel(context.intentType)}
-                  </dt>
-                  <dd className="shrink-0 font-semibold tabular-nums">
-                    {context.confirmedCount}/{context.validCount}
-                  </dd>
+                <div key={context.intentType}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
+                    <dt className="font-medium">
+                      {ownerSearchContextLabel(context.intentType)}
+                    </dt>
+                    <dd className="text-xs font-medium tabular-nums text-foreground/85">
+                      {ownerSearchContextAnswerText(context.confirmedCount, context.validCount)}
+                    </dd>
+                  </div>
+                  <div
+                    className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"
+                    role="progressbar"
+                    aria-label={
+                      ownerSearchContextLabel(context.intentType) + ": " +
+                      ownerSearchContextAnswerText(context.confirmedCount, context.validCount)
+                    }
+                    aria-valuemin={0}
+                    aria-valuemax={context.validCount}
+                    aria-valuenow={context.confirmedCount}
+                  >
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{
+                        width: (
+                          context.validCount > 0
+                            ? Math.max(0, Math.min(100, 100 * context.confirmedCount / context.validCount))
+                            : 0
+                        ) + "%",
+                      }}
+                    />
+                  </div>
                 </div>
               ))}
             </dl>
           ) : (
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               {summary.visibility.count === 0
-                ? "이번 측정에서 확정 노출된 검색 상황이 없습니다."
-                : "검색 상황별 확정 결과를 확인할 수 없습니다."}
+                ? "이번 측정에서 확정 노출된 질문 유형이 없습니다."
+                : "질문 유형별 확정 결과를 확인할 수 없습니다."}
             </p>
           )}
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            확정 노출이 확인된 검색 상황 최대 3개만 표시합니다.
+            업체가 등장한 질문 유형 중 최대 3개만 표시합니다. 전체 결과는 상세 분석에서 볼 수 있습니다.
           </p>
         </div>
 

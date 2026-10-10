@@ -37,11 +37,15 @@ describe("dashboard owner productization layer", () => {
   it("keeps the ten-second summary to three KPIs and no more than two fact statements", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
     expect(dashboardSource).toContain('compactSummarySearchScopes(summary)');
-    expect(dashboardSource).toContain("어떤 검색에서 보였나요?");
+    expect(dashboardSource).toContain("어떤 질문에서 내 업체가 나왔나요?");
+    expect(dashboardSource).toContain("ownerSearchContextLabel(context.intentType)");
+    expect(dashboardSource).toContain("ownerSearchContextAnswerText(context.confirmedCount, context.validCount)");
     expect(dashboardSource).toContain('<h3 className="text-sm font-semibold">이번 측정에서 관찰된 다른 업체</h3>');
     expect(dashboardSource).toContain("summary.searchContexts.slice(0, 3)");
     expect(dashboardSource).toContain("summary.competitorCount");
     expect(dashboardSource).toContain("가장 자주 관찰된 업체");
+    expect(dashboardSource).toContain("질문 종류별 AI 답변에서 내 업체가 등장한 횟수입니다.");
+    expect(dashboardSource).not.toContain("{context.confirmedCount}/{context.validCount}");
     expect(dashboardSource).toContain("이번 측정에서 확인할 ");
     expect(dashboardSource).toContain("{item.recommendedCheck}");
     expect(dashboardSource).toContain("상세 분석 보기");
@@ -70,7 +74,9 @@ describe("dashboard owner productization layer", () => {
   it("preserves the prominent original owner hero and exactly two compact info cards", () => {
     expect(dashboardSource).toContain('aria-label="이번 측정의 검색 상황과 관찰 업체"');
     expect(dashboardSource).toContain('className="grid gap-3 md:grid-cols-2"');
-    expect(dashboardSource).toContain("이번 측정에서 확정 노출된 검색 상황이 없습니다.");
+    expect(dashboardSource).toContain("이번 측정에서 확정 노출된 질문 유형이 없습니다.");
+    expect(dashboardSource).toContain('role="progressbar"');
+    expect(dashboardSource).toContain("context.validCount > 0");
     expect(dashboardSource).toContain("이번 측정에서 관찰된 다른 업체");
     expect(dashboardSource).not.toContain("{item.evidence}");
     expect(dashboardSource).toContain('summary.heroVariant === "visible_top3"');
