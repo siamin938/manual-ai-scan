@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,17 +25,22 @@ type OrgContextValue = {
 const OrgContext = createContext<OrgContextValue | null>(null);
 
 export function useSession() {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      // Signing out in this or another tab must discard prior tenant/customer caches.
+      if (event === "SIGNED_OUT") queryClient.clear();
+      setSession(s);
+    });
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setReady(true);
     });
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [queryClient]);
 
   return { session, ready };
 }
