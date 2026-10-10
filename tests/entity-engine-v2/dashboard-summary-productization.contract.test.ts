@@ -22,6 +22,18 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('label="확정 상위 3곳 노출률"');
   });
 
+  it("restores the original prominent owner-facing question, exposure and Top3 headline", () => {
+    expect(dashboardSource).toContain('{summary.visibility.total}번 물어봤더니 내 업체는{" "}');
+    expect(dashboardSource).toContain('<strong className="text-primary">{summary.visibility.count}번</strong> 나왔고, 그중{" "}');
+    expect(dashboardSource).toContain('<strong className="text-primary">{summary.top3.count}번</strong>은{" "}');
+    expect(dashboardSource).toContain('<strong className="text-primary">상위 3곳</strong> 안에 나왔습니다.');
+    expect(dashboardSource).toContain('summary.heroVariant === "visible_no_top3"');
+    expect(dashboardSource).toContain('summary.heroVariant === "not_visible"');
+    expect(dashboardSource).toContain("이번 측정의 핵심 결과를 확인하고 있습니다.");
+    expect(dashboardSource).toContain('<BarChart3 aria-hidden="true" />');
+    expect(dashboardSource).not.toContain('String(summary.visibility.total) + "개 질문 중 "');
+  });
+
   it("keeps the ten-second summary to three KPIs and no more than two fact statements", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
     expect(dashboardSource).toContain('compactSummarySearchScopes(summary)');
