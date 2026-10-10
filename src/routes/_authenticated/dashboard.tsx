@@ -1161,7 +1161,13 @@ function DashboardPage() {
   };
 
   return (
-    <div className="print-page print-report space-y-8 lg:space-y-10">
+    <div
+      className={
+        view === "summary"
+          ? "print-page print-report space-y-6 lg:space-y-7"
+          : "print-page print-report space-y-8 lg:space-y-10"
+      }
+    >
       <div className="border-b border-border pb-6 lg:flex lg:items-end lg:justify-between lg:gap-8">
         <div className="max-w-3xl">
           <p className="report-kicker mb-3">
@@ -2389,11 +2395,7 @@ function DashboardSummary({
         <div className="rounded-xl border bg-card p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <Users className="size-4 text-muted-foreground" aria-hidden="true" />
-            <h3 className="text-sm font-semibold">
-              {summary.visibility.count === 0
-                ? "이번 측정에서 관찰된 다른 업체"
-                : "함께 관찰된 업체"}
-            </h3>
+            <h3 className="text-sm font-semibold">이번 측정에서 관찰된 다른 업체</h3>
           </div>
           <p className="mt-3 text-2xl font-semibold tabular-nums">
             {summary.competitorCount}곳

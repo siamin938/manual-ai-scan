@@ -38,7 +38,7 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
     expect(dashboardSource).toContain('compactSummarySearchScopes(summary)');
     expect(dashboardSource).toContain("어떤 검색에서 보였나요?");
-    expect(dashboardSource).toContain("함께 관찰된 업체");
+    expect(dashboardSource).toContain('<h3 className="text-sm font-semibold">이번 측정에서 관찰된 다른 업체</h3>');
     expect(dashboardSource).toContain("summary.searchContexts.slice(0, 3)");
     expect(dashboardSource).toContain("summary.competitorCount");
     expect(dashboardSource).toContain("가장 자주 관찰된 업체");
@@ -48,6 +48,23 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).not.toContain("이번 측정에서 대신 확인된 내용");
     expect(dashboardSource).not.toContain("같은 기준 검색에서 반복 확인된 다른 업체");
     expect(dashboardSource).not.toContain('SummaryKpiCard');
+  });
+
+  it("tightens spacing only in the ten-second summary without moving the detailed report", () => {
+    expect(dashboardSource).toContain(
+      'view === "summary"\n          ? "print-page print-report space-y-6 lg:space-y-7"\n          : "print-page print-report space-y-8 lg:space-y-10"',
+    );
+    expect(dashboardSource).toContain('border-b border-border pb-6');
+    expect(dashboardSource).toContain('function DashboardSummary({');
+    expect(dashboardSource).toContain('{summary.visibility.total}번 물어봤더니 내 업체는{" "}');
+  });
+
+  it("uses the factual other-business label for both visible and zero exposure runs", () => {
+    const summaryView = dashboardSource.split("function DashboardSummary({")[1]?.split("function BaselineBadge(")[0];
+    expect(summaryView).toContain('<h3 className="text-sm font-semibold">이번 측정에서 관찰된 다른 업체</h3>');
+    expect(summaryView).not.toContain(': "함께 관찰된 업체"');
+    expect(summaryView).toContain("{summary.competitorCount}곳");
+    expect(summaryView).toContain("{summary.topCompetitor.name}");
   });
 
   it("preserves the prominent original owner hero and exactly two compact info cards", () => {
