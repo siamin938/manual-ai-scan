@@ -167,7 +167,7 @@ describe("Action Opportunity v1.0 customer-style private preview", () => {
     expect(JSON.stringify({ dto, res })).toBe(before);
   });
 
-  it("is exclusively mounted in the internal admin route, never the customer dashboard", () => {
+  it("is mounted only in internal QA and the private administrator-only dashboard view", () => {
     const admin = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/internal-observation-pipeline.tsx"),
       "utf8",
@@ -194,7 +194,11 @@ describe("Action Opportunity v1.0 customer-style private preview", () => {
     expect(component).toContain("다른 관찰");
     expect(component).toContain('rel="noopener noreferrer"');
     expect(component).toContain("비공개 미리보기 · 고객에게 미노출");
-    expect(customer).not.toContain("ActionOpportunityV1CustomerPreview");
+    expect(customer).toContain("ActionOpportunityV1CustomerPreview");
+    expect(customer).toContain("getActionOpportunityV1DashboardPrivatePreview");
+    expect(customer).toContain("privateV1AdminAllowed && privateV1Selected && (");
+    expect(customer).toContain('className="no-print space-y-4');
+    expect(customer).toContain("canRenderDashboardPrivateV1Preview");
     expect(customer).not.toContain("buildCustomerPreviewV1Model");
   });
 });
