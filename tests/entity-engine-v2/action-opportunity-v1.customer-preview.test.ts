@@ -185,6 +185,10 @@ describe("Action Opportunity v1.0 customer-style private preview", () => {
     expect(admin).toContain("getPilotOpsAdminResult");
     expect(admin).toContain("actionOpportunityRunMismatch");
     expect(component).toContain("판단 근거 살펴보기");
+    expect(component).toContain('className="group/evidence mt-4 rounded-lg border"');
+    expect(component).toContain("group-open/evidence:hidden");
+    expect(component).toContain('className="group/extra rounded-xl border bg-background"');
+    expect(component).toContain("group-open/extra:hidden");
     expect(component).toContain("다른 관찰");
     expect(component).toContain('rel="noopener noreferrer"');
     expect(component).toContain("비공개 미리보기 · 고객에게 미노출");
