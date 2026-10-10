@@ -35,10 +35,10 @@ function OwnerOpportunityCard({
         <p className="mt-1 text-sm leading-6">{card.recommendedCheck}</p>
       </div>
 
-      <details className="group mt-4 rounded-lg border">
+      <details className="group/evidence mt-4 rounded-lg border">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-          <span className="group-open:hidden">판단 근거 살펴보기 ▾</span>
-          <span className="hidden group-open:inline">근거 접기 ▴</span>
+          <span className="group-open/evidence:hidden">판단 근거 살펴보기 ▾</span>
+          <span className="hidden group-open/evidence:inline">근거 접기 ▴</span>
         </summary>
         <div className="space-y-3 border-t px-4 py-3">
           <p className="text-sm leading-6 text-muted-foreground">{card.explanation}</p>
@@ -161,15 +161,15 @@ export function ActionOpportunityV1CustomerPreview({
       )}
 
       {model.additional.length > 0 && (
-        <details className="group rounded-xl border bg-background">
+        <details className="group/extra rounded-xl border bg-background">
           <summary className="cursor-pointer px-4 py-4 sm:px-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-sm font-semibold">
                 다른 관찰 {model.additional.length}개도 확인하기
               </span>
               <span className="text-sm text-muted-foreground">
-                <span className="group-open:hidden">펼쳐보기 ▾</span>
-                <span className="hidden group-open:inline">접기 ▴</span>
+                <span className="group-open/extra:hidden">펼쳐보기 ▾</span>
+                <span className="hidden group-open/extra:inline">접기 ▴</span>
               </span>
             </div>
           </summary>
