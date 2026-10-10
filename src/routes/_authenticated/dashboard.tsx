@@ -20,6 +20,10 @@ import {
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrg } from "@/lib/org";
+import { canViewDataAssetAdmin } from "@/lib/data-asset-admin.functions";
+import { getActionOpportunityV1DashboardPrivatePreview } from "@/lib/action-opportunity-v1.dashboard-private.functions";
+import { canRenderDashboardPrivateV1Preview } from "@/lib/action-opportunity-v1.dashboard-private-scope";
+import { ActionOpportunityV1CustomerPreview } from "@/components/action-opportunity-v1-customer-preview";
 import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS, normalizeQuestion } from "@/lib/question-suggestions";
 import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
@@ -780,9 +784,22 @@ function DashboardPage() {
   const { view: requestedView } = Route.useSearch();
   const view = requestedView ?? "summary";
   const navigate = useNavigate({ from: "/dashboard" });
-  const { activeOrgId } = useOrg();
+  const { activeOrgId, session } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
   const businessId = businesses.selectedBusinessId;
+  const [privatePreviewSelection, setPrivatePreviewSelection] = useState<{
+    orgId: string;
+    businessId: string;
+    runId: string;
+  } | null>(null);
+  const checkPrivateV1Admin = useServerFn(canViewDataAssetAdmin);
+  const privateV1AdminQuery = useQuery({
+    queryKey: ["can-view-data-asset-admin", session?.user.id],
+    enabled: !!session?.user.id,
+    retry: false,
+    staleTime: 0,
+    queryFn: () => checkPrivateV1Admin({ data: undefined }),
+  });
   const [expandedCompetitorBusinessId, setExpandedCompetitorBusinessId] = useState<string | null>(
     null,
   );
@@ -991,6 +1008,49 @@ function DashboardPage() {
   const result = query.data;
   const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
+  const privateV1AdminAllowed = privateV1AdminQuery.data?.allowed === true;
+  const privateV1Selected =
+    privatePreviewSelection !== null &&
+    privatePreviewSelection.orgId === activeOrgId &&
+    privatePreviewSelection.businessId === businessId &&
+    privatePreviewSelection.runId === dto?.scope.runId;
+  const fetchPrivateV1Preview = useServerFn(getActionOpportunityV1DashboardPrivatePreview);
+  const privateV1PreviewQuery = useQuery({
+    queryKey: [
+      "action-opportunity-v1-dashboard-private",
+      session?.user.id,
+      activeOrgId,
+      businessId,
+      dto?.scope.runId,
+    ],
+    enabled:
+      privateV1AdminAllowed &&
+      privateV1Selected &&
+      !!activeOrgId &&
+      !!businessId &&
+      !!dto?.scope.runId,
+    retry: false,
+    queryFn: () =>
+      fetchPrivateV1Preview({
+        data: {
+          orgId: activeOrgId as string,
+          businessId: businessId as string,
+        },
+      }),
+  });
+  const privateV1PreviewCurrent = canRenderDashboardPrivateV1Preview({
+    adminAllowed: privateV1AdminAllowed,
+    selected: privatePreviewSelection,
+    current: {
+      orgId: activeOrgId,
+      businessId,
+      runId: dto?.scope.runId ?? null,
+    },
+    preview:
+      privateV1PreviewQuery.data?.ok === true
+        ? privateV1PreviewQuery.data
+        : null,
+  });
   const isUnifiedDiagnostic =
     hasCompletedUnifiedRun ||
     (!!dto?.scope.questionSetName && isUnifiedDiagnosticSetName(dto.scope.questionSetName));
@@ -1131,6 +1191,30 @@ function DashboardPage() {
               </Button>
             </div>
           )}
+          {privateV1AdminAllowed && dto && model && activeOrgId && businessId && (
+            <Button
+              type="button"
+              variant={privateV1Selected ? "secondary" : "outline"}
+              className="w-full justify-center sm:w-auto"
+              aria-expanded={privateV1Selected}
+              aria-controls="dashboard-action-v1-private-preview"
+              onClick={() => {
+                setPrivatePreviewSelection(
+                  privateV1Selected
+                    ? null
+                    : {
+                        orgId: activeOrgId,
+                        businessId,
+                        runId: dto.scope.runId,
+                      },
+                );
+              }}
+            >
+              {privateV1Selected
+                ? "v1.0 비공개 검수 닫기"
+                : "관리자 전용 · v1.0 비공개 검수"}
+            </Button>
+          )}
           <div className="inline-flex w-full rounded-lg border bg-muted/40 p-1 sm:w-auto" aria-label="진단 보기 방식">
             <Button
               type="button"
@@ -1160,6 +1244,37 @@ function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {privateV1AdminAllowed && privateV1Selected && (
+        <section
+          id="dashboard-action-v1-private-preview"
+          className="no-print space-y-4 rounded-xl border border-dashed border-primary/40 bg-muted/20 p-4 sm:p-6"
+          aria-label="관리자 전용 Action Opportunity v1.0 비공개 검수"
+        >
+          <div className="space-y-1">
+            <p className="text-sm font-semibold">관리자 전용 · v1.0 고객 화면 구성 검수</p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              현재 선택한 업체의 고객용 카드 배치를 검수합니다. 기존 고객 대시보드와 인쇄·PDF에는 표시되지 않습니다.
+            </p>
+          </div>
+          {privateV1PreviewQuery.isPending || privateV1PreviewQuery.isFetching ? (
+            <p className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">
+              현재 대표 측정의 비공개 미리보기를 불러오는 중입니다.
+            </p>
+          ) : privateV1PreviewCurrent && privateV1PreviewQuery.data?.ok ? (
+            <ActionOpportunityV1CustomerPreview
+              model={privateV1PreviewQuery.data.model}
+              citedPages={privateV1PreviewQuery.data.citedPages}
+              citedPagesLoading={false}
+            />
+          ) : (
+            <p className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">
+              현재 업체·대표 측정에 맞는 비공개 검수 자료를 불러올 수 없습니다.
+              권한이나 Run이 변경됐다면 화면을 다시 확인해 주세요.
+            </p>
+          )}
+        </section>
+      )}
 
       {!businessId && !businesses.isLoading && (
         <Card>
