@@ -86,9 +86,9 @@ describe("Action Opportunity v1.0 dashboard private preview isolation", () => {
     expect(dashboard).toContain("getActionOpportunityV1DashboardPrivatePreview");
     expect(dashboard).toContain('queryKey: ["can-view-data-asset-admin", session?.user.id]');
     expect(dashboard).toContain("privateV1AdminAllowed && dto && model");
-    expect(dashboard).toContain('privateV1AdminAllowed && privateV1Selected && (');
+    expect(dashboard).toContain('open={privateV1AdminAllowed && privateV1Selected}');
     expect(dashboard).toContain("canRenderDashboardPrivateV1Preview");
-    expect(dashboard).toContain('className="no-print space-y-4');
+    expect(dashboard).toContain('className="no-print max-h-[90vh] overflow-y-auto sm:max-w-4xl"');
     expect(dashboard).toContain("ActionOpportunityV1CustomerPreview");
     expect(dashboard).toContain("privateV1PreviewQuery.data?.ok");
     expect(dashboard).toContain("session?.user.id,");

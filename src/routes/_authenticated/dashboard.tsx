@@ -2352,7 +2352,7 @@ function DashboardSummary({
 
       <div className="no-print flex flex-col items-center gap-2 pt-2 text-center">
         <Button type="button" size="lg" onClick={onShowDetail}>
-          근거와 확인 항목은 상세 분석에서 보기
+          상세 분석 보기
           <ArrowRight aria-hidden="true" />
         </Button>
         <p className="text-xs text-muted-foreground">

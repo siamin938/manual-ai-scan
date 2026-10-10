@@ -26,7 +26,7 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
     expect(dashboardSource).toContain('compactSummarySearchScopes(summary)');
     expect(dashboardSource).toContain("이번 측정에서 주목할 점");
-    expect(dashboardSource).toContain("근거와 확인 항목은 상세 분석에서 보기");
+    expect(dashboardSource).toContain("상세 분석 보기");
     expect(dashboardSource).not.toContain("이번 측정에서 대신 확인된 내용");
     expect(dashboardSource).not.toContain("같은 기준 검색에서 반복 확인된 다른 업체");
     expect(dashboardSource).not.toContain('SummaryKpiCard');

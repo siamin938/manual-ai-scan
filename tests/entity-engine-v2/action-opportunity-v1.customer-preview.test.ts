@@ -196,8 +196,8 @@ describe("Action Opportunity v1.0 customer-style private preview", () => {
     expect(component).toContain("비공개 미리보기 · 고객에게 미노출");
     expect(customer).toContain("ActionOpportunityV1CustomerPreview");
     expect(customer).toContain("getActionOpportunityV1DashboardPrivatePreview");
-    expect(customer).toContain("privateV1AdminAllowed && privateV1Selected && (");
-    expect(customer).toContain('className="no-print space-y-4');
+    expect(customer).toContain("open={privateV1AdminAllowed && privateV1Selected}");
+    expect(customer).toContain('className="no-print max-h-[90vh] overflow-y-auto sm:max-w-4xl"');
     expect(customer).toContain("canRenderDashboardPrivateV1Preview");
     expect(customer).not.toContain("buildCustomerPreviewV1Model");
   });
