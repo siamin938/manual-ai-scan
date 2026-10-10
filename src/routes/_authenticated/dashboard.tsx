@@ -7,7 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, Printer } from "lucide-react";
+import { ArrowRight, BarChart3, Printer } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -2268,7 +2268,10 @@ function DashboardSummary({
 }) {
   const scopes = compactSummarySearchScopes(summary);
   const observations = buildCompactSummaryInsights(summary);
-  const hasCount = summary.visibility.count !== null && summary.visibility.total !== null;
+  const hasHeroCounts =
+    summary.visibility.total !== null &&
+    summary.visibility.count !== null &&
+    summary.top3.count !== null;
   const pageLabel =
     summary.verifiedPageStatus === "pending"
       ? "확인 중"
@@ -2280,17 +2283,40 @@ function DashboardSummary({
 
   return (
     <section className="space-y-4" aria-label="사장님용 10초 요약">
-      <div className="rounded-xl border border-primary/25 bg-accent/55 p-5 sm:p-6">
-        <p className="text-xs font-semibold text-primary">이번 측정 한눈에 보기</p>
-        <h2 className="mt-2 text-xl font-semibold leading-8 sm:text-2xl">
-          {hasCount
-            ? String(summary.visibility.total) + "개 질문 중 " +
-              String(summary.visibility.count) + "개에서 내 업체가 확인됐습니다."
-            : "이번 측정의 확정 노출을 확인하고 있습니다."}
-        </h2>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          이번 진단 질문에서 내 업체로 확정된 AI 답변만 집계한 결과입니다.
-        </p>
+      <div className="rounded-xl border border-primary/20 bg-accent/70 px-5 py-6 sm:px-7 sm:py-7">
+        <div className="flex items-start gap-4">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <BarChart3 aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            {summary.heroVariant === "visible_top3" && hasHeroCounts ? (
+              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
+                {summary.visibility.total}번 물어봤더니 내 업체는{" "}
+                <strong className="text-primary">{summary.visibility.count}번</strong> 나왔고, 그중{" "}
+                <strong className="text-primary">{summary.top3.count}번</strong>은{" "}
+                <strong className="text-primary">상위 3곳</strong> 안에 나왔습니다.
+              </p>
+            ) : summary.heroVariant === "visible_no_top3" && hasHeroCounts ? (
+              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
+                {summary.visibility.total}번 중 내 업체는{" "}
+                <strong className="text-primary">{summary.visibility.count}번</strong> 나왔지만,{" "}
+                <strong className="text-primary">상위 3곳</strong>에서는 아직 확인되지 않았습니다.
+              </p>
+            ) : summary.heroVariant === "not_visible" && hasHeroCounts ? (
+              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
+                {summary.visibility.total}번 물어봤지만 이번 측정에서는{" "}
+                <strong className="text-primary">내 업체가 확인되지 않았습니다.</strong>
+              </p>
+            ) : (
+              <p className="text-xl font-semibold leading-8 sm:text-2xl">
+                이번 측정의 핵심 결과를 확인하고 있습니다.
+              </p>
+            )}
+            <p className="mt-2 text-sm text-muted-foreground">
+              이번 측정 기준 · AI 답변 {summary.visibility.total ?? "확인 중"}건 분석
+            </p>
+          </div>
+        </div>
         <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
           <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
             <p className="text-xs text-muted-foreground">확정 노출</p>
