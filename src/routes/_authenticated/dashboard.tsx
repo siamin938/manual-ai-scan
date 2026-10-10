@@ -2364,7 +2364,7 @@ function DashboardSummary({
         <div className="rounded-xl border bg-card p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <Search className="size-4 text-muted-foreground" aria-hidden="true" />
-            <h3 className="text-sm font-semibold">어떤 질문에서 내 업체가 나왔나요?</h3>
+            <h3 className="text-sm font-semibold">어떤 종류의 질문에서 내 업체가 나왔나요?</h3>
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
             질문 종류별 AI 답변에서 내 업체가 등장한 횟수입니다.

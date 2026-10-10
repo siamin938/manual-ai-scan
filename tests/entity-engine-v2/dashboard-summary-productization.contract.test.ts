@@ -37,7 +37,7 @@ describe("dashboard owner productization layer", () => {
   it("keeps the ten-second summary to three KPIs and no more than two fact statements", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
     expect(dashboardSource).toContain('compactSummarySearchScopes(summary)');
-    expect(dashboardSource).toContain("어떤 질문에서 내 업체가 나왔나요?");
+    expect(dashboardSource).toContain("어떤 종류의 질문에서 내 업체가 나왔나요?");
     expect(dashboardSource).toContain("ownerSearchContextLabel(context.intentType)");
     expect(dashboardSource).toContain("ownerSearchContextAnswerText(context.confirmedCount, context.validCount)");
     expect(dashboardSource).toContain('<h3 className="text-sm font-semibold">이번 측정에서 관찰된 다른 업체</h3>');
