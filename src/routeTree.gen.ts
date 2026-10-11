@@ -17,10 +17,10 @@ import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authentic
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDataAssetsRouteImport } from './routes/_authenticated/data-assets'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
-import { Route as AuthenticatedInternalObservationPipelineRouteImport } from './routes/_authenticated/internal-observation-pipeline'
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
 import { Route as AuthenticatedMeasurementCreditsRouteImport } from './routes/_authenticated/measurement-credits'
 import { Route as AuthenticatedPilotOpsRouteImport } from './routes/_authenticated/pilot-ops'
+import { Route as AuthenticatedInternalObservationPipelineRouteImport } from './routes/_authenticated/internal-observation-pipeline'
 import { Route as AuthenticatedProfileCoverageRouteImport } from './routes/_authenticated/profile-coverage'
 import { Route as AuthenticatedQuestionsRouteImport } from './routes/_authenticated/questions'
 import { Route as AuthenticatedExperimentsIndexRouteImport } from './routes/_authenticated/experiments.index'
@@ -69,12 +69,6 @@ const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedInternalObservationPipelineRoute =
-  AuthenticatedInternalObservationPipelineRouteImport.update({
-    id: '/internal-observation-pipeline',
-    path: '/internal-observation-pipeline',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedManualChecksRoute =
   AuthenticatedManualChecksRouteImport.update({
     id: '/manual-checks',
@@ -92,6 +86,12 @@ const AuthenticatedPilotOpsRoute = AuthenticatedPilotOpsRouteImport.update({
   path: '/pilot-ops',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedInternalObservationPipelineRoute =
+  AuthenticatedInternalObservationPipelineRouteImport.update({
+    id: '/internal-observation-pipeline',
+    path: '/internal-observation-pipeline',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedProfileCoverageRoute =
   AuthenticatedProfileCoverageRouteImport.update({
     id: '/profile-coverage',
@@ -146,10 +146,10 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/data-assets': typeof AuthenticatedDataAssetsRoute
   '/insights': typeof AuthenticatedInsightsRoute
-  '/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
   '/pilot-ops': typeof AuthenticatedPilotOpsRoute
+  '/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -167,10 +167,10 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/data-assets': typeof AuthenticatedDataAssetsRoute
   '/insights': typeof AuthenticatedInsightsRoute
-  '/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
   '/pilot-ops': typeof AuthenticatedPilotOpsRoute
+  '/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -190,10 +190,10 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/data-assets': typeof AuthenticatedDataAssetsRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
-  '/_authenticated/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
   '/_authenticated/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
   '/_authenticated/pilot-ops': typeof AuthenticatedPilotOpsRoute
+  '/_authenticated/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/_authenticated/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/_authenticated/questions': typeof AuthenticatedQuestionsRoute
   '/_authenticated/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -213,10 +213,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/data-assets'
     | '/insights'
-    | '/internal-observation-pipeline'
     | '/manual-checks'
     | '/measurement-credits'
     | '/pilot-ops'
+    | '/internal-observation-pipeline'
     | '/profile-coverage'
     | '/questions'
     | '/experiments/$experimentId'
@@ -234,10 +234,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/data-assets'
     | '/insights'
-    | '/internal-observation-pipeline'
     | '/manual-checks'
     | '/measurement-credits'
     | '/pilot-ops'
+    | '/internal-observation-pipeline'
     | '/profile-coverage'
     | '/questions'
     | '/experiments/$experimentId'
@@ -256,10 +256,10 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/data-assets'
     | '/_authenticated/insights'
-    | '/_authenticated/internal-observation-pipeline'
     | '/_authenticated/manual-checks'
     | '/_authenticated/measurement-credits'
     | '/_authenticated/pilot-ops'
+    | '/_authenticated/internal-observation-pipeline'
     | '/_authenticated/profile-coverage'
     | '/_authenticated/questions'
     | '/_authenticated/experiments/$experimentId'
@@ -335,13 +335,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInsightsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/internal-observation-pipeline': {
-      id: '/_authenticated/internal-observation-pipeline'
-      path: '/internal-observation-pipeline'
-      fullPath: '/internal-observation-pipeline'
-      preLoaderRoute: typeof AuthenticatedInternalObservationPipelineRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/manual-checks': {
       id: '/_authenticated/manual-checks'
       path: '/manual-checks'
@@ -361,6 +354,13 @@ declare module '@tanstack/react-router' {
       path: '/pilot-ops'
       fullPath: '/pilot-ops'
       preLoaderRoute: typeof AuthenticatedPilotOpsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/internal-observation-pipeline': {
+      id: '/_authenticated/internal-observation-pipeline'
+      path: '/internal-observation-pipeline'
+      fullPath: '/internal-observation-pipeline'
+      preLoaderRoute: typeof AuthenticatedInternalObservationPipelineRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/profile-coverage': {
@@ -427,10 +427,10 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDataAssetsRoute: typeof AuthenticatedDataAssetsRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
-  AuthenticatedInternalObservationPipelineRoute: typeof AuthenticatedInternalObservationPipelineRoute
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
   AuthenticatedMeasurementCreditsRoute: typeof AuthenticatedMeasurementCreditsRoute
   AuthenticatedPilotOpsRoute: typeof AuthenticatedPilotOpsRoute
+  AuthenticatedInternalObservationPipelineRoute: typeof AuthenticatedInternalObservationPipelineRoute
   AuthenticatedProfileCoverageRoute: typeof AuthenticatedProfileCoverageRoute
   AuthenticatedQuestionsRoute: typeof AuthenticatedQuestionsRoute
   AuthenticatedExperimentsExperimentIdRoute: typeof AuthenticatedExperimentsExperimentIdRoute
@@ -446,11 +446,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDataAssetsRoute: AuthenticatedDataAssetsRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
-  AuthenticatedInternalObservationPipelineRoute:
-    AuthenticatedInternalObservationPipelineRoute,
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
   AuthenticatedMeasurementCreditsRoute: AuthenticatedMeasurementCreditsRoute,
   AuthenticatedPilotOpsRoute: AuthenticatedPilotOpsRoute,
+  AuthenticatedInternalObservationPipelineRoute: AuthenticatedInternalObservationPipelineRoute,
   AuthenticatedProfileCoverageRoute: AuthenticatedProfileCoverageRoute,
   AuthenticatedQuestionsRoute: AuthenticatedQuestionsRoute,
   AuthenticatedExperimentsExperimentIdRoute:
