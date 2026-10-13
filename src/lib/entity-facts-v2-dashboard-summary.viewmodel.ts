@@ -65,6 +65,7 @@ export type EntityFactsV2DashboardSummaryViewModel = {
   verifiedPageCount: number | null;
   competitorCount: number;
   topCompetitor: { name: string; responseCount: number } | null;
+  topCompetitors: Array<{ name: string; responseCount: number; top3ResponseCount: number }>;
   searchContexts: DashboardSummarySearchContext[];
   searchScopes: DashboardSummarySearchScope[] | null;
   searchScopeObservation: DashboardSummarySearchScopeObservation | null;
@@ -128,8 +129,8 @@ function buildSearchScopeObservation(args: {
   }
 
   const headline =
-    `상세 검색 ${summary.custom.confirmedCount}/${summary.custom.validCount}에서는 확인됐지만, ` +
-    `기준 검색 ${summary.core.confirmedCount}/${summary.core.validCount}에서는 확인되지 않았습니다.`;
+    `상세 조건 검색 ${summary.custom.confirmedCount}/${summary.custom.validCount}에서는 확인됐지만, ` +
+    `넓은 범위 검색 ${summary.core.confirmedCount}/${summary.core.validCount}에서는 확인되지 않았습니다.`;
 
   let evidence: string | null = null;
   if (
@@ -137,8 +138,8 @@ function buildSearchScopeObservation(args: {
     args.broadSearchObservation.targetIndependentSourceResponseCount === 0
   ) {
     evidence = args.hasVerifiedOwnedDomain
-      ? "공식 홈페이지는 등록돼 있지만, 이번 기준 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다."
-      : "이번 기준 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다.";
+      ? "공식 홈페이지는 등록돼 있지만, 이번 넓은 범위 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다."
+      : "이번 넓은 범위 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다.";
   }
 
   return {
@@ -226,6 +227,21 @@ export function buildEntityFactsV2DashboardSummaryViewModel(args: {
       : null,
     competitorCount: model.metricCards.competitorCount,
     topCompetitor: model.recentSummary.topCompetitor,
+    topCompetitors: model.competitors.rows
+      .filter((row) => row.name.trim().length > 0 && row.responseCount > 0)
+      .slice()
+      .sort(
+        (a, b) =>
+          b.responseCount - a.responseCount ||
+          b.top3ResponseCount - a.top3ResponseCount ||
+          a.name.localeCompare(b.name, "ko"),
+      )
+      .slice(0, 3)
+      .map((row) => ({
+        name: row.name,
+        responseCount: row.responseCount,
+        top3ResponseCount: row.top3ResponseCount,
+      })),
     searchContexts,
     searchScopes,
     searchScopeObservation,

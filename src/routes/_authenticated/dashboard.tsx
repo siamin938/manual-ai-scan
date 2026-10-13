@@ -147,27 +147,29 @@ function unifiedLayerSummarySentence(summary: UnifiedDiagnosticLayerSummary): st
   const coreConfirmed = summary.core.confirmedCount;
 
   if (customConfirmed > 0 && coreConfirmed === 0) {
-    return "상세 검색에서는 확인됐지만, 더 넓은 기준 검색에서는 확인되지 않았습니다.";
+    return "상세 조건 검색에서는 확인됐지만, 넓은 범위 검색에서는 확인되지 않았습니다.";
   }
   if (customConfirmed === 0 && coreConfirmed > 0) {
-    return "더 넓은 기준 검색에서는 확인됐지만, 상세 검색에서는 확인되지 않았습니다.";
+    return "넓은 범위 검색에서는 확인됐지만, 상세 조건 검색에서는 확인되지 않았습니다.";
   }
   if (customConfirmed > 0 && coreConfirmed > 0) {
-    return "상세 검색과 더 넓은 기준 검색 모두에서 확정 노출이 확인됐습니다.";
+    return "상세 조건 검색과 넓은 범위 검색 모두에서 확정 노출이 확인됐습니다.";
   }
-  return "이번 측정에서는 상세 검색과 기준 검색 모두에서 확정 노출이 확인되지 않았습니다.";
+  return "이번 측정에서는 상세 조건 검색과 넓은 범위 검색 모두에서 확정 노출이 확인되지 않았습니다.";
 }
 
 function UnifiedDiagnosticLayerSummaryCard({
   summary,
   broadSearchObservation,
   hasVerifiedOwnedDomain,
+  broadQuestionExample,
 }: {
   summary: UnifiedDiagnosticLayerSummary;
   broadSearchObservation:
     | import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadBroadSearchObservationDTO
     | undefined;
   hasVerifiedOwnedDomain: boolean;
+  broadQuestionExample: string | null;
 }) {
   const hasUnresolved =
     summary.overall.unresolvedCount > 0 ||
@@ -180,7 +182,7 @@ function UnifiedDiagnosticLayerSummaryCard({
         <p className="report-kicker">SEARCH SCOPE</p>
         <CardTitle className="text-xl">검색 범위별 확정 노출</CardTitle>
         <p className="text-sm leading-6 text-muted-foreground">
-          같은 24문항 안에서 넓은 기준 검색과 상세 검색을 나눠 보여드립니다.
+          같은 24개 질문을 넓은 지역·주력 서비스 중심의 검색과 상세 지역·선택 조건 검색으로 나눠 보여드립니다.
         </p>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
@@ -192,12 +194,12 @@ function UnifiedDiagnosticLayerSummaryCard({
               note: "통합 24문항 전체",
             },
             {
-              label: "상세 검색 확정 노출",
+              label: "상세 조건 검색 확정 노출",
               metric: summary.custom,
               note: "상세 지역 · 선택 조건",
             },
             {
-              label: "기준 검색 확정 노출",
+              label: "넓은 범위 검색 확정 노출",
               metric: summary.core,
               note: "넓은 지역 · 주력 서비스",
             },
@@ -218,11 +220,30 @@ function UnifiedDiagnosticLayerSummaryCard({
         {broadSearchObservation && (
           <div className="space-y-3 border-t border-border pt-4">
             <div>
-              <p className="text-sm font-semibold">기준 검색에서 반복 관찰된 업체</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                넓은 기준 검색 {broadSearchObservation.validCount}문항에서 2회 이상 확인된
-                타업체입니다. 출처는 같은 기준 검색 답변에서 업체와 연결된 독립 웹 출처만
-                표시합니다.
+              <p className="text-base font-semibold">넓은 범위 검색에서도 반복 확인된 업체</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                넓은 범위 검색은 상세 지역을 좁히기 전에 광역 지역과 주력 서비스를 묻는
+                질문입니다. 이번 측정의 {broadSearchObservation.validCount}개 유효 답변에서
+                2회 이상 관찰된 다른 업체를 보여드립니다.
+              </p>
+              {broadQuestionExample && (
+                <p className="mt-2 text-sm leading-6">
+                  <span className="font-semibold">이번 측정의 질문 예시 · </span>
+                  “{broadQuestionExample}”
+                </p>
+              )}
+              {broadSearchObservation.repeatedCompetitors.length > 0 && (
+                <div className="mt-3 rounded-lg border bg-muted/20 px-3 py-3 text-sm leading-6">
+                  <p className="font-semibold">왜 눈여겨볼 만할까요?</p>
+                  <p className="mt-1 text-muted-foreground">
+                    상세 지역 조건을 좁히지 않은 질문에서도 여러 번 등장했기 때문에
+                    이번 측정에서 비교해 볼 만한 관찰 사례입니다. 다만 더 잘하는 업체이거나
+                    전체 AI 추천에서 우위에 있다는 의미는 아닙니다.
+                  </p>
+                </div>
+              )}
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                표에는 같은 넓은 범위 검색 답변에서 업체와 연결된 독립 웹 출처만 표시합니다.
               </p>
             </div>
 
@@ -230,7 +251,7 @@ function UnifiedDiagnosticLayerSummaryCard({
               <div>
                 <span className="font-medium">내 업체</span>
                 <span className="ml-2 tabular-nums">
-                  기준 검색 {broadSearchObservation.targetConfirmedCount}/
+                  넓은 범위 검색 {broadSearchObservation.targetConfirmedCount}/
                   {broadSearchObservation.validCount}
                 </span>
                 <span className="mx-1 text-muted-foreground">·</span>
@@ -243,14 +264,14 @@ function UnifiedDiagnosticLayerSummaryCard({
               {hasVerifiedOwnedDomain &&
                 broadSearchObservation.targetIndependentSourceResponseCount === 0 && (
                   <p className="text-muted-foreground">
-                    공식 홈페이지는 등록돼 있지만, 이번 기준 검색 답변에서는 내 업체와 독립 웹
+                    공식 홈페이지는 등록돼 있지만, 이번 넓은 범위 검색 답변에서는 내 업체와 독립 웹
                     출처 연결이 확인되지 않았습니다.
                   </p>
                 )}
               {!hasVerifiedOwnedDomain &&
                 broadSearchObservation.targetIndependentSourceResponseCount === 0 && (
                   <p className="text-muted-foreground">
-                    차보임에 등록된 공식 홈페이지가 없고, 이번 기준 검색에서도 내 업체와 독립 웹
+                    차보임에 등록된 공식 홈페이지가 없고, 이번 넓은 범위 검색에서도 내 업체와 독립 웹
                     출처 연결이 확인되지 않았습니다.
                   </p>
                 )}
@@ -302,14 +323,14 @@ function UnifiedDiagnosticLayerSummaryCard({
               </div>
             ) : (
               <p className="rounded-md border px-3 py-3 text-sm text-muted-foreground">
-                기준 검색에서 2회 이상 반복 관찰된 다른 업체가 없습니다.
+                넓은 범위 검색에서 2회 이상 반복 관찰된 다른 업체가 없습니다.
               </p>
             )}
 
             {broadSearchObservation.singleObservationCompetitors.length > 0 && (
               <details className="rounded-md border bg-muted/10">
                 <summary className="cursor-pointer px-3 py-3 text-sm font-medium">
-                  기준 검색에서 추가로 한 번 확인된 업체{" "}
+                  넓은 범위 검색에서 추가로 한 번 확인된 업체{" "}
                   {broadSearchObservation.singleObservationCompetitors.length}곳
                 </summary>
                 <div className="border-t px-3 py-3">
@@ -349,9 +370,9 @@ function UnifiedDiagnosticLayerSummaryCard({
 
             {broadSearchObservation.observedCompetitorCount > 0 && (
               <div className="space-y-2 rounded-md border px-3 py-3">
-                <p className="text-sm font-semibold">이번 기준 검색에서 확인된 공개 근거 패턴</p>
+                <p className="text-sm font-semibold">이번 넓은 범위 검색에서 확인된 공개 근거 패턴</p>
                 <p className="text-xs leading-5 text-muted-foreground">
-                  기준 검색에서 확인된 타업체 {broadSearchObservation.observedCompetitorCount}곳 중{" "}
+                  넓은 범위 검색에서 확인된 타업체 {broadSearchObservation.observedCompetitorCount}곳 중{" "}
                   {broadSearchObservation.independentWebLinkedCompetitorCount}곳에서 독립 웹
                   출처가 함께 연결됐습니다.
                   {broadSearchObservation.repeatedCompetitors.length > 0 && (
@@ -1073,6 +1094,16 @@ function DashboardPage() {
           overview: dto.overview,
         })
       : null;
+  // Reuse an actual broad-scope question from the current representative Run.
+  const broadQuestionIds = new Set(
+    dto?.questionLocations
+      ?.filter((question) => question.city === null)
+      .map((question) => question.questionId) ?? [],
+  );
+  const broadQuestionExample =
+    dto?.questionAreas.find(
+      (question) => broadQuestionIds.has(question.questionId) && question.validCount > 0,
+    )?.questionText ?? null;
 
   const linkedTargetSources =
     model?.sources.rows.filter(
@@ -1449,6 +1480,7 @@ function DashboardPage() {
             <UnifiedDiagnosticLayerSummaryCard
               summary={unifiedLayerSummary}
               broadSearchObservation={dto?.broadSearchObservation}
+              broadQuestionExample={broadQuestionExample}
               hasVerifiedOwnedDomain={verifiedFirstPartySourceTypes.includes("owned_domain")}
             />
           )}
@@ -1640,7 +1672,7 @@ function DashboardPage() {
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
                   {isUnifiedDiagnostic
-                    ? "상세 지역과 선택 조건이 반영된 상세 검색을 먼저 보여드리고, 넓은 기준 검색은 그다음에 표시합니다."
+                    ? "상세 지역과 선택 조건이 반영된 상세 조건 검색을 먼저 보여드리고, 넓은 범위 검색은 그다음에 표시합니다."
                     : "노출이 확정되지 않았거나, 일부만 확인됐거나, 대상 동일성 확인이 더 필요한 질문입니다."}
                 </p>
                 {weakQuestionRows.length === 0 ? (
@@ -1663,8 +1695,8 @@ function DashboardPage() {
                           {isUnifiedDiagnostic && (
                             <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
                               {questionUsesDetailedLocation(q.questionText, dto.business.city)
-                                ? "상세 검색"
-                                : "기준 검색"}
+                                ? "상세 조건 검색"
+                                : "넓은 범위 검색"}
                             </Badge>
                           )}
                         </div>
@@ -2334,7 +2366,7 @@ function DashboardSummary({
           </div>
           <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
             <p className="text-xs text-muted-foreground">
-              {scopes ? "기준 검색" : "상위 3곳 확정"}
+              {scopes ? "넓은 범위 검색" : "상위 3곳 확정"}
             </p>
             <p className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
               {scopes
@@ -2344,7 +2376,7 @@ function DashboardSummary({
           </div>
           <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
             <p className="text-xs text-muted-foreground">
-              {scopes ? "맞춤 검색" : "내 업체 관련 페이지"}
+              {scopes ? "상세 조건 검색" : "내 업체 관련 페이지"}
             </p>
             <p className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
               {scopes
@@ -2353,9 +2385,14 @@ function DashboardSummary({
             </p>
           </div>
         </div>
-        {!scopes && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            이번 측정은 기준·맞춤 검색을 안전하게 분리할 수 없어 다른 확정 지표를 표시합니다.
+        {scopes ? (
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            넓은 범위 검색은 광역 지역·주력 서비스를 묻는 8개 질문,
+            상세 조건 검색은 상세 지역·선택 조건을 반영한 16개 질문입니다.
+          </p>
+        ) : (
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            이번 측정은 넓은 범위·상세 조건 검색을 안전하게 분리할 수 없어 다른 확정 지표를 표시합니다.
           </p>
         )}
       </div>
@@ -2421,29 +2458,89 @@ function DashboardSummary({
         <div className="rounded-xl border bg-card p-4 sm:p-5">
           <div className="flex items-center gap-2">
             <Users className="size-4 text-muted-foreground" aria-hidden="true" />
-            <h3 className="text-sm font-semibold">이번 측정에서 관찰된 다른 업체</h3>
+            <h3 className="text-base font-semibold">이번 측정에서 관찰된 다른 업체</h3>
           </div>
-          <p className="mt-3 text-2xl font-semibold tabular-nums">
-            {summary.competitorCount}곳
-          </p>
-          {summary.topCompetitor ? (
-            <div className="mt-2 space-y-0.5">
-              <p className="text-xs text-muted-foreground">가장 자주 관찰된 업체</p>
-              <p className="text-sm font-semibold break-words">{summary.topCompetitor.name}</p>
-              <p className="text-xs leading-5 text-muted-foreground">
-                {summary.visibility.total !== null
-                  ? String(summary.visibility.total) + "개 답변 중 "
-                  : "이번 측정에서 "}
-                {summary.topCompetitor.responseCount}개에서 관찰
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+            <p className="text-3xl font-bold tabular-nums sm:text-4xl">
+              {summary.competitorCount}곳
+            </p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              이번 AI 답변에서 확인된 다른 업체 수
+            </p>
+          </div>
+          {summary.topCompetitors.length > 0 ? (
+            <div className="mt-4 border-t pt-3">
+              <p className="text-sm font-semibold">답변에서 자주 관찰된 업체</p>
+              <ol className="mt-3 space-y-3">
+                {summary.topCompetitors.map((competitor) => (
+                  <li key={competitor.name}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 break-words text-sm font-medium">
+                        {competitor.name}
+                      </span>
+                      <span className="shrink-0 text-sm font-semibold tabular-nums">
+                        {competitor.responseCount}
+                        {summary.visibility.total !== null
+                          ? "/" + summary.visibility.total
+                          : "개 답변"}
+                      </span>
+                    </div>
+                    {summary.visibility.total !== null && summary.visibility.total > 0 && (
+                      <div
+                        className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"
+                        role="progressbar"
+                        aria-label={
+                          competitor.name + ": " + competitor.responseCount +
+                          "/" + summary.visibility.total + "개 답변에서 관찰"
+                        }
+                        aria-valuemin={0}
+                        aria-valuemax={summary.visibility.total}
+                        aria-valuenow={competitor.responseCount}
+                      >
+                        <div
+                          className="h-full rounded-full bg-primary"
+                          style={{
+                            width: percentOf(competitor.responseCount, summary.visibility.total) + "%",
+                          }}
+                        />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                관찰 횟수 기준 최대 3곳입니다. 업체의 실제 경쟁력이나
+                AI 추천 순위를 뜻하지 않습니다.
               </p>
             </div>
           ) : (
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
               {summary.competitorCount === 0
                 ? "이번 측정에서 별도로 확인된 다른 업체가 없습니다."
-                : "반복 관찰 업체의 상세 정보는 상세 분석에서 확인할 수 있습니다."}
+                : "업체별 관찰 횟수를 확인할 수 없습니다. 상세 분석에서 확인해 주세요."}
             </p>
           )}
+        </div>
+      </div>
+
+      <div
+        className="rounded-xl border bg-card px-4 py-4 sm:px-5"
+        aria-label="이번 측정의 인용 페이지 검증"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">내 업체 관련성이 확인된 인용 페이지</h3>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {summary.verifiedPageStatus === "complete" && summary.verifiedPageCount !== null
+                ? "이번 측정에서 인용된 페이지 중 업체·지점 관련성이 확인된 페이지입니다. 인터넷 전체의 업체 페이지 수는 아닙니다."
+                : summary.verifiedPageStatus === "pending"
+                  ? "이번 측정에서 인용된 페이지의 업체 관련성을 확인 중입니다."
+                  : summary.verifiedPageStatus === "not_verified"
+                    ? "이번 측정에서는 인용 페이지 관련성 검증이 실행되지 않았습니다."
+                    : "현재 인용 페이지 관련성 결과를 확인할 수 없습니다."}
+            </p>
+          </div>
+          <p className="shrink-0 text-2xl font-semibold tabular-nums">{pageLabel}</p>
         </div>
       </div>
 
@@ -2765,7 +2862,7 @@ function ComparisonCard({
             <div>
               <p className="text-sm font-semibold">검색 범위별 변화</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                같은 통합 24문항에서 상세 검색과 기준 검색의 확정 노출만 따로 비교합니다.
+                같은 통합 24문항에서 상세 조건 검색과 넓은 범위 검색의 확정 노출만 따로 비교합니다.
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">

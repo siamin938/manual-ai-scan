@@ -14,8 +14,8 @@ const stylesSource = readFileSync(
 
 describe("dashboard owner productization layer", () => {
   it("keeps Top3 as supporting context while promoting broad-search visibility in the summary KPIs", () => {
-    expect(dashboardSource).toContain('scopes ? "기준 검색" : "상위 3곳 확정"');
-    expect(dashboardSource).toContain('scopes ? "맞춤 검색" : "내 업체 관련 페이지"');
+    expect(dashboardSource).toContain('scopes ? "넓은 범위 검색" : "상위 3곳 확정"');
+    expect(dashboardSource).toContain('scopes ? "상세 조건 검색" : "내 업체 관련 페이지"');
     expect(dashboardSource).toContain("compactSummaryCount(summary.visibility)");
     expect(dashboardSource).not.toContain('label="상위 3곳에 나온 답변"');
     expect(dashboardSource).toContain("summary.top3");
@@ -40,10 +40,14 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("어떤 종류의 질문에서 내 업체가 나왔나요?");
     expect(dashboardSource).toContain("ownerSearchContextLabel(context.intentType)");
     expect(dashboardSource).toContain("ownerSearchContextAnswerText(context.confirmedCount, context.validCount)");
-    expect(dashboardSource).toContain('<h3 className="text-sm font-semibold">이번 측정에서 관찰된 다른 업체</h3>');
+    expect(dashboardSource).toContain('<h3 className="text-base font-semibold">이번 측정에서 관찰된 다른 업체</h3>');
     expect(dashboardSource).toContain("summary.searchContexts.slice(0, 3)");
     expect(dashboardSource).toContain("summary.competitorCount");
-    expect(dashboardSource).toContain("가장 자주 관찰된 업체");
+    expect(dashboardSource).toContain("답변에서 자주 관찰된 업체");
+    expect(dashboardSource).toContain("summary.topCompetitors.map(");
+    expect(dashboardSource).toContain("내 업체 관련성이 확인된 인용 페이지");
+    expect(dashboardSource).toContain("summary.verifiedPageStatus");
+    expect(dashboardSource).toContain("broadQuestionExample={broadQuestionExample}");
     expect(dashboardSource).toContain("질문 종류별 AI 답변에서 내 업체가 등장한 횟수입니다.");
     expect(dashboardSource).not.toContain("{context.confirmedCount}/{context.validCount}");
     expect(dashboardSource).toContain("이번 측정에서 확인할 ");
@@ -65,13 +69,13 @@ describe("dashboard owner productization layer", () => {
 
   it("uses the factual other-business label for both visible and zero exposure runs", () => {
     const summaryView = dashboardSource.split("function DashboardSummary({")[1]?.split("function BaselineBadge(")[0];
-    expect(summaryView).toContain('<h3 className="text-sm font-semibold">이번 측정에서 관찰된 다른 업체</h3>');
+    expect(summaryView).toContain('<h3 className="text-base font-semibold">이번 측정에서 관찰된 다른 업체</h3>');
     expect(summaryView).not.toContain(': "함께 관찰된 업체"');
     expect(summaryView).toContain("{summary.competitorCount}곳");
-    expect(summaryView).toContain("{summary.topCompetitor.name}");
+    expect(summaryView).toContain("summary.topCompetitors.map(");
   });
 
-  it("preserves the prominent original owner hero and exactly two compact info cards", () => {
+  it("preserves the original hero and two side-by-side question and competitor cards", () => {
     expect(dashboardSource).toContain('aria-label="이번 측정의 검색 상황과 관찰 업체"');
     expect(dashboardSource).toContain('className="grid gap-3 md:grid-cols-2"');
     expect(dashboardSource).toContain("이번 측정에서 확정 노출된 질문 유형이 없습니다.");

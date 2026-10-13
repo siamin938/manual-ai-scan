@@ -72,6 +72,9 @@ describe("10-second owner summary uses only existing exact observation values", 
     expect(compactSummarySearchScopes(s)?.custom.validCount).toBe(16);
     const items = buildCompactSummaryInsights(s);
     expect(items.map(x => x.id)).toEqual(["broad_scope_gap", "verified_page_zero"]);
+    expect(items[0]?.title).toBe("넓은 범위 검색에서 확정 노출 0건");
+    expect(items[0]?.evidence).toContain("넓은 범위 검색 0/8");
+    expect(items[0]?.evidence).toContain("상세 조건 검색 3/16");
     expect(items[0]?.evidence).toContain("0/8");
     expect(items[0]?.evidence).toContain("3/16");
     expect(items[0]?.recommendedCheck).toContain("서비스 가능 지역");

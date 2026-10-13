@@ -38,7 +38,19 @@ function makeModel(): EntityFactsV2DashboardCutoverModel {
       citationSourceCount: 0,
       observedSourceCount: 0,
     },
-    competitors: { heading: "AI 답변에서 함께 관찰된 업체", rows: [], legacyBadgesAvailable: false },
+    competitors: {
+      heading: "AI 답변에서 함께 관찰된 업체",
+      rows: [
+        {
+          name: "함께 나온 업체",
+          responseCount: 7,
+          questionCount: 7,
+          top3ResponseCount: 2,
+          label: "함께 관찰",
+        },
+      ],
+      legacyBadgesAvailable: false,
+    },
     weakQuestions: { heading: "내 업체가 잘 보이지 않거나 추가 확인이 필요한 검색 질문", rows: [] },
     citationSources: { heading: "AI 답변에서 실제 인용된 출처", rows: [] },
     targetReferenceSources: { heading: "AI 답변 내 근접 단서", rows: [] },
@@ -111,6 +123,9 @@ describe("entity facts v2 dashboard summary view model", () => {
     expect(summary.verifiedPageCount).toBe(4);
     expect(summary.competitorCount).toBe(1);
     expect(summary.topCompetitor).toEqual({ name: "함께 나온 업체", responseCount: 7 });
+    expect(summary.topCompetitors).toEqual([
+      { name: "함께 나온 업체", responseCount: 7, top3ResponseCount: 2 },
+    ]);
     expect(summary.searchContexts.map((item) => [item.intentType, item.confirmedCount])).toEqual([
       ["service", 2],
       ["discovery", 1],
@@ -125,6 +140,41 @@ describe("entity facts v2 dashboard summary view model", () => {
     expect(summary.opportunities).toHaveLength(2);
     expect(summary.verifiedPages).toHaveLength(3);
     expect(JSON.stringify(summary)).not.toContain("현대 엑스티어");
+  });
+
+  it("sorts three recorded competitors deterministically without inventing a new score", () => {
+    const model = makeModel();
+    model.metricCards.competitorCount = 5;
+    model.competitors.rows = [
+      { name: "둘째 업체", responseCount: 3, questionCount: 3, top3ResponseCount: 1, label: "함께 관찰" },
+      { name: "첫째 업체", responseCount: 6, questionCount: 6, top3ResponseCount: 3, label: "함께 관찰" },
+      { name: "넷째 업체", responseCount: 1, questionCount: 1, top3ResponseCount: 1, label: "함께 관찰" },
+      { name: "셋째 업체", responseCount: 3, questionCount: 3, top3ResponseCount: 2, label: "함께 관찰" },
+      { name: "다섯째 업체", responseCount: 1, questionCount: 1, top3ResponseCount: 0, label: "함께 관찰" },
+    ];
+    const summary = buildEntityFactsV2DashboardSummaryViewModel({
+      model, unifiedLayerSummary: null, actionOpportunityModel: null,
+    });
+    expect(summary.topCompetitors.map(({ name, responseCount }) => [name, responseCount])).toEqual([
+      ["첫째 업체", 6],
+      ["셋째 업체", 3],
+      ["둘째 업체", 3],
+    ]);
+    expect(summary.competitorCount).toBe(5);
+    expect(summary.visibility.count).toBe(4);
+    expect(summary.verifiedPageCount).toBe(4);
+  });
+
+  it("does not invent a ranked competitor list when there are no actual rows", () => {
+    const model = makeModel();
+    model.metricCards.competitorCount = 0;
+    model.competitors.rows = [];
+    model.recentSummary.topCompetitor = null;
+    const summary = buildEntityFactsV2DashboardSummaryViewModel({
+      model, unifiedLayerSummary: null, actionOpportunityModel: null,
+    });
+    expect(summary.topCompetitors).toEqual([]);
+    expect(summary.competitorCount).toBe(0);
   });
 
   it("surfaces a non-causal observation when detail search is visible but broad search is not", () => {
@@ -179,9 +229,9 @@ describe("entity facts v2 dashboard summary view model", () => {
 
     expect(summary.searchScopeObservation).toEqual({
       kind: "custom_without_core",
-      headline: "상세 검색 14/16에서는 확인됐지만, 기준 검색 0/8에서는 확인되지 않았습니다.",
+      headline: "상세 조건 검색 14/16에서는 확인됐지만, 넓은 범위 검색 0/8에서는 확인되지 않았습니다.",
       evidence:
-        "공식 홈페이지는 등록돼 있지만, 이번 기준 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다.",
+        "공식 홈페이지는 등록돼 있지만, 이번 넓은 범위 검색 답변에서는 내 업체와 독립 웹 출처 연결이 확인되지 않았습니다.",
       repeatedCompetitors: [
         {
           name: "퀀텀팩토리 서초점",

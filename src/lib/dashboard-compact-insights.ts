@@ -99,9 +99,9 @@ export function buildCompactSummaryInsights(
   ) {
     items.push({
       id: "broad_scope_gap",
-      title: "넓은 지역 기준 검색에서 확정 노출 0건",
+      title: "넓은 범위 검색에서 확정 노출 0건",
       evidence:
-        "기준 검색 0/8 · 맞춤 검색 " +
+        "넓은 범위 검색 0/8 · 상세 조건 검색 " +
         scopes.custom.confirmedCount + "/16",
       recommendedCheck: "공식 홈페이지와 공개 프로필의 서비스 가능 지역·주력 서비스가 일관되게 안내되는지 확인해 보세요.",
     });
