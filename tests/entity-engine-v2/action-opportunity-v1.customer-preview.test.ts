@@ -173,7 +173,7 @@ describe("Action Opportunity v1.0 customer-style private preview", () => {
       "utf8",
     );
     const cardStart = component.indexOf("function OwnerOpportunityCard({");
-    const evidenceStart = component.indexOf('<details className="group/evidence', cardStart);
+    const evidenceStart = component.indexOf('className="group/evidence mt-4 rounded-lg border"', cardStart);
     const observation = component.indexOf("{card.observation}", cardStart);
     const recommendedCheck = component.indexOf("{card.recommendedCheck}", cardStart);
     const explanation = component.indexOf("{card.explanation}", cardStart);
