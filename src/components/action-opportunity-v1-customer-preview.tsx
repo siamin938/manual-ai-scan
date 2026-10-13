@@ -22,14 +22,11 @@ function OwnerOpportunityCard({
         <Badge variant={card.priority === "high" ? "default" : "secondary"}>
           {card.priority === "high" ? "먼저 확인" : "함께 확인"}
         </Badge>
-        <p className="text-xs text-muted-foreground">이번 측정에서 확인할 내용</p>
       </div>
 
       <h3 className="mt-3 text-base font-semibold leading-7 sm:text-lg">
         {card.title}
       </h3>
-      <p className="mt-2 text-sm leading-6 text-foreground/85">{card.observation}</p>
-
       <div className="mt-4 rounded-lg bg-muted/45 px-4 py-3">
         <p className="text-sm font-semibold">무엇을 확인하면 될까요?</p>
         <p className="mt-1 text-sm leading-6">{card.recommendedCheck}</p>
@@ -41,6 +38,12 @@ function OwnerOpportunityCard({
           <span className="hidden group-open/evidence:inline">근거 접기 ▴</span>
         </summary>
         <div className="space-y-3 border-t px-4 py-3">
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-muted-foreground">
+              이번 측정에서 확인된 사실
+            </p>
+            <p className="text-sm leading-6">{card.observation}</p>
+          </div>
           <p className="text-sm leading-6 text-muted-foreground">{card.explanation}</p>
           <dl className="space-y-2">
             {card.evidence.map((row, index) => (
@@ -53,9 +56,9 @@ function OwnerOpportunityCard({
 
           {card.id === "competitor_source_difference" && (
             <div className="space-y-2 border-t pt-3">
-              <p className="text-sm font-semibold">실제로 인용된 페이지</p>
+              <p className="text-sm font-semibold">다른 업체와 연결된 인용 페이지</p>
               {citedPagesLoading ? (
-                <p className="text-sm text-muted-foreground">인용된 페이지를 확인 중입니다.</p>
+                <p className="text-sm text-muted-foreground">다른 업체와 연결된 인용 페이지를 확인 중입니다.</p>
               ) : citedPages.length > 0 ? (
                 citedPages.map((page, index) => (
                   <a
@@ -65,16 +68,18 @@ function OwnerOpportunityCard({
                     rel="noopener noreferrer"
                     className="block break-all text-sm leading-6 text-primary underline underline-offset-2"
                   >
-                    인용 페이지 열기 · {page.entityName} ↗
+                    다른 업체 인용 페이지 열기 · {page.entityName} ↗
                   </a>
                 ))
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  연결 관계가 구분되는 인용 페이지 링크를 확인하지 못했습니다.
+                  다른 업체와 연결된 열람 가능한 인용 페이지를 확인하지 못했습니다.
                 </p>
               )}
               <p className="text-xs leading-5 text-muted-foreground">
-                AI 답변에서 인용된 페이지입니다. 해당 업체의 공식 페이지이거나 노출 원인으로 확인된 것은 아닙니다.
+                실제 AI 답변에서 다른 업체와 함께 관찰된 인용 페이지입니다.
+                내 업체 관련성 확인된 인용 페이지 수에는 포함하지 않습니다.
+                해당 업체의 공식 페이지이거나 AI 노출 원인으로 확인된 것은 아닙니다.
               </p>
             </div>
           )}
@@ -112,9 +117,8 @@ export function ActionOpportunityV1CustomerPreview({
           이번 측정에서 확인해 볼 내용
         </h2>
         <p className="mt-2 text-sm leading-6 text-foreground/80">
-          AI 답변 {model.answeredCount}개 중 내 업체가 나온 답변은{" "}
-          <strong className="text-foreground">{model.confirmedCount}개</strong>입니다.
-          실제로 관찰된 차이를 바탕으로 확인할 항목을 정리했습니다.
+          기존 AI 노출 요약을 바탕으로 실제로 확인할 작업과 판단 근거를 보여드립니다.
+          새로운 측정 결과나 개선 효과의 순위가 아닙니다.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div className="rounded-lg border bg-card/90 p-3">
@@ -130,10 +134,14 @@ export function ActionOpportunityV1CustomerPreview({
             </p>
           </div>
           <div className="col-span-2 rounded-lg border bg-card/90 p-3 sm:col-span-1">
-            <p className="text-xs text-muted-foreground">내 업체 관련 페이지</p>
+            <p className="text-xs text-muted-foreground">내 업체 관련성 확인된 인용 페이지</p>
             <p className="mt-1 text-lg font-semibold">{model.relatedPageLabel}</p>
           </div>
         </div>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          관련 페이지 수는 이번 측정에서 내 업체·지점과의 관련성을 확인한 인용 페이지만 셉니다.
+          다른 업체와 연결된 인용 페이지는 포함하지 않습니다.
+        </p>
       </div>
 
       {model.primary.length === 0 ? (
@@ -146,7 +154,8 @@ export function ActionOpportunityV1CustomerPreview({
           <div>
             <h3 className="text-lg font-semibold">먼저 확인해 보세요</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              가장 먼저 읽을 두 가지 관찰을 보여드립니다. 개선 효과의 순위는 아닙니다.
+              관찰 수치를 반복하기보다 확인할 작업을 먼저 보여드립니다.
+              관찰 사실과 근거는 각 항목에서 펼쳐볼 수 있습니다. 개선 효과의 순위는 아닙니다.
             </p>
           </div>
           {model.primary.map((card) => (

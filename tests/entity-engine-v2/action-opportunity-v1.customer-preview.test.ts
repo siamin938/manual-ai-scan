@@ -167,6 +167,52 @@ describe("Action Opportunity v1.0 customer-style private preview", () => {
     expect(JSON.stringify({ dto, res })).toBe(before);
   });
 
+  it("makes the private preview action-first while keeping all observed facts in expandable evidence", () => {
+    const component = readFileSync(
+      resolve(process.cwd(), "src/components/action-opportunity-v1-customer-preview.tsx"),
+      "utf8",
+    );
+    const cardStart = component.indexOf("function OwnerOpportunityCard({");
+    const evidenceStart = component.indexOf('<details className="group/evidence', cardStart);
+    const observation = component.indexOf("{card.observation}", cardStart);
+    const recommendedCheck = component.indexOf("{card.recommendedCheck}", cardStart);
+    const explanation = component.indexOf("{card.explanation}", cardStart);
+    expect(cardStart).toBeGreaterThanOrEqual(0);
+    expect(evidenceStart).toBeGreaterThan(cardStart);
+    expect(recommendedCheck).toBeGreaterThan(cardStart);
+    expect(recommendedCheck).toBeLessThan(evidenceStart);
+    expect(observation).toBeGreaterThan(evidenceStart);
+    expect(explanation).toBeGreaterThan(observation);
+    expect(component).toContain("이번 측정에서 확인된 사실");
+    expect(component).toContain("기존 AI 노출 요약을 바탕으로");
+    expect(component).toContain("새로운 측정 결과나 개선 효과의 순위가 아닙니다.");
+  });
+
+  it("clearly separates target-verified citation counts from competitor citation links", () => {
+    const component = readFileSync(
+      resolve(process.cwd(), "src/components/action-opportunity-v1-customer-preview.tsx"),
+      "utf8",
+    );
+    expect(component).toContain("내 업체 관련성 확인된 인용 페이지");
+    expect(component).toContain("다른 업체와 연결된 인용 페이지");
+    expect(component).toContain("다른 업체 인용 페이지 열기 · {page.entityName} ↗");
+    expect(component).toContain("내 업체 관련성 확인된 인용 페이지 수에는 포함하지 않습니다.");
+    expect(component).not.toContain(
+      '<p className="text-xs text-muted-foreground">내 업체 관련 페이지</p>',
+    );
+    expect(component).not.toContain(
+      '<p className="text-sm font-semibold">실제로 인용된 페이지</p>',
+    );
+    expect(component).toContain("rel=\"noopener noreferrer\"");
+    expect(component).toContain("비공개 미리보기 · 고객에게 미노출");
+    const pending = input();
+    pending.verifiedTargetCitationPageStatus = "pending";
+    expect(buildCustomerPreviewV1Model(pending, result())?.relatedPageLabel).toBe("확인 중");
+    const unavailable = input();
+    unavailable.verifiedTargetCitationPageStatus = "not_verified";
+    expect(buildCustomerPreviewV1Model(unavailable, result())?.relatedPageLabel).toBe("미검증");
+  });
+
   it("is mounted only in internal QA and the private administrator-only dashboard view", () => {
     const admin = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/internal-observation-pipeline.tsx"),
