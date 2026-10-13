@@ -1,4 +1,7 @@
+import { useState } from "react";
 import type { CustomerPreviewV1Card, CustomerPreviewV1Model } from "@/lib/action-opportunity-v1.customer-preview.viewmodel";
+import type { CompactSummaryInsight } from "@/lib/dashboard-compact-insights";
+import { matchOwnerSummaryInsightToV1Card } from "@/lib/action-opportunity-v1.owner-summary-bridge";
 import { formatSeoul } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 
@@ -11,11 +14,15 @@ function OwnerOpportunityCard({
   card,
   citedPages,
   citedPagesLoading,
+  expandEvidence = false,
 }: {
   card: CustomerPreviewV1Card;
   citedPages: readonly CustomerPreviewV1SourceLink[];
   citedPagesLoading: boolean;
+  expandEvidence?: boolean;
 }) {
+  const [evidenceOpen, setEvidenceOpen] = useState(expandEvidence);
+
   return (
     <article className="rounded-xl border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -32,7 +39,11 @@ function OwnerOpportunityCard({
         <p className="mt-1 text-sm leading-6">{card.recommendedCheck}</p>
       </div>
 
-      <details className="group/evidence mt-4 rounded-lg border">
+      <details
+        className="group/evidence mt-4 rounded-lg border"
+        open={evidenceOpen}
+        onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}
+      >
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
           <span className="group-open/evidence:hidden">판단 근거 살펴보기 ▾</span>
           <span className="hidden group-open/evidence:inline">근거 접기 ▴</span>
@@ -98,11 +109,22 @@ export function ActionOpportunityV1CustomerPreview({
   model,
   citedPages,
   citedPagesLoading,
+  focusedInsight = null,
 }: {
   model: CustomerPreviewV1Model;
   citedPages: readonly CustomerPreviewV1SourceLink[];
   citedPagesLoading: boolean;
+  focusedInsight?: CompactSummaryInsight | null;
 }) {
+  const focusedCard = matchOwnerSummaryInsightToV1Card({
+    insight: focusedInsight,
+    preview: model,
+    expectedRunId: model.runId,
+  });
+  const otherCards = focusedCard
+    ? [...model.primary, ...model.additional].filter((item) => item.id !== focusedCard.id)
+    : [];
+
   return (
     <section className="space-y-5" aria-label="고객용 Action Opportunity 비공개 미리보기">
       <div className="rounded-xl border border-primary/25 bg-accent/65 px-4 py-5 sm:px-6">
@@ -144,6 +166,47 @@ export function ActionOpportunityV1CustomerPreview({
         </p>
       </div>
 
+      {focusedCard ? (
+        <div className="space-y-3" aria-label="핵심 요약에서 선택한 항목의 비공개 근거">
+          <div>
+            <h3 className="text-lg font-semibold">핵심 요약에서 선택한 항목의 근거</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              현재 대표 측정의 관찰 수치가 v1.0 확인 항목과 일치하는 경우에만
+              근거를 연결해 보여드립니다. 개선 효과나 원인을 단정하지 않습니다.
+            </p>
+          </div>
+          <OwnerOpportunityCard
+            card={focusedCard}
+            citedPages={citedPages}
+            citedPagesLoading={citedPagesLoading}
+            expandEvidence
+          />
+          {otherCards.length > 0 && (
+            <details className="rounded-xl border bg-background">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
+                다른 관찰 {otherCards.length}개도 확인하기 ▾
+              </summary>
+              <div className="space-y-3 border-t p-3 sm:p-4">
+                {otherCards.map((card) => (
+                  <OwnerOpportunityCard
+                    key={card.id}
+                    card={card}
+                    citedPages={citedPages}
+                    citedPagesLoading={citedPagesLoading}
+                  />
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      ) : (
+        <>
+          {focusedInsight && (
+            <div className="rounded-lg border px-4 py-3 text-sm leading-6 text-muted-foreground">
+              선택한 핵심 요약 항목과 v1.0의 상세 근거가 정확히 일치하지 않아
+              해당 근거를 연결하지 않았습니다. 아래 일반 비공개 검수 결과를 확인해 주세요.
+            </div>
+          )}
       {model.primary.length === 0 ? (
         <div className="rounded-xl border p-5 text-sm leading-6 text-muted-foreground">
           현재 측정 결과에서 근거가 충분한 확인 항목이 없습니다.
@@ -193,6 +256,10 @@ export function ActionOpportunityV1CustomerPreview({
             ))}
           </div>
         </details>
+      )}
+
+
+        </>
       )}
 
       <p className="text-xs leading-5 text-muted-foreground">{model.disclaimer}</p>

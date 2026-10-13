@@ -213,6 +213,25 @@ describe("Action Opportunity v1.0 customer-style private preview", () => {
     expect(buildCustomerPreviewV1Model(unavailable, result())?.relatedPageLabel).toBe("미검증");
   });
 
+  it("keeps the original full QA view while allowing strictly matched owner-summary focus", () => {
+    const component = readFileSync(
+      resolve(process.cwd(), "src/components/action-opportunity-v1-customer-preview.tsx"),
+      "utf8",
+    );
+    expect(component).toContain("matchOwnerSummaryInsightToV1Card({");
+    expect(component).toContain("focusedInsight?: CompactSummaryInsight | null");
+    expect(component).toContain("focusedCard ? (");
+    expect(component).toContain("open={evidenceOpen}");
+    expect(component).toContain("onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}");
+    expect(component).toContain("expandEvidence");
+    expect(component).toContain("선택한 핵심 요약 항목과 v1.0의 상세 근거가 정확히 일치하지 않아");
+    expect(component).toContain("model.primary.map((card) => (");
+    expect(component).toContain("model.additional.map((card) => (");
+    expect(component).toContain("다른 관찰 {otherCards.length}개도 확인하기");
+    expect(component).toContain('model.runId');
+    expect(component).toContain('비공개 미리보기 · 고객에게 미노출');
+  });
+
   it("is mounted only in internal QA and the private administrator-only dashboard view", () => {
     const admin = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/internal-observation-pipeline.tsx"),

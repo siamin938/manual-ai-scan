@@ -24,6 +24,7 @@ import { canViewDataAssetAdmin } from "@/lib/data-asset-admin.functions";
 import { getActionOpportunityV1DashboardPrivatePreview } from "@/lib/action-opportunity-v1.dashboard-private.functions";
 import { canRenderDashboardPrivateV1Preview } from "@/lib/action-opportunity-v1.dashboard-private-scope";
 import { ActionOpportunityV1CustomerPreview } from "@/components/action-opportunity-v1-customer-preview";
+import { v1RuleForOwnerSummaryInsight } from "@/lib/action-opportunity-v1.owner-summary-bridge";
 import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS, normalizeQuestion } from "@/lib/question-suggestions";
 import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
@@ -60,6 +61,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   buildCompactSummaryInsights,
+  type CompactSummaryInsight,
   compactSummaryCount,
   compactSummarySearchScopes,
   ownerSearchContextLabel,
@@ -821,6 +823,7 @@ function DashboardPage() {
     businessId: string;
     runId: string;
   } | null>(null);
+  const [privateV1Focus, setPrivateV1Focus] = useState<CompactSummaryInsight | null>(null);
   const checkPrivateV1Admin = useServerFn(canViewDataAssetAdmin);
   const privateV1AdminQuery = useQuery({
     queryKey: ["can-view-data-asset-admin", session?.user.id],
@@ -1244,6 +1247,7 @@ function DashboardPage() {
               aria-expanded={privateV1Selected}
               aria-controls="dashboard-action-v1-private-preview"
               onClick={() => {
+                setPrivateV1Focus(null);
                 setPrivatePreviewSelection(
                   privateV1Selected
                     ? null
@@ -1293,7 +1297,10 @@ function DashboardPage() {
       <Dialog
         open={privateV1AdminAllowed && privateV1Selected}
         onOpenChange={(open) => {
-          if (!open) setPrivatePreviewSelection(null);
+          if (!open) {
+            setPrivatePreviewSelection(null);
+            setPrivateV1Focus(null);
+          }
         }}
       >
         <DialogContent
@@ -1314,6 +1321,7 @@ function DashboardPage() {
           ) : privateV1PreviewCurrent && privateV1PreviewQuery.data?.ok ? (
             <ActionOpportunityV1CustomerPreview
               model={privateV1PreviewQuery.data.model}
+              focusedInsight={privateV1Focus}
               citedPages={privateV1PreviewQuery.data.citedPages}
               citedPagesLoading={false}
             />
@@ -1434,6 +1442,18 @@ function DashboardPage() {
         <DashboardSummary
           summary={summaryModel}
           onShowDetail={() => setDashboardView("detail")}
+          onReviewEvidence={
+            privateV1AdminAllowed && activeOrgId && businessId && dto
+              ? (insight) => {
+                  setPrivateV1Focus(insight);
+                  setPrivatePreviewSelection({
+                    orgId: activeOrgId,
+                    businessId,
+                    runId: dto.scope.runId,
+                  });
+                }
+              : undefined
+          }
         />
       )}
 
@@ -2302,9 +2322,11 @@ function DashboardPage() {
 function DashboardSummary({
   summary,
   onShowDetail,
+  onReviewEvidence,
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
   onShowDetail: () => void;
+  onReviewEvidence?: (insight: CompactSummaryInsight) => void;
 }) {
   const scopes = compactSummarySearchScopes(summary);
   const observations = buildCompactSummaryInsights(summary);
@@ -2563,6 +2585,17 @@ function DashboardSummary({
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
                   {item.recommendedCheck}
                 </p>
+                {onReviewEvidence && v1RuleForOwnerSummaryInsight(item.id) && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="no-print mt-1 h-auto px-0 py-1 text-xs"
+                    onClick={() => onReviewEvidence(item)}
+                  >
+                    관리자 검수 · 이 항목의 근거 미리보기
+                  </Button>
+                )}
               </div>
             ))}
           </div>

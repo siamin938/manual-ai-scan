@@ -91,6 +91,11 @@ describe("Action Opportunity v1.0 dashboard private preview isolation", () => {
     expect(dashboard).toContain('className="no-print max-h-[90vh] overflow-y-auto sm:max-w-4xl"');
     expect(dashboard).toContain("ActionOpportunityV1CustomerPreview");
     expect(dashboard).toContain("privateV1PreviewQuery.data?.ok");
+    expect(dashboard).toContain("privateV1AdminAllowed && activeOrgId && businessId && dto");
+    expect(dashboard).toContain("setPrivateV1Focus(insight)");
+    expect(dashboard).toContain("focusedInsight={privateV1Focus}");
+    expect(dashboard).toContain("v1RuleForOwnerSummaryInsight(item.id)");
+    expect(dashboard).toContain('className="no-print mt-1 h-auto px-0 py-1 text-xs"');
     expect(dashboard).toContain("session?.user.id,");
     expect(dashboard).toContain("dto?.scope.runId,");
     expect(dashboard).not.toContain("publicV1Enabled");
