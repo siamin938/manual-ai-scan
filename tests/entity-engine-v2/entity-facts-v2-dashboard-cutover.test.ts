@@ -578,8 +578,8 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain("waitForDashboardRetry");
     expect(dashboardSource).toContain("questionUsesDetailedLocation");
     expect(dashboardSource).toContain("unifiedWeakQuestionPriority");
-    expect(dashboardSource).toContain("상세 검색");
-    expect(dashboardSource).toContain("기준 검색");
+    expect(dashboardSource).toContain("상세 조건 검색");
+    expect(dashboardSource).toContain("넓은 범위 검색");
     expect(dashboardSource).toContain("confirmedRatio");
     expect(dashboardSource).toContain(
       "AI에 자주 관찰되는 업체들은 어떤 출처와 함께 보일까요?",
@@ -589,13 +589,13 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).not.toContain("unified-diagnostic-question-layers");
     expect(dashboardSource).toContain("검색 범위별 확정 노출");
     expect(dashboardSource).toContain("전체 확정 노출");
-    expect(dashboardSource).toContain("상세 검색 확정 노출");
-    expect(dashboardSource).toContain("기준 검색 확정 노출");
+    expect(dashboardSource).toContain("상세 조건 검색 확정 노출");
+    expect(dashboardSource).toContain("넓은 범위 검색 확정 노출");
     expect(dashboardSource).toContain(
       "이번 통합 24문항 측정에서 확정된 응답 기준입니다.",
     );
     expect(dashboardSource).toContain(
-      "상세 검색에서는 확인됐지만, 더 넓은 기준 검색에서는 확인되지 않았습니다.",
+      "상세 조건 검색에서는 확인됐지만, 넓은 범위 검색에서는 확인되지 않았습니다.",
     );
     expect(dashboardSource).toContain("!isUnifiedDiagnostic");
     expect(dashboardSource).toContain(
