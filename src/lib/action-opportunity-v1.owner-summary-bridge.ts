@@ -33,7 +33,8 @@ function evidenceValue(card: CustomerPreviewV1Card, label: string): string | nul
 }
 
 function containsExactRatio(text: string, expected: string | null): boolean {
-  return expected !== null && (text.match(/\d+\/\d+/gu) ?? []).includes(expected);
+  const observed: string[] = text.match(/\d+\/\d+/gu) ?? [];
+  return expected !== null && observed.includes(expected);
 }
 
 function hasMatchingEvidence(

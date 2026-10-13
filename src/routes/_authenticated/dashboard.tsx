@@ -2326,7 +2326,7 @@ function DashboardSummary({
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
   onShowDetail: () => void;
-  onReviewEvidence?: (insight: CompactSummaryInsight) => void;
+  onReviewEvidence?: ((insight: CompactSummaryInsight) => void) | undefined;
 }) {
   const scopes = compactSummarySearchScopes(summary);
   const observations = buildCompactSummaryInsights(summary);
