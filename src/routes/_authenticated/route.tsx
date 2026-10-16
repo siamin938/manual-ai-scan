@@ -30,6 +30,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 const NAV = [
   { to: "/dashboard", label: "AI 노출 진단" },
+  { to: "/measurement-history", label: "측정 기록" },
   { to: "/businesses", label: "업체 등록" },
   { to: "/questions", label: "질문 생성" },
   { to: "/runs", label: "측정하기" },

@@ -1,0 +1,157 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  canDisplayHistoryDetail,
+  getHistorySearchScopes,
+  isValidHistoryAggregate,
+  MEASUREMENT_HISTORY_PAGE_SIZE,
+} from "../../src/lib/measurement-history.model";
+import {
+  ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
+  ENTITY_FACTS_V2_READ_ENGINE_VERSION,
+  ENTITY_FACTS_V2_READ_FACT_VERSION,
+  type EntityFactsV2ReadGatewayDTO,
+} from "../../src/lib/entity-facts-v2-read-gateway.types";
+
+const runId = "11111111-1111-4111-8111-111111111111";
+const orgId = "22222222-2222-4222-8222-222222222222";
+const businessId = "33333333-3333-4333-8333-333333333333";
+
+function aggregate() {
+  return {
+    version: "0.1", factsVersion: "0.3", contractOk: true, contractIssues: [],
+    overview: {
+      validCount: 24, confirmedMentionCount: 3, unresolvedTargetCount: 0,
+      visibilityLowerBoundPct: 12.5, visibilityUpperBoundPct: 12.5,
+      confirmedTop3Count: 3, top3UncertainCount: 0,
+      top3LowerBoundPct: 12.5, top3UpperBoundPct: 12.5,
+      measurementCount: 24, invalidCount: 0, questionCount: 24,
+      coveredQuestionCount: 3, unresolvedQuestionCount: 0,
+      missingQuestionCount: 21, sourcePartialMeasurementCount: 0,
+    },
+    questionGroups: [{
+      intentType: "local", questionCount: 24, validCount: 24,
+      confirmedMentionCount: 3, unresolvedTargetCount: 0,
+      visibilityLowerBoundPct: 12.5, visibilityUpperBoundPct: 12.5,
+      confirmedTop3Count: 3, top3UncertainCount: 0,
+      top3LowerBoundPct: 12.5, top3UpperBoundPct: 12.5,
+    }],
+    questionAreas: [{
+      questionId: "44444444-4444-4444-8444-444444444444",
+      questionText: "안산에서 PPF 맡길 곳 추천해줘", intentType: "local",
+      status: "covered", validCount: 1, confirmedMentionCount: 1,
+      unresolvedTargetCount: 0,
+      visibilityLowerBoundPct: 100, visibilityUpperBoundPct: 100,
+      confirmedTop3Count: 1, top3UncertainCount: 0,
+      top3LowerBoundPct: 100, top3UpperBoundPct: 100,
+    }],
+    competitors: [{
+      canonicalKey: "auto:원투랩핑", responseCount: 4, questionCount: 4,
+      intentCount: 2, top3ResponseCount: 3,
+    }],
+    targetSources: [], qualityFlagCounts: {},
+  };
+}
+
+function storage() {
+  return {
+    requestedRunId: runId, sourceRunId: runId,
+    factVersion: ENTITY_FACTS_V2_READ_FACT_VERSION,
+    aggregateVersion: ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
+    engineVersion: ENTITY_FACTS_V2_READ_ENGINE_VERSION,
+    measurementCount: 24, validMeasurementCount: 24,
+    contractOk: true, aggregate: aggregate(),
+  };
+}
+
+describe("Read-only measurement history", () => {
+  it("accepts a validated snapshot only when it belongs to the selected Run", () => {
+    expect(isValidHistoryAggregate(storage())).toBe(true);
+    expect(isValidHistoryAggregate({ ...storage(), requestedRunId: orgId })).toBe(false);
+    expect(isValidHistoryAggregate({ ...storage(), sourceRunId: businessId })).toBe(false);
+    expect(isValidHistoryAggregate({ ...storage(), engineVersion: "stale" })).toBe(false);
+    expect(isValidHistoryAggregate({ ...storage(), validMeasurementCount: 23 })).toBe(false);
+    expect(isValidHistoryAggregate({ ...storage(), contractOk: false })).toBe(false);
+    expect(isValidHistoryAggregate({ ...storage(), aggregate: { overview: { validCount: 24 } } })).toBe(false);
+  });
+
+  it("refuses stale cross-org, cross-business or cross-Run cached results", () => {
+    const report = {
+      business: { id: businessId }, scope: { runId },
+    } as EntityFactsV2ReadGatewayDTO;
+    const response = { ok: true as const, data: { orgId, businessId, runId, report } };
+    const selected = { orgId, businessId, runId, response };
+    expect(canDisplayHistoryDetail(selected)).toBe(true);
+    expect(canDisplayHistoryDetail({ ...selected, orgId: "another-org" })).toBe(false);
+    expect(canDisplayHistoryDetail({ ...selected, businessId: "another-business" })).toBe(false);
+    expect(canDisplayHistoryDetail({ ...selected, runId: "another-run" })).toBe(false);
+    expect(canDisplayHistoryDetail({ ...selected, response: undefined })).toBe(false);
+    expect(canDisplayHistoryDetail({
+      ...selected, response: { ok: true, data: { ...response.data, report: {
+        ...report, scope: { runId: "another-run" },
+      } } },
+    })).toBe(false);
+  });
+
+  it("only presents 8+16 scope labels when all the selected Run questions match", () => {
+    const questionAreas = Array.from({ length: 24 }, (_, i) => ({
+      questionId: `question-${i}`, validCount: 1,
+      confirmedMentionCount: i >= 8 && i < 11 ? 1 : 0,
+    }));
+    const questionLocations = questionAreas.map((row, i) => ({
+      questionId: row.questionId, city: i < 8 ? null : "안산",
+    }));
+    const report = { questionAreas, questionLocations } as EntityFactsV2ReadGatewayDTO;
+    expect(getHistorySearchScopes(report)).toEqual({
+      core: { valid: 8, confirmed: 0 },
+      custom: { valid: 16, confirmed: 3 },
+    });
+    expect(getHistorySearchScopes({ ...report, questionLocations: undefined })).toBeNull();
+    expect(getHistorySearchScopes({ ...report, questionLocations: questionLocations.slice(1) })).toBeNull();
+    expect(getHistorySearchScopes({
+      ...report, questionLocations: [...questionLocations.slice(0, 23), { questionId: "wrong", city: null }],
+    })).toBeNull();
+    expect(getHistorySearchScopes({
+      ...report, questionLocations: questionLocations.map((row, i) => i === 0 ? { ...row, city: "안산" } : row),
+    })).toBeNull();
+  });
+
+  it("preserves the existing live dashboard and protects member-only archive reads", () => {
+    const at = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
+    const wrapper = at("src/lib/measurement-history.functions.ts");
+    const server = at("src/lib/measurement-history.server.ts");
+    const history = at("src/routes/_authenticated/measurement-history.tsx");
+    const nav = at("src/routes/_authenticated/route.tsx");
+    const dashboard = at("src/routes/_authenticated/dashboard.tsx");
+
+    expect(MEASUREMENT_HISTORY_PAGE_SIZE).toBe(20);
+    expect(wrapper.match(/\.middleware\(\[requireSupabaseAuth\]\)/gu)).toHaveLength(2);
+    expect(wrapper.match(/\.from\("organization_members"\)/gu)).toHaveLength(2);
+    expect(wrapper.match(/\.eq\("user_id", context.userId\)/gu)).toHaveLength(2);
+    expect(wrapper.indexOf('if (!membership) return { ok: false, error: "FORBIDDEN" };')).toBeLessThan(
+      wrapper.indexOf("fetchMeasurementHistoryCatalog(data)"),
+    );
+    expect(wrapper).toContain("fetchMeasurementHistoryDetail(data)");
+    expect(server).toContain('.eq("org_id", orgId).eq("business_id", businessId)');
+    expect(server).toContain('.eq("source_run_id", runId)');
+    expect(server).toContain('.eq("status", "completed")');
+    expect(server).toContain('isValidHistoryAggregate(');
+    expect(server).toContain("buildEntityFactsV2ReadGatewayFromSnapshot(");
+    expect(server).toContain("confirmedIds.size === report.overview.confirmedMentionCount");
+    for (const file of [wrapper, server, history]) {
+      for (const forbidden of [".insert(", ".update(", ".delete(", ".upsert(", "enqueueRun(", "debitCredit(", "startMeasurement("]) {
+        expect(file).not.toContain(forbidden);
+      }
+    }
+    expect(history).toContain("canDisplayHistoryDetail({");
+    expect(history).toContain("getHistorySearchScopes(report)");
+    expect(history).toContain("report.questionAreas.map((area)");
+    expect(history).toContain("report.competitors.map((row");
+    expect(history).toContain("report.citationSources");
+    expect(history).toContain('verified === "complete"');
+    expect(nav).toContain('{ to: "/measurement-history", label: "측정 기록" }');
+    expect(dashboard).toContain("getEntityFactsV2ReadGateway");
+    expect(dashboard).not.toContain("getMeasurementHistoryDetail");
+  });
+});
