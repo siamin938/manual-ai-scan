@@ -18,6 +18,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDataAssetsRouteImport } from './routes/_authenticated/data-assets'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
+import { Route as AuthenticatedMeasurementHistoryRouteImport } from './routes/_authenticated/measurement-history'
 import { Route as AuthenticatedMeasurementCreditsRouteImport } from './routes/_authenticated/measurement-credits'
 import { Route as AuthenticatedPilotOpsRouteImport } from './routes/_authenticated/pilot-ops'
 import { Route as AuthenticatedInternalObservationPipelineRouteImport } from './routes/_authenticated/internal-observation-pipeline'
@@ -73,6 +74,12 @@ const AuthenticatedManualChecksRoute =
   AuthenticatedManualChecksRouteImport.update({
     id: '/manual-checks',
     path: '/manual-checks',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMeasurementHistoryRoute =
+  AuthenticatedMeasurementHistoryRouteImport.update({
+    id: '/measurement-history',
+    path: '/measurement-history',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedMeasurementCreditsRoute =
@@ -147,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/data-assets': typeof AuthenticatedDataAssetsRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
+  '/measurement-history': typeof AuthenticatedMeasurementHistoryRoute
   '/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
   '/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
@@ -168,6 +176,7 @@ export interface FileRoutesByTo {
   '/data-assets': typeof AuthenticatedDataAssetsRoute
   '/insights': typeof AuthenticatedInsightsRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
+  '/measurement-history': typeof AuthenticatedMeasurementHistoryRoute
   '/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
   '/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
@@ -191,6 +200,7 @@ export interface FileRoutesById {
   '/_authenticated/data-assets': typeof AuthenticatedDataAssetsRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
+  '/_authenticated/measurement-history': typeof AuthenticatedMeasurementHistoryRoute
   '/_authenticated/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
   '/_authenticated/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/_authenticated/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/data-assets'
     | '/insights'
     | '/manual-checks'
+    | '/measurement-history'
     | '/measurement-credits'
     | '/pilot-ops'
     | '/internal-observation-pipeline'
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/data-assets'
     | '/insights'
     | '/manual-checks'
+    | '/measurement-history'
     | '/measurement-credits'
     | '/pilot-ops'
     | '/internal-observation-pipeline'
@@ -257,6 +269,7 @@ export interface FileRouteTypes {
     | '/_authenticated/data-assets'
     | '/_authenticated/insights'
     | '/_authenticated/manual-checks'
+    | '/_authenticated/measurement-history'
     | '/_authenticated/measurement-credits'
     | '/_authenticated/pilot-ops'
     | '/_authenticated/internal-observation-pipeline'
@@ -340,6 +353,13 @@ declare module '@tanstack/react-router' {
       path: '/manual-checks'
       fullPath: '/manual-checks'
       preLoaderRoute: typeof AuthenticatedManualChecksRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/measurement-history': {
+      id: '/_authenticated/measurement-history'
+      path: '/measurement-history'
+      fullPath: '/measurement-history'
+      preLoaderRoute: typeof AuthenticatedMeasurementHistoryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/measurement-credits': {
@@ -428,6 +448,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDataAssetsRoute: typeof AuthenticatedDataAssetsRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
+  AuthenticatedMeasurementHistoryRoute: typeof AuthenticatedMeasurementHistoryRoute
   AuthenticatedMeasurementCreditsRoute: typeof AuthenticatedMeasurementCreditsRoute
   AuthenticatedPilotOpsRoute: typeof AuthenticatedPilotOpsRoute
   AuthenticatedInternalObservationPipelineRoute: typeof AuthenticatedInternalObservationPipelineRoute
@@ -447,6 +468,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDataAssetsRoute: AuthenticatedDataAssetsRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
+  AuthenticatedMeasurementHistoryRoute: AuthenticatedMeasurementHistoryRoute,
   AuthenticatedMeasurementCreditsRoute: AuthenticatedMeasurementCreditsRoute,
   AuthenticatedPilotOpsRoute: AuthenticatedPilotOpsRoute,
   AuthenticatedInternalObservationPipelineRoute: AuthenticatedInternalObservationPipelineRoute,
