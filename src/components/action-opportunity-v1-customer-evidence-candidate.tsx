@@ -1,16 +1,24 @@
+import { useState } from "react";
 import type { V1CustomerEvidenceCandidate } from "@/lib/action-opportunity-v1.customer-release-candidate";
 
 /**
- * Unmounted release candidate. Do not wire into customer routes until explicit
- * release approval and real authenticated browser QA.
+ * Release-candidate component: mounted only inside the admin-only QA wrapper.
+ * Never mount on customer routes without approval and real browser QA.
  */
 export function ActionOpportunityV1CustomerEvidenceCandidate({
   detail,
+  expandEvidence = false,
 }: {
   detail: V1CustomerEvidenceCandidate;
+  expandEvidence?: boolean | undefined;
 }) {
+  const [evidenceOpen, setEvidenceOpen] = useState(expandEvidence);
   return (
-    <details className="group rounded-lg border bg-card">
+    <details
+      className="group rounded-lg border bg-card"
+      open={evidenceOpen}
+      onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}
+    >
       <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
         <span className="group-open:hidden">판단 근거 자세히 보기 ▾</span>
         <span className="hidden group-open:inline">판단 근거 접기 ▴</span>
