@@ -9,10 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
+import { fetchMemberHistoryCatalog } from "@/lib/measurement-history.member-catalog";
 import { listMeasurementHistory, getMeasurementHistoryDetail } from "@/lib/measurement-history.functions";
 import {
   canDisplayHistoryDetail,
   isMatchingHistoryCatalog,
+  enrichMemberHistoryCatalog,
   getHistorySearchScopes,
   type MeasurementHistoryRunItem,
 } from "@/lib/measurement-history.model";
@@ -265,27 +267,46 @@ function MeasurementHistoryPage() {
   const [choice, setChoice] = useState<{ orgId: string; businessId: string; runId: string } | null>(null);
   const page = pageState?.orgId === activeOrgId && pageState.businessId === businessId
     ? pageState.page : 0;
-  const fetchCatalog = useServerFn(listMeasurementHistory);
+  // List dates using the signed-in user's own session and the existing RLS
+  // policy. A failed server-function transport must never hide paid history.
   const catalogQuery = useQuery({
-    queryKey: ["measurement-history-catalog", session?.user.id, activeOrgId, businessId, page],
+    queryKey: ["measurement-history-member-dates", session?.user.id, activeOrgId, businessId, page],
     enabled: !!session?.user.id && !!activeOrgId && !!businessId,
     retry: 1,
+    queryFn: () => fetchMemberHistoryCatalog({
+      orgId: activeOrgId as string, businessId: businessId as string, page,
+    }),
+  });
+
+  // A server-only query can enrich those SAME Run IDs with confirmed counts,
+  // but is deliberately not part of the date index's availability gate.
+  const fetchCatalog = useServerFn(listMeasurementHistory);
+  const serverCatalogQuery = useQuery({
+    queryKey: ["measurement-history-snapshot-enrichment", session?.user.id, activeOrgId, businessId, page],
+    enabled: isMatchingHistoryCatalog({
+      orgId: activeOrgId, businessId, page, response: catalogQuery.data,
+    }) && catalogQuery.data?.ok === true && catalogQuery.data.data.runs.length > 0,
+    retry: false,
     queryFn: () => fetchCatalog({ data: {
       orgId: activeOrgId as string, businessId: businessId as string, page,
     } }),
   });
+  const mergedCatalog = enrichMemberHistoryCatalog(catalogQuery.data, serverCatalogQuery.data);
   const catalog = isMatchingHistoryCatalog({
     orgId: activeOrgId,
     businessId,
     page,
-    response: catalogQuery.data,
-  }) && catalogQuery.data?.ok
-    ? catalogQuery.data.data : null;
+    response: mergedCatalog,
+  }) && mergedCatalog?.ok
+    ? mergedCatalog.data : null;
+
+  // Don't run a privileged historical-detail request until the user chooses
+  // an archived Run. The index is still useful when the server is unavailable.
   const selectedRunId = choice?.orgId === activeOrgId &&
     choice.businessId === businessId &&
     catalog?.runs.some((item) => item.runId === choice.runId)
     ? choice.runId
-    : catalog?.runs[0]?.runId ?? null;
+    : null;
   const fetchDetail = useServerFn(getMeasurementHistoryDetail);
   const detailQuery = useQuery({
     queryKey: ["measurement-history-detail", session?.user.id, activeOrgId, businessId, selectedRunId],
@@ -361,8 +382,10 @@ function MeasurementHistoryPage() {
                 <div className="space-y-3">
                   {catalog.snapshotStatus === "temporarily_unavailable" && (
                     <p className="rounded-lg border px-3 py-2 text-sm text-muted-foreground" role="status">
-                      완료된 측정 날짜는 확인됐습니다. 일부 결과의 저장 상태는 현재 확인할 수 없으므로
-                      날짜를 선택해 상세 조회를 시도하거나 잠시 후 다시 불러와 주세요.
+                      완료된 측정 날짜는 확인됐습니다.
+                      {serverCatalogQuery.isFetching
+                        ? " 저장된 상세 수치를 추가로 확인 중입니다."
+                        : " 저장된 상세 수치는 날짜를 선택하여 확인할 수 있습니다."}
                     </p>
                   )}
                   <div className="grid gap-2 md:grid-cols-2">

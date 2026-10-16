@@ -43,6 +43,32 @@ export function isMatchingHistoryCatalog(args: {
     response.data.page === page;
 }
 
+/**
+ * The browser's authenticated-RLS index is authoritative for which historical
+ * Run IDs may appear. Server-only v2 facts may enrich the same records, but a
+ * failed/stale/mismatched server function must never block the date list or
+ * supply records for another page, business or organization.
+ */
+export function enrichMemberHistoryCatalog(
+  member: MeasurementHistoryCatalogResponse | undefined,
+  facts: MeasurementHistoryCatalogResponse | undefined,
+): MeasurementHistoryCatalogResponse | undefined {
+  if (!member?.ok || !facts?.ok) return member;
+  const a = member.data;
+  const b = facts.data;
+  if (a.orgId !== b.orgId || a.businessId !== b.businessId ||
+    a.page !== b.page || a.hasNextPage !== b.hasNextPage ||
+    a.runs.length !== b.runs.length ||
+    !a.runs.every((row, i) =>
+      row.runId === b.runs[i]?.runId &&
+      row.measuredAt === b.runs[i]?.measuredAt
+    )
+  ) {
+    return member;
+  }
+  return facts;
+}
+
 export function isValidHistoryAggregate(args: {
   requestedRunId: string;
   sourceRunId: string;

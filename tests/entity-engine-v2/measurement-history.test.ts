@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   canDisplayHistoryDetail,
   isMatchingHistoryCatalog,
+  enrichMemberHistoryCatalog,
   getHistorySearchScopes,
   isValidHistoryAggregate,
   MEASUREMENT_HISTORY_PAGE_SIZE,
@@ -133,7 +134,85 @@ describe("Read-only measurement history", () => {
     expect(view).toContain("측정 기록 다시 불러오기");
     expect(view).toContain("상세 결과 다시 확인");
     expect(view).not.toContain("disabled={!available}");
-    expect(view).toContain("catalog?.runs[0]?.runId ?? null");
+    expect(view).toContain("fetchMemberHistoryCatalog({");
+    expect(view).toContain("enrichMemberHistoryCatalog(catalogQuery.data, serverCatalogQuery.data)");
+    expect(view).toContain("serverCatalogQuery");
+    expect(view).toContain("catalog?.runs.some((item) => item.runId === choice.runId)");
+    expect(view).not.toContain("catalog?.runs[0]?.runId ?? null");
+  });
+
+  it("keeps the member-authorized dates when server fact enrichment fails or mismatches", () => {
+    const member = {
+      ok: true as const,
+      data: {
+        orgId, businessId, page: 0,
+        snapshotStatus: "temporarily_unavailable" as const,
+        hasNextPage: false,
+        runs: [{
+          runId, runName: "완료된 측정",
+          measuredAt: "2026-09-27T05:43:12Z",
+          status: "not_available" as const,
+          validCount: null, confirmedCount: null, top3Count: null,
+        }],
+      },
+    };
+    const enriched = {
+      ok: true as const,
+      data: {
+        ...member.data,
+        snapshotStatus: "ready" as const,
+        runs: [{
+          ...member.data.runs[0]!,
+          status: "available" as const,
+          validCount: 24, confirmedCount: 16, top3Count: 16,
+        }],
+      },
+    };
+    expect(enrichMemberHistoryCatalog(member, undefined)).toEqual(member);
+    expect(enrichMemberHistoryCatalog(member, { ok: false, error: "INTERNAL_ERROR" })).toEqual(member);
+    expect(enrichMemberHistoryCatalog(member, enriched)).toEqual(enriched);
+    expect(enrichMemberHistoryCatalog(member, {
+      ...enriched, data: { ...enriched.data, orgId: "other-org" },
+    })).toEqual(member);
+    expect(enrichMemberHistoryCatalog(member, {
+      ...enriched, data: { ...enriched.data, businessId: "other-business" },
+    })).toEqual(member);
+    expect(enrichMemberHistoryCatalog(member, {
+      ...enriched, data: { ...enriched.data, page: 1 },
+    })).toEqual(member);
+    expect(enrichMemberHistoryCatalog(member, {
+      ...enriched, data: { ...enriched.data, runs: [{
+        ...enriched.data.runs[0]!, runId: "other-run",
+      }] },
+    })).toEqual(member);
+    expect(enrichMemberHistoryCatalog(member, {
+      ...enriched, data: { ...enriched.data, runs: [{
+        ...enriched.data.runs[0]!, measuredAt: "2026-09-26T05:43:12Z",
+      }] },
+    })).toEqual(member);
+  });
+
+  it("uses existing member RLS for date-only catalog, no frontend private materialization", () => {
+    const at = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
+    const browser = at("src/lib/measurement-history.member-catalog.ts");
+    const view = at("src/routes/_authenticated/measurement-history.tsx");
+    const privileged = at("src/lib/measurement-history.functions.ts");
+    expect(browser).toContain('import { supabase }');
+    expect(browser).toContain('.from("measurement_runs")');
+    expect(browser).toContain('.select("id,name,completed_at,created_at")');
+    expect(browser).toContain('.eq("org_id", orgId)');
+    expect(browser).toContain('.eq("business_id", businessId)');
+    expect(browser).toContain('.eq("status", "completed")');
+    expect(browser).toContain('.range(start, start + MEASUREMENT_HISTORY_PAGE_SIZE)');
+    expect(browser).not.toContain("supabaseAdmin");
+    expect(browser).not.toContain('from("run_entity_fact_aggregates_v2")');
+    expect(browser).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(browser).not.toContain("measurement_credit_accounts");
+    expect(view).toContain("queryKey: [\"measurement-history-member-dates\", session?.user.id");
+    expect(view).toContain("enabled: isMatchingHistoryCatalog({");
+    expect(view).toContain("snapshotStatus === \"temporarily_unavailable\"");
+    expect(view).toContain("const selectedRunId = choice?");
+    expect(privileged).toContain(".middleware([requireSupabaseAuth])");
   });
 
   it("refuses stale cross-org, cross-business or cross-Run cached results", () => {
