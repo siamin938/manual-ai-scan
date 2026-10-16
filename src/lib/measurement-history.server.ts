@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, Json } from "@/integrations/supabase/types";
-import { CUSTOMER_STANDARD_QUESTION_COUNT } from "./customer-measurement.helpers";
+import { CUSTOMER_STANDARD_QUESTION_COUNT, isUuid } from "./customer-measurement.helpers";
 import {
   buildEntityFactsV2ReadGatewayFromSnapshot,
 } from "./entity-facts-v2-read-gateway.build";
@@ -70,7 +70,7 @@ type HistoryDb = Omit<Database, "public"> & {
 };
 
 const historyDb = supabaseAdmin as unknown as SupabaseClient<HistoryDb>;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
 
 async function getScopedBusiness(orgId: string, businessId: string) {
   const result = await supabaseAdmin.from("businesses")
@@ -94,7 +94,7 @@ export async function fetchMeasurementHistoryCatalog(
   memberClient: SupabaseClient<Database>,
 ): Promise<MeasurementHistoryCatalogResponse> {
   const { orgId, businessId, page } = args;
-  if (!UUID_RE.test(orgId) || !UUID_RE.test(businessId) ||
+  if (!isUuid(orgId) || !isUuid(businessId) ||
     !Number.isInteger(page) || page < 0 || page > 1000) {
     return { ok: false, error: "NOT_AVAILABLE" };
   }
@@ -193,7 +193,7 @@ export async function fetchMeasurementHistoryCatalog(
 function getBusinessIdFromKey(key: string): string | null {
   if (!key.startsWith("business:")) return null;
   const id = key.slice("business:".length).trim().toLowerCase();
-  return UUID_RE.test(id) ? id : null;
+  return isUuid(id) ? id : null;
 }
 
 async function assembleHistoryV2Report(args: {
@@ -474,7 +474,7 @@ export async function fetchMeasurementHistoryDetail(args: {
   orgId: string; businessId: string; runId: string;
 }): Promise<MeasurementHistoryDetailResponse> {
   const { orgId, businessId, runId } = args;
-  if (![orgId, businessId, runId].every((id) => UUID_RE.test(id))) {
+  if (![orgId, businessId, runId].every((id) => isUuid(id))) {
     return { ok: false, error: "NOT_AVAILABLE" };
   }
   const report = await assembleHistoryV2Report(args);

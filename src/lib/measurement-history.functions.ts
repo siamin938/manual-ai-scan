@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isUuid } from "./customer-measurement.helpers";
 import {
   fetchMeasurementHistoryCatalog,
   fetchMeasurementHistoryDetail,
@@ -9,11 +10,11 @@ import type {
   MeasurementHistoryDetailResponse,
 } from "./measurement-history.model";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
 
 function validateScope(orgId: unknown, businessId: unknown) {
   if (typeof orgId !== "string" || typeof businessId !== "string" ||
-      !UUID_RE.test(orgId) || !UUID_RE.test(businessId)) {
+      !isUuid(orgId) || !isUuid(businessId)) {
     throw new Error("INVALID_REQUEST");
   }
   return { orgId: orgId.toLowerCase(), businessId: businessId.toLowerCase() };
@@ -46,7 +47,7 @@ export const getMeasurementHistoryDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { orgId: string; businessId: string; runId: string }) => {
     const scope = validateScope(input?.orgId, input?.businessId);
-    if (typeof input?.runId !== "string" || !UUID_RE.test(input.runId)) {
+    if (typeof input?.runId !== "string" || !isUuid(input.runId)) {
       throw new Error("INVALID_REQUEST");
     }
     return { ...scope, runId: input.runId.toLowerCase() };

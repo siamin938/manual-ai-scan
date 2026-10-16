@@ -1,10 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
+import { isUuid } from "./customer-measurement.helpers";
 import {
   MEASUREMENT_HISTORY_PAGE_SIZE,
   type MeasurementHistoryCatalogResponse,
 } from "./measurement-history.model";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
 
 /**
  * The dates/name of completed customer measurements are ALREADY permitted by
@@ -21,7 +22,7 @@ export async function fetchMemberHistoryCatalog(args: {
   page: number;
 }): Promise<MeasurementHistoryCatalogResponse> {
   const { orgId, businessId, page } = args;
-  if (!UUID_RE.test(orgId) || !UUID_RE.test(businessId) ||
+  if (!isUuid(orgId) || !isUuid(businessId) ||
       !Number.isInteger(page) || page < 0 || page > 1000) {
     return { ok: false, error: "NOT_AVAILABLE" };
   }
