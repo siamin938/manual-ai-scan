@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
+import { isUnifiedDiagnosticSetName } from "@/lib/custom-question-suggestions";
 import { fetchMemberHistoryCatalog } from "@/lib/measurement-history.member-catalog";
 import { listMeasurementHistory, getMeasurementHistoryDetail } from "@/lib/measurement-history.functions";
 import {
@@ -21,6 +22,7 @@ import {
 import type {
   EntityFactsV2ReadGatewayDTO,
   EntityFactsV2ReadQuestionAreaDTO,
+  EntityFactsV2ReadCitationSourceDTO,
 } from "@/lib/entity-facts-v2-read-gateway.types";
 import { ownerSearchContextLabel } from "@/lib/dashboard-compact-insights";
 
@@ -52,6 +54,22 @@ function AnswerStatus({ area }: { area: EntityFactsV2ReadQuestionAreaDTO }) {
     return <Badge variant="secondary">추가 확인 필요</Badge>;
   }
   return <Badge variant="outline">확정 등장 없음</Badge>;
+}
+
+const INITIAL_CITATION_SOURCES = 10;
+
+function CitationSourceLink({ source }: { source: EntityFactsV2ReadCitationSourceDTO }) {
+  return (
+    <a
+      href={source.sampleUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-start justify-between gap-2 border-b py-2 text-sm text-primary hover:underline"
+    >
+      <span className="min-w-0 break-all">{source.domain} <ExternalLink className="inline h-3 w-3" /></span>
+      <span className="shrink-0 text-muted-foreground">{source.responseCount}개 답변</span>
+    </a>
+  );
 }
 
 function ArchivedReport({ report }: { report: EntityFactsV2ReadGatewayDTO }) {
@@ -88,7 +106,9 @@ function ArchivedReport({ report }: { report: EntityFactsV2ReadGatewayDTO }) {
           )}
           {!scope && (
             <p className="text-sm text-muted-foreground">
-              이 측정은 8개 넓은 범위·16개 상세 조건 검색으로 구분할 수 있는 기록이 확인되지 않아, 구분별 수치를 표시하지 않습니다.
+              {report.scope.questionSetName && !isUnifiedDiagnosticSetName(report.scope.questionSetName)
+                ? "이전 방식의 질문 세트로 진행한 측정입니다. 현행 기준(넓은 범위 8개·상세 조건 16개)과 구성이 달라 범위별 수치를 표시하지 않습니다. 전체 24개 질문과 당시 결과는 그대로 보존됩니다."
+                : "이 회차는 현행 8개·16개 질문 구분을 검증할 수 없어 범위별 수치를 표시하지 않습니다. 전체 질문과 당시 결과는 그대로 확인할 수 있습니다."}
             </p>
           )}
           {report.overview.unresolvedTargetCount > 0 && (
@@ -121,7 +141,7 @@ function ArchivedReport({ report }: { report: EntityFactsV2ReadGatewayDTO }) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">당시 관찰된 다른 업체 · {report.competitors.length}곳</CardTitle>
@@ -154,18 +174,26 @@ function ArchivedReport({ report }: { report: EntityFactsV2ReadGatewayDTO }) {
           <CardContent className="space-y-4">
             <div>
               <p className="mb-2 text-sm font-semibold">실제 답변에 인용된 출처</p>
-              {citations.length ? citations.map((source) => (
-                <a
-                  key={source.domain}
-                  href={source.sampleUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-start justify-between gap-2 border-b py-2 text-sm text-primary hover:underline"
-                >
-                  <span className="min-w-0 break-all">{source.domain} <ExternalLink className="inline h-3 w-3" /></span>
-                  <span className="shrink-0 text-muted-foreground">{source.responseCount}개 답변</span>
-                </a>
-              )) : (
+              {citations.length ? (
+                <>
+                  <p className="mb-1 text-xs text-muted-foreground">이번 회차에서 관찰된 출처 {citations.length}개 · 인용 답변 수 기준 정렬</p>
+                  {citations.slice(0, INITIAL_CITATION_SOURCES).map((source) => (
+                    <CitationSourceLink key={source.domain} source={source} />
+                  ))}
+                  {citations.length > INITIAL_CITATION_SOURCES && (
+                    <details className="mt-3 rounded-lg border px-3 py-3">
+                      <summary className="cursor-pointer text-sm font-semibold">
+                        나머지 인용 출처 {citations.length - INITIAL_CITATION_SOURCES}개 더 보기
+                      </summary>
+                      <div className="mt-2">
+                        {citations.slice(INITIAL_CITATION_SOURCES).map((source) => (
+                          <CitationSourceLink key={source.domain} source={source} />
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              ) : (
                 <p className="text-sm text-muted-foreground">열람 가능한 인용 출처 요약을 확인하지 못했습니다.</p>
               )}
               <p className="mt-2 text-xs leading-5 text-muted-foreground">

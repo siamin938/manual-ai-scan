@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { isUnifiedDiagnosticSetName } from "../../src/lib/custom-question-suggestions";
 import {
   canDisplayHistoryDetail,
   isMatchingHistoryCatalog,
@@ -254,6 +255,30 @@ describe("Read-only measurement history", () => {
     expect(getHistorySearchScopes({
       ...report, questionLocations: questionLocations.map((row, i) => i === 0 ? { ...row, city: "안산" } : row),
     })).toBeNull();
+  });
+
+  it("explains legacy question sets without mislabeling them as current 8+16 measurements", () => {
+    expect(isUnifiedDiagnosticSetName("카스페이스 구로점 AI 검색 질문 2026-09-18")).toBe(false);
+    expect(isUnifiedDiagnosticSetName("AI 진단 질문 · 카스페이스 구로점 · 2026-09-26")).toBe(true);
+    const source = readFileSync(resolve(process.cwd(), "src/routes/_authenticated/measurement-history.tsx"), "utf8");
+    expect(source).toContain("!isUnifiedDiagnosticSetName(report.scope.questionSetName)");
+    expect(source).toContain("이전 방식의 질문 세트로 진행한 측정입니다.");
+    expect(source).toContain("전체 24개 질문과 당시 결과는 그대로 보존됩니다.");
+    expect(source).toContain("이 회차는 현행 8개·16개 질문 구분을 검증할 수 없어");
+    expect(source).toContain("getHistorySearchScopes(report)");
+  });
+
+  it("keeps all archived citation source links accessible with a concise default view", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/routes/_authenticated/measurement-history.tsx"), "utf8");
+    expect(source).toContain("const INITIAL_CITATION_SOURCES = 10");
+    expect(source).toContain("citations.slice(0, INITIAL_CITATION_SOURCES).map");
+    expect(source).toContain("citations.slice(INITIAL_CITATION_SOURCES).map");
+    expect(source).toContain("나머지 인용 출처");
+    expect(source).toContain('className="grid gap-5 lg:grid-cols-2 lg:items-start"');
+    expect(source).toContain('rel="noopener noreferrer"');
+    expect(source).toContain("CitationSourceLink");
+    expect(source).toContain('observed.map((row)');
+    expect(source).toContain("verified === \"complete\"");
   });
 
   it("preserves the existing live dashboard and protects member-only archive reads", () => {
