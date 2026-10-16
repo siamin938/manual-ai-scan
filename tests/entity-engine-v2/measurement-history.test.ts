@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   canDisplayHistoryDetail,
+  isMatchingHistoryCatalog,
   getHistorySearchScopes,
   isValidHistoryAggregate,
   MEASUREMENT_HISTORY_PAGE_SIZE,
@@ -76,6 +77,65 @@ describe("Read-only measurement history", () => {
     expect(isValidHistoryAggregate({ ...storage(), aggregate: { overview: { validCount: 24 } } })).toBe(false);
   });
 
+  it("shows a member-authorized catalog even when the optional snapshot index is unavailable", () => {
+    const response = {
+      ok: true as const,
+      data: {
+        orgId,
+        businessId,
+        page: 0,
+        snapshotStatus: "temporarily_unavailable" as const,
+        hasNextPage: false,
+        runs: [
+          {
+            runId,
+            runName: "완료된 고객 측정",
+            measuredAt: "2026-09-27T05:43:12Z",
+            status: "not_available" as const,
+            validCount: null,
+            confirmedCount: null,
+            top3Count: null,
+          },
+        ],
+      },
+    };
+    expect(isMatchingHistoryCatalog({ orgId, businessId, page: 0, response })).toBe(true);
+    expect(isMatchingHistoryCatalog({ orgId, businessId, page: 1, response })).toBe(false);
+    expect(isMatchingHistoryCatalog({ orgId, businessId: "another-business", page: 0, response })).toBe(false);
+    expect(isMatchingHistoryCatalog({ orgId: "another-org", businessId, page: 0, response })).toBe(false);
+    expect(isMatchingHistoryCatalog({ orgId, businessId, page: 0, response: undefined })).toBe(false);
+    expect(isMatchingHistoryCatalog({ orgId, businessId, page: 0, response: { ok: false, error: "FORBIDDEN" } })).toBe(false);
+  });
+
+  it("reads the catalog dates with the authenticated RLS client before optional admin snapshot lookups", () => {
+    const at = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
+    const server = at("src/lib/measurement-history.server.ts");
+    const wrapper = at("src/lib/measurement-history.functions.ts");
+    const view = at("src/routes/_authenticated/measurement-history.tsx");
+
+    const catalogStart = server.indexOf("export async function fetchMeasurementHistoryCatalog(");
+    const catalogEnd = server.indexOf("function getBusinessIdFromKey(");
+    expect(catalogStart).toBeGreaterThan(-1);
+    expect(catalogEnd).toBeGreaterThan(catalogStart);
+    const catalog = server.slice(catalogStart, catalogEnd);
+    expect(catalog).toContain('memberClient\n    .from("businesses")');
+    expect(catalog).toContain('memberClient\n    .from("measurement_runs")');
+    expect(catalog).toContain('.eq("org_id", orgId).eq("business_id", businessId)');
+    expect(catalog.indexOf('.from("measurement_runs")')).toBeLessThan(
+      catalog.indexOf('.from("run_entity_fact_aggregates_v2")'),
+    );
+    expect(catalog).toContain('snapshotStatus = "temporarily_unavailable"');
+    expect(catalog).toContain("catch {");
+    expect(catalog).not.toContain('if (aggregateError) return { ok: false');
+    expect(wrapper).toContain("fetchMeasurementHistoryCatalog(data, context.supabase)");
+    expect(view).toContain("isMatchingHistoryCatalog({");
+    expect(view).toContain('catalog.snapshotStatus === "temporarily_unavailable"');
+    expect(view).toContain("측정 기록 다시 불러오기");
+    expect(view).toContain("상세 결과 다시 확인");
+    expect(view).not.toContain("disabled={!available}");
+    expect(view).toContain("catalog?.runs[0]?.runId ?? null");
+  });
+
   it("refuses stale cross-org, cross-business or cross-Run cached results", () => {
     const report = {
       business: { id: businessId }, scope: { runId },
@@ -130,7 +190,7 @@ describe("Read-only measurement history", () => {
     expect(wrapper.match(/\.from\("organization_members"\)/gu)).toHaveLength(2);
     expect(wrapper.match(/\.eq\("user_id", context.userId\)/gu)).toHaveLength(2);
     expect(wrapper.indexOf('if (!membership) return { ok: false, error: "FORBIDDEN" };')).toBeLessThan(
-      wrapper.indexOf("fetchMeasurementHistoryCatalog(data)"),
+      wrapper.indexOf("fetchMeasurementHistoryCatalog(data, context.supabase)"),
     );
     expect(wrapper).toContain("fetchMeasurementHistoryDetail(data)");
     expect(server).toContain('.eq("org_id", orgId).eq("business_id", businessId)');

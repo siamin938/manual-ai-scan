@@ -19,12 +19,29 @@ export type MeasurementHistoryRunItem = {
 };
 
 export type MeasurementHistoryCatalogResponse =
-  | { ok: true; data: { orgId: string; businessId: string; page: number; hasNextPage: boolean; runs: MeasurementHistoryRunItem[] } }
+  | { ok: true; data: { orgId: string; businessId: string; page: number; snapshotStatus: "ready" | "temporarily_unavailable"; hasNextPage: boolean; runs: MeasurementHistoryRunItem[] } }
   | { ok: false; error: "FORBIDDEN" | "NOT_AVAILABLE" | "INTERNAL_ERROR" };
 
 export type MeasurementHistoryDetailResponse =
   | { ok: true; data: { orgId: string; businessId: string; runId: string; report: EntityFactsV2ReadGatewayDTO } }
   | { ok: false; error: "FORBIDDEN" | "NOT_AVAILABLE" | "INTERNAL_ERROR" };
+
+/**
+ * Never render cached catalog rows from a different organization, business,
+ * or page. The user ID remains part of the React Query cache key.
+ */
+export function isMatchingHistoryCatalog(args: {
+  orgId: string | null;
+  businessId: string | null;
+  page: number;
+  response: MeasurementHistoryCatalogResponse | undefined;
+}): boolean {
+  const { orgId, businessId, page, response } = args;
+  return !!orgId && !!businessId && response?.ok === true &&
+    response.data.orgId === orgId &&
+    response.data.businessId === businessId &&
+    response.data.page === page;
+}
 
 export function isValidHistoryAggregate(args: {
   requestedRunId: string;

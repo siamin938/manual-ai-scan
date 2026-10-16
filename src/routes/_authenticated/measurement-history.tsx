@@ -12,6 +12,7 @@ import { formatSeoul } from "@/lib/format";
 import { listMeasurementHistory, getMeasurementHistoryDetail } from "@/lib/measurement-history.functions";
 import {
   canDisplayHistoryDetail,
+  isMatchingHistoryCatalog,
   getHistorySearchScopes,
   type MeasurementHistoryRunItem,
 } from "@/lib/measurement-history.model";
@@ -236,22 +237,21 @@ function HistoryRunButton({ item, selected, onSelect }: {
   return (
     <button
       type="button"
-      disabled={!available}
       aria-pressed={selected}
       onClick={() => onSelect(item.runId)}
       className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${selected
         ? "border-primary bg-primary/5"
-        : available ? "hover:border-primary/50 hover:bg-muted/50" : "cursor-not-allowed opacity-60"}`}
+        : "hover:border-primary/50 hover:bg-muted/50"}`}
     >
       <span className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-semibold">{formatSeoul(item.measuredAt)}</span>
         <Badge variant={available ? "outline" : "secondary"}>
-          {available ? "열람 가능" : "기록 확인 필요"}
+          {available ? "열람 가능" : "상세 확인 필요"}
         </Badge>
       </span>
       <span className="mt-1 block text-xs text-muted-foreground">
         {available ? `확정 노출 ${item.confirmedCount}/${item.validCount} · 상위 3곳 ${item.top3Count}/${item.validCount}` :
-          "완료된 측정이지만 현재 저장 형식에서는 상세 열람이 불가합니다."}
+          "측정 날짜는 보존되어 있습니다. 선택하면 상세 결과를 다시 확인합니다."}
       </span>
     </button>
   );
@@ -269,26 +269,28 @@ function MeasurementHistoryPage() {
   const catalogQuery = useQuery({
     queryKey: ["measurement-history-catalog", session?.user.id, activeOrgId, businessId, page],
     enabled: !!session?.user.id && !!activeOrgId && !!businessId,
-    retry: false,
+    retry: 1,
     queryFn: () => fetchCatalog({ data: {
       orgId: activeOrgId as string, businessId: businessId as string, page,
     } }),
   });
-  const catalog = catalogQuery.data?.ok &&
-    catalogQuery.data.data.orgId === activeOrgId &&
-    catalogQuery.data.data.businessId === businessId &&
-    catalogQuery.data.data.page === page
+  const catalog = isMatchingHistoryCatalog({
+    orgId: activeOrgId,
+    businessId,
+    page,
+    response: catalogQuery.data,
+  }) && catalogQuery.data?.ok
     ? catalogQuery.data.data : null;
   const selectedRunId = choice?.orgId === activeOrgId &&
     choice.businessId === businessId &&
-    catalog?.runs.some((item) => item.runId === choice.runId && item.status === "available")
+    catalog?.runs.some((item) => item.runId === choice.runId)
     ? choice.runId
-    : catalog?.runs.find((item) => item.status === "available")?.runId ?? null;
+    : catalog?.runs[0]?.runId ?? null;
   const fetchDetail = useServerFn(getMeasurementHistoryDetail);
   const detailQuery = useQuery({
     queryKey: ["measurement-history-detail", session?.user.id, activeOrgId, businessId, selectedRunId],
     enabled: !!session?.user.id && !!activeOrgId && !!businessId && !!selectedRunId,
-    retry: false,
+    retry: 1,
     queryFn: () => fetchDetail({ data: {
       orgId: activeOrgId as string, businessId: businessId as string,
       runId: selectedRunId as string,
@@ -336,15 +338,34 @@ function MeasurementHistoryPage() {
               {catalogQuery.isPending || catalogQuery.isFetching ? (
                 <p className="text-sm text-muted-foreground">측정 기록을 불러오는 중입니다.</p>
               ) : !catalog ? (
-                <p className="text-sm text-muted-foreground">
-                  측정 기록을 불러올 수 없습니다. 계정 권한과 현재 조직을 확인해 주세요.
-                </p>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground" role="alert">
+                    {catalogQuery.isError
+                      ? "측정 기록 요청에 실패했습니다. 서버 연결 상태를 확인한 뒤 다시 시도해 주세요."
+                      : catalogQuery.data?.ok === false && catalogQuery.data.error === "FORBIDDEN"
+                        ? "현재 계정은 선택한 조직의 측정 기록을 볼 권한이 없습니다."
+                        : catalogQuery.data?.ok === false && catalogQuery.data.error === "NOT_AVAILABLE"
+                          ? "선택한 업체의 측정 기록을 조회할 수 없습니다."
+                          : "측정 기록을 일시적으로 불러오지 못했습니다. 다시 시도해 주세요."}
+                  </p>
+                  <Button type="button" variant="outline" size="sm" disabled={catalogQuery.isFetching}
+                    onClick={() => void catalogQuery.refetch()}>
+                    측정 기록 다시 불러오기
+                  </Button>
+                </div>
               ) : !catalog.runs.length ? (
                 <p className="text-sm text-muted-foreground">
                   {page === 0 ? "현재 업체에 완료된 고객 측정 기록이 없습니다." : "이 페이지에는 측정 기록이 없습니다."}
                 </p>
               ) : (
-                <div className="grid gap-2 md:grid-cols-2">
+                <div className="space-y-3">
+                  {catalog.snapshotStatus === "temporarily_unavailable" && (
+                    <p className="rounded-lg border px-3 py-2 text-sm text-muted-foreground" role="status">
+                      완료된 측정 날짜는 확인됐습니다. 일부 결과의 저장 상태는 현재 확인할 수 없으므로
+                      날짜를 선택해 상세 조회를 시도하거나 잠시 후 다시 불러와 주세요.
+                    </p>
+                  )}
+                  <div className="grid gap-2 md:grid-cols-2">
                   {catalog.runs.map((item) => (
                     <HistoryRunButton
                       key={item.runId}
@@ -356,6 +377,7 @@ function MeasurementHistoryPage() {
                       })}
                     />
                   ))}
+                  </div>
                 </div>
               )}
               <div className="flex justify-between gap-2 pt-2">
@@ -382,8 +404,15 @@ function MeasurementHistoryPage() {
             <Card><CardContent className="py-8 text-sm text-muted-foreground">선택한 측정의 저장된 결과를 확인 중입니다.</CardContent></Card>
           )}
           {selectedRunId && !detailQuery.isPending && !detailQuery.isFetching && !report && (
-            <Card><CardContent className="py-8 text-sm text-muted-foreground">
-              선택한 날짜의 상세 결과를 안전하게 열람할 수 없습니다. 기록을 임의로 생성하거나 다른 회차의 데이터를 대신 보여주지 않습니다.
+            <Card><CardContent className="space-y-3 py-8 text-sm text-muted-foreground">
+              <p role="alert">
+                선택한 날짜의 상세 결과를 아직 열람할 수 없습니다.
+                기록을 임의로 생성하거나 다른 회차의 데이터를 대신 보여주지 않습니다.
+              </p>
+              <Button type="button" variant="outline" size="sm"
+                onClick={() => void detailQuery.refetch()}>
+                상세 결과 다시 확인
+              </Button>
             </CardContent></Card>
           )}
           {selectedRunId && !detailQuery.isFetching && report && <ArchivedReport report={report} />}

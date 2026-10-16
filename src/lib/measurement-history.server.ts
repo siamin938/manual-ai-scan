@@ -89,22 +89,36 @@ const completedCustomerRuns = (orgId: string, businessId: string) =>
     .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
     .is("experiment_id", null);
 
-export async function fetchMeasurementHistoryCatalog(args: {
-  orgId: string; businessId: string; page: number;
-}): Promise<MeasurementHistoryCatalogResponse> {
+export async function fetchMeasurementHistoryCatalog(
+  args: { orgId: string; businessId: string; page: number },
+  memberClient: SupabaseClient<Database>,
+): Promise<MeasurementHistoryCatalogResponse> {
   const { orgId, businessId, page } = args;
   if (!UUID_RE.test(orgId) || !UUID_RE.test(businessId) ||
     !Number.isInteger(page) || page < 0 || page > 1000) {
     return { ok: false, error: "NOT_AVAILABLE" };
   }
 
-  const business = await getScopedBusiness(orgId, businessId);
-  if (business.error) return { ok: false, error: "INTERNAL_ERROR" };
-  if (!business.data) return { ok: false, error: "NOT_AVAILABLE" };
+  // The customer history index is visible via member RLS. An administrative
+  // materialization failure must not conceal the already-owned date records.
+  const { data: business, error: businessError } = await memberClient
+    .from("businesses").select("id")
+    .eq("org_id", orgId).eq("id", businessId)
+    .eq("is_client_business", true).eq("active", true).maybeSingle();
+  if (businessError) return { ok: false, error: "INTERNAL_ERROR" };
+  if (!business) return { ok: false, error: "NOT_AVAILABLE" };
 
-  // Fetch one additional row to distinguish the last page from a truncated list.
+  // Fetch one additional row to distinguish the last page. The session's
+  // RLS client, not the service-role client, reads the index's public fields.
   const start = page * MEASUREMENT_HISTORY_PAGE_SIZE;
-  const { data: allRuns, error } = await completedCustomerRuns(orgId, businessId)
+  const { data: allRuns, error } = await memberClient
+    .from("measurement_runs")
+    .select("id,name,completed_at,created_at")
+    .eq("org_id", orgId).eq("business_id", businessId)
+    .eq("run_type", "audit").eq("phase", "standalone")
+    .eq("diagnostic_scope", "customer").eq("status", "completed")
+    .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
+    .is("experiment_id", null)
     .order("completed_at", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -114,20 +128,32 @@ export async function fetchMeasurementHistoryCatalog(args: {
   const runs = (allRuns ?? []).slice(0, MEASUREMENT_HISTORY_PAGE_SIZE);
   const ids = runs.map((run) => run.id);
   const aggregates: V2AggregateRow[] = [];
+  let snapshotStatus: "ready" | "temporarily_unavailable" = "ready";
   if (ids.length > 0) {
-    const { data, error: aggregateError } = await historyDb
-      .from("run_entity_fact_aggregates_v2")
-      .select("id,materialization_id,source_run_id,fact_version,aggregate_version,engine_version,measurement_count,valid_measurement_count,contract_ok,aggregate,aggregate_hash")
-      .eq("org_id", orgId).eq("business_id", businessId)
-      .in("source_run_id", ids);
-    if (aggregateError) return { ok: false, error: "INTERNAL_ERROR" };
-    aggregates.push(...(data ?? []));
+    try {
+      const { data, error: aggregateError } = await historyDb
+        .from("run_entity_fact_aggregates_v2")
+        .select("id,materialization_id,source_run_id,fact_version,aggregate_version,engine_version,measurement_count,valid_measurement_count,contract_ok,aggregate,aggregate_hash")
+        .eq("org_id", orgId).eq("business_id", businessId)
+        .in("source_run_id", ids);
+      if (aggregateError) {
+        snapshotStatus = "temporarily_unavailable";
+        console.warn("[measurement-history] optional snapshot index query failed", aggregateError.code);
+      } else {
+        aggregates.push(...(data ?? []));
+      }
+    } catch {
+      // If the privileged snapshot client is not ready, preserve the
+      // member-authorized date index and fail closed on all detailed counts.
+      snapshotStatus = "temporarily_unavailable";
+      console.warn("[measurement-history] optional snapshot index unavailable");
+    }
   }
 
   return {
     ok: true,
     data: {
-      orgId, businessId, page,
+      orgId, businessId, page, snapshotStatus,
       hasNextPage: (allRuns ?? []).length > MEASUREMENT_HISTORY_PAGE_SIZE,
       runs: runs.map((run) => {
         const rows = aggregates.filter((row) =>

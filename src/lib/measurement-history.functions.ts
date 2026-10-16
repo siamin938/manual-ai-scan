@@ -39,7 +39,7 @@ export const listMeasurementHistory = createServerFn({ method: "POST" })
       .eq("org_id", data.orgId).eq("user_id", context.userId).maybeSingle();
     if (error) return { ok: false, error: "INTERNAL_ERROR" };
     if (!membership) return { ok: false, error: "FORBIDDEN" };
-    return fetchMeasurementHistoryCatalog(data);
+    return fetchMeasurementHistoryCatalog(data, context.supabase);
   });
 
 export const getMeasurementHistoryDetail = createServerFn({ method: "POST" })
