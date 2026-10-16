@@ -24,6 +24,9 @@ import { canViewDataAssetAdmin } from "@/lib/data-asset-admin.functions";
 import { getActionOpportunityV1DashboardPrivatePreview } from "@/lib/action-opportunity-v1.dashboard-private.functions";
 import { canRenderDashboardPrivateV1Preview } from "@/lib/action-opportunity-v1.dashboard-private-scope";
 import { ActionOpportunityV1CustomerPreview } from "@/components/action-opportunity-v1-customer-preview";
+import { ActionOpportunityV1AdminOwnerDrilldown } from "@/components/action-opportunity-v1-admin-owner-drilldown";
+import { isCustomerEvidenceInsightId } from "@/lib/action-opportunity-v1.customer-read";
+import type { V1CustomerQaScope } from "@/lib/action-opportunity-v1.customer-dashboard-qa-scope";
 import { v1RuleForOwnerSummaryInsight } from "@/lib/action-opportunity-v1.owner-summary-bridge";
 import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS, normalizeQuestion } from "@/lib/question-suggestions";
@@ -1441,6 +1444,20 @@ function DashboardPage() {
       {dto && model && summaryModel && view === "summary" && (
         <DashboardSummary
           summary={summaryModel}
+          customerEvidenceQaScope={
+            privateV1AdminAllowed &&
+            session?.user.id &&
+            activeOrgId &&
+            businessId &&
+            dto.business.id === businessId
+              ? {
+                  userId: session.user.id,
+                  orgId: activeOrgId,
+                  businessId,
+                  runId: dto.scope.runId,
+                }
+              : undefined
+          }
           onShowDetail={() => setDashboardView("detail")}
           onReviewEvidence={
             privateV1AdminAllowed && activeOrgId && businessId && dto
@@ -2321,10 +2338,12 @@ function DashboardPage() {
 
 function DashboardSummary({
   summary,
+  customerEvidenceQaScope,
   onShowDetail,
   onReviewEvidence,
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
+  customerEvidenceQaScope?: V1CustomerQaScope | undefined;
   onShowDetail: () => void;
   onReviewEvidence?: ((insight: CompactSummaryInsight) => void) | undefined;
 }) {
@@ -2595,6 +2614,14 @@ function DashboardSummary({
                   >
                     관리자 검수 · 이 항목의 근거 미리보기
                   </Button>
+                )}
+                {customerEvidenceQaScope && isCustomerEvidenceInsightId(item.id) && (
+                  <ActionOpportunityV1AdminOwnerDrilldown
+                    key={`${customerEvidenceQaScope.userId}:${customerEvidenceQaScope.orgId}:${customerEvidenceQaScope.businessId}:${customerEvidenceQaScope.runId}:${item.id}`}
+                    scope={customerEvidenceQaScope}
+                    insightId={item.id}
+                    adminAllowed={true}
+                  />
                 )}
               </div>
             ))}
