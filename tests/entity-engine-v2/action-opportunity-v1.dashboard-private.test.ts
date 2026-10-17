@@ -95,7 +95,10 @@ describe("Action Opportunity v1.0 dashboard private preview isolation", () => {
     expect(dashboard).toContain("setPrivateV1Focus(insight)");
     expect(dashboard).toContain("focusedInsight={privateV1Focus}");
     expect(dashboard).toContain("v1RuleForOwnerSummaryInsight(item.id)");
-    expect(dashboard).toContain('className="no-print mt-1 h-auto px-0 py-1 text-xs"');
+    expect(dashboard).toContain("관리자 상세 검수 도구");
+    expect(dashboard).toContain('className="no-print mt-3 border-t pt-3"');
+    expect(dashboard).toContain("onClick={() => onReviewEvidence(item)}");
+    expect(dashboard).not.toContain("관리자 검수 · 이 항목의 근거 미리보기");
     expect(dashboard).toContain("session?.user.id,");
     expect(dashboard).toContain("dto?.scope.runId,");
     expect(dashboard).not.toContain("publicV1Enabled");
