@@ -80,6 +80,7 @@ describe("Action v1 owner summary: administrator-only customer evidence QA", () 
     const at = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
     const dashboard = at("src/routes/_authenticated/dashboard.tsx");
     const inline = at("src/components/action-opportunity-v1-admin-owner-drilldown.tsx");
+    const presentation = at("src/components/action-opportunity-v1-customer-evidence-candidate.tsx");
     const existingAdmin = at("src/lib/action-opportunity-v1.dashboard-private.functions.ts");
     const server = at("src/lib/action-opportunity-v1.customer-read.functions.ts");
 
@@ -95,6 +96,9 @@ describe("Action v1 owner summary: administrator-only customer evidence QA", () 
     expect(dashboard).toContain("dto.business.id === businessId");
     expect(dashboard).toContain("isCustomerEvidenceInsightId(item.id)");
     expect(dashboard).toContain("<ActionOpportunityV1AdminOwnerDrilldown");
+    expect(dashboard).toContain("관리자 상세 검수 도구");
+    expect(dashboard).toContain("onClick={() => onReviewEvidence(item)}");
+    expect(dashboard).not.toContain("관리자 검수 · 이 항목의 근거 미리보기");
     expect(dashboard).toContain("key={`${customerEvidenceQaScope.userId}:${customerEvidenceQaScope.orgId}:${customerEvidenceQaScope.businessId}:${customerEvidenceQaScope.runId}:${item.id}`}");
 
     expect(inline).toContain("getActionOpportunityV1CustomerEvidence");
@@ -107,10 +111,19 @@ describe("Action v1 owner summary: administrator-only customer evidence QA", () 
     expect(inline).toContain("insightId,");
     expect(inline).toContain('className="no-print"');
     expect(inline).toContain("aria-expanded={expanded}");
-    expect(inline).toContain("관리자 검수 · 고객용 근거 펼침 테스트");
+    expect(inline).toContain("판단 근거 자세히 보기");
+    expect(inline).toContain("판단 근거 닫기");
     expect(inline).toContain("<ActionOpportunityV1CustomerEvidenceCandidate");
-    expect(inline).toContain("detail={response.detail} expandEvidence");
+    expect(inline).toContain("detail={response.detail}");
+    expect(inline).not.toContain("expandEvidence");
     expect(inline).toContain("if (!adminAllowed) return null");
+    expect((inline.match(/<Button\b/gu) ?? [])).toHaveLength(1);
+    expect(presentation).not.toContain("<details");
+    expect(presentation).not.toContain("useState(");
+    expect(presentation).toContain("이번 측정에서 확인된 사실");
+    expect(presentation).toContain("판단 근거");
+    expect(presentation).not.toContain("{detail.recommendedCheck}");
+    expect(presentation).toContain("{detail.disclaimer}");
 
     // No customer preview release: only the existing internal admin RPC
     // and its authenticated + membership checks remain in place.

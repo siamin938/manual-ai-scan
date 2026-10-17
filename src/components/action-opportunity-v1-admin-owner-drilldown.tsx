@@ -73,9 +73,7 @@ export function ActionOpportunityV1AdminOwnerDrilldown({
         aria-controls={panelId}
         onClick={() => setExpanded((wasExpanded) => !wasExpanded)}
       >
-        {expanded
-          ? "관리자 검수 · 고객용 근거 닫기"
-          : "관리자 검수 · 고객용 근거 펼침 테스트"}
+        {expanded ? "판단 근거 닫기" : "판단 근거 자세히 보기"}
       </Button>
       {expanded && (
         <div id={panelId} className="mt-2">
@@ -84,7 +82,7 @@ export function ActionOpportunityV1AdminOwnerDrilldown({
               현재 대표 측정의 고객용 판단 근거를 확인 중입니다.
             </p>
           ) : valid && response?.ok === true ? (
-            <ActionOpportunityV1CustomerEvidenceCandidate detail={response.detail} expandEvidence />
+            <ActionOpportunityV1CustomerEvidenceCandidate detail={response.detail} />
           ) : (
             <p className="rounded-lg border p-3 text-sm text-muted-foreground" role="status">
               이 항목의 현재 대표 측정 근거를 연결하지 않았습니다.

@@ -2604,17 +2604,6 @@ function DashboardSummary({
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
                   {item.recommendedCheck}
                 </p>
-                {onReviewEvidence && v1RuleForOwnerSummaryInsight(item.id) && (
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="no-print mt-1 h-auto px-0 py-1 text-xs"
-                    onClick={() => onReviewEvidence(item)}
-                  >
-                    관리자 검수 · 이 항목의 근거 미리보기
-                  </Button>
-                )}
                 {customerEvidenceQaScope && isCustomerEvidenceInsightId(item.id) && (
                   <ActionOpportunityV1AdminOwnerDrilldown
                     key={`${customerEvidenceQaScope.userId}:${customerEvidenceQaScope.orgId}:${customerEvidenceQaScope.businessId}:${customerEvidenceQaScope.runId}:${item.id}`}
@@ -2626,6 +2615,29 @@ function DashboardSummary({
               </div>
             ))}
           </div>
+        )}
+        {onReviewEvidence && observations.some((item) => v1RuleForOwnerSummaryInsight(item.id)) && (
+          <details className="no-print mt-3 border-t pt-3">
+            <summary className="cursor-pointer text-xs text-muted-foreground">
+              관리자 상세 검수 도구
+            </summary>
+            <div className="mt-2 flex flex-col items-start gap-1">
+              {observations
+                .filter((item) => v1RuleForOwnerSummaryInsight(item.id))
+                .map((item) => (
+                  <Button
+                    key={item.id}
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto whitespace-normal px-0 py-1 text-left text-xs"
+                    onClick={() => onReviewEvidence(item)}
+                  >
+                    {item.title} · 내부 근거 검수
+                  </Button>
+                ))}
+            </div>
+          </details>
         )}
         <p className="mt-3 text-xs leading-5 text-muted-foreground">
           관찰 결과의 차이는 특정 업체·출처가 노출에 영향을 준 원인이나 개선 효과를 의미하지 않습니다.

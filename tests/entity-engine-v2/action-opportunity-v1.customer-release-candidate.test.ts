@@ -206,19 +206,24 @@ describe("Action Opportunity v1 customer release candidate (NOT mounted)", () =>
     })).toBeNull();
   });
 
-  it("remains unmounted, read-only and does not weaken the admin-only dashboard", () => {
+  it("remains read-only, admin QA mounted and not customer released", () => {
     const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
     const candidate = read("src/lib/action-opportunity-v1.customer-release-candidate.ts");
     const component = read("src/components/action-opportunity-v1-customer-evidence-candidate.tsx");
     const dashboard = read("src/routes/_authenticated/dashboard.tsx");
     const privateFn = read("src/lib/action-opportunity-v1.dashboard-private.functions.ts");
 
-    expect(component).toContain("판단 근거 자세히 보기");
-    expect(component).toContain("무엇을 확인하면 될까요?");
+    expect(component).toContain("이번 측정에서 확인된 사실");
+    expect(component).toContain("판단 근거");
+    expect(component).not.toContain("<details");
+    expect(component).not.toContain("useState(");
+    expect(component).not.toContain("{detail.recommendedCheck}");
     expect(candidate).toContain("matchOwnerSummaryInsightToV1Card");
     expect(candidate).not.toContain("supabaseAdmin");
     expect(candidate).not.toContain("createServerFn");
     expect(dashboard).not.toContain("ActionOpportunityV1CustomerEvidenceCandidate");
+    expect(dashboard).toContain("관리자 상세 검수 도구");
+    expect(dashboard).toContain("privateV1AdminAllowed &&");
     expect(dashboard).not.toContain("buildV1CustomerEvidenceCandidate");
     expect(dashboard).toContain("getActionOpportunityV1DashboardPrivatePreview");
     expect(privateFn).toContain('rpc("can_view_data_asset_admin_v01")');
