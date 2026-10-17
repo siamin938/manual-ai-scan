@@ -1,4 +1,4 @@
-import type { EntityFactsV2ReadGatewayDTO } from "./entity-facts-v2-read-gateway.types";
+import type { EntityFactsV2ReadGatewayDTO, EntityFactsV2ReadGatewayResponse } from "./entity-facts-v2-read-gateway.types";
 import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
@@ -41,6 +41,33 @@ export function isMatchingHistoryCatalog(args: {
     response.data.orgId === orgId &&
     response.data.businessId === businessId &&
     response.data.page === page;
+}
+
+/**
+ * 'Latest' is the exact representative Run resolved by the SAME authenticated
+ * v2 read gateway as the current dashboard, not the first date in a catalog.
+ * If verification is unavailable, leave every row as a historical detail link.
+ *
+ * The gateway request is independently authenticated for this org/business;
+ * the org, business, page and listed Run IDs are checked again before UI use.
+ */
+export function resolveCurrentHistoryRunId(args: {
+  orgId: string | null;
+  businessId: string | null;
+  page: number;
+  catalog: MeasurementHistoryCatalogResponse | undefined;
+  gateway: EntityFactsV2ReadGatewayResponse | undefined;
+}): string | null {
+  const { orgId, businessId, page, catalog, gateway } = args;
+  if (!isMatchingHistoryCatalog({ orgId, businessId, page, response: catalog }) ||
+      catalog?.ok !== true || gateway?.ok !== true ||
+      gateway.data.business.id !== businessId) {
+    return null;
+  }
+  const currentRunId = gateway.data.scope.runId;
+  return currentRunId && catalog.data.runs.some((row) => row.runId === currentRunId)
+    ? currentRunId
+    : null;
 }
 
 /**

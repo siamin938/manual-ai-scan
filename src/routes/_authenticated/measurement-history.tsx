@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CalendarDays, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,11 +12,13 @@ import { formatSeoul } from "@/lib/format";
 import { isUnifiedDiagnosticSetName } from "@/lib/custom-question-suggestions";
 import { fetchMemberHistoryCatalog } from "@/lib/measurement-history.member-catalog";
 import { listMeasurementHistory, getMeasurementHistoryDetail } from "@/lib/measurement-history.functions";
+import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
 import {
   canDisplayHistoryDetail,
   isMatchingHistoryCatalog,
   enrichMemberHistoryCatalog,
   getHistorySearchScopes,
+  resolveCurrentHistoryRunId,
   type MeasurementHistoryRunItem,
 } from "@/lib/measurement-history.model";
 import type {
@@ -258,12 +260,46 @@ function ArchivedReport({ report }: { report: EntityFactsV2ReadGatewayDTO }) {
   );
 }
 
-function HistoryRunButton({ item, selected, onSelect }: {
+function HistoryRunButton({ item, selected, isCurrentRepresentative, onSelect }: {
   item: MeasurementHistoryRunItem;
   selected: boolean;
+  isCurrentRepresentative: boolean;
   onSelect: (id: string) => void;
 }) {
   const available = item.status === "available";
+  const contents = (
+    <>
+      <span className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-semibold">{formatSeoul(item.measuredAt)}</span>
+        <Badge variant={isCurrentRepresentative ? "default" : available ? "outline" : "secondary"}>
+          {isCurrentRepresentative ? "최신 진단" : available ? "열람 가능" : "상세 확인 필요"}
+        </Badge>
+      </span>
+      <span className="mt-1 block text-xs text-muted-foreground">
+        {available ? `확정 노출 ${item.confirmedCount}/${item.validCount} · 상위 3곳 ${item.top3Count}/${item.validCount}` :
+          "측정 날짜는 보존되어 있습니다. 상세 수치는 별도 확인이 필요합니다."}
+      </span>
+      {isCurrentRepresentative && (
+        <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+          최신 AI 노출 진단 보기 <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
+      )}
+    </>
+  );
+
+  if (isCurrentRepresentative) {
+    return (
+      <Link
+        to="/dashboard"
+        search={{}}
+        aria-label={`${formatSeoul(item.measuredAt)} 최신 AI 노출 진단 보기`}
+        className="block w-full rounded-lg border border-primary/50 bg-primary/5 px-4 py-3 text-left transition-colors hover:bg-primary/10"
+      >
+        {contents}
+      </Link>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -273,16 +309,7 @@ function HistoryRunButton({ item, selected, onSelect }: {
         ? "border-primary bg-primary/5"
         : "hover:border-primary/50 hover:bg-muted/50"}`}
     >
-      <span className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold">{formatSeoul(item.measuredAt)}</span>
-        <Badge variant={available ? "outline" : "secondary"}>
-          {available ? "열람 가능" : "상세 확인 필요"}
-        </Badge>
-      </span>
-      <span className="mt-1 block text-xs text-muted-foreground">
-        {available ? `확정 노출 ${item.confirmedCount}/${item.validCount} · 상위 3곳 ${item.top3Count}/${item.validCount}` :
-          "측정 날짜는 보존되어 있습니다. 선택하면 상세 결과를 다시 확인합니다."}
-      </span>
+      {contents}
     </button>
   );
 }
@@ -328,10 +355,33 @@ function MeasurementHistoryPage() {
   }) && mergedCatalog?.ok
     ? mergedCatalog.data : null;
 
-  // Don't run a privileged historical-detail request until the user chooses
-  // an archived Run. The index is still useful when the server is unavailable.
+  // Resolve 'latest' with the SAME read gateway used by /dashboard.
+  // An unavailable/mismatched response never guesses from chronological order:
+  // the customer can still open the saved record as historical data.
+  const fetchCurrentRepresentative = useServerFn(getEntityFactsV2ReadGateway);
+  const currentRepresentativeQuery = useQuery({
+    queryKey: ["measurement-history-current-representative", session?.user.id, activeOrgId, businessId],
+    enabled:
+      !!session?.user.id && !!activeOrgId && !!businessId &&
+      !!catalog && catalog.runs.length > 0,
+    staleTime: 0,
+    retry: false,
+    queryFn: () => fetchCurrentRepresentative({
+      data: { orgId: activeOrgId as string, businessId: businessId as string },
+    }),
+  });
+  const currentRunId = resolveCurrentHistoryRunId({
+    orgId: activeOrgId,
+    businessId,
+    page,
+    catalog: mergedCatalog,
+    gateway: currentRepresentativeQuery.isFetching ? undefined : currentRepresentativeQuery.data,
+  });
+
+  // Only older Runs open an archive detail. Current Run links to /dashboard.
   const selectedRunId = choice?.orgId === activeOrgId &&
     choice.businessId === businessId &&
+    choice.runId !== currentRunId &&
     catalog?.runs.some((item) => item.runId === choice.runId)
     ? choice.runId
     : null;
@@ -361,7 +411,7 @@ function MeasurementHistoryPage() {
           <h1 className="text-2xl font-bold">측정 기록</h1>
         </div>
         <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-          완료된 AI 진단을 날짜별로 다시 볼 수 있습니다. 새로운 측정을 해도 이전에 관찰된 질문, 다른 업체, 인용 출처 기록은 이곳에서 확인합니다.
+          완료된 AI 진단을 날짜별로 보존합니다. 현재 대표 측정은 최신 AI 노출 진단으로 연결되고, 이전 측정은 당시 질문·다른 업체·인용 출처를 확인할 수 있습니다.
         </p>
         <BusinessSelector
           options={businesses.options}
@@ -422,6 +472,7 @@ function MeasurementHistoryPage() {
                       key={item.runId}
                       item={item}
                       selected={selectedRunId === item.runId}
+                      isCurrentRepresentative={currentRunId === item.runId}
                       onSelect={(runId) => setChoice({
                         orgId: activeOrgId as string,
                         businessId, runId,

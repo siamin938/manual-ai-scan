@@ -5,6 +5,7 @@ import { isUnifiedDiagnosticSetName } from "../../src/lib/custom-question-sugges
 import {
   canDisplayHistoryDetail,
   isMatchingHistoryCatalog,
+  resolveCurrentHistoryRunId,
   enrichMemberHistoryCatalog,
   getHistorySearchScopes,
   isValidHistoryAggregate,
@@ -15,6 +16,7 @@ import {
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
   ENTITY_FACTS_V2_READ_FACT_VERSION,
   type EntityFactsV2ReadGatewayDTO,
+  type EntityFactsV2ReadGatewayResponse,
 } from "../../src/lib/entity-facts-v2-read-gateway.types";
 
 const runId = "11111111-1111-4111-8111-111111111111";
@@ -214,6 +216,68 @@ describe("Read-only measurement history", () => {
     expect(view).toContain("snapshotStatus === \"temporarily_unavailable\"");
     expect(view).toContain("const selectedRunId = choice?");
     expect(privileged).toContain(".middleware([requireSupabaseAuth])");
+  });
+
+  it("tags latest only when the current dashboard's representative Run is verified", () => {
+    const newestRunId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const previousRunId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const catalog = {
+      ok: true as const,
+      data: {
+        orgId, businessId, page: 0,
+        snapshotStatus: "ready" as const, hasNextPage: false,
+        runs: [
+          { runId: newestRunId, runName: "newest", measuredAt: "2026-09-27T05:43:12Z",
+            status: "available" as const, validCount: 24, confirmedCount: 16, top3Count: 16 },
+          { runId: previousRunId, runName: "previous", measuredAt: "2026-09-26T14:08:15Z",
+            status: "available" as const, validCount: 24, confirmedCount: 16, top3Count: 16 },
+        ],
+      },
+    };
+    const current = (runId: string, business = businessId): EntityFactsV2ReadGatewayResponse =>
+      ({ ok: true, data: { business: { id: business }, scope: { runId } } }
+        as unknown as EntityFactsV2ReadGatewayResponse);
+    const getId = (gateway: EntityFactsV2ReadGatewayResponse | undefined, page = 0) =>
+      resolveCurrentHistoryRunId({ orgId, businessId, page, catalog, gateway });
+
+    expect(getId(current(newestRunId))).toBe(newestRunId);
+    // Chronology is NOT the source of truth: the verified gateway can select an older Run.
+    expect(getId(current(previousRunId))).toBe(previousRunId);
+    expect(getId(undefined)).toBeNull();
+    expect(getId({ ok: false, error: "NO_V2_DATA" })).toBeNull();
+    expect(getId(current(newestRunId, "another-business"))).toBeNull();
+    expect(getId(current("cccccccc-cccc-4ccc-8ccc-cccccccccccc"))).toBeNull();
+    expect(getId(current(newestRunId), 1)).toBeNull();
+    expect(resolveCurrentHistoryRunId({
+      orgId: "another-org", businessId, page: 0, catalog, gateway: current(newestRunId),
+    })).toBeNull();
+    expect(resolveCurrentHistoryRunId({
+      orgId, businessId: "another-business", page: 0, catalog, gateway: current(newestRunId),
+    })).toBeNull();
+    expect(resolveCurrentHistoryRunId({
+      orgId, businessId, page: 0,
+      catalog: { ok: false, error: "FORBIDDEN" }, gateway: current(newestRunId),
+    })).toBeNull();
+  });
+
+  it("links verified current Run to the unchanged dashboard and keeps older archive reading", () => {
+    const at = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
+    const history = at("src/routes/_authenticated/measurement-history.tsx");
+    const dashboard = at("src/routes/_authenticated/dashboard.tsx");
+    expect(history).toContain("useServerFn(getEntityFactsV2ReadGateway)");
+    expect(history).toContain('queryKey: ["measurement-history-current-representative", session?.user.id, activeOrgId, businessId]');
+    expect(history).toContain("gateway: currentRepresentativeQuery.isFetching ? undefined : currentRepresentativeQuery.data");
+    expect(history).toContain("isCurrentRepresentative={currentRunId === item.runId}");
+    expect(history).toContain("choice.runId !== currentRunId");
+    expect(history).toContain("if (isCurrentRepresentative) {");
+    expect(history).toContain('to="/dashboard"');
+    expect(history).toContain("search={{}}");
+    expect(history).toContain("최신 AI 노출 진단 보기");
+    expect(history).toContain("최신 진단");
+    expect(history).toContain("onClick={() => onSelect(item.runId)}");
+    expect(history).toContain("getMeasurementHistoryDetail");
+    expect(dashboard).toContain("getEntityFactsV2ReadGateway");
+    expect(dashboard).not.toContain("resolveCurrentHistoryRunId");
   });
 
   it("refuses stale cross-org, cross-business or cross-Run cached results", () => {
