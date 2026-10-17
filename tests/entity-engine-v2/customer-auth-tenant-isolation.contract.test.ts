@@ -37,10 +37,17 @@ describe("customer auth and tenant security contract", () => {
     expect(auth).toContain("updateUser({ password: newPassword })");
   });
 
-  it("clears cached customer and organization data on cross-tab or explicit sign-out", () => {
+  it("clears customer caches and stored business selections on sign-out or account switch", () => {
     expect(org).toContain("useQueryClient");
-    expect(org).toContain('if (event === "SIGNED_OUT") queryClient.clear();');
-    expect(org.indexOf("queryClient.clear()")).toBeLessThan(org.indexOf("setSession(s);"));
+    expect(org).toContain("shouldDiscardCustomerState(event, previousUserId, nextUserId)");
+    expect(org).toContain("queryClient.clear();");
+    expect(org).toContain("clearStoredTargetBusinessSelections(window.localStorage)");
+    expect(org.indexOf("queryClient.clear()")).toBeLessThan(org.indexOf("setSession(nextSession);"));
+    expect(org).toContain("if (eventRevision === initialRevision)");
+    expect(layout).toContain("key={session.user.id}");
+    expect(layout).toContain("if (!ready || !session)");
+    expect(layout).toContain("if (ready && !session)");
+    expect(layout).toContain('navigate({ to: "/auth", replace: true })');
     expect(layout).toContain("setIsSigningOut(true)");
     expect(layout).toContain("await supabase.auth.signOut()");
     expect(layout).toContain('navigate({ to: "/auth" })');

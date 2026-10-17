@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,11 +46,25 @@ const INTERNAL_NAV = [
 
 
 function AuthedLayout() {
-  const { session } = useSession();
+  const { session, ready } = useSession();
+  const navigate = useNavigate();
+
+  // A cross-tab sign-out can occur after beforeLoad has finished.
+  // Redirect before showing organization onboarding or a stale customer view.
+  useEffect(() => {
+    if (ready && !session) {
+      void navigate({ to: "/auth", replace: true });
+    }
+  }, [ready, session, navigate]);
+
+  if (!ready || !session) {
+    return <div className="py-16 text-center text-sm text-muted-foreground">로그인 상태를 확인하는 중…</div>;
+  }
+
   return (
-    <OrgProvider session={session}>
+    <OrgProvider key={session.user.id} session={session}>
       <ActiveTargetBusinessProvider>
-        <Shell sessionUserId={session?.user.id ?? null} />
+        <Shell sessionUserId={session.user.id} />
       </ActiveTargetBusinessProvider>
     </OrgProvider>
   );

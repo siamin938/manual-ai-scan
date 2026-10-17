@@ -2,6 +2,10 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  clearStoredTargetBusinessSelections,
+  shouldDiscardCustomerState,
+} from "@/lib/session-privacy";
 
 export type AppRole = "owner" | "admin" | "analyst" | "client_viewer";
 
@@ -30,16 +34,53 @@ export function useSession() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    let disposed = false;
+    let eventRevision = 0;
+    let previousUserId: string | null = null;
+
+    const acceptSession = (event: string, nextSession: Session | null) => {
+      if (disposed) return;
+      const nextUserId = nextSession?.user.id ?? null;
+
+      if (shouldDiscardCustomerState(event, previousUserId, nextUserId)) {
+        // Clear tenant data before updating the visible identity. A new user
+        // must never inherit the previous user's React Query result cache.
+        queryClient.clear();
+        if (typeof window !== "undefined") {
+          try {
+            clearStoredTargetBusinessSelections(window.localStorage);
+          } catch {
+            // Disabled storage must never prevent logging out.
+          }
+        }
+      }
+
+      previousUserId = nextUserId;
+      setSession(nextSession);
+    };
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      // Signing out in this or another tab must discard prior tenant/customer caches.
-      if (event === "SIGNED_OUT") queryClient.clear();
-      setSession(s);
+      eventRevision += 1;
+      acceptSession(event, s);
     });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+
+    // The initial read may finish AFTER an auth event in another tab. Never
+    // reapply that older session over an already-observed SIGNED_OUT/IN event.
+    const initialRevision = eventRevision;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (disposed) return;
+      if (eventRevision === initialRevision) {
+        acceptSession("INITIAL_READ", data.session);
+      }
       setReady(true);
+    }).catch(() => {
+      if (!disposed) setReady(true);
     });
-    return () => sub.subscription.unsubscribe();
+
+    return () => {
+      disposed = true;
+      sub.subscription.unsubscribe();
+    };
   }, [queryClient]);
 
   return { session, ready };
