@@ -30,6 +30,11 @@ import type { V1CustomerQaScope } from "@/lib/action-opportunity-v1.customer-das
 import { v1RuleForOwnerSummaryInsight } from "@/lib/action-opportunity-v1.owner-summary-bridge";
 import { formatSeoul } from "@/lib/format";
 import { INTENT_LABELS, normalizeQuestion } from "@/lib/question-suggestions";
+import {
+  buildSearchContextQuestionEvidence,
+  searchContextQuestionEvidenceLabel,
+} from "@/lib/search-context-question-evidence";
+import type { EntityFactsV2ReadQuestionAreaDTO } from "@/lib/entity-facts-v2-read-gateway.types";
 import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
 import { buildEntityFactsV2DashboardCutoverModel } from "@/lib/entity-facts-v2-read-gateway.dashboard-cutover";
 import {
@@ -476,9 +481,12 @@ function MeasurementTooltip({
 
 function SearchContextChart({
   groups,
+  questions,
 }: {
-  groups: Array<QuestionGroupCounts & { intentType: string }>;
+  groups: Array<QuestionGroupCounts & { intentType: string; questionCount: number }>;
+  questions: readonly EntityFactsV2ReadQuestionAreaDTO[];
 }) {
+  const questionEvidence = buildSearchContextQuestionEvidence(groups, questions);
   const data = groups.map((group) => ({
     label: intentLabel(group.intentType),
     confirmed: group.confirmedMentionCount,
@@ -569,6 +577,42 @@ function SearchContextChart({
           노출 미확인
         </span>
       </div>
+      <details className="no-print mt-4 rounded-lg border bg-card/70 px-3 py-3 sm:px-4">
+        <summary className="cursor-pointer text-sm font-semibold">
+          검색 상황별 실제 질문 {groups.reduce((sum, group) => sum + group.questionCount, 0)}개 확인
+        </summary>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          이 검색 유형은 질문 생성 시 지정한 검색 목적입니다.
+          질문 표현이 비슷해도 다른 유형에 포함될 수 있으며, 기존 분류나 노출 판정은 바꾸지 않습니다.
+        </p>
+        <div className="mt-3 divide-y">
+          {questionEvidence.map((group) => (
+            <details key={group.intentType} className="py-2">
+              <summary className="cursor-pointer text-sm font-medium">
+                {intentLabel(group.intentType)} · 확정 노출 {group.confirmedMentionCount}/{group.validCount}
+              </summary>
+              {group.questions === null ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  이 측정에 저장된 분류별 질문 수치가 일치하지 않아 개별 질문 목록은 표시하지 않습니다.
+                </p>
+              ) : (
+                <ol className="mt-2 space-y-2 pl-4">
+                  {group.questions.map((question) => (
+                    <li key={question.questionId} className="list-decimal text-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                        <span className="min-w-0 flex-1 break-words leading-6">{question.questionText}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {searchContextQuestionEvidenceLabel(question)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </details>
+          ))}
+        </div>
+      </details>
       <div className="sr-only">
         {data.map((item) => (
           <p key={item.label}>
@@ -2292,15 +2336,16 @@ function DashboardPage() {
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <p className="mb-3 text-xs text-muted-foreground">
-                비슷한 검색 질문을 묶어 내 업체가 실제로 확인된 질문과 추가 확인이 필요한 질문을
-                보여드립니다. 각 검색 상황은 이번 측정의 해당 질문 수를 기준으로 비교합니다.
+                이번 측정에서 질문을 만들 때 지정한 검색 목적별로 확정 노출을 비교합니다.
+                예를 들어 1/3은 해당 유형의 유효 AI 답변 3개 중 내 업체가 확정 등장한 답변이 1개라는 뜻입니다.
+                아래에서 각 유형의 실제 질문을 확인할 수 있습니다.
               </p>
               {model.questionGroups.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
                   질문군 요약이 아직 없습니다.
                 </p>
               ) : (
-                <SearchContextChart groups={model.questionGroups} />
+                <SearchContextChart groups={model.questionGroups} questions={dto.questionAreas} />
               )}
             </CardContent>
           </Card>
