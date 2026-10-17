@@ -234,9 +234,12 @@ describe("Read-only measurement history", () => {
         ],
       },
     };
-    const current = (runId: string, business = businessId): EntityFactsV2ReadGatewayResponse =>
-      ({ ok: true, data: { business: { id: business }, scope: { runId } } }
-        as unknown as EntityFactsV2ReadGatewayResponse);
+    const current = (runId: string, business = businessId): EntityFactsV2ReadGatewayResponse => {
+      return {
+        ok: true,
+        data: { business: { id: business }, scope: { runId } },
+      } as unknown as EntityFactsV2ReadGatewayResponse;
+    };
     const getId = (gateway: EntityFactsV2ReadGatewayResponse | undefined, page = 0) =>
       resolveCurrentHistoryRunId({ orgId, businessId, page, catalog, gateway });
 
