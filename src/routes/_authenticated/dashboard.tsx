@@ -1427,6 +1427,7 @@ function DashboardPage() {
           key={`${dto.business.id}:${dto.scope.runId}`}
           summary={summaryModel}
           questionAreas={dto.questionAreas}
+          intentOrder={dto.questionGroups.map(group => group.intentType)}
           questionLocations={dto.questionLocations ?? []}
           scopeEvidenceAvailable={!!unifiedLayerSummary}
           broadObservation={dto.broadSearchObservation ?? null}
@@ -2453,6 +2454,7 @@ function DashboardPage() {
 function DashboardSummary({
   summary,
   questionAreas,
+  intentOrder,
   questionLocations,
   scopeEvidenceAvailable,
   broadObservation,
@@ -2463,6 +2465,7 @@ function DashboardSummary({
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
   questionAreas: readonly EntityFactsV2ReadQuestionAreaDTO[];
+  intentOrder: readonly string[];
   questionLocations: readonly import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadQuestionLocationDTO[];
   scopeEvidenceAvailable: boolean;
   broadObservation: import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadBroadSearchObservationDTO | null;
@@ -2484,7 +2487,7 @@ function DashboardSummary({
 
   return (
     <section className="space-y-4" aria-label="사장님용 10초 요약">
-      <DiagnosticSummaryLayout summary={summary} questions={questionAreas} locations={questionLocations} enabled={scopeEvidenceAvailable} observation={broadObservation} benchmark={benchmark}
+      <DiagnosticSummaryLayout summary={summary} questions={questionAreas} intentOrder={intentOrder} locations={questionLocations} enabled={scopeEvidenceAvailable} observation={broadObservation} benchmark={benchmark}
         actionTitle={summary.opportunities[0]?.title ?? observations[0]?.title ?? "저장된 질문과 답변 확인"}
         actionEvidence={summary.opportunities[0]?.observation ?? observations[0]?.recommendedCheck ?? "현재 자료에서는 우선 확인할 대상을 정하기 어렵습니다."}
         onAction={() => onShowDetail(summary.opportunities.length > 0 ? "priorities" : observations[0]?.id === "repeated_competitor" ? "businesses" : observations[0]?.id.startsWith("verified_page") ? "sources" : "questions")}

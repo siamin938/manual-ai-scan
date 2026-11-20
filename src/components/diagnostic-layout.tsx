@@ -12,6 +12,26 @@ import type { VisibilityBenchmarkDTO } from "@/lib/visibility-benchmark.types";
 
 type Question = Pick<EntityFactsV2ReadQuestionAreaDTO, "questionId" | "questionText" | "intentType" | "validCount" | "confirmedMentionCount" | "unresolvedTargetCount">;
 
+// Presentation ordering only: keep each stored question object and its evidence unchanged.
+export function interleaveQuestionsByIntent<T extends Pick<Question, "intentType">>(questions: readonly T[], intentOrder: readonly string[]): T[] {
+  const order = [...new Set([...intentOrder, ...questions.map(q => q.intentType)])];
+  const buckets = order.map(intent => questions.filter(q => q.intentType === intent));
+  const result: T[] = [];
+  const depth = Math.max(0, ...buckets.map(bucket => bucket.length));
+  for (let row = 0; row < depth; row += 1) {
+    for (const bucket of buckets) {
+      const question = bucket[row];
+      if (question) result.push(question);
+    }
+  }
+  return result;
+}
+
+export function hasVerifiedBroadAbsence(scopes: EntityFactsV2DashboardSummaryViewModel["searchScopes"]): boolean {
+  const broad = scopes?.find(scope => scope.kind === "core");
+  return !!broad && broad.validCount > 0 && broad.confirmedCount === 0;
+}
+
 export function EvidencePopup({ title, description, children, open, onOpenChange, returnFocus }: {
   title: string; description: string; children: ReactNode; open: boolean; onOpenChange: (open: boolean) => void; returnFocus?: HTMLElement | null;
 }) {
@@ -35,16 +55,16 @@ function QuestionResults({ questions }: { questions: readonly Question[] }) {
   return <ol className="diagnostic-question-results">{questions.map(q => <li key={q.questionId} data-question-id={q.questionId}><p>{q.questionText}</p><p className="text-muted-foreground">{searchContextQuestionEvidenceLabel(q)}</p><p className="text-muted-foreground">유효 답변 {q.validCount}개 · 추가 확인 {q.unresolvedTargetCount}개</p></li>)}</ol>;
 }
 
-export function QuestionMatrix({ questions, locations, enabled, scopes, headline }: {
+export function QuestionMatrix({ questions, locations, enabled, scopes, headline, intentOrder = ALLOWED_INTENTS }: {
   questions: readonly EntityFactsV2ReadQuestionAreaDTO[]; locations: readonly EntityFactsV2ReadQuestionLocationDTO[]; enabled: boolean;
-  scopes: EntityFactsV2DashboardSummaryViewModel["searchScopes"]; headline: string;
+  scopes: EntityFactsV2DashboardSummaryViewModel["searchScopes"]; headline: string; intentOrder?: readonly string[];
 }) {
   const [current, setCurrent] = useState<Question | null>(null);
   const focus = useRef<HTMLElement | null>(null);
   const byId = new Map(locations.map(row => [row.questionId, row]));
   return <section className="diagnostic-panel diagnostic-matrix" aria-label="실제 질문별 등장 결과"><h2>{headline}</h2>
     {!enabled ? <p className="text-muted-foreground">이 측정은 실제 질문의 검색 범위를 구분할 자료가 없습니다. 저장된 질문은 상세 분석에서 확인할 수 있습니다.</p> : [true, false].map(broad => {
-      const rows = questions.filter(q => { const location = byId.get(q.questionId); return location && (location.city === null) === broad; });
+      const rows = interleaveQuestionsByIntent(questions.filter(q => { const location = byId.get(q.questionId); return location && (location.city === null) === broad; }), intentOrder);
       const scope = scopes?.find(s => s.kind === (broad ? "core" : "custom"));
       return <div className="diagnostic-scope" key={String(broad)}><div className="diagnostic-scope-label"><h3>{broad ? "넓은 지역 전체에서 찾을 때" : "조건을 좁혀 찾을 때"}</h3><strong>{scope && scope.validCount > 0 ? `${scope.confirmedCount} / ${scope.validCount}` : "유효 답변 없음"}</strong></div>
         <div className="diagnostic-bubble-grid">{rows.map(q => <Button key={q.questionId} variant="ghost" className="diagnostic-bubble-button" aria-label={`${q.questionText}: ${searchContextQuestionEvidenceLabel(q)}`} onClick={event => { focus.current = event.currentTarget; setCurrent(q); }}><QuestionBubble question={q} /></Button>)}</div>
@@ -60,15 +80,16 @@ function Podium() {
   return <svg className="diagnostic-podium" viewBox="0 0 100 100" aria-hidden="true"><path d="m50 8 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" fill="none" stroke="currentColor" strokeWidth="2"/><rect className="podium-low" x="5" y="52" width="26" height="25" rx="4"/><rect className="podium-high" x="36" y="31" width="28" height="46" rx="4"/><rect className="podium-low" x="69" y="60" width="24" height="17" rx="4"/></svg>;
 }
 
-export function DiagnosticSummaryLayout({ summary, questions, locations, enabled, observation, benchmark, actionTitle, actionEvidence, onAction, onTopic }: {
+export function DiagnosticSummaryLayout({ summary, questions, locations, enabled, observation, benchmark, actionTitle, actionEvidence, onAction, onTopic, intentOrder }: {
   summary: EntityFactsV2DashboardSummaryViewModel; questions: readonly EntityFactsV2ReadQuestionAreaDTO[]; locations: readonly EntityFactsV2ReadQuestionLocationDTO[]; enabled: boolean;
   observation: EntityFactsV2ReadBroadSearchObservationDTO | null; benchmark: VisibilityBenchmarkDTO | null;
   actionTitle: string; actionEvidence: string; onAction: () => void; onTopic: (topic: string) => void;
+  intentOrder?: readonly string[];
 }) {
   const hasCounts = summary.visibility.count !== null && summary.visibility.total !== null;
   return <div className="diagnostic-summary-layout"><div className="diagnostic-summary-top">
     <section className="diagnostic-result" aria-label="이번 진단 결과"><p>AI 답변 {summary.visibility.total ?? "확인 중"}{summary.visibility.total !== null ? "개 중" : ""}</p><div className="diagnostic-result-number"><strong data-digits={String(summary.visibility.count ?? "").length}>{hasCounts ? summary.visibility.count : "–"}</strong><span>{hasCounts ? "개에 등장" : "결과 확인 중"}</span><Podium /></div><div className="diagnostic-result-footer"><Star aria-hidden="true"/><span>{summary.top3.count === null ? "상위 3곳 결과 확인 중" : `등장한 답변 중 ${summary.top3.count}개에서 상위 3곳`}</span></div></section>
-    <QuestionMatrix questions={questions} locations={locations} enabled={enabled} scopes={summary.searchScopes} headline={summary.searchScopeObservation ? "조건을 좁혔을 때만 등장" : "어떤 범위의 질문에서 나왔나요?"} />
+    <QuestionMatrix questions={questions} locations={locations} enabled={enabled} scopes={summary.searchScopes} {...(intentOrder ? { intentOrder } : {})} headline={enabled && summary.searchScopeObservation && hasVerifiedBroadAbsence(summary.searchScopes) ? "조건을 좁혔을 때만 등장" : "어떤 범위의 질문에서 나왔나요?"} />
   </div><aside className="diagnostic-action" aria-label="먼저 확인할 일"><div className="diagnostic-action-icon"><MapPin aria-hidden="true"/></div><div><p className="diagnostic-eyebrow">먼저 확인할 곳</p><h3>{actionTitle}</h3><p className="diagnostic-action-evidence">{actionEvidence}</p></div><Button className="diagnostic-evidence-cta no-print" onClick={onAction}>실제 관찰 근거 보기<ChevronRight aria-hidden="true"/></Button></aside>
     <div className="diagnostic-summary-tiles"><Button variant="outline" className="diagnostic-link-tile" onClick={() => onTopic("businesses")}><span className="diagnostic-tile-icon"><Store/></span><span><strong>넓은 지역에 나온 업체</strong><small>{observation ? `한 번 등장 ${observation.singleObservationCompetitors.length}곳 / 반복 등장 ${observation.repeatedCompetitors.length}곳` : "넓은 지역 분류 자료 없음"}</small></span><ChevronRight/></Button><Button variant="outline" className="diagnostic-link-tile diagnostic-source-tile" onClick={() => onTopic("sources")}><span className="diagnostic-tile-icon"><Link2/></span><span><strong>자주 등장한 업체의 출처</strong><small>{benchmark ? `최근 ${benchmark.windowDays}일 / 자동차 업체 ${benchmark.highVisibilityEntityCount}곳` : "시장 표본 자료 없음"}</small></span><ChevronRight/></Button></div>
   </div>;

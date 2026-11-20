@@ -199,7 +199,7 @@ describe("approved CHABOIM home and dashboard design", () => {
     expect(panels).toContain("observation.repeatedCompetitors");
     expect(panels).toContain("aria-pressed={selection === group.key}");
     expect(panels).toContain('!printExpanded && selection !== group.key ? "broad-evidence-list hidden space-y-3 print:block"');
-    expect(panels).toContain('group.highEntitySharePct === null ? "미집계"');
+    expect(panels).toContain('share === null ? "집계 전"');
     expect(panels).toContain("group.highEntitySharePct !== null && <span");
     expect(read("src/routes/_authenticated/dashboard.tsx")).toContain("key={`${dto.business.id}:${dto.scope.runId}`}");
   });
