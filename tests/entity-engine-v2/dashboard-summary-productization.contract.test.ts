@@ -178,3 +178,27 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('summary.verifiedPageStatus === "not_verified"');
   });
 });
+
+describe("approved CHABOIM home and dashboard design", () => {
+  const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
+  it("uses the local approved landing photo and preserves public sample values", () => {
+    const home = read("src/routes/index.tsx");
+    expect(home).toContain('@/assets/chaboim-landing.webp');
+    expect(home).not.toContain("user-uploads://");
+    expect(home).toContain('redirect({ to: "/dashboard" })');
+    expect(home).toContain("손님이 AI에 물을 때,");
+    expect(home).toContain("AI 답변 24개 중");
+    expect(home).toContain("14/16");
+    expect(home).toContain("5/8");
+  });
+  it("uses server-classified broad competitor rows and keeps null benchmark shares unplotted", () => {
+    const panels = read("src/components/dashboard-evidence-panels.tsx");
+    expect(panels).toContain("observation.singleObservationCompetitors");
+    expect(panels).toContain("observation.repeatedCompetitors");
+    expect(panels).toContain("aria-pressed={selection === group.key}");
+    expect(panels).toContain('!printExpanded && selection !== group.key ? "broad-evidence-list hidden space-y-3 print:block"');
+    expect(panels).toContain('group.highEntitySharePct === null ? "미집계"');
+    expect(panels).toContain("group.highEntitySharePct !== null && <div");
+    expect(read("src/routes/_authenticated/dashboard.tsx")).toContain("key={`${dto.business.id}:${dto.scope.runId}`}");
+  });
+});

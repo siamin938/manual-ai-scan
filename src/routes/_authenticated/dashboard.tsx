@@ -1,3 +1,4 @@
+import { BroadCompetitorEvidence, BenchmarkSourceEvidence, QuestionScopeEvidence } from "@/components/dashboard-evidence-panels";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import {
@@ -1483,7 +1484,11 @@ function DashboardPage() {
 
       {dto && model && summaryModel && view === "summary" && (
         <DashboardSummary
+          key={`${dto.business.id}:${dto.scope.runId}`}
           summary={summaryModel}
+          questionAreas={dto.questionAreas}
+          questionLocations={dto.questionLocations ?? []}
+          scopeEvidenceAvailable={!!unifiedLayerSummary}
           customerEvidenceQaScope={
             privateV1AdminAllowed &&
             session?.user.id &&
@@ -1516,6 +1521,9 @@ function DashboardPage() {
 
       {dto && model && view === "detail" && (
         <>
+          <nav className="no-print grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="상세 분석 탐색">
+            {[["questions", "질문"], ["businesses", "다른 업체"], ["sources", "출처"], ["comparison", "지난 측정"]].map(([topic, label]) => <Button key={topic} variant={detailTopic === topic ? "default" : "outline"} aria-pressed={detailTopic === topic} onClick={() => setDetailTopic(topic ?? "questions")}>{label}</Button>)}
+          </nav>
           <p className="text-base text-muted-foreground">저장된 질문과 실제 답변의 근거를 확인하세요. 같은 측정의 결과를 주제별로 모았습니다.</p>
           <details id="diagnostic-questions" className="diagnostic-topic" open={printExpanded || detailTopic === "questions"}>
             <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "questions" ? "" : "questions"); }}>
@@ -1523,6 +1531,10 @@ function DashboardPage() {
               <span className="text-base font-normal text-muted-foreground">검색 유형과 실제 저장 질문</span>
             </summary>
             <div className="diagnostic-topic-content space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2">{buildSearchContextQuestionEvidence(model.questionGroups, dto.questionAreas).map((group) => <details key={group.intentType} className="rounded-lg border bg-card p-4" open={printExpanded}>
+            <summary className="flex min-h-11 cursor-pointer items-center gap-3 text-base font-semibold"><Search className="size-5 shrink-0 text-primary" aria-hidden="true" />{intentLabel(group.intentType)}<span className="ml-auto text-sm tabular-nums">{group.confirmedMentionCount}/{group.validCount}</span></summary>
+            {group.questions ? <ul className="mt-4 space-y-4">{group.questions.map((q) => <li key={q.questionId}><p className="text-base">{q.questionText}</p><p className="text-sm text-muted-foreground">{searchContextQuestionEvidenceLabel(q)}</p></li>)}</ul> : <p className="mt-3">질문별 저장 근거를 확인할 수 없습니다.</p>}
+          </details>)}</div>
           <Card className="report-section print-avoid-break">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">SEARCH CONTEXT</p>
@@ -1628,6 +1640,7 @@ function DashboardPage() {
               <span className="text-base font-normal text-muted-foreground">업체로 확인된 관찰 결과</span>
             </summary>
             <div className="diagnostic-topic-content space-y-6">
+          {dto.broadSearchObservation && <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} />}
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">OBSERVED BUSINESSES</p>
@@ -1698,6 +1711,7 @@ function DashboardPage() {
               <span className="text-base font-normal text-muted-foreground">관련 확인 페이지와 전체 인용 출처 구분</span>
             </summary>
             <div className="diagnostic-topic-content space-y-6">
+          {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} printExpanded={printExpanded} />}
             <Card className="report-section">
               <CardHeader className="border-b bg-muted/20">
                 <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
@@ -2341,7 +2355,7 @@ function DashboardPage() {
             />
           )}
 
-          {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} />}
+
 
 
             </div>
@@ -2431,11 +2445,17 @@ function DashboardPage() {
 
 function DashboardSummary({
   summary,
+  questionAreas,
+  questionLocations,
+  scopeEvidenceAvailable,
   customerEvidenceQaScope,
   onShowDetail,
   onReviewEvidence,
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
+  questionAreas: readonly EntityFactsV2ReadQuestionAreaDTO[];
+  questionLocations: readonly import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadQuestionLocationDTO[];
+  scopeEvidenceAvailable: boolean;
   customerEvidenceQaScope?: V1CustomerQaScope | undefined;
   onShowDetail: (topic?: string) => void;
   onReviewEvidence?: ((insight: CompactSummaryInsight) => void) | undefined;
@@ -2458,12 +2478,12 @@ function DashboardSummary({
   return (
     <section className="space-y-4" aria-label="사장님용 10초 요약">
       <div className="grid items-start gap-6 border-b border-border pb-7 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-10">
-        <div className="min-w-0 py-2">
-          <p className="mb-3 text-base font-medium text-muted-foreground">이번 진단 결과</p>
+        <div className="owner-result min-w-0 rounded-lg bg-midnight p-6 text-on-midnight sm:p-8">
+          <p className="mb-3 text-base font-medium">이번 진단 결과</p>
           {hasHeroCounts ? (
             <h2 className="text-3xl font-bold leading-relaxed sm:text-4xl">
-              AI 답변 <strong className="text-primary tabular-nums">{summary.visibility.total}개</strong> 중<br />
-              <strong className="text-primary tabular-nums">{summary.visibility.count}개</strong>에 우리 업체가 나왔어요
+              AI 답변 <strong className="text-on-midnight tabular-nums">{summary.visibility.total}개</strong> 중<br />
+              <strong className="text-on-midnight tabular-nums">{summary.visibility.count}개</strong>에 우리 업체가 나왔어요
             </h2>
           ) : (
             <h2 className="text-2xl font-bold leading-relaxed">이번 측정의 핵심 결과를 확인하고 있습니다.</h2>
@@ -2479,11 +2499,11 @@ function DashboardSummary({
             <p className="mt-4 text-lg">상위 3곳 안에서는 아직 확인되지 않았어요.</p>
           )}
           {summary.heroVariant === "not_visible" && hasHeroCounts && (
-            <p className="mt-4 text-base text-muted-foreground">이번 유효 답변에서 확정 등장이 없었습니다. 모든 AI 검색에서 보이지 않는다는 뜻은 아닙니다.</p>
+            <p className="mt-4 text-base text-on-midnight/80">이번 유효 답변에서 확정 등장이 없었습니다. 모든 AI 검색에서 보이지 않는다는 뜻은 아닙니다.</p>
           )}
-          <p className="mt-3 text-base text-muted-foreground">업체로 확인된 등장만 표시합니다. 등장 여부가 추천이나 노출 보장을 뜻하지는 않습니다.</p>
+          <p className="mt-3 text-base text-on-midnight/80">업체로 확인된 등장만 표시합니다. 등장 여부가 추천이나 노출 보장을 뜻하지는 않습니다.</p>
         </div>
-        <aside className="min-w-0 border-l-4 border-primary bg-accent/40 p-5" aria-label="먼저 확인할 일">
+        <aside className="min-w-0 rounded-lg border bg-card p-5" aria-label="먼저 확인할 일">
           <h3 className="text-lg font-bold">먼저 확인해 보세요</h3>
           {summary.opportunities[0] ? (
             <><p className="mt-3 text-lg font-semibold">{summary.opportunities[0].title}</p><p className="mt-2 text-base leading-7 text-muted-foreground">{summary.opportunities[0].observation}</p></>
@@ -2496,6 +2516,14 @@ function DashboardSummary({
             실제 관찰 근거 보기<ArrowRight aria-hidden="true" />
           </Button>
         </aside>
+      </div>
+      <section className="rounded-lg border bg-card p-5 sm:p-7">
+        <QuestionScopeEvidence questions={questionAreas} locations={questionLocations} enabled={scopeEvidenceAvailable} />
+        <Button variant="link" className="no-print mt-4 px-0" onClick={() => onShowDetail("questions")}>실제 답변과 인용 근거 열기<ArrowRight aria-hidden="true" /></Button>
+      </section>
+      <div className="no-print grid gap-4 sm:grid-cols-2">
+        <Button variant="outline" className="h-auto min-h-24 justify-between whitespace-normal p-5 text-left text-lg" onClick={() => onShowDetail("businesses")}>넓은 검색에서 관찰된 업체<ArrowRight className="shrink-0" aria-hidden="true" /></Button>
+        <Button variant="outline" className="h-auto min-h-24 justify-between whitespace-normal p-5 text-left text-lg" onClick={() => onShowDetail("sources")}>업계에서 관찰된 출처<ArrowRight className="shrink-0" aria-hidden="true" /></Button>
       </div>
       <section className="py-3" aria-label="검색 범위별 확정 등장">
         <h3 className="text-xl font-bold">어떤 범위의 질문에서 나왔나요?</h3>
@@ -3076,19 +3104,14 @@ function ComparisonCard({
 function BenchmarkCard({
   benchmark,
   basisLabel,
+  printExpanded = false,
 }: {
+  printExpanded?: boolean;
   basisLabel: string;
   benchmark: NonNullable<
     Extract<Awaited<ReturnType<typeof getVisibilityBenchmark>>, { ok: true }>["benchmark"]
   >;
 }) {
-  const chartGroups = benchmark.sourceGroups.slice(0, 6);
-  const chartData = chartGroups.map((group) => ({
-    label: group.label,
-    share: group.highEntitySharePct ?? 0,
-    connected: group.targetConnected,
-  }));
-
   return (
     <Card className="report-section">
       <CardHeader className="border-b bg-muted/20">
@@ -3114,88 +3137,7 @@ function BenchmarkCard({
             아직 공통 출처 패턴을 판단할 표본이 부족합니다.
           </p>
         ) : (
-          <div className="space-y-4">
-            <div
-              className="h-72 w-full sm:h-80"
-              role="img"
-              aria-label="시장 벤치마크 출처 그룹별 고노출 업체 관찰 비율"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={chartData}
-                  layout="vertical"
-                  margin={{ top: 8, right: 48, bottom: 8, left: 8 }}
-                  barCategoryGap="30%"
-                >
-                  <CartesianGrid horizontal={false} stroke="var(--color-border)" />
-                  <XAxis type="number" domain={[0, 100]} hide />
-                  <YAxis
-                    type="category"
-                    dataKey="label"
-                    width={112}
-                    tick={{ fill: "var(--color-foreground)", fontSize: 12 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<BenchmarkTooltip />} cursor={{ fill: "var(--color-muted)" }} />
-                  <Bar
-                    dataKey="share"
-                    name="관찰 비율"
-                    fill="var(--color-chart-1)"
-                    radius={[0, 3, 3, 0]}
-                    isAnimationActive={false}
-                  >
-                    <LabelList
-                      dataKey="share"
-                      position="right"
-                      formatter={(value: number) => `${value.toFixed(1)}%`}
-                      className="fill-foreground text-[11px] font-semibold"
-                    />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="divide-y rounded-md border">
-              {chartGroups.map((g) => (
-                <div
-                  key={g.key}
-                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2"
-                >
-                  <p className="text-sm font-medium">{g.label}</p>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {g.sites.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {g.sites
-                          .slice(0, 4)
-                          .map((site) => site.label)
-                          .join(" · ")}
-                      </p>
-                    )}
-                    <Badge variant={g.targetConnected ? "default" : "secondary"}>
-                      {g.targetConnected
-                        ? "최근 측정에서 내 업체 직접 연결 확인"
-                        : "최근 측정에서 내 업체 직접 연결 미확인"}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="sr-only">
-              {chartGroups.map((group) => (
-                <p key={group.key}>
-                  {group.label}: 고노출 업체 {benchmark.highVisibilityEntityCount}곳 중{" "}
-                  {group.highEntityCount}곳에서 관찰
-                  {group.highEntitySharePct !== null
-                    ? `, ${group.highEntitySharePct.toFixed(1)}%`
-                    : ""}
-                  .{" "}
-                  {group.targetConnected
-                    ? "최근 측정에서 내 업체 직접 연결 확인"
-                    : "최근 측정에서 내 업체 직접 연결 미확인"}
-                </p>
-              ))}
-            </div>
-          </div>
+          <BenchmarkSourceEvidence benchmark={benchmark} printExpanded={printExpanded} />
         )}
         {benchmark.categoryContext?.available === true && (
           <div className="space-y-2 rounded-md border bg-muted/40 p-3">
