@@ -475,41 +475,30 @@ export async function fetchBroadSearchObservation(args: {
     ),
   ];
 
-  const [mentionsResult, verificationsResult, attributionsResult] =
-    mentionIds.length > 0
-      ? await Promise.all([
-          supabaseAdmin
-            .from("measurement_mentions")
-            .select("id,measurement_id,matched_business_id,position")
-            .eq("org_id", args.orgId)
-            .in("id", mentionIds),
-          supabaseAdmin
-            .from("measurement_entity_verifications")
-            .select(
-              "measurement_mention_id,verification_status,verified_count_as_business",
-            )
-            .eq("org_id", args.orgId)
-            .eq("business_id", args.businessId)
-            .in("measurement_mention_id", mentionIds),
-          supabaseAdmin
-            .from("measurement_citation_attributions")
-            .select("measurement_id,canonical_key,domain,attribution_level")
-            .eq("org_id", args.orgId)
-            .eq("business_id", args.businessId)
-            .eq("source_run_id", args.runId)
-            .in("measurement_id", measurementIds)
-            .limit(2000),
-        ])
-      : [
-          { data: [], error: null },
-          { data: [], error: null },
-          { data: [], error: null },
-        ];
+  const emptyLegacyRows = { data: [], error: null };
+  const [mentionsResult, verificationsResult, attributionsResult] = await Promise.all([
+    mentionIds.length ? supabaseAdmin.from("measurement_mentions")
+      .select("id,measurement_id,matched_business_id,position")
+      .eq("org_id", args.orgId)
+      .in("id", mentionIds) : emptyLegacyRows,
+    mentionIds.length ? supabaseAdmin.from("measurement_entity_verifications")
+      .select("measurement_mention_id,verification_status,verified_count_as_business")
+      .eq("org_id", args.orgId)
+      .eq("business_id", args.businessId)
+      .in("measurement_mention_id", mentionIds) : emptyLegacyRows,
+    supabaseAdmin.from("measurement_citation_attributions")
+      .select("measurement_id,canonical_key,domain,attribution_level", { count: "exact" })
+      .eq("org_id", args.orgId)
+      .eq("business_id", args.businessId)
+      .eq("source_run_id", args.runId)
+      .in("attribution_level", ["direct", "section"])
+      .in("measurement_id", measurementIds),
+  ]);
 
   if (
     mentionsResult.error ||
     verificationsResult.error ||
-    attributionsResult.error
+    attributionsResult.error || attributionsResult.count !== attributionsResult.data?.length
   ) {
     return null;
   }
