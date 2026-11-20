@@ -607,7 +607,7 @@ describe("Entity Facts v2 dashboard cutover mapping", () => {
     expect(dashboardSource).toContain('view === "summary"');
     expect(dashboardSource).toContain('view === "detail"');
     expect(dashboardSource).toContain("DiagnosticSummaryLayout");
-    expect(dashboardSource).toContain("actionTitle={summary.opportunities[0]?.title");
+    expect(dashboardSource).toContain("actionTitle={priority?.title ?? summary.opportunities[0]?.title");
     expect(dashboardSource).toContain("AI 노출 진단");
     expect(dashboardSource).toContain("핵심 요약");
     expect(dashboardSource).not.toContain("사장님이 10초 안에 핵심만 이해할 수 있도록");

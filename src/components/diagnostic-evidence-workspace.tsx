@@ -2,7 +2,9 @@ import { createContext, useContext, useEffect, useRef, useState, type MouseEvent
 import { CalendarDays, Check, ChevronRight, ClipboardCheck, Link2, MessageSquare, ShieldCheck, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EvidencePopup } from "@/components/diagnostic-layout";
-import { searchContextQuestionEvidenceLabel } from "@/lib/search-context-question-evidence";
+import { buildSearchContextQuestionEvidence } from "@/lib/search-context-question-evidence";
+import { QuestionResults } from "@/components/diagnostic-question-results";
+import type { PriorityEvidence } from "@/components/diagnostic-priority-evidence";
 import { INTENT_LABELS } from "@/lib/question-suggestions";
 import { formatSeoul } from "@/lib/format";
 import type { EntityFactsV2ReadGatewayDTO } from "@/lib/entity-facts-v2-read-gateway.types";
@@ -28,7 +30,6 @@ export function EvidenceBar({ confirmed, valid, label }: { confirmed: number; va
   return <div className="evidence-bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={valid} aria-valuenow={confirmed}><span style={{ width: `${Math.min(100, Math.max(0, confirmed / valid * 100))}%` }} /></div>;
 }
 
-type PriorityEvidence = { title: string; sourceGroupLabel: string; highEntityCount: number; highVisibilityEntityCount: number; highEntitySharePct: number | null; targetConnected: boolean | null; sites: readonly { label: string; domain?: string }[] };
 export function sourceCardMetrics(model: Pick<EntityFactsV2DashboardCutoverModel, "verifiedTargetCitationPages" | "sources">) {
   return {
     pages: model.verifiedTargetCitationPages.status === "complete" && model.verifiedTargetCitationPages.available ? model.verifiedTargetCitationPages.rows.length : null,
@@ -83,7 +84,8 @@ export function DiagnosticEvidenceWorkspace({ dto, model, summary, comparison, c
     { label: "추가 연결 단서", state: model.sources.available ? `${model.sources.rows.filter(r => r.evidence === "clue").length}개` : "미수집", rows: model.sources.rows.filter(r => r.evidence === "clue") },
     { label: "측정 전체 인용 도메인", state: dto.citationSources ? `${model.citationSources.rows.length}개` : "미수집", rows: model.citationSources.rows },
   ];
-  const questionRows = (rows: typeof dto.questionAreas) => <ol className="diagnostic-question-results">{rows.map(q => <li key={q.questionId} data-question-id={q.questionId}><p>{q.questionText}</p><p>{searchContextQuestionEvidenceLabel(q)}</p>{q.unresolvedTargetCount > 0 && <p>추가 확인 {q.unresolvedTargetCount}개</p>}</li>)}</ol>;
+  const questionEvidence = buildSearchContextQuestionEvidence(dto.questionGroups, dto.questionAreas);
+  const popupQuestions = questions === "all" ? dto.questionAreas : questionEvidence.find(group => group.intentType === questions)?.questions;
   return <details ref={root} className="diagnostic-additional evidence-workspace" open={expanded || printExpanded} onToggle={event => { if (!printExpanded) setExpanded(event.currentTarget.open); }}>
     <summary>추가 분석/근거 보기</summary>
     <div className="evidence-picker no-print" aria-label="추가 근거 주제">{evidenceTopics.map(key => {
@@ -96,7 +98,7 @@ export function DiagnosticEvidenceWorkspace({ dto, model, summary, comparison, c
     })}</div>
     <section id="diagnostic-evidence-panel" className="evidence-panel" aria-label={labels[topic]}>
       <h2>{labels[topic]}</h2>
-      {topic === "questions" && <><p>업체 등장 / 유효 답변</p><div className="evidence-question-groups">{model.questionGroups.map(group => <Button key={group.intentType} variant="ghost" className="evidence-group" onClick={event => { focus.current = event.currentTarget; setQuestions(group.intentType); }}><span><strong>{koreanIntent(group.intentType)}</strong><span>{group.confirmedMentionCount} / {group.validCount}{group.unresolvedTargetCount > 0 && ` · 추가 확인 ${group.unresolvedTargetCount}`}</span></span><EvidenceBar confirmed={group.confirmedMentionCount} valid={group.validCount} label={`${koreanIntent(group.intentType)} 업체 등장 / 유효 답변`} /><ChevronRight aria-hidden="true" /></Button>)}</div>{model.questionGroups.length === 0 && <p>저장된 질문 그룹이 없습니다.</p>}<Button variant="outline" onClick={event => { focus.current = event.currentTarget; setQuestions("all"); }}>질문 원문 {dto.questionAreas.length}개</Button></>}
+      {topic === "questions" && <><p>업체가 등장한 답변 / 유효 답변</p><div className="evidence-question-groups">{model.questionGroups.map(group => <Button key={group.intentType} variant="ghost" className="evidence-group" onClick={event => { focus.current = event.currentTarget; setQuestions(group.intentType); }}><span><strong>{koreanIntent(group.intentType)}</strong><span>{group.confirmedMentionCount} / {group.validCount}{group.unresolvedTargetCount > 0 && ` · 추가 확인 ${group.unresolvedTargetCount}`}</span></span><EvidenceBar confirmed={group.confirmedMentionCount} valid={group.validCount} label={`${koreanIntent(group.intentType)} 업체 등장 / 유효 답변`} /><ChevronRight aria-hidden="true" /></Button>)}</div>{model.questionGroups.length === 0 && <p>저장된 질문 그룹이 없습니다.</p>}<Button variant="outline" onClick={event => { focus.current = event.currentTarget; setQuestions("all"); }}>질문 원문 {dto.questionAreas.length}개</Button></>}
       {topic === "businesses" && <><p>이번 측정 전체에서 확인된 업체입니다. 넓은 지역 분류와는 별개입니다.</p><ol className="evidence-short-list">{model.competitors.rows.slice(0, 5).map(row => <li key={row.name}><strong>{row.name}</strong><span>등장 {row.responseCount}회 · 상위 3곳 {row.top3ResponseCount}회</span><EvidenceBar confirmed={row.responseCount} valid={model.recentSummary.validCount} label={`${row.name} 등장 횟수`} /></li>)}</ol>{model.competitors.rows.length === 0 && <p>확인된 다른 업체가 없습니다.</p>}{dto.broadSearchObservation ? <p>넓은 지역: 한 번 {dto.broadSearchObservation.singleObservationCompetitors.length}곳 · 두 번 이상 {dto.broadSearchObservation.repeatedCompetitors.length}곳</p> : <p>넓은 지역 분류 자료는 없습니다.</p>}</>}
       {topic === "sources" && <><p>이번 업체의 출처 근거입니다. 시장 표본과 합산하지 않습니다.</p><div className="evidence-source-states">{sourceLists.map((list, index) => { const Icon = index === 0 ? ShieldCheck : Link2; return <div key={list.label}><Icon aria-hidden="true"/><strong>{list.label}</strong><span>{list.state}</span><ul>{list.rows.slice(0, 2).map((row, i) => <li key={`${row.domain}:${i}`}>{"sampleUrl" in row ? <a href={row.sampleUrl} target="_blank" rel="noopener noreferrer">{row.domain}</a> : row.domain}</li>)}</ul></div>; })}</div></>}
       {topic === "comparison" && (comparisonError ? <p>이전 측정 비교 정보를 불러오지 못했습니다.</p> : comparison?.comparisonAvailable && comparison.visibility ? <><p>같은 질문과 측정 조건이 확인된 결과입니다.</p><div className="evidence-comparison"><span>이전<strong>{comparison.visibility.previousValueText}</strong></span><ChevronRight aria-hidden="true"/><span>이번<strong>{comparison.visibility.currentValueText}</strong></span></div><p>변화 {comparison.visibility.deltaText ?? "확인 불가"}</p></> : <p>{comparison?.description ?? "같은 조건으로 비교할 이전 측정 자료를 아직 확인할 수 없습니다."}</p>)}
@@ -106,7 +108,7 @@ export function DiagnosticEvidenceWorkspace({ dto, model, summary, comparison, c
     </section>
     <EvidencePopup title={`${labels[topic]} · 원자료`} description="현재 업체의 근거와 시장 표본은 별도로 표시합니다." open={raw} onOpenChange={setRaw} returnFocus={focus.current}>
       {raw && <>
-        {topic === "questions" && questionRows(dto.questionAreas)}
+        {topic === "questions" && <QuestionResults questions={dto.questionAreas}/>}
         {topic === "sources" && <div className="evidence-source-detail-groups">{sourceDetails.map(list => <details key={list.label} open={list.rows.length > 0 && list.rows.length <= 3}><summary>{list.label}<strong>{list.state}</strong></summary>{list.rows.length === 0 ? <p>{list.state}</p> : <ul className="evidence-short-list">{list.rows.map((row, i) => <li key={`${row.domain}:${i}`}><strong>{"title" in row && typeof row.title === "string" && row.title ? row.title : row.domain}</strong>{"sampleUrl" in row ? <a href={row.sampleUrl} target="_blank" rel="noopener noreferrer">{row.domain} · 페이지 열기</a> : <span>{row.domain}</span>}<span>관찰 {row.responseCount}회{"basisLabel" in row && ` · ${row.basisLabel}`}</span>{"linkedEntities" in row && <span>{row.linkedEntities.map(entity => `${entity.name} ${entity.responseCount}회`).join(" · ")}</span>}</li>)}</ul>}</details>)}</div>}
         {topic === "priorities" && <><h3>{priority?.title ?? summary?.opportunities[0]?.title}</h3>{priority && <><p>{priority.sourceGroupLabel} · 시장 {priority.highEntityCount} / {priority.highVisibilityEntityCount}곳 · {priority.highEntitySharePct === null ? "비율 미집계" : `${priority.highEntitySharePct.toFixed(1)}%`}</p><p>내 업체 같은 출처 그룹: {priority.targetConnected === null ? "미수집" : priority.targetConnected ? "연결 확인" : "연결 미확인"}</p><ul>{priority.sites.map((site, i) => <li key={`${site.label}:${i}`}>{site.label}{site.domain && ` · ${site.domain}`}</li>)}</ul></>}</>}
         {(topic === "businesses" || topic === "comparison") && <ArchiveContext.Provider value={{ topic, print: false }}>{children}</ArchiveContext.Provider>}
@@ -114,7 +116,7 @@ export function DiagnosticEvidenceWorkspace({ dto, model, summary, comparison, c
       </>}
       <Button variant="outline" onClick={() => setRaw(false)}>닫기</Button>
     </EvidencePopup>
-    <EvidencePopup title="질문 원문과 실제 결과" description="확정 결과와 추가 확인을 구분합니다." open={questions !== null} onOpenChange={open => { if (!open) setQuestions(null); }} returnFocus={focus.current}>{questionRows(dto.questionAreas.filter(q => questions === "all" || q.intentType === questions))}<Button variant="outline" onClick={() => setQuestions(null)}>닫기</Button></EvidencePopup>
+    <EvidencePopup title="질문 원문과 실제 결과" description="확정 결과와 추가 확인을 구분합니다." open={questions !== null} onOpenChange={open => { if (!open) setQuestions(null); }} returnFocus={focus.current}>{popupQuestions ? <QuestionResults questions={popupQuestions}/> : <p>질문별 저장 근거가 유형 집계와 일치하지 않아 결과를 표시할 수 없습니다. 전체 질문 원문에서 저장 자료를 확인하세요.</p>}<Button variant="outline" onClick={() => setQuestions(null)}>닫기</Button></EvidencePopup>
     {printExpanded && <div className="evidence-print-archive"><ArchiveContext.Provider value={{ topic: null, print: true }}>{children}</ArchiveContext.Provider></div>}
   </details>;
 }

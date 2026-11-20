@@ -1,4 +1,6 @@
 import { DiagnosticEvidenceWorkspace, EvidenceArchive } from "@/components/diagnostic-evidence-workspace";
+import { QuestionResults } from "@/components/diagnostic-question-results";
+import type { PriorityEvidence } from "@/components/diagnostic-priority-evidence";
 import { DiagnosticSummaryLayout, DiagnosticTopicTabs, DiagnosticQuestions, DiagnosticHistory } from "@/components/diagnostic-layout";
 import { BroadCompetitorEvidence, BenchmarkSourceEvidence } from "@/components/dashboard-evidence-panels";
 import { useEffect, useRef, useState } from "react";
@@ -599,18 +601,7 @@ function SearchContextChart({
                   이 측정에 저장된 분류별 질문 수치가 일치하지 않아 개별 질문 목록은 표시하지 않습니다.
                 </p>
               ) : (
-                <ol className="mt-2 space-y-2 pl-4">
-                  {group.questions.map((question) => (
-                    <li key={question.questionId} className="list-decimal text-sm">
-                      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                        <span className="min-w-0 flex-1 break-words leading-6">{question.questionText}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {searchContextQuestionEvidenceLabel(question)}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+                <QuestionResults questions={group.questions}/>
               )}
             </details>
           ))}
@@ -1234,6 +1225,14 @@ function DashboardPage() {
         broadSearchObservation: dto?.broadSearchObservation ?? null,
       })
     : null;
+  const firstPriority = actionOpportunityModel?.items[0];
+  const priorityEvidence: PriorityEvidence | null = firstPriority ? {
+    title: firstPriority.title, sourceGroupLabel: firstPriority.sourceGroupLabel,
+    highEntityCount: firstPriority.highEntityCount, highVisibilityEntityCount: firstPriority.highVisibilityEntityCount,
+    highEntitySharePct: firstPriority.highEntitySharePct,
+    targetConnected: benchmark?.sourceGroups.find(group => group.key === firstPriority.sourceGroupKey)?.targetConnected ?? null,
+    sites: firstPriority.sites,
+  } : null;
   const setDashboardView = (nextView: "summary" | "detail", topic = "questions") => {
     setDetailTopic(["questions", "businesses", "sources", "comparison"].includes(topic) ? topic : "questions");
     setEvidenceEntry(previous => ({ topic, version: previous.version + 1 }));
@@ -1428,6 +1427,7 @@ function DashboardPage() {
         <DashboardSummary
           key={`${dto.business.id}:${dto.scope.runId}`}
           summary={summaryModel}
+          priority={priorityEvidence}
           questionAreas={dto.questionAreas}
           intentOrder={dto.questionGroups.map(group => group.intentType)}
           questionLocations={dto.questionLocations ?? []}
@@ -1472,19 +1472,11 @@ function DashboardPage() {
             {(detailTopic === "questions" || printExpanded) && <DiagnosticQuestions key={`${dto.business.id}:${dto.scope.runId}`} groups={dto.questionGroups} questions={dto.questionAreas} />}
             {(detailTopic === "businesses" || printExpanded) && (dto.broadSearchObservation ? <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} /> : <p>이 측정은 넓은 지역 업체 분류 자료가 없습니다. 추가 근거에서 기존 관찰 업체를 확인하세요.</p>)}
             {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
-            {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} />{comparisonModel && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
+            {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
           </div>
           </>}
           <DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={evidenceEntry.topic} entryVersion={evidenceEntry.version}
-            priority={actionOpportunityModel?.items[0] ? {
-              title: actionOpportunityModel.items[0].title,
-              sourceGroupLabel: actionOpportunityModel.items[0].sourceGroupLabel,
-              highEntityCount: actionOpportunityModel.items[0].highEntityCount,
-              highVisibilityEntityCount: actionOpportunityModel.items[0].highVisibilityEntityCount,
-              highEntitySharePct: actionOpportunityModel.items[0].highEntitySharePct,
-              targetConnected: benchmark?.sourceGroups.find(group => group.key === actionOpportunityModel.items[0]?.sourceGroupKey)?.targetConnected ?? null,
-              sites: actionOpportunityModel.items[0].sites,
-            } : null}>
+            priority={priorityEvidence}>
           <EvidenceArchive topic="method">
       {view === "detail" && businessId && unifiedTransitionPending && (
         <Card className="border-primary/40 bg-primary/[0.03]">
@@ -1550,7 +1542,7 @@ function DashboardPage() {
             <div className="diagnostic-topic-content space-y-6">
           <div className="grid gap-3 sm:grid-cols-2">{buildSearchContextQuestionEvidence(model.questionGroups, dto.questionAreas).map((group) => <details key={group.intentType} className="rounded-lg border bg-card p-4" open={printExpanded}>
             <summary className="flex min-h-11 cursor-pointer items-center gap-3 text-base font-semibold"><Search className="size-5 shrink-0 text-primary" aria-hidden="true" />{intentLabel(group.intentType)}<span className="ml-auto text-sm tabular-nums">{group.confirmedMentionCount}/{group.validCount}</span></summary>
-            {group.questions ? <ul className="mt-4 space-y-4">{group.questions.map((q) => <li key={q.questionId}><p className="text-base">{q.questionText}</p><p className="text-sm text-muted-foreground">{searchContextQuestionEvidenceLabel(q)}</p></li>)}</ul> : <p className="mt-3">질문별 저장 근거를 확인할 수 없습니다.</p>}
+            {group.questions ? <QuestionResults questions={group.questions}/> : <p className="mt-3">질문별 저장 근거를 확인할 수 없습니다.</p>}
           </details>)}</div>
           <Card className="report-section print-avoid-break">
             <CardHeader className="border-b bg-muted/20">
@@ -1603,32 +1595,9 @@ function DashboardPage() {
                     현재 우선 확인할 질문이 없습니다.
                   </p>
                 ) : (
-                  weakQuestionRows
+                  <QuestionResults questions={dto.questionAreas.filter(q => weakQuestionRows
                     .slice(0, (showAllWeakQuestions || printExpanded) ? weakQuestionRows.length : 6)
-                    .map((q) => (
-                      <div key={q.questionId} className="rounded-md border p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-sm font-medium">{q.questionText}</p>
-                          <Badge variant={weakQuestionBadgeVariant(q.statusTone)}>
-                            {q.statusLabel}
-                          </Badge>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                          <span>{intentLabel(q.intentType)}</span>
-                          {isUnifiedDiagnostic && (
-                            <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
-                              {questionUsesDetailedLocation(q.questionText, dto.business.city)
-                                ? "상세 조건 검색"
-                                : "넓은 범위 검색"}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          확정 노출 {q.confirmedMentionCount}건 · 추가 확인 필요{" "}
-                          {q.unresolvedTargetCount}건
-                        </p>
-                      </div>
-                    ))
+                    .some(row => row.questionId === q.questionId))}/>
                 )}
                 {weakQuestionRows.length > 6 && (
                   <div className="flex justify-center pt-1">
@@ -2444,6 +2413,7 @@ function DashboardPage() {
 
 function DashboardSummary({
   summary,
+  priority,
   questionAreas,
   intentOrder,
   questionLocations,
@@ -2455,6 +2425,7 @@ function DashboardSummary({
   onReviewEvidence,
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
+  priority: PriorityEvidence | null;
   questionAreas: readonly EntityFactsV2ReadQuestionAreaDTO[];
   intentOrder: readonly string[];
   questionLocations: readonly import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadQuestionLocationDTO[];
@@ -2478,8 +2449,8 @@ function DashboardSummary({
 
   return (
     <section className="space-y-4" aria-label="사장님용 10초 요약">
-      <DiagnosticSummaryLayout summary={summary} questions={questionAreas} intentOrder={intentOrder} locations={questionLocations} enabled={scopeEvidenceAvailable} observation={broadObservation} benchmark={benchmark}
-        actionTitle={summary.opportunities[0]?.title ?? observations[0]?.title ?? "저장된 질문과 답변 확인"}
+      <DiagnosticSummaryLayout priority={priority} summary={summary} questions={questionAreas} intentOrder={intentOrder} locations={questionLocations} enabled={scopeEvidenceAvailable} observation={broadObservation} benchmark={benchmark}
+        actionTitle={priority?.title ?? summary.opportunities[0]?.title ?? observations[0]?.title ?? "저장된 질문과 답변 확인"}
         actionEvidence={summary.opportunities[0]?.observation ?? observations[0]?.recommendedCheck ?? "현재 자료에서는 우선 확인할 대상을 정하기 어렵습니다."}
         onAction={() => onShowDetail(summary.opportunities.length > 0 ? "priorities" : observations[0]?.id === "repeated_competitor" ? "businesses" : observations[0]?.id.startsWith("verified_page") ? "sources" : "questions")}
         onTopic={onShowDetail} />

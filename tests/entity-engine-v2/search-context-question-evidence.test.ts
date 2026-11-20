@@ -140,8 +140,8 @@ describe("Current Run: search context categories and exact saved questions", () 
     expect(dashboard).toContain("검색 상황별 실제 질문");
     expect(dashboard).toContain("질문 생성 시 지정한 검색 목적");
     expect(dashboard).toContain("질문 표현이 비슷해도 다른 유형에 포함될 수");
-    expect(dashboard).toContain("group.questions.map((question)");
-    expect(dashboard).toContain("searchContextQuestionEvidenceLabel(question)");
+    expect(dashboard).toContain("<QuestionResults questions={group.questions}/>");
+    expect(at("src/components/diagnostic-question-results.tsx")).toContain("questionPresentationGroups(questions)");
     expect(dashboard).toContain('className="diagnostic-questions mt-4 border-t pt-4"');
     expect(dashboard).toContain('dataKey="confirmed"');
     expect(dashboard).toContain('dataKey="unresolved"');

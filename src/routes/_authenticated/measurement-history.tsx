@@ -34,6 +34,10 @@ export const Route = createFileRoute("/_authenticated/measurement-history")({
     meta: [
       { title: "측정 기록 · 차보임 CHABOIM" },
       { name: "description", content: "완료된 AI 노출 측정 결과를 날짜별로 다시 확인합니다." },
+      { property: "og:title", content: "측정 기록 · 차보임 CHABOIM" },
+      { property: "og:description", content: "완료된 AI 노출 측정 결과를 날짜별로 다시 확인합니다." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
@@ -275,9 +279,8 @@ function HistoryRunButton({ item, selected, isCurrentRepresentative, onSelect }:
           {isCurrentRepresentative ? "최신 진단" : available ? "열람 가능" : "상세 확인 필요"}
         </Badge>
       </span>
-      <span className="mt-1 block text-xs text-muted-foreground">
-        {available ? `확정 노출 ${item.confirmedCount}/${item.validCount} · 상위 3곳 ${item.top3Count}/${item.validCount}` :
-          "측정 날짜는 보존되어 있습니다. 상세 수치는 별도 확인이 필요합니다."}
+      <span className="history-answer-metrics">
+        {[{ label: "업체 등장", value: item.confirmedCount }, { label: "상위 3곳", value: item.top3Count }].map(metric => <span key={metric.label}><small>{metric.label}</small><strong>{available && metric.value !== null && item.validCount !== null ? <>{metric.value} <small>/ {item.validCount} 답변</small></> : "확인 필요"}</strong></span>)}
       </span>
       {isCurrentRepresentative && (
         <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary">
