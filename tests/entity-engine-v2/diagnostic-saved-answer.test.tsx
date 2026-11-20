@@ -15,6 +15,12 @@ describe("saved diagnostic answer presentation", () => {
     expect(html).toContain("다른 정비소");
     expect(html).toContain('href="https://example.com/branch"');
   });
+  it("preserves ranges in Korean schedules and prices as saved", () => {
+    const text = "월~토 11:00~20:00, 5~7만원. ~~종료~~";
+    const html = renderToStaticMarkup(<DiagnosticAnswerText businessName="" text={text}/>);
+    expect(html).toContain("월~토 11:00~20:00, 5~7만원.");
+    expect(html).toContain("<del>종료</del>");
+  });
   it("renders comparison tables and keeps untrusted HTML and embedded media inert", () => {
     const html = renderToStaticMarkup(<DiagnosticAnswerText businessName="가게" text={
       "| 업체 | 지역 |\n| --- | --- |\n| 가게 | 판교 |\n\n<em>원문 태그</em>\n\n![사진](https://example.com/a.png) [텍스트](about:blank)"

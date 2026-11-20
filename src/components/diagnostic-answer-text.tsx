@@ -1,5 +1,11 @@
 import { Fragment, useMemo, type ReactNode } from "react";
-import { marked, type MarkedToken, type Token } from "marked";
+import { Marked, type MarkedToken, type Token } from "marked";
+
+// Korean schedules and prices use single tildes for ranges. Keep them
+// verbatim and reserve strikethrough for explicit double-tildes.
+const answerMarkdown = new Marked({ gfm: true, breaks: true }, {
+  tokenizer: { del(src: string) { return src.startsWith("~~") ? false : undefined; } },
+});
 
 function highlightName(text: string, pattern: RegExp | null) {
   if (!pattern) return text;
@@ -57,7 +63,7 @@ export function DiagnosticAnswerText({ text, businessName }: { text: string; bus
     const chars = Array.from(businessName.replace(/\s/gu, ""));
     const escaped = chars.map(c => c.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
     const name = chars.length > 1 && chars.length <= 100 ? new RegExp("(" + escaped.join("\\s*") + ")", "iu") : null;
-    return renderTokens(marked.lexer(text, { gfm: true, breaks: true }), name);
+    return renderTokens(answerMarkdown.lexer(text), name);
   }, [text, businessName]);
   return <div className="saved-answer-text">{content}</div>;
 }
