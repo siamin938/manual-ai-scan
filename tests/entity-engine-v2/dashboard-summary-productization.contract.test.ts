@@ -188,8 +188,8 @@ describe("approved CHABOIM home and dashboard design", () => {
     expect(home).toContain('redirect({ to: "/dashboard" })');
     expect(home).toContain("손님이 AI에 물을 때,");
     expect(home).toContain("AI 답변 24개 중");
-    expect(home).toContain("14/16");
-    expect(home).toContain("5/8");
+    expect(home).toContain('count: 14, total: 16');
+    expect(home).toContain('name: "경쟁업체 A", count: 5');
   });
   it("uses server-classified broad competitor rows and keeps null benchmark shares unplotted", () => {
     const panels = read("src/components/dashboard-evidence-panels.tsx");

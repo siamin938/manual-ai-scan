@@ -73,9 +73,24 @@ function LandingPage() {
             <div className="rounded-lg border bg-card p-5 sm:p-8">
               <div className="mb-6 border-b pb-4"><p className="text-base text-muted-foreground">공개 샘플 보고서</p><h3 className="mt-1 text-xl font-bold">샘플 오토케어</h3></div>
               <Tabs defaultValue="visibility"><TabsList className="grid h-auto min-h-12 w-full grid-cols-3"><TabsTrigger value="visibility">내 업체 노출</TabsTrigger><TabsTrigger value="competitors">다른 업체</TabsTrigger><TabsTrigger value="sources">인용 출처</TabsTrigger></TabsList>
-                <TabsContent value="visibility" className="pt-5"><p className="text-2xl font-bold leading-10">AI 답변 24개 중 <span className="text-primary">14개</span>에 등장했어요</p><p className="mt-2 text-base text-muted-foreground">그중 13회는 상위 3곳 안에 들었어요.</p><div className="mt-6 grid gap-3 sm:grid-cols-2">{[["넓은 질문", "0/8"], ["조건을 좁힌 질문", "14/16"]].map(([label,value]) => <div key={label} className="rounded-lg bg-muted p-4"><p className="text-base">{label}</p><p className="mt-3 text-2xl font-bold tabular-nums">{value}</p></div>)}</div></TabsContent>
-                <TabsContent value="competitors" className="space-y-4 pt-5">{[["경쟁업체 A","5/8"],["경쟁업체 B","4/8"]].map(([name,value]) => <div key={name} className="border-b py-4"><p className="text-lg font-semibold">{name}</p><p className="mt-2 text-base text-muted-foreground">넓은 질문 {value} 답변에서 관찰<br />독립 웹 출처 확인됨</p></div>)}</TabsContent>
-                <TabsContent value="sources" className="space-y-4 pt-5"><p className="text-xl font-bold">업체 관련성이 확인된 인용 페이지 5개</p><p className="text-base leading-8">업체 프로필: 확정 등장 답변 14개 중 4개<br />자동차 플랫폼 작업 사례: 14개 중 2개</p><p className="text-sm text-muted-foreground">페이지 수와 인용된 답변 수는 다른 단위입니다.</p></TabsContent>
+                <TabsContent value="visibility" className="pt-5">
+                  <p className="text-4xl font-bold leading-tight tabular-nums"><span className="text-primary">14</span> / 24개</p>
+                  <p className="mt-2 text-base">AI 답변 24개 중 14개에 등장했어요.</p>
+                  <p className="mt-2 text-base text-muted-foreground">그중 13회는 상위 3곳 안에 들었어요.</p>
+                  <div className="mt-6 space-y-5">{[{ label: "넓은 질문", count: 0, total: 8 }, { label: "조건을 좁힌 질문", count: 14, total: 16 }].map(({ label, count, total }) => <div key={label} className="min-w-0">
+                    <p className="text-base font-medium">{label} <span className="tabular-nums">{count}/{total}개</span></p>
+                    <div className="mt-3 flex w-full min-w-0 gap-1" aria-hidden="true">{Array.from({ length: total }, (_, i) => <span key={i} className={`h-6 min-w-0 flex-1 rounded-sm ${i < count ? "bg-primary" : "bg-muted"}`} />)}</div>
+                  </div>)}</div>
+                </TabsContent>
+                <TabsContent value="competitors" className="space-y-4 pt-5">{[{ name: "경쟁업체 A", count: 5 }, { name: "경쟁업체 B", count: 4 }].map(({ name, count }) => <div key={name} className="border-b py-4">
+                  <p className="text-lg font-semibold">{name}</p><p className="mt-2 text-base text-muted-foreground">넓은 질문 {count}/8 답변에서 관찰</p>
+                  <div className="mt-3 flex h-4 overflow-hidden rounded-full bg-muted" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <span key={i} className={`min-w-0 flex-1 ${i < count ? "bg-primary" : "bg-muted"}`} />)}</div>
+                  <p className="mt-2 text-base text-muted-foreground">독립 웹 출처 확인됨</p>
+                </div>)}</TabsContent>
+                <TabsContent value="sources" className="space-y-4 pt-5"><p className="text-xl font-bold">업체 관련성이 확인된 인용 페이지 5개</p>
+                  <ul className="divide-y">{[{ name: "업체 프로필", count: 4 }, { name: "신차패키지 작업 사례", count: 2 }, { name: "PPF 시공 사례", count: 2 }].map(({ name, count }) => <li key={name} className="py-3 text-base"><p className="font-semibold">{name}</p><p className="mt-1 text-muted-foreground">{count}/14 확정 등장 답변</p></li>)}</ul>
+                  <p className="text-sm text-muted-foreground">페이지 수와 인용된 답변 수는 다른 단위입니다.</p>
+                </TabsContent>
               </Tabs>
             </div>
           </div>

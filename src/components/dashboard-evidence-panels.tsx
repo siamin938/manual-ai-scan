@@ -29,16 +29,16 @@ export function QuestionScopeEvidence({ questions, locations, enabled }: {
 }
 
 export function BroadCompetitorEvidence({ observation, printExpanded = false }: { observation: EntityFactsV2ReadBroadSearchObservationDTO; printExpanded?: boolean }) {
-  const [selection, setSelection] = useState<"single" | "repeated">("repeated");
-  const groups = [{key:"single" as const, label:"한 번 등장", rows:observation.singleObservationCompetitors}, {key:"repeated" as const, label:"두 번 이상", rows:observation.repeatedCompetitors}];
+  const [selection, setSelection] = useState<"single" | "repeated">(() => observation.singleObservationCompetitors.length > 0 ? "single" : "repeated");
+  const groups = [{key:"single" as const, label:"한 번 등장", heading:"넓은 범위 검색에서 추가로 한 번 확인된 업체", rows:observation.singleObservationCompetitors}, {key:"repeated" as const, label:"두 번 이상", heading:"넓은 범위 검색에서 두 번 이상 확인된 업체", rows:observation.repeatedCompetitors}];
   return <section className="space-y-5 border-t pt-6" aria-label="넓은 범위 검색 업체 분류">
-    <h3 className="text-xl font-bold">넓은 범위 검색에서 추가로 한 번 확인된 업체</h3>
+    <h3 className="text-xl font-bold">넓은 지역 검색에 나온 다른 업체</h3>
     <p className="text-base text-muted-foreground">이번 넓은 검색의 유효 답변 {observation.validCount}개 기준입니다. 한 번의 등장은 반복 패턴이 아닌 추가 관찰입니다.</p>
     <div className="no-print grid grid-cols-2 gap-3">{groups.map((group) => <Button key={group.key} variant="ghost" className="broad-choice h-auto min-h-20 whitespace-normal" aria-pressed={selection === group.key} onClick={() => setSelection(group.key)}>
       <span className="min-w-0 text-base">{group.label} <strong>{group.rows.length}곳</strong></span>{selection === group.key && <Check className="size-5 shrink-0" aria-hidden="true" />}
     </Button>)}</div>
     {groups.map((group) => <div key={group.key} className={!printExpanded && selection !== group.key ? "broad-evidence-list hidden space-y-3 print:block" : "broad-evidence-list space-y-3"} data-classification={group.key}>
-      <h4 className="text-lg font-semibold">{group.label} {group.rows.length}곳</h4>
+      <h4 className="text-lg font-semibold">{group.heading} <span className="tabular-nums">{group.rows.length}곳</span></h4>
       {group.rows.length === 0 ? <p className="text-base text-muted-foreground">이 분류에서 확인된 업체가 없습니다.</p> : group.rows.map((row) => <details key={row.name} className="rounded-lg border p-4" open={printExpanded}>
         <summary className="grid min-h-11 cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-3"><span className="min-w-0 break-words text-base font-semibold">{row.name}</span><span className="shrink-0 tabular-nums">{row.responseCount}/{observation.validCount} 답변</span></summary>
         <p className="mt-3 text-base">상위 3곳에서 {row.top3ResponseCount}회 관찰. 검색 상황 {row.intentCount}종.</p>
