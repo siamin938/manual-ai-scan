@@ -1,6 +1,6 @@
 import { DiagnosticSummaryLayout, DiagnosticTopicTabs, DiagnosticQuestions, DiagnosticHistory } from "@/components/diagnostic-layout";
 import { BroadCompetitorEvidence, BenchmarkSourceEvidence } from "@/components/dashboard-evidence-panels";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   createFileRoute,
@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, CalendarDays, Printer, Search, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, Printer, Search, Users, ChevronDown } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -69,6 +69,7 @@ import {
 import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import {
   buildCompactSummaryInsights,
@@ -861,6 +862,7 @@ function openPrintableSnapshot(title: string): boolean {
 }
 
 function DashboardPage() {
+  const toolsTriggerRef = useRef<HTMLButtonElement>(null);
   const { view: requestedView } = Route.useSearch();
   const view = requestedView ?? "summary";
   const [detailTopic, setDetailTopic] = useState("questions");
@@ -1276,9 +1278,18 @@ function DashboardPage() {
       }
     >
       <header className="dashboard-toolbar diagnostic-header">
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
-          <div className="diagnostic-heading"><p>AI 노출 진단</p><h1>{model?.businessName ?? "업체 선택"}</h1><p className="diagnostic-measured"><CalendarDays aria-hidden="true"/>{model ? `측정일 ${formatSeoul(model.measuredAt)}` : "최근 완료된 진단을 확인합니다"}</p></div>
-          <div className="no-print flex min-w-0 flex-wrap items-center gap-3">
+        <div className="diagnostic-heading"><p>AI 노출 진단</p><h1>{model?.businessName ?? "업체 선택"}</h1><p className="diagnostic-measured"><CalendarDays aria-hidden="true"/>{model ? `측정일 ${formatSeoul(model.measuredAt)}` : "최근 완료된 진단을 확인합니다"}</p></div>
+        <div className="diagnostic-header-actions no-print">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button ref={toolsTriggerRef} type="button" variant="ghost" className="diagnostic-tools-trigger">
+                업체 및 도구<ChevronDown aria-hidden="true" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="diagnostic-popup diagnostic-tools-popover no-print" aria-label="업체 및 도구" onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              toolsTriggerRef.current?.focus();
+            }}>
             <BusinessSelector
               options={businesses.options}
               value={businesses.selectedBusinessId}
@@ -1286,13 +1297,6 @@ function DashboardPage() {
               isLoading={businesses.isLoading}
               isError={businesses.isError}
             />
-          </div>
-        </div>
-        <div className="diagnostic-compact-tools no-print">
-          <p className="text-base text-muted-foreground">
-            {model ? `측정일 ${formatSeoul(model.measuredAt)}` : "최근 완료된 진단을 확인합니다"}
-            <span className="hidden print:inline"> 대상 업체 · {model?.businessName}</span>
-          </p>
           <div className="no-print flex flex-wrap items-center gap-2">
             {dto && model && (
               <Button type="button" variant="outline" className="min-h-11 gap-2" onClick={printDashboardReport}>
@@ -1326,7 +1330,8 @@ function DashboardPage() {
           )}
 
           </div>
-        </div>
+            </PopoverContent>
+          </Popover>
         <div className="no-print diagnostic-view-segment" aria-label="진단 보기 방식">
           <Button type="button" variant={view === "summary" ? "default" : "ghost"} aria-pressed={view === "summary"} className="min-h-12 text-base shadow-none" onClick={() => setDashboardView("summary")}>
             핵심 요약
@@ -1334,6 +1339,7 @@ function DashboardPage() {
           <Button type="button" variant={view === "detail" ? "default" : "ghost"} aria-pressed={view === "detail"} className="min-h-12 text-base shadow-none" onClick={() => setDashboardView("detail")}>
             상세 분석
           </Button>
+        </div>
         </div>
       </header>
 

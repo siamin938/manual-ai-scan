@@ -359,17 +359,20 @@
 .diagnostic-page { max-width:1200px; margin-inline:auto; padding:24px 58px 36px; font-size:16px; letter-spacing:0; }
 main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--background); }
 .diagnostic-page h2 { font-size:28px; line-height:1.35; font-weight:750; }
-.diagnostic-header { position:relative; margin-bottom:30px; background:transparent !important; display:grid; grid-template-columns:minmax(0,1fr) 254px; align-items:center; gap:12px; }
-.diagnostic-header > div:first-child { display:contents; }
+.diagnostic-header { position:relative; margin-bottom:14px; background:transparent !important; display:grid; grid-template-columns:minmax(0,1fr) 254px; align-items:center; gap:12px; }
 .diagnostic-heading { grid-column:1; }
 .diagnostic-heading > p:first-child { color:var(--muted-foreground); font-weight:700; }
 .diagnostic-heading h1 { font-size:39px; line-height:1.35; margin:3px 0 9px; overflow-wrap:anywhere; }
 .diagnostic-measured { display:flex; gap:8px; align-items:center; color:var(--muted-foreground); font-size:14px; }
 .diagnostic-measured svg { width:16px; height:16px; }
-.diagnostic-header > div:first-child > .no-print { grid-column:1; grid-row:3; justify-content:flex-start; }
-.diagnostic-compact-tools { grid-column:2; grid-row:3; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
-.diagnostic-compact-tools > p { display:none; }
-.diagnostic-compact-tools button { font-size:13px; }
+.diagnostic-header-actions { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.diagnostic-tools-trigger { order:2; min-height:44px; font-size:13px; gap:6px; }
+.diagnostic-header-actions > [data-slot="popover-trigger"] { order:2; }
+.diagnostic-tools-popover { width:400px; max-width:calc(100vw - 32px); display:grid; gap:16px; border-radius:16px; }
+.diagnostic-tools-popover button { min-height:44px; }
+.diagnostic-tools-popover > div:first-child { width:100%; }
+.diagnostic-tools-popover [role="combobox"] { flex:1; width:0; min-width:0; }
+.diagnostic-tools-popover :is(button,[role="combobox"]):focus-visible { outline:3px solid var(--ring); outline-offset:3px; }
 .diagnostic-view-segment { grid-column:2; grid-row:1; display:grid; grid-template-columns:1fr 1fr; width:254px; height:48px; padding:3px; background:var(--muted); border-radius:14px; }
 .diagnostic-view-segment button { min-height:42px; height:42px; border-radius:11px; font-size:15px; color:var(--muted-foreground); background:transparent; }
 .diagnostic-view-segment button[aria-pressed=true] { background:var(--card); color:var(--foreground); box-shadow:var(--diagnostic-shadow); border:1px solid var(--border); }
@@ -480,9 +483,10 @@ main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--backg
   .diagnostic-page { padding:16px; }
   .diagnostic-header { grid-template-columns:minmax(0,1fr); gap:12px; margin-bottom:18px; }
   .diagnostic-heading h1 { font-size:26px; }
-  .diagnostic-view-segment { grid-column:1; grid-row:2; width:100%; }
-  .diagnostic-compact-tools { grid-column:1; grid-row:4; justify-content:flex-start; }
-  .diagnostic-header > div:first-child > .no-print { grid-row:3; }
+  .diagnostic-header-actions { flex-direction:row; gap:8px; align-items:center; }
+  .diagnostic-header-actions .diagnostic-view-segment { flex:1; width:auto; min-width:0; }
+  .diagnostic-header-actions .diagnostic-view-segment button { font-size:13px; padding-inline:6px; }
+  .diagnostic-tools-trigger { padding-inline:6px; flex-shrink:0; }
   .diagnostic-summary-layout, .diagnostic-summary-top, .diagnostic-summary-tiles { grid-template-columns:minmax(0,1fr); gap:12px; }
   .diagnostic-result { min-height:186px; padding:16px 20px; }
   .diagnostic-result > p { font-size:16px; }
@@ -570,4 +574,4 @@ main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--backg
 
 @media(max-width:767px) { .diagnostic-matrix { padding-block:10px; } }
 .diagnostic-state-note { overflow-wrap:anywhere; }
-.diagnostic-page .diagnostic-compact-tools + .diagnostic-view-segment button { min-height:42px; }
+.diagnostic-page .diagnostic-header-actions .diagnostic-view-segment button { min-height:42px; }

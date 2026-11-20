@@ -126,7 +126,7 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("printWindow.print()");
     expect(dashboardSource).not.toContain('window.open("", "_blank")');
     expect(dashboardSource).not.toContain('print?: "1"');
-    expect(dashboardSource).toContain("대상 업체 · {model?.businessName}");
+    expect(dashboardSource).toContain('<h1>{model?.businessName ?? "업체 선택"}</h1>');
     expect(dashboardSource).toContain("report-section print-avoid-break");
     expect(dashboardSource).toContain("no-print flex flex-col items-center");
     expect(dashboardSource).toContain('className="no-print max-h-[90vh] overflow-y-auto sm:max-w-4xl"');
