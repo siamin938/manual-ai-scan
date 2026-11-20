@@ -38,10 +38,10 @@ export function sourceCardMetrics(model: Pick<EntityFactsV2DashboardCutoverModel
   };
 }
 function koreanIntent(intent: string) { return INTENT_LABELS[intent as keyof typeof INTENT_LABELS] ?? "기타"; }
-export function DiagnosticEvidenceWorkspace({ dto, model, summary, comparison, comparisonError, printExpanded, entryTopic, entryVersion, children, priority = null }: {
+export function DiagnosticEvidenceWorkspace({ dto, model, summary, comparison, comparisonError, printExpanded, entryTopic, children, priority = null }: {
   dto: EntityFactsV2ReadGatewayDTO; model: EntityFactsV2DashboardCutoverModel; summary: EntityFactsV2DashboardSummaryViewModel | null;
   comparison: EntityFactsV2ComparisonViewModel | null; comparisonError: boolean; printExpanded: boolean;
-  entryTopic: string; entryVersion: number; children: ReactNode; priority?: PriorityEvidence | null;
+  entryTopic: string; children: ReactNode; priority?: PriorityEvidence | null;
 }) {
   const [topic, setTopic] = useState<EvidenceTopic>("questions");
   const [expanded, setExpanded] = useState(false);
@@ -49,8 +49,9 @@ export function DiagnosticEvidenceWorkspace({ dto, model, summary, comparison, c
   const focus = useRef<HTMLElement | null>(null);
   const root = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
-    if (entryVersion > 0 && isEvidenceTopic(entryTopic)) { setTopic(entryTopic); setExpanded(true); }
-  }, [entryTopic, entryVersion]);
+    if (isEvidenceTopic(entryTopic)) setTopic(entryTopic);
+    setExpanded(false);
+  }, [entryTopic]);
   useEffect(() => {
     const enter = () => {
       const key = window.location.hash.replace("#diagnostic-", "");

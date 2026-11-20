@@ -165,6 +165,8 @@ describe("dashboard owner productization layer", () => {
       expect(dashboardSource).toContain(`<EvidenceArchive topic="${topic}">`);
       expect(evidenceSource).toContain(` ${topic}:`);
     }
+    expect(dashboardSource).toContain("entryTopic={detailTopic}");
+    expect(dashboardSource).not.toContain("setEvidenceEntry");
     expect(evidenceSource).toContain('id={`diagnostic-${key}`}');
     expect(evidenceSource).toContain('window.addEventListener("hashchange", enter)');
     expect(evidenceSource).toContain('useContext(PrintArchiveContext)');

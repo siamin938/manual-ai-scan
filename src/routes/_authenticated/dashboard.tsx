@@ -863,7 +863,6 @@ function DashboardPage() {
   const view = requestedView ?? "summary";
   const [detailTopic, setDetailTopic] = useState("questions");
   const [printExpanded, setPrintExpanded] = useState(false);
-  const [evidenceEntry, setEvidenceEntry] = useState({ topic: "questions", version: 0 });
   useEffect(() => {
     const beforePrint = () => flushSync(() => setPrintExpanded(true));
     const afterPrint = () => setPrintExpanded(false);
@@ -1258,7 +1257,6 @@ function DashboardPage() {
   } : null;
   const setDashboardView = (nextView: "summary" | "detail", topic = "questions") => {
     setDetailTopic(["questions", "businesses", "sources", "comparison"].includes(topic) ? topic : "questions");
-    setEvidenceEntry(previous => ({ topic, version: previous.version + 1 }));
     void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
   };
   const printDashboardReport = () => {
@@ -1506,7 +1504,7 @@ function DashboardPage() {
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
           </div>
           </>}
-          <div className={view === "detail" || printExpanded ? "" : "hidden"}><DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={evidenceEntry.topic} entryVersion={evidenceEntry.version}
+          <div className={view === "detail" || printExpanded ? "" : "hidden"}><DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={detailTopic}
             priority={priorityEvidence}>
           <EvidenceArchive topic="method">
       {view === "detail" && businessId && unifiedTransitionPending && (
