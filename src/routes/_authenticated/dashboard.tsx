@@ -1,3 +1,4 @@
+import { QuestionAnswerContext } from "@/components/diagnostic-question-answer-panel";
 import { repeatedPeerEvidence, siteDisplayName } from "@/lib/diagnostic-source-links";
 import { RepeatedPeerEvidence } from "@/components/repeated-peer-evidence";
 import { DiagnosticEvidenceWorkspace, EvidenceArchive } from "@/components/diagnostic-evidence-workspace";
@@ -1292,6 +1293,9 @@ function DashboardPage() {
   };
 
   return (
+    <QuestionAnswerContext.Provider value={activeOrgId && session?.user.id && dto && dto.business.id === businessId ? {
+      userId: session.user.id, orgId: activeOrgId, businessId: dto.business.id, runId: dto.scope.runId, businessName: dto.business.name,
+    } : null}>
     <div
       className={
         "print-page print-report diagnostic-page"
@@ -2438,6 +2442,7 @@ function DashboardPage() {
         </>
       )}
     </div>
+    </QuestionAnswerContext.Provider>
   );
 }
 
