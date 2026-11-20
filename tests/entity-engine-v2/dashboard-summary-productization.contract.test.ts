@@ -8,6 +8,7 @@ const dashboardSource = readFileSync(
 );
 
 const layoutSource = readFileSync(resolve(process.cwd(), "src/components/diagnostic-layout.tsx"), "utf8");
+const evidenceSource = readFileSync(resolve(process.cwd(), "src/components/diagnostic-evidence-workspace.tsx"), "utf8");
 
 const stylesSource = readFileSync(
   resolve(process.cwd(), "src/styles.css"),
@@ -161,9 +162,13 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('onShowDetail(summary.opportunities.length > 0 ? "priorities"');
     expect(dashboardSource).toContain('params={{ runId: dto.scope.runId }}');
     for (const topic of ["questions", "businesses", "sources", "comparison", "priorities", "method"]) {
-      expect(dashboardSource).toContain(`id="diagnostic-${topic}"`);
-      expect(dashboardSource).toContain(`open={printExpanded || detailTopic === "${topic}"}`);
+      expect(dashboardSource).toContain(`<EvidenceArchive topic="${topic}">`);
+      expect(evidenceSource).toContain(` ${topic}:`);
     }
+    expect(evidenceSource).toContain('id={`diagnostic-${key}`}');
+    expect(evidenceSource).toContain('window.addEventListener("hashchange", enter)');
+    expect(evidenceSource).toContain('context.print || context.topic === topic');
+    expect(evidenceSource).toContain('print: true');
     expect(dashboardSource).toContain('flushSync(() => setPrintExpanded(true))');
     expect(dashboardSource).toContain('report.querySelectorAll("details")');
     expect(dashboardSource).toContain('(showAllCompetitors || printExpanded)');

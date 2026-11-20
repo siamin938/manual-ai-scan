@@ -1,3 +1,4 @@
+import { DiagnosticEvidenceWorkspace, EvidenceArchive } from "@/components/diagnostic-evidence-workspace";
 import { DiagnosticSummaryLayout, DiagnosticTopicTabs, DiagnosticQuestions, DiagnosticHistory } from "@/components/diagnostic-layout";
 import { BroadCompetitorEvidence, BenchmarkSourceEvidence } from "@/components/dashboard-evidence-panels";
 import { useEffect, useRef, useState } from "react";
@@ -867,13 +868,7 @@ function DashboardPage() {
   const view = requestedView ?? "summary";
   const [detailTopic, setDetailTopic] = useState("questions");
   const [printExpanded, setPrintExpanded] = useState(false);
-  useEffect(() => {
-    if (view !== "detail") return;
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById(`diagnostic-${detailTopic}`)?.scrollIntoView({ block: "start" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [view, detailTopic]);
+  const [evidenceEntry, setEvidenceEntry] = useState({ topic: "questions", version: 0 });
   useEffect(() => {
     const beforePrint = () => flushSync(() => setPrintExpanded(true));
     const afterPrint = () => setPrintExpanded(false);
@@ -1240,7 +1235,8 @@ function DashboardPage() {
       })
     : null;
   const setDashboardView = (nextView: "summary" | "detail", topic = "questions") => {
-    setDetailTopic(topic);
+    setDetailTopic(["questions", "businesses", "sources", "comparison"].includes(topic) ? topic : "questions");
+    setEvidenceEntry(previous => ({ topic, version: previous.version + 1 }));
     void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
   };
   const printDashboardReport = () => {
@@ -1468,8 +1464,9 @@ function DashboardPage() {
         />
       )}
 
-      {dto && model && (view === "detail" || printExpanded) && (
+      {dto && model && (
         <>
+          {(view === "detail" || printExpanded) && <>
           <DiagnosticTopicTabs topic={detailTopic} onChange={setDetailTopic} />
           <div className="diagnostic-main-topic">
             {(detailTopic === "questions" || printExpanded) && <DiagnosticQuestions key={`${dto.business.id}:${dto.scope.runId}`} groups={dto.questionGroups} questions={dto.questionAreas} />}
@@ -1477,8 +1474,9 @@ function DashboardPage() {
             {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} />{comparisonModel && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
           </div>
-          <details className="diagnostic-additional" open={printExpanded || detailTopic === "priorities" || detailTopic === "method"}>
-            <summary>추가 분석/근거 보기</summary>
+          </>}
+          <DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={evidenceEntry.topic} entryVersion={evidenceEntry.version}>
+          <EvidenceArchive topic="method">
       {view === "detail" && businessId && unifiedTransitionPending && (
         <Card className="border-primary/40 bg-primary/[0.03]">
           <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
@@ -1538,11 +1536,8 @@ function DashboardPage() {
         </section>
       )}
 
-          <details id="diagnostic-questions" className="diagnostic-topic" open={printExpanded || detailTopic === "questions"}>
-            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "questions" ? "" : "questions"); }}>
-              <h2>어떤 질문에서 나왔나요?</h2>
-              <span className="text-base font-normal text-muted-foreground">검색 유형과 실제 저장 질문</span>
-            </summary>
+          </EvidenceArchive>
+          <EvidenceArchive topic="questions">
             <div className="diagnostic-topic-content space-y-6">
           <div className="grid gap-3 sm:grid-cols-2">{buildSearchContextQuestionEvidence(model.questionGroups, dto.questionAreas).map((group) => <details key={group.intentType} className="rounded-lg border bg-card p-4" open={printExpanded}>
             <summary className="flex min-h-11 cursor-pointer items-center gap-3 text-base font-semibold"><Search className="size-5 shrink-0 text-primary" aria-hidden="true" />{intentLabel(group.intentType)}<span className="ml-auto text-sm tabular-nums">{group.confirmedMentionCount}/{group.validCount}</span></summary>
@@ -1646,12 +1641,9 @@ function DashboardPage() {
 
             <Button asChild variant="outline" className="no-print min-h-11"><Link to="/runs/$runId" params={{ runId: dto.scope.runId }}>질문별 실제 답변과 인용 보기<ArrowRight aria-hidden="true" /></Link></Button>
             </div>
-          </details>
-          <details id="diagnostic-businesses" className="diagnostic-topic" open={printExpanded || detailTopic === "businesses"}>
-            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "businesses" ? "" : "businesses"); }}>
-              <h2>어떤 업체가 함께 나왔나요?</h2>
-              <span className="text-base font-normal text-muted-foreground">업체로 확인된 관찰 결과</span>
-            </summary>
+          </EvidenceArchive>
+          <EvidenceArchive topic="businesses">
+            {dto.broadSearchObservation && <BroadCompetitorEvidence observation={dto.broadSearchObservation} printExpanded={printExpanded} />}
             <div className="diagnostic-topic-content space-y-6">
 
           <Card className="report-section">
@@ -1717,12 +1709,8 @@ function DashboardPage() {
 
 
             </div>
-          </details>
-          <details id="diagnostic-sources" className="diagnostic-topic" open={printExpanded || detailTopic === "sources"}>
-            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "sources" ? "" : "sources"); }}>
-              <h2>AI가 인용한 출처는 어디인가요?</h2>
-              <span className="text-base font-normal text-muted-foreground">관련 확인 페이지와 전체 인용 출처 구분</span>
-            </summary>
+          </EvidenceArchive>
+          <EvidenceArchive topic="sources">
             <div className="diagnostic-topic-content space-y-6">
           {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} printExpanded={printExpanded} />}
             <Card className="report-section">
@@ -2332,12 +2320,8 @@ function DashboardPage() {
 
 
             </div>
-          </details>
-          <details id="diagnostic-comparison" className="diagnostic-topic" open={printExpanded || detailTopic === "comparison"}>
-            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "comparison" ? "" : "comparison"); }}>
-              <h2>지난번과 달라졌나요?</h2>
-              <span className="text-base font-normal text-muted-foreground">동일 조건이 확인된 측정만 비교</span>
-            </summary>
+          </EvidenceArchive>
+          <EvidenceArchive topic="comparison">
             <div className="diagnostic-topic-content space-y-6">
           {comparisonModel && (
             <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />
@@ -2352,12 +2336,8 @@ function DashboardPage() {
 
 
             </div>
-          </details>
-          <details id="diagnostic-priorities" className="diagnostic-topic" open={printExpanded || detailTopic === "priorities"}>
-            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "priorities" ? "" : "priorities"); }}>
-              <h2>어디부터 확인하면 좋을까요?</h2>
-              <span className="text-base font-normal text-muted-foreground">관찰 근거와 시장 참고 자료</span>
-            </summary>
+          </EvidenceArchive>
+          <EvidenceArchive topic="priorities">
             <div className="diagnostic-topic-content space-y-6">
           {actionOpportunityModel && (
             <ActionOpportunitySection
@@ -2372,12 +2352,8 @@ function DashboardPage() {
 
 
             </div>
-          </details>
-          <details id="diagnostic-method" className="diagnostic-topic" open={printExpanded || detailTopic === "method"}>
-            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "method" ? "" : "method"); }}>
-              <h2>측정 기준과 분석 방법</h2>
-              <span className="text-base font-normal text-muted-foreground">전체 지표와 결과의 해석 범위</span>
-            </summary>
+          </EvidenceArchive>
+          <EvidenceArchive topic="method">
             <div className="diagnostic-topic-content space-y-6">
           <p className="border-b border-border pb-5 text-sm text-muted-foreground">
             분석에 사용한 유효 AI 답변 {model.recentSummary.validCount}건 · 최근 측정{" "}
@@ -2449,8 +2425,8 @@ function DashboardPage() {
           </Card>
 
             </div>
-          </details>
-          </details>
+          </EvidenceArchive>
+          </DiagnosticEvidenceWorkspace>
         </>
       )}
     </div>
@@ -2499,7 +2475,7 @@ function DashboardSummary({
         onAction={() => onShowDetail(summary.opportunities.length > 0 ? "priorities" : observations[0]?.id === "repeated_competitor" ? "businesses" : observations[0]?.id.startsWith("verified_page") ? "sources" : "questions")}
         onTopic={onShowDetail} />
       <details className="diagnostic-topic">
-        <summary><h2>추가 분석/근거 보기</h2><span className="text-base font-normal text-muted-foreground">다른 업체와 인용 페이지</span></summary>
+        <summary><h2>요약 관찰·QA 원자료</h2><span className="text-base font-normal text-muted-foreground">전용 근거와 검토 도구</span></summary>
         <div className="diagnostic-topic-content space-y-5">
       <div className="grid gap-3 md:grid-cols-2" aria-label="이번 측정의 검색 상황과 관찰 업체">
         <div className="rounded-xl border bg-card p-4 sm:p-5">
