@@ -1,4 +1,5 @@
-import { BroadCompetitorEvidence, BenchmarkSourceEvidence, QuestionScopeEvidence } from "@/components/dashboard-evidence-panels";
+import { DiagnosticSummaryLayout, DiagnosticTopicTabs, DiagnosticQuestions, DiagnosticHistory } from "@/components/diagnostic-layout";
+import { BroadCompetitorEvidence, BenchmarkSourceEvidence } from "@/components/dashboard-evidence-panels";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import {
@@ -9,7 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, Printer, Search, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, Printer, Search, Users } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -1271,14 +1272,12 @@ function DashboardPage() {
   return (
     <div
       className={
-        view === "summary"
-          ? "print-page print-report space-y-6 lg:space-y-7"
-          : "print-page print-report space-y-8 lg:space-y-10"
+        "print-page print-report diagnostic-page"
       }
     >
-      <header className="dashboard-toolbar border-b border-border pb-5">
+      <header className="dashboard-toolbar diagnostic-header">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold">AI 노출 진단</h1>
+          <div className="diagnostic-heading"><p>AI 노출 진단</p><h1>{model?.businessName ?? "업체 선택"}</h1><p className="diagnostic-measured"><CalendarDays aria-hidden="true"/>{model ? `측정일 ${formatSeoul(model.measuredAt)}` : "최근 완료된 진단을 확인합니다"}</p></div>
           <div className="no-print flex min-w-0 flex-wrap items-center gap-3">
             <BusinessSelector
               options={businesses.options}
@@ -1289,7 +1288,7 @@ function DashboardPage() {
             />
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="diagnostic-compact-tools no-print">
           <p className="text-base text-muted-foreground">
             {model ? `측정일 ${formatSeoul(model.measuredAt)}` : "최근 완료된 진단을 확인합니다"}
             <span className="hidden print:inline"> 대상 업체 · {model?.businessName}</span>
@@ -1328,7 +1327,7 @@ function DashboardPage() {
 
           </div>
         </div>
-        <div className="no-print mt-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:inline-grid sm:min-w-80" aria-label="진단 보기 방식">
+        <div className="no-print diagnostic-view-segment" aria-label="진단 보기 방식">
           <Button type="button" variant={view === "summary" ? "default" : "ghost"} aria-pressed={view === "summary"} className="min-h-12 text-base shadow-none" onClick={() => setDashboardView("summary")}>
             핵심 요약
           </Button>
@@ -1389,6 +1388,90 @@ function DashboardPage() {
         </Card>
       )}
 
+      {query.isLoading && businessId && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
+        </div>
+      )}
+
+      {result &&
+        !result.ok &&
+        !(unifiedTransitionPending && result.error === "NO_V2_DATA") && (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            {result.error === "NO_V2_DATA"
+              ? "최근 완료된 측정에 v2 진단 데이터가 아직 준비되지 않았습니다."
+              : result.error === "FORBIDDEN"
+                ? "이 업체의 진단을 볼 권한이 없습니다."
+                : result.error === "BUSINESS_NOT_AVAILABLE"
+                  ? "현재 진단할 수 있는 업체가 아닙니다."
+                  : result.error === "INVALID_V2_DATA"
+                    ? "최근 진단 데이터의 검증에 실패해 결과를 표시하지 않습니다."
+                    : "진단 결과를 불러오지 못했습니다. 잠시 후 다시 시도하세요."}
+          </CardContent>
+        </Card>
+      )}
+
+      {query.isError && (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-destructive">
+            진단 요청이 실패했습니다.
+          </CardContent>
+        </Card>
+      )}
+
+      {dto && model && summaryModel && view === "summary" && (
+        <DashboardSummary
+          key={`${dto.business.id}:${dto.scope.runId}`}
+          summary={summaryModel}
+          questionAreas={dto.questionAreas}
+          questionLocations={dto.questionLocations ?? []}
+          scopeEvidenceAvailable={!!unifiedLayerSummary}
+          broadObservation={dto.broadSearchObservation ?? null}
+          benchmark={benchmark}
+          customerEvidenceQaScope={
+            privateV1AdminAllowed &&
+            session?.user.id &&
+            activeOrgId &&
+            businessId &&
+            dto.business.id === businessId
+              ? {
+                  userId: session.user.id,
+                  orgId: activeOrgId,
+                  businessId,
+                  runId: dto.scope.runId,
+                }
+              : undefined
+          }
+          onShowDetail={(topic) => setDashboardView("detail", topic)}
+          onReviewEvidence={
+            privateV1AdminAllowed && activeOrgId && businessId && dto
+              ? (insight) => {
+                  setPrivateV1Focus(insight);
+                  setPrivatePreviewSelection({
+                    orgId: activeOrgId,
+                    businessId,
+                    runId: dto.scope.runId,
+                  });
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {dto && model && (view === "detail" || printExpanded) && (
+        <>
+          <DiagnosticTopicTabs topic={detailTopic} onChange={setDetailTopic} />
+          <div className="diagnostic-main-topic">
+            {(detailTopic === "questions" || printExpanded) && <DiagnosticQuestions key={`${dto.business.id}:${dto.scope.runId}`} groups={dto.questionGroups} questions={dto.questionAreas} />}
+            {(detailTopic === "businesses" || printExpanded) && (dto.broadSearchObservation ? <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} /> : <p>이 측정은 넓은 지역 업체 분류 자료가 없습니다. 추가 근거에서 기존 관찰 업체를 확인하세요.</p>)}
+            {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
+            {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} />{comparisonModel && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
+          </div>
+          <details className="diagnostic-additional" open={printExpanded || detailTopic === "priorities" || detailTopic === "method"}>
+            <summary>추가 분석/근거 보기</summary>
       {view === "detail" && businessId && unifiedTransitionPending && (
         <Card className="border-primary/40 bg-primary/[0.03]">
           <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
@@ -1448,83 +1531,6 @@ function DashboardPage() {
         </section>
       )}
 
-      {query.isLoading && businessId && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-      )}
-
-      {result &&
-        !result.ok &&
-        !(unifiedTransitionPending && result.error === "NO_V2_DATA") && (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {result.error === "NO_V2_DATA"
-              ? "최근 완료된 측정에 v2 진단 데이터가 아직 준비되지 않았습니다."
-              : result.error === "FORBIDDEN"
-                ? "이 업체의 진단을 볼 권한이 없습니다."
-                : result.error === "BUSINESS_NOT_AVAILABLE"
-                  ? "현재 진단할 수 있는 업체가 아닙니다."
-                  : result.error === "INVALID_V2_DATA"
-                    ? "최근 진단 데이터의 검증에 실패해 결과를 표시하지 않습니다."
-                    : "진단 결과를 불러오지 못했습니다. 잠시 후 다시 시도하세요."}
-          </CardContent>
-        </Card>
-      )}
-
-      {query.isError && (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-destructive">
-            진단 요청이 실패했습니다.
-          </CardContent>
-        </Card>
-      )}
-
-      {dto && model && summaryModel && view === "summary" && (
-        <DashboardSummary
-          key={`${dto.business.id}:${dto.scope.runId}`}
-          summary={summaryModel}
-          questionAreas={dto.questionAreas}
-          questionLocations={dto.questionLocations ?? []}
-          scopeEvidenceAvailable={!!unifiedLayerSummary}
-          customerEvidenceQaScope={
-            privateV1AdminAllowed &&
-            session?.user.id &&
-            activeOrgId &&
-            businessId &&
-            dto.business.id === businessId
-              ? {
-                  userId: session.user.id,
-                  orgId: activeOrgId,
-                  businessId,
-                  runId: dto.scope.runId,
-                }
-              : undefined
-          }
-          onShowDetail={(topic) => setDashboardView("detail", topic)}
-          onReviewEvidence={
-            privateV1AdminAllowed && activeOrgId && businessId && dto
-              ? (insight) => {
-                  setPrivateV1Focus(insight);
-                  setPrivatePreviewSelection({
-                    orgId: activeOrgId,
-                    businessId,
-                    runId: dto.scope.runId,
-                  });
-                }
-              : undefined
-          }
-        />
-      )}
-
-      {dto && model && view === "detail" && (
-        <>
-          <nav className="no-print grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="상세 분석 탐색">
-            {[["questions", "질문"], ["businesses", "다른 업체"], ["sources", "출처"], ["comparison", "지난 측정"]].map(([topic, label]) => <Button key={topic} variant={detailTopic === topic ? "default" : "outline"} aria-pressed={detailTopic === topic} onClick={() => setDetailTopic(topic ?? "questions")}>{label}</Button>)}
-          </nav>
-          <p className="text-base text-muted-foreground">저장된 질문과 실제 답변의 근거를 확인하세요. 같은 측정의 결과를 주제별로 모았습니다.</p>
           <details id="diagnostic-questions" className="diagnostic-topic" open={printExpanded || detailTopic === "questions"}>
             <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "questions" ? "" : "questions"); }}>
               <h2>어떤 질문에서 나왔나요?</h2>
@@ -1640,7 +1646,7 @@ function DashboardPage() {
               <span className="text-base font-normal text-muted-foreground">업체로 확인된 관찰 결과</span>
             </summary>
             <div className="diagnostic-topic-content space-y-6">
-          {dto.broadSearchObservation && <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} />}
+
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
               <p className="report-kicker">OBSERVED BUSINESSES</p>
@@ -2437,6 +2443,7 @@ function DashboardPage() {
 
             </div>
           </details>
+          </details>
         </>
       )}
     </div>
@@ -2448,6 +2455,8 @@ function DashboardSummary({
   questionAreas,
   questionLocations,
   scopeEvidenceAvailable,
+  broadObservation,
+  benchmark,
   customerEvidenceQaScope,
   onShowDetail,
   onReviewEvidence,
@@ -2456,16 +2465,14 @@ function DashboardSummary({
   questionAreas: readonly EntityFactsV2ReadQuestionAreaDTO[];
   questionLocations: readonly import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadQuestionLocationDTO[];
   scopeEvidenceAvailable: boolean;
+  broadObservation: import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadBroadSearchObservationDTO | null;
+  benchmark: import("@/lib/visibility-benchmark.types").VisibilityBenchmarkDTO | null;
   customerEvidenceQaScope?: V1CustomerQaScope | undefined;
   onShowDetail: (topic?: string) => void;
   onReviewEvidence?: ((insight: CompactSummaryInsight) => void) | undefined;
 }) {
 
   const observations = buildCompactSummaryInsights(summary);
-  const hasHeroCounts =
-    summary.visibility.total !== null &&
-    summary.visibility.count !== null &&
-    summary.top3.count !== null;
   const pageLabel =
     summary.verifiedPageStatus === "pending"
       ? "확인 중"
@@ -2477,79 +2484,13 @@ function DashboardSummary({
 
   return (
     <section className="space-y-4" aria-label="사장님용 10초 요약">
-      <div className="grid items-start gap-6 border-b border-border pb-7 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-10">
-        <div className="owner-result min-w-0 rounded-lg bg-midnight p-6 text-on-midnight sm:p-8">
-          <p className="mb-3 text-base font-medium">이번 진단 결과</p>
-          {hasHeroCounts ? (
-            <h2 className="text-3xl font-bold leading-relaxed sm:text-4xl">
-              AI 답변 <strong className="text-on-midnight tabular-nums">{summary.visibility.total}개</strong> 중<br />
-              <strong className="text-on-midnight tabular-nums">{summary.visibility.count}개</strong>에 우리 업체가 나왔어요
-            </h2>
-          ) : (
-            <h2 className="text-2xl font-bold leading-relaxed">이번 측정의 핵심 결과를 확인하고 있습니다.</h2>
-          )}
-          {summary.heroVariant === "visible_top3" && hasHeroCounts && (
-            <p className="mt-4 text-lg leading-7">
-              {summary.top3.count === summary.visibility.count
-                ? `등장한 ${summary.visibility.count}번 모두 상위 3곳 안에 들었어요.`
-                : `등장한 답변 중 ${summary.top3.count}개에서 상위 3곳 안에 들었어요.`}
-            </p>
-          )}
-          {summary.heroVariant === "visible_no_top3" && hasHeroCounts && (
-            <p className="mt-4 text-lg">상위 3곳 안에서는 아직 확인되지 않았어요.</p>
-          )}
-          {summary.heroVariant === "not_visible" && hasHeroCounts && (
-            <p className="mt-4 text-base text-on-midnight/80">이번 유효 답변에서 확정 등장이 없었습니다. 모든 AI 검색에서 보이지 않는다는 뜻은 아닙니다.</p>
-          )}
-          <p className="mt-3 text-base text-on-midnight/80">업체로 확인된 등장만 표시합니다. 등장 여부가 추천이나 노출 보장을 뜻하지는 않습니다.</p>
-        </div>
-        <aside className="min-w-0 rounded-lg border bg-card p-5" aria-label="먼저 확인할 일">
-          <h3 className="text-lg font-bold">먼저 확인해 보세요</h3>
-          {summary.opportunities[0] ? (
-            <><p className="mt-3 text-lg font-semibold">{summary.opportunities[0].title}</p><p className="mt-2 text-base leading-7 text-muted-foreground">{summary.opportunities[0].observation}</p></>
-          ) : observations[0] ? (
-            <><p className="mt-3 text-lg font-semibold">{observations[0].title}</p><p className="mt-2 text-base leading-7 text-muted-foreground">{observations[0].recommendedCheck}</p></>
-          ) : (
-            <p className="mt-3 text-base text-muted-foreground">현재 자료에서는 우선 확인할 대상을 정하기 어렵습니다. 저장된 질문과 답변을 먼저 확인하세요.</p>
-          )}
-          <Button type="button" variant="outline" className="no-print mt-5 min-h-11 w-full whitespace-normal text-base" onClick={() => onShowDetail(summary.opportunities.length > 0 ? "priorities" : observations[0]?.id === "repeated_competitor" ? "businesses" : observations[0]?.id.startsWith("verified_page") ? "sources" : "questions")}>
-            실제 관찰 근거 보기<ArrowRight aria-hidden="true" />
-          </Button>
-        </aside>
-      </div>
-      <section className="rounded-lg border bg-card p-5 sm:p-7">
-        <QuestionScopeEvidence questions={questionAreas} locations={questionLocations} enabled={scopeEvidenceAvailable} />
-        <Button variant="link" className="no-print mt-4 px-0" onClick={() => onShowDetail("questions")}>실제 답변과 인용 근거 열기<ArrowRight aria-hidden="true" /></Button>
-      </section>
-      <div className="no-print grid gap-4 sm:grid-cols-2">
-        <Button variant="outline" className="h-auto min-h-24 justify-between whitespace-normal p-5 text-left text-lg" onClick={() => onShowDetail("businesses")}>넓은 검색에서 관찰된 업체<ArrowRight className="shrink-0" aria-hidden="true" /></Button>
-        <Button variant="outline" className="h-auto min-h-24 justify-between whitespace-normal p-5 text-left text-lg" onClick={() => onShowDetail("sources")}>업계에서 관찰된 출처<ArrowRight className="shrink-0" aria-hidden="true" /></Button>
-      </div>
-      <section className="py-3" aria-label="검색 범위별 확정 등장">
-        <h3 className="text-xl font-bold">어떤 범위의 질문에서 나왔나요?</h3>
-        {summary.searchScopes ? (
-          <div className="mt-5 space-y-6">
-            {summary.searchScopes.filter((scope) => scope.kind !== "overall").slice().reverse().map((scope) => (
-              <div key={scope.kind}>
-                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="text-base font-semibold">{scope.kind === "core" ? "넓은 지역 질문" : "상세 조건 질문"}</p>
-                  <p className="text-lg font-semibold tabular-nums">{scope.validCount > 0 ? `${scope.validCount}개 중 ${scope.confirmedCount}개` : "유효 답변 없음"}</p>
-                </div>
-                {scope.validCount > 0 && (
-                  <div className="h-3 overflow-hidden rounded-sm bg-muted" role="progressbar" aria-label={scope.kind === "core" ? "넓은 지역 질문 확정 등장" : "상세 조건 질문 확정 등장"} aria-valuemin={0} aria-valuemax={scope.validCount} aria-valuenow={scope.confirmedCount}>
-                    <div className={scope.kind === "core" ? "h-full bg-primary" : "h-full bg-chart-2"} style={{ width: percentOf(scope.confirmedCount, scope.validCount) + "%" }} />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-3 text-base text-muted-foreground">이 측정은 검색 범위를 구분할 자료가 없습니다. 상세 분석에서 저장된 질문을 확인하세요.</p>
-        )}
-        <p className="mt-4 text-base text-muted-foreground">각 분모는 해당 범위의 유효 답변 수입니다. 무응답과 미측정은 확정 등장 0개와 다릅니다.</p>
-      </section>
+      <DiagnosticSummaryLayout summary={summary} questions={questionAreas} locations={questionLocations} enabled={scopeEvidenceAvailable} observation={broadObservation} benchmark={benchmark}
+        actionTitle={summary.opportunities[0]?.title ?? observations[0]?.title ?? "저장된 질문과 답변 확인"}
+        actionEvidence={summary.opportunities[0]?.observation ?? observations[0]?.recommendedCheck ?? "현재 자료에서는 우선 확인할 대상을 정하기 어렵습니다."}
+        onAction={() => onShowDetail(summary.opportunities.length > 0 ? "priorities" : observations[0]?.id === "repeated_competitor" ? "businesses" : observations[0]?.id.startsWith("verified_page") ? "sources" : "questions")}
+        onTopic={onShowDetail} />
       <details className="diagnostic-topic">
-        <summary><h2>추가 관찰과 확인 사항</h2><span className="text-base font-normal text-muted-foreground">다른 업체와 인용 페이지</span></summary>
+        <summary><h2>추가 분석/근거 보기</h2><span className="text-base font-normal text-muted-foreground">다른 업체와 인용 페이지</span></summary>
         <div className="diagnostic-topic-content space-y-5">
       <div className="grid gap-3 md:grid-cols-2" aria-label="이번 측정의 검색 상황과 관찰 업체">
         <div className="rounded-xl border bg-card p-4 sm:p-5">

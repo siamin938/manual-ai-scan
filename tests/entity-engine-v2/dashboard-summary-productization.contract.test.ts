@@ -7,6 +7,8 @@ const dashboardSource = readFileSync(
   "utf8",
 );
 
+const layoutSource = readFileSync(resolve(process.cwd(), "src/components/diagnostic-layout.tsx"), "utf8");
+
 const stylesSource = readFileSync(
   resolve(process.cwd(), "src/styles.css"),
   "utf8",
@@ -14,31 +16,31 @@ const stylesSource = readFileSync(
 
 describe("dashboard owner productization layer", () => {
   it("keeps existing counts while presenting scope denominators separately", () => {
-    expect(dashboardSource).toContain('scope.kind === "core" ? "넓은 지역 질문" : "상세 조건 질문"');
-    expect(dashboardSource).toContain("`${scope.validCount}개 중 ${scope.confirmedCount}개`");
-    expect(dashboardSource).toContain("{summary.visibility.total}개");
-    expect(dashboardSource).toContain("{summary.visibility.count}개");
+    expect(layoutSource).toContain('s.kind === (broad ? "core" : "custom")');
+    expect(layoutSource).toContain("`${scope.confirmedCount} / ${scope.validCount}`");
+    expect(layoutSource).toContain("summary.visibility.total ??");
+    expect(layoutSource).toContain("hasCounts ? summary.visibility.count");
     expect(dashboardSource).not.toContain('label="상위 3곳에 나온 답변"');
-    expect(dashboardSource).toContain("summary.top3");
+    expect(layoutSource).toContain("summary.top3");
     expect(dashboardSource).toContain('label="확정 상위 3곳 노출률"');
   });
 
   it("uses valid-answer counts with Top3 as conditional supporting context", () => {
-    expect(dashboardSource).toContain("{summary.visibility.total}개");
-    expect(dashboardSource).toContain("{summary.visibility.count}개");
-    expect(dashboardSource).toContain("summary.top3.count === summary.visibility.count");
-    expect(dashboardSource).toContain("번 모두 상위 3곳 안에 들었어요.");
-    expect(dashboardSource).toContain('summary.heroVariant === "visible_no_top3"');
-    expect(dashboardSource).toContain('summary.heroVariant === "not_visible"');
-    expect(dashboardSource).toContain("이번 측정의 핵심 결과를 확인하고 있습니다.");
-    expect(dashboardSource).toContain('aria-label="먼저 확인할 일"');
+    expect(layoutSource).toContain("summary.visibility.total ??");
+    expect(layoutSource).toContain("hasCounts ? summary.visibility.count");
+    expect(layoutSource).toContain("summary.top3.count === null");
+    expect(layoutSource).toContain("개에서 상위 3곳");
+    expect(layoutSource).toContain("summary.top3.count");
+    expect(layoutSource).toContain("summary.visibility.count !== null");
+    expect(layoutSource).toContain("결과 확인 중");
+    expect(layoutSource).toContain('aria-label="먼저 확인할 일"');
     expect(dashboardSource).not.toContain('String(summary.visibility.total) + "개 질문 중 "');
   });
 
   it("retains secondary observations below the conclusion and first existing opportunity", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
-    expect(dashboardSource).toContain("summary.searchScopes.filter((scope)");
-    expect(dashboardSource).toContain("summary.opportunities[0].observation");
+    expect(layoutSource).toContain("scopes={summary.searchScopes}");
+    expect(dashboardSource).toContain("summary.opportunities[0]?.observation");
     expect(dashboardSource).toContain("어떤 종류의 질문에서 내 업체가 나왔나요?");
     expect(dashboardSource).toContain("ownerSearchContextLabel(context.intentType)");
     expect(dashboardSource).toContain("ownerSearchContextAnswerText(context.confirmedCount, context.validCount)");
@@ -62,11 +64,11 @@ describe("dashboard owner productization layer", () => {
 
   it("keeps summary spacing and compact toolbar while grouping the detailed report", () => {
     expect(dashboardSource).toContain(
-      'view === "summary"\n          ? "print-page print-report space-y-6 lg:space-y-7"\n          : "print-page print-report space-y-8 lg:space-y-10"',
+      '"print-page print-report diagnostic-page"',
     );
-    expect(dashboardSource).toContain('dashboard-toolbar border-b border-border pb-5');
+    expect(dashboardSource).toContain('dashboard-toolbar diagnostic-header');
     expect(dashboardSource).toContain('function DashboardSummary({');
-    expect(dashboardSource).toContain("{summary.visibility.total}개");
+    expect(layoutSource).toContain("summary.visibility.total ??");
   });
 
   it("uses the factual other-business label for both visible and zero exposure runs", () => {
@@ -85,8 +87,8 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("context.validCount > 0");
     expect(dashboardSource).toContain("이번 측정에서 관찰된 다른 업체");
     expect(dashboardSource).not.toContain("{item.evidence}");
-    expect(dashboardSource).toContain('summary.heroVariant === "visible_top3"');
-    expect(dashboardSource).toContain('aria-label="먼저 확인할 일"');
+    expect(layoutSource).toContain("hasCounts ? summary.visibility.count");
+    expect(layoutSource).toContain('aria-label="먼저 확인할 일"');
   });
 
   it("retains detailed evidence, scope comparisons and non-causal disclaimers", () => {
@@ -170,9 +172,9 @@ describe("dashboard owner productization layer", () => {
   });
 
   it("does not treat missing denominators as zero or add an empty verified page card for zero visibility", () => {
-    expect(dashboardSource).toContain('scope.validCount > 0 ?');
-    expect(dashboardSource).toContain('"유효 답변 없음"');
-    expect(dashboardSource).toContain('summary.searchScopes ?');
+    expect(layoutSource).toContain('scope.validCount > 0 ?');
+    expect(layoutSource).toContain('"유효 답변 없음"');
+    expect(layoutSource).toContain('scopes?.find');
     expect(dashboardSource).toContain('summary.heroVariant !== "not_visible" &&');
     expect(dashboardSource).toContain('summary.verifiedPageStatus === "pending"');
     expect(dashboardSource).toContain('summary.verifiedPageStatus === "not_verified"');
@@ -198,7 +200,7 @@ describe("approved CHABOIM home and dashboard design", () => {
     expect(panels).toContain("aria-pressed={selection === group.key}");
     expect(panels).toContain('!printExpanded && selection !== group.key ? "broad-evidence-list hidden space-y-3 print:block"');
     expect(panels).toContain('group.highEntitySharePct === null ? "미집계"');
-    expect(panels).toContain("group.highEntitySharePct !== null && <div");
+    expect(panels).toContain("group.highEntitySharePct !== null && <span");
     expect(read("src/routes/_authenticated/dashboard.tsx")).toContain("key={`${dto.business.id}:${dto.scope.runId}`}");
   });
 });

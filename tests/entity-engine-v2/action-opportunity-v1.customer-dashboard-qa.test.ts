@@ -84,7 +84,7 @@ describe("Action v1 owner summary: administrator-only customer evidence QA", () 
     const existingAdmin = at("src/lib/action-opportunity-v1.dashboard-private.functions.ts");
     const server = at("src/lib/action-opportunity-v1.customer-read.functions.ts");
 
-    expect(dashboard).toContain("에 우리 업체가 나왔어요");
+    expect(at("src/components/diagnostic-layout.tsx")).toContain("개에 등장");
     expect(dashboard).toContain("이번 측정에서 확인할");
     expect(dashboard).toContain("어떤 종류의 질문에서 내 업체가 나왔나요?");
     expect(dashboard).toContain("이번 측정에서 관찰된 다른 업체");
