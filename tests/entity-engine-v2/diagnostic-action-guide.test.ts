@@ -1,5 +1,6 @@
 import { describe,expect,it } from "vitest";
-import { nextMeasurementQuestion, actionGuideCopy } from "../../src/components/diagnostic-action-guide";
+import { nextMeasurementQuestion, actionGuideCopy, actionWritingHintKind } from "../../src/components/diagnostic-action-guide";
+import type { PriorityEvidence } from "../../src/components/diagnostic-priority-evidence";
 import type { EntityFactsV2ReadGatewayDTO } from "../../src/lib/entity-facts-v2-read-gateway.types";
 type Input = Pick<EntityFactsV2ReadGatewayDTO, "questionAreas"|"questionGroups"|"questionLocations">;
 const bounds = {confirmedTop3Count:0,top3UncertainCount:0,visibilityLowerBoundPct:0,visibilityUpperBoundPct:0,top3LowerBoundPct:0,top3UpperBoundPct:0};
@@ -29,4 +30,24 @@ describe("execution guide saved evidence boundaries",()=>{
   expect(nextMeasurementQuestion(dto)).toBe(dto.questionAreas[0]);
  });
  it("covers all seven engine kinds without title parsing",()=>expect(Object.keys(actionGuideCopy)).toEqual(["profile_directory","owned_web_presence","auto_platform","blog_presence","news_presence","video_presence","community_presence"]));
+ const priority: PriorityEvidence = {kind:"profile_directory", title:"legacy",sourceGroupLabel:"saved",highEntityCount:1,highVisibilityEntityCount:2,highEntitySharePct:50,targetConnected:null,sites:[]};
+ const savedQuestion = nextMeasurementQuestion(input([{id:"local",valid:1,confirmed:0,unresolved:0}]));
+ it.each(["comparison","price_value"])("connects saved %s intent to an actionable cost hint",intentType=>{
+  if(!savedQuestion) throw Error("fixture");
+  expect(actionWritingHintKind(priority,{...savedQuestion,intentType})).toBe("cost");
+ });
+ it.each([["review_quality","review"],["local","location"],["trust","expertise"],["service","service"],["recommendation","recommendation"],["discovery","discovery"]])("uses the saved %s intent without parsing original text",(intentType,expected)=>{
+  if(!savedQuestion || !intentType) throw Error("fixture");
+  expect(actionWritingHintKind(priority,{...savedQuestion,intentType})).toBe(expected);
+ });
+ it("does not invent a hint without a saved question",()=>expect(actionWritingHintKind(priority,null)).toBeNull());
+ it("does not direct a channel without a source signal",()=>{
+  expect(actionWritingHintKind({...priority,highEntityCount:0},savedQuestion)).toBeNull();
+  expect(actionWritingHintKind(null,savedQuestion)).toBeNull();
+ });
+ it("leaves unknown intents neutral rather than parsing price words",()=>{
+  if(!savedQuestion) throw Error("fixture");
+  expect(actionWritingHintKind(priority,{...savedQuestion,intentType:"unknown",questionText:"가격 비교"})).toBeNull();
+ });
+ it.each(Object.keys(actionGuideCopy) as (keyof typeof actionGuideCopy)[])("preserves %s source proposal with a saved hint",kind=>expect(actionWritingHintKind({...priority,kind},savedQuestion)).toBe("location"));
 });
