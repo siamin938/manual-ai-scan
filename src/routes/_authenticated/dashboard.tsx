@@ -854,6 +854,7 @@ function openPrintableSnapshot(title: string): boolean {
 }
 
 function DashboardPage() {
+  const [qaSelection, setQaSelection] = useState<string | null>(null);
   const toolsTriggerRef = useRef<HTMLButtonElement>(null);
   const { view: requestedView } = Route.useSearch();
   const view = requestedView ?? "summary";
@@ -1227,6 +1228,7 @@ function DashboardPage() {
     : null;
   const firstPriority = actionOpportunityModel?.items[0];
   const priorityEvidence: PriorityEvidence | null = firstPriority ? {
+    kind: firstPriority.kind, evidenceScope: firstPriority.evidenceScope, ...(benchmark ? {windowDays: benchmark.windowDays} : {}),
     title: firstPriority.title, sourceGroupLabel: firstPriority.sourceGroupLabel,
     highEntityCount: firstPriority.highEntityCount, highVisibilityEntityCount: firstPriority.highVisibilityEntityCount,
     highEntitySharePct: firstPriority.highEntitySharePct,
@@ -1324,6 +1326,7 @@ function DashboardPage() {
             </Button>
           )}
 
+          {privateV1AdminAllowed && dto && model && <Button variant="outline" aria-expanded={qaSelection === `${dto.business.id}:${dto.scope.runId}`} onClick={() => { setQaSelection(qaSelection === `${dto.business.id}:${dto.scope.runId}` ? null : `${dto.business.id}:${dto.scope.runId}`); if (view !== "summary") setDashboardView("summary"); toolsTriggerRef.current?.click(); window.setTimeout(() => { const qa = document.getElementById("diagnostic-operator-qa"); qa?.scrollIntoView({block:"start"}); qa?.focus(); }, 150); }}>요약 관찰 및 QA 원자료</Button>}
           </div>
             </PopoverContent>
           </Popover>
@@ -1427,6 +1430,9 @@ function DashboardPage() {
         <DashboardSummary
           key={`${dto.business.id}:${dto.scope.runId}`}
           summary={summaryModel}
+          actionDto={dto}
+          printExpanded={printExpanded}
+          showQa={privateV1AdminAllowed && (printExpanded || qaSelection === `${dto.business.id}:${dto.scope.runId}`)}
           priority={priorityEvidence}
           questionAreas={dto.questionAreas}
           intentOrder={dto.questionGroups.map(group => group.intentType)}
@@ -1475,7 +1481,7 @@ function DashboardPage() {
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
           </div>
           </>}
-          <DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={evidenceEntry.topic} entryVersion={evidenceEntry.version}
+          <div className={view === "detail" || printExpanded ? "" : "hidden"}><DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={evidenceEntry.topic} entryVersion={evidenceEntry.version}
             priority={priorityEvidence}>
           <EvidenceArchive topic="method">
       {view === "detail" && businessId && unifiedTransitionPending && (
@@ -2404,7 +2410,7 @@ function DashboardPage() {
 
             </div>
           </EvidenceArchive>
-          </DiagnosticEvidenceWorkspace>
+          </DiagnosticEvidenceWorkspace></div>
         </>
       )}
     </div>
@@ -2413,6 +2419,9 @@ function DashboardPage() {
 
 function DashboardSummary({
   summary,
+  actionDto,
+  showQa,
+  printExpanded,
   priority,
   questionAreas,
   intentOrder,
@@ -2425,6 +2434,9 @@ function DashboardSummary({
   onReviewEvidence,
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
+  actionDto: import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadGatewayDTO;
+  showQa: boolean;
+  printExpanded: boolean;
   priority: PriorityEvidence | null;
   questionAreas: readonly EntityFactsV2ReadQuestionAreaDTO[];
   intentOrder: readonly string[];
@@ -2449,12 +2461,12 @@ function DashboardSummary({
 
   return (
     <section className="space-y-4" aria-label="사장님용 10초 요약">
-      <DiagnosticSummaryLayout priority={priority} summary={summary} questions={questionAreas} intentOrder={intentOrder} locations={questionLocations} enabled={scopeEvidenceAvailable} observation={broadObservation} benchmark={benchmark}
+      <DiagnosticSummaryLayout actionDto={actionDto} printExpanded={printExpanded} priority={priority} summary={summary} questions={questionAreas} intentOrder={intentOrder} locations={questionLocations} enabled={scopeEvidenceAvailable} observation={broadObservation} benchmark={benchmark}
         actionTitle={priority?.title ?? summary.opportunities[0]?.title ?? observations[0]?.title ?? "저장된 질문과 답변 확인"}
         actionEvidence={summary.opportunities[0]?.observation ?? observations[0]?.recommendedCheck ?? "현재 자료에서는 우선 확인할 대상을 정하기 어렵습니다."}
         onAction={() => onShowDetail(summary.opportunities.length > 0 ? "priorities" : observations[0]?.id === "repeated_competitor" ? "businesses" : observations[0]?.id.startsWith("verified_page") ? "sources" : "questions")}
         onTopic={onShowDetail} />
-      <details className="diagnostic-topic">
+      {showQa && <details id="diagnostic-operator-qa" tabIndex={-1} className="diagnostic-topic" open>
         <summary><h2>요약 관찰·QA 원자료</h2><span className="text-base font-normal text-muted-foreground">전용 근거와 검토 도구</span></summary>
         <div className="diagnostic-topic-content space-y-5">
       <div className="grid gap-3 md:grid-cols-2" aria-label="이번 측정의 검색 상황과 관찰 업체">
@@ -2664,7 +2676,7 @@ function DashboardSummary({
       </div>
 
         </div>
-      </details>
+      </details>}
       <div className="no-print flex flex-col items-center gap-2 pt-2 text-center">
         <Button type="button" size="lg" onClick={() => onShowDetail("questions")}>
           상세 분석 보기

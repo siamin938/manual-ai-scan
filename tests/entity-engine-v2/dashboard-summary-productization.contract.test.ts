@@ -34,7 +34,7 @@ describe("dashboard owner productization layer", () => {
     expect(layoutSource).toContain("summary.top3.count");
     expect(layoutSource).toContain("summary.visibility.count !== null");
     expect(layoutSource).toContain("결과 확인 중");
-    expect(layoutSource).toContain('aria-label="먼저 확인할 일"');
+    expect(layoutSource).toContain("<DiagnosticActionGuide");
     expect(dashboardSource).not.toContain('String(summary.visibility.total) + "개 질문 중 "');
   });
 
@@ -89,7 +89,7 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("이번 측정에서 관찰된 다른 업체");
     expect(dashboardSource).not.toContain("{item.evidence}");
     expect(layoutSource).toContain("hasCounts ? summary.visibility.count");
-    expect(layoutSource).toContain('aria-label="먼저 확인할 일"');
+    expect(layoutSource).toContain("<DiagnosticActionGuide");
   });
 
   it("retains detailed evidence, scope comparisons and non-causal disclaimers", () => {

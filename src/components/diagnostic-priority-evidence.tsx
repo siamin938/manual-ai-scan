@@ -1,5 +1,5 @@
 import { Check, CircleHelp } from "lucide-react";
-export type PriorityEvidence = { title: string; sourceGroupLabel: string; highEntityCount: number; highVisibilityEntityCount: number; highEntitySharePct: number | null; targetConnected: boolean | null; sites: readonly { label: string; domain?: string }[] };
+export type PriorityEvidence = { kind?: import("@/lib/action-opportunity-engine-v01").ActionOpportunityKind; evidenceScope?: "category" | "global"; windowDays?: number; title: string; sourceGroupLabel: string; highEntityCount: number; highVisibilityEntityCount: number; highEntitySharePct: number | null; targetConnected: boolean | null; sites: readonly { label: string; domain?: string }[] };
 export function PriorityEvidenceFacts({ priority }: { priority: PriorityEvidence }) {
   return <div className="priority-compact-facts"><span><strong>시장 업체</strong> {priority.highEntityCount} / {priority.highVisibilityEntityCount}곳 <small>{priority.sourceGroupLabel}</small>{priority.highEntitySharePct !== null && <b>{priority.highEntitySharePct.toFixed(1)}%</b>}</span><span>{priority.targetConnected ? <Check aria-hidden="true"/> : <CircleHelp aria-hidden="true"/>}<strong>내 업체</strong> {priority.targetConnected === null ? "연결 미수집" : priority.targetConnected ? "연결 확인" : "연결 미확인"}</span></div>;
 }
