@@ -333,6 +333,7 @@
   .landing-copy { order: 2; width: 100%; }
   .landing-examples { order: 4; width: 100%; grid-template-columns: minmax(0,1fr); gap: 12px; }
 }
+@media(max-width:359px) { .landing-copy h1 { font-size: 26px; } }
 
 .broad-choice.broad-choice { border: 2px solid var(--border); border-radius: 16px; outline: none; box-shadow: none; }
 .broad-choice.broad-choice[aria-pressed="true"] { background: var(--selection-blue); border-color: var(--primary); color: var(--foreground); }

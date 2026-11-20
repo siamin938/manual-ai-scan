@@ -57,7 +57,7 @@ function LandingPage() {
         </header>
         <div className="landing-copy landing-inner">
           <p className="mb-5 text-base">자동차 업체를 위한 AI 노출 진단</p>
-          <h1>손님이 AI에 물을 때,<br />우리 가게도 나올까요?</h1>
+          <h1>우리 업체는 AI 답변에<br />얼마나 자주 등장할까요?</h1>
           <p className="mt-6 max-w-lg text-lg leading-8">실제 고객 질문에서 우리 업체가 등장했는지,<br className="hidden sm:block" /> 어떤 질문과 출처를 먼저 확인할지 살펴보세요.</p>
           <div className="mt-8 flex flex-wrap gap-3"><Button asChild size="lg"><Link to="/auth">내 업체 진단하기<ArrowRight aria-hidden="true" /></Link></Button><Button asChild size="lg" variant="outline"><a href="#sample">샘플 먼저 보기</a></Button></div>
         </div>

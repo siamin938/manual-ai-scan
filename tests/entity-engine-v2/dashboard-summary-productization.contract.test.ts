@@ -186,7 +186,7 @@ describe("approved CHABOIM home and dashboard design", () => {
     expect(home).toContain('@/assets/chaboim-landing.webp');
     expect(home).not.toContain("user-uploads://");
     expect(home).toContain('redirect({ to: "/dashboard" })');
-    expect(home).toContain("손님이 AI에 물을 때,");
+    expect(home).toContain("우리 업체는 AI 답변에");
     expect(home).toContain("AI 답변 24개 중");
     expect(home).toContain('count: 14, total: 16');
     expect(home).toContain('name: "경쟁업체 A", count: 5');
