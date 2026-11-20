@@ -1475,7 +1475,16 @@ function DashboardPage() {
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} />{comparisonModel && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
           </div>
           </>}
-          <DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={evidenceEntry.topic} entryVersion={evidenceEntry.version}>
+          <DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={evidenceEntry.topic} entryVersion={evidenceEntry.version}
+            priority={actionOpportunityModel?.items[0] ? {
+              title: actionOpportunityModel.items[0].title,
+              sourceGroupLabel: actionOpportunityModel.items[0].sourceGroupLabel,
+              highEntityCount: actionOpportunityModel.items[0].highEntityCount,
+              highVisibilityEntityCount: actionOpportunityModel.items[0].highVisibilityEntityCount,
+              highEntitySharePct: actionOpportunityModel.items[0].highEntitySharePct,
+              targetConnected: benchmark?.sourceGroups.find(group => group.key === actionOpportunityModel.items[0]?.sourceGroupKey)?.targetConnected ?? null,
+              sites: actionOpportunityModel.items[0].sites,
+            } : null}>
           <EvidenceArchive topic="method">
       {view === "detail" && businessId && unifiedTransitionPending && (
         <Card className="border-primary/40 bg-primary/[0.03]">

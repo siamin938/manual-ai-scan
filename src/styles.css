@@ -592,8 +592,10 @@ main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--backg
 .evidence-panel > p { color:var(--muted-foreground); }
 .evidence-panel > button { justify-self:start; min-height:44px; white-space:normal; }
 .evidence-panel h2 { font-size:22px; }
-.evidence-question-groups { display:grid; gap:8px; }
-.evidence-group.evidence-group { display:grid; grid-template-columns:minmax(0,1fr) minmax(90px,35%) 20px; height:auto; min-height:64px; gap:16px; white-space:normal; text-align:left; padding:12px; }
+.evidence-question-groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 16px; }
+.evidence-group.evidence-group { display:grid; grid-template-columns:minmax(0,1fr) 20px; height:auto; min-height:82px; gap:8px; white-space:normal; text-align:left; padding:12px; }
+.evidence-group .evidence-bar { grid-row:2; }
+.evidence-group > svg { grid-column:2; grid-row:1 / 3; }
 .evidence-group > span { display:grid; gap:4px; }
 .evidence-group > span > span { font-size:14px; color:var(--muted-foreground); }
 .evidence-short-list { display:grid; gap:14px; }
@@ -610,6 +612,24 @@ main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--backg
 .evidence-comparison strong { font-size:24px; }
 .evidence-priority { display:grid; gap:12px; }
 .evidence-priority > span { font-weight:700; color:var(--diagnostic-teal); }
+.evidence-card-source-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.evidence-card-source-metrics > span { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.evidence-card-source-metrics small { font-size:12px; }
+.evidence-card-source-metrics strong { font-size:26px; color:var(--foreground); line-height:1.2; }
+.evidence-card-number { font-size:26px; line-height:1.2; color:var(--foreground); }
+.evidence-choice > span > small { display:block; font-size:12px; margin-top:6px; }
+.evidence-priority-flow { display:grid; grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr); align-items:center; gap:18px; }
+.evidence-priority-flow > div { display:grid; gap:12px; }
+.evidence-priority-flow strong { font-size:26px; color:var(--diagnostic-navy); }
+.evidence-priority-flow .evidence-bar > span { background:var(--diagnostic-teal); }
+.evidence-source-detail-groups { display:grid; gap:12px; }
+.evidence-source-detail-groups > details { border:1px solid var(--border); border-radius:16px; padding:12px; }
+.evidence-source-detail-groups summary { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; cursor:pointer; }
+.evidence-source-detail-groups summary strong { flex-shrink:0; white-space:nowrap; }
+.evidence-source-detail-groups ul { margin-top:12px; }
+.evidence-source-detail-groups a { min-height:44px; display:inline-flex; align-items:center; color:var(--diagnostic-teal); text-decoration:underline; overflow-wrap:anywhere; }
+.evidence-criteria { border-top:1px solid var(--border); margin-top:16px; }
+.evidence-criteria > summary { min-height:44px; cursor:pointer; display:flex; align-items:center; }
 .evidence-method { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
 .evidence-method dd { font-size:24px; font-weight:700; margin-top:8px; }
 .evidence-archive .report-kicker { display:none; }
@@ -622,6 +642,11 @@ main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--backg
  .evidence-choice-heading { flex-wrap:wrap; gap:6px; }
  .evidence-choice-heading strong { flex:1; }
  .evidence-panel { padding:16px; }
+ .evidence-question-groups { grid-template-columns:minmax(0,1fr); }
+ .evidence-card-source-metrics { grid-template-columns:minmax(0,1fr); }
+ .evidence-card-source-metrics > span { flex-direction:row; align-items:center; justify-content:space-between; gap:4px; }
+ .evidence-card-source-metrics strong { font-size:24px; }
+ .evidence-priority-flow { grid-template-columns:minmax(0,1fr); gap:12px; }
  .evidence-group.evidence-group { grid-template-columns:minmax(0,1fr) 20px; gap:8px; }
  .evidence-group .evidence-bar { grid-row:2; }
  .evidence-group > svg { grid-column:2; grid-row:1 / 3; }
