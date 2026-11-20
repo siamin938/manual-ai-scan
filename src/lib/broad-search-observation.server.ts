@@ -277,8 +277,8 @@ export function buildBroadSearchObservation(
     const positions = new Map<string, Json>();
     for (const entity of Array.isArray(entities) ? entities : []) {
       const detail = factObject(entity);
-      if (detail && typeof detail.canonicalKey === "string" && typeof detail.bestPosition === "number") {
-        positions.set(detail.canonicalKey, detail.bestPosition);
+      if (detail && typeof detail["canonicalKey"] === "string" && typeof detail["bestPosition"] === "number") {
+        positions.set(detail["canonicalKey"], detail["bestPosition"]);
       }
     }
     for (const key of keys) {
@@ -529,7 +529,7 @@ export async function fetchBroadSearchObservation(args: {
     promotedCompetitorCanonicalKeys: args.promotedCompetitorCanonicalKeys,
     mergeCanonicalAliases: args.mergeCanonicalAliases,
   });
-  const validIds = new Set((facts ?? []).filter(row => factObject(row.facts)?.valid === true).map(row => row.measurement_id));
+  const validIds = new Set((facts ?? []).filter(row => factObject(row.facts)?.["valid"] === true).map(row => row.measurement_id));
   if (validIds.size === 0) return observation;
   const citations = await supabaseAdmin.from("measurement_citations")
     .select("measurement_id,title,url,domain", { count: "exact" })
