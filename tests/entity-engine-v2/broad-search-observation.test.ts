@@ -267,3 +267,17 @@ describe("broad search observation v0.2", () => {
     ]);
   });
 });
+
+it("counts the materialized per-answer business even when legacy mention extraction missed it", () => {
+  const key = "auto:테스트정비";
+  const result = buildBroadSearchObservation({
+    businessId: "target", questions: [{id:"q",intent_type:"local"}],
+    measurements: [{id:"m",question_id:"q"}], mentions: [], verifications: [], canonicalizations: [],
+    attributions: [], facts: [{ measurement_id: "m", facts: {valid:true,targetSeen:false,
+      confirmedOtherEntityKeys:[key],confirmedOtherEntities:[{canonicalKey:key,bestPosition:2}]}}],
+    finalCompetitorNamesByCanonicalKey:{[key]:"테스트 정비"},baseV2CompetitorCanonicalKeys:[key],
+    promotedCompetitorCanonicalKeys:[],mergeCanonicalAliases:{},
+  });
+  expect(result.singleObservationCompetitors).toMatchObject([{name:"테스트 정비",responseCount:1,top3ResponseCount:1}]);
+  expect(result.targetConfirmedCount).toBe(0);
+});

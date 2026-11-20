@@ -1,3 +1,5 @@
+import { repeatedPeerEvidence, siteDisplayName } from "@/lib/diagnostic-source-links";
+import { RepeatedPeerEvidence } from "@/components/repeated-peer-evidence";
 import { DiagnosticEvidenceWorkspace, EvidenceArchive } from "@/components/diagnostic-evidence-workspace";
 import { QuestionResults } from "@/components/diagnostic-question-results";
 import type { PriorityEvidence } from "@/components/diagnostic-priority-evidence";
@@ -1007,6 +1009,9 @@ function DashboardPage() {
     },
   });
 
+  const result = query.data;
+  const dto = result && result.ok ? result.data : null;
+  const evidenceRunId = dto?.scope.runId;
   const fetchComparison = useServerFn(getEntityFactsV2Comparison);
   const comparisonQuery = useQuery({
     queryKey: ["entity-facts-v2-comparison", activeOrgId, businessId],
@@ -1053,8 +1058,8 @@ function DashboardPage() {
 
   const fetchActionOpportunityEvidence = useServerFn(getActionOpportunityEvidence);
   const actionEvidenceQuery = useQuery({
-    queryKey: ["action-opportunity-evidence", activeOrgId, businessId],
-    enabled: !!activeOrgId && !!businessId && !!benchmark,
+    queryKey: ["action-opportunity-evidence", activeOrgId, businessId, evidenceRunId, benchmark?.thresholdPct],
+    enabled: !!activeOrgId && !!businessId && !!evidenceRunId,
     retry: false,
     queryFn: async () => {
       try {
@@ -1063,16 +1068,18 @@ function DashboardPage() {
             orgId: activeOrgId as string,
             businessId: businessId as string,
             highVisibilityThresholdPct: benchmark?.thresholdPct ?? 20,
+            ...(evidenceRunId ? { expectedRunId: evidenceRunId } : {}),
           },
         });
         return response && response.ok
           ? {
               highVisibilityExamples: response.highVisibilityExamples,
               currentRunReferences: response.currentRunReferences,
+              peerPageReferences: response.peerPageReferences,
             }
-          : { highVisibilityExamples: [], currentRunReferences: [] };
+          : { highVisibilityExamples: [], currentRunReferences: [], peerPageReferences: [] };
       } catch {
-        return { highVisibilityExamples: [], currentRunReferences: [] };
+        return { highVisibilityExamples: [], currentRunReferences: [], peerPageReferences: [] };
       }
     },
   });
@@ -1094,8 +1101,6 @@ function DashboardPage() {
       }),
   });
 
-  const result = query.data;
-  const dto = result && result.ok ? result.data : null;
   const model = dto ? buildEntityFactsV2DashboardCutoverModel(dto) : null;
   const privateV1AdminAllowed = privateV1AdminQuery.data?.allowed === true;
   const privateV1Selected =
@@ -1227,6 +1232,18 @@ function DashboardPage() {
       })
     : null;
   const firstPriority = actionOpportunityModel?.items[0];
+  const peerPages = actionEvidenceQuery.data?.peerPageReferences ?? [];
+  const repeatedPeers = dto ? repeatedPeerEvidence(dto, peerPages) : [];
+  const ownChannel = { profile_directory: "naver_place", owned_web_presence: "owned_domain", blog_presence: "naver_blog" } as const;
+  const ownType = firstPriority && Object.prototype.hasOwnProperty.call(ownChannel, firstPriority.kind)
+    ? ownChannel[firstPriority.kind as keyof typeof ownChannel] : null;
+  const ownPage = firstPartyResult?.ok && ownType
+    ? firstPartyResult.publicPages?.find(page => page.sourceType === ownType) : undefined;
+  const matchingDomains = new Set(peerPages.filter(group => group.sourceGroupKey === firstPriority?.sourceGroupKey).map(group => group.domain));
+  const comparableSources = repeatedPeers.flatMap(peer => peer.sources.filter(source => source.url && matchingDomains.has(source.domain))
+    .map(source => ({ name: peer.name, appearances: peer.responseCount, ...source })))
+    .sort((a, b) => b.count - a.count || b.appearances - a.appearances || a.name.localeCompare(b.name, "ko"));
+  const distinctSites = new Set<string>();
   const priorityEvidence: PriorityEvidence | null = firstPriority ? {
     kind: firstPriority.kind, evidenceScope: firstPriority.evidenceScope, ...(benchmark ? {windowDays: benchmark.windowDays} : {}),
     title: firstPriority.title, sourceGroupLabel: firstPriority.sourceGroupLabel,
@@ -1234,6 +1251,12 @@ function DashboardPage() {
     highEntitySharePct: firstPriority.highEntitySharePct,
     targetConnected: benchmark?.sourceGroups.find(group => group.key === firstPriority.sourceGroupKey)?.targetConnected ?? null,
     sites: firstPriority.sites,
+    ...(ownPage ? { ownPage } : {}),
+    peerExamples: comparableSources.filter(source => {
+      if (distinctSites.has(source.domain)) return false;
+      distinctSites.add(source.domain);
+      return true;
+    }).slice(0, 2),
   } : null;
   const setDashboardView = (nextView: "summary" | "detail", topic = "questions") => {
     setDetailTopic(["questions", "businesses", "sources", "comparison"].includes(topic) ? topic : "questions");
@@ -1476,6 +1499,7 @@ function DashboardPage() {
           <DiagnosticTopicTabs topic={detailTopic} onChange={setDetailTopic} />
           <div className="diagnostic-main-topic">
             {(detailTopic === "questions" || printExpanded) && <DiagnosticQuestions key={`${dto.business.id}:${dto.scope.runId}`} groups={dto.questionGroups} questions={dto.questionAreas} />}
+            {(detailTopic === "businesses" || printExpanded) && <RepeatedPeerEvidence rows={repeatedPeers} validCount={dto.overview.validCount} targetCount={dto.overview.confirmedMentionCount} sourcesAvailable={model.sources.available} printExpanded={printExpanded} />}
             {(detailTopic === "businesses" || printExpanded) && (dto.broadSearchObservation ? <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} /> : <p>이 측정은 넓은 지역 업체 분류 자료가 없습니다. 추가 근거에서 기존 관찰 업체를 확인하세요.</p>)}
             {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
@@ -2881,23 +2905,6 @@ function ActionOpportunitySection({
       </CardContent>
     </Card>
   );
-}
-
-const SITE_DISPLAY_NAMES: Array<{ match: RegExp; name: string }> = [
-  { match: /(^|\.)mycle\.co\.kr$/, name: "마이클" },
-  { match: /(^|\.)seongnam\.go\.kr$/, name: "성남시" },
-  { match: /(^|\.)issuetale\.kr$/, name: "이슈테일" },
-  { match: /(^|\.)daangn\.com$/, name: "당근" },
-  { match: /(^|\.)pf\.kakao\.com$/, name: "카카오톡 채널" },
-  { match: /(^|\.)placeview\.co\.kr$/, name: "플레이스뷰" },
-  { match: /(^|\.)oh-car\.kr$/, name: "오늘의카" },
-  { match: /(^|\.)blog\.naver\.com$/, name: "네이버 블로그" },
-  { match: /(^|\.)cafe\.naver\.com$/, name: "네이버 카페" },
-];
-
-function siteDisplayName(domain: string): string {
-  const normalized = domain.toLowerCase().replace(/^www\./, "");
-  return SITE_DISPLAY_NAMES.find((entry) => entry.match.test(normalized))?.name ?? domain;
 }
 
 function ComparisonCard({

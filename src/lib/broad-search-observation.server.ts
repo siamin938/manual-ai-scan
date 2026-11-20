@@ -1,3 +1,4 @@
+import { scopedCitedPages } from "./diagnostic-source-links";
 import type { Json } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { classifySourceDomain, normalizeSourceDomain } from "./source-domain-classifier";
@@ -250,57 +251,55 @@ export function buildBroadSearchObservation(
     }
   >();
 
-  for (const row of input.canonicalizations) {
-    if (!validMeasurementIds.has(row.measurement_id)) continue;
-    if (!verifiedMentionIds.has(row.measurement_mention_id)) continue;
-
-    const mention = mentionById.get(row.measurement_mention_id);
-    if (!mention || mention.matched_business_id) continue;
-
-    const rawKey = normalizedKey(row.canonical_key);
-    const resolvedKey = resolveCanonicalKey(rawKey, input.mergeCanonicalAliases);
-    if (!input.finalCompetitorNamesByCanonicalKey[resolvedKey]) continue;
-
-    // Existing v2 competitors use exact per-response v2 confirmation. Only
-    // cross-response PROMOTE identities may use the persisted legacy verifier
-    // for scoped counting. This keeps the scoped count from exceeding or
-    // contradicting the final run-wide v2 competitor truth.
-    if (
-      baseV2Keys.has(resolvedKey) &&
-      !confirmedOtherKeysByMeasurement.get(row.measurement_id)?.has(resolvedKey)
-    ) {
-      continue;
-    }
-    if (!baseV2Keys.has(resolvedKey) && !promotedKeys.has(resolvedKey)) continue;
-
-    const measurement = measurementById.get(row.measurement_id);
-    if (!measurement) continue;
-    const question = questionById.get(measurement.question_id);
-    if (!question) continue;
-
-    const group = groups.get(resolvedKey) ?? {
-      measurementIds: new Set<string>(),
-      questionIds: new Set<string>(),
-      intentTypes: new Set<string>(),
-      bestPositionByMeasurement: new Map<string, number>(),
+  function recordAppearance(key: string, id: string, position: Json | undefined) {
+    const measurement = measurementById.get(id);
+    const question = measurement && questionById.get(measurement.question_id);
+    if (!measurement || !question || !input.finalCompetitorNamesByCanonicalKey[key]) return;
+    const group = groups.get(key) ?? {
+      measurementIds: new Set<string>(), questionIds: new Set<string>(),
+      intentTypes: new Set<string>(), bestPositionByMeasurement: new Map<string, number>(),
     };
-
-    group.measurementIds.add(row.measurement_id);
-    group.questionIds.add(measurement.question_id);
+    group.measurementIds.add(id);
+    group.questionIds.add(question.id);
     if (question.intent_type) group.intentTypes.add(question.intent_type);
+    if (typeof position === "number" && Number.isInteger(position) && position >= 1) {
+      group.bestPositionByMeasurement.set(id, Math.min(group.bestPositionByMeasurement.get(id) ?? Infinity, position));
+    }
+    groups.set(key, group);
+  }
 
-    if (
-      typeof mention.position === "number" &&
-      Number.isInteger(mention.position) &&
-      mention.position >= 1
-    ) {
-      const current = group.bestPositionByMeasurement.get(row.measurement_id);
-      if (current === undefined || mention.position < current) {
-        group.bestPositionByMeasurement.set(row.measurement_id, mention.position);
+  // A materialized per-answer confirmation does not require a second legacy parser hit.
+  const authoritativePositions = new Set<string>();
+  for (const row of input.facts) {
+    const keys = confirmedOtherKeysByMeasurement.get(row.measurement_id);
+    if (!keys) continue;
+    const entities = factObject(row.facts)?.["confirmedOtherEntities"];
+    const positions = new Map<string, Json>();
+    for (const entity of Array.isArray(entities) ? entities : []) {
+      const detail = factObject(entity);
+      if (detail && typeof detail["canonicalKey"] === "string" && typeof detail["bestPosition"] === "number") {
+        positions.set(detail["canonicalKey"], detail["bestPosition"]);
       }
     }
+    for (const key of keys) {
+      if (!baseV2Keys.has(key)) continue;
+      if (positions.has(key)) authoritativePositions.add(JSON.stringify([key, row.measurement_id]));
+      recordAppearance(key, row.measurement_id, positions.get(key));
+    }
+  }
 
-    groups.set(resolvedKey, group);
+  // Existing promoted identities and older facts without a saved position use
+  // the scoped verifier. It may never add a base identity to an unconfirmed answer.
+  for (const row of input.canonicalizations) {
+    if (!validMeasurementIds.has(row.measurement_id) || !verifiedMentionIds.has(row.measurement_mention_id)) continue;
+    const mention = mentionById.get(row.measurement_mention_id);
+    if (!mention || mention.measurement_id !== row.measurement_id || mention.matched_business_id === input.businessId) continue;
+    const key = resolveCanonicalKey(normalizedKey(row.canonical_key), input.mergeCanonicalAliases);
+    if (baseV2Keys.has(key)) {
+      if (!confirmedOtherKeysByMeasurement.get(row.measurement_id)?.has(key)) continue;
+      if (authoritativePositions.has(JSON.stringify([key, row.measurement_id]))) continue;
+    } else if (!promotedKeys.has(key) || mention.matched_business_id) continue;
+    recordAppearance(key, row.measurement_id, mention.position);
   }
 
   const competitorRows = [...groups.entries()]
@@ -438,7 +437,7 @@ export async function fetchBroadSearchObservation(args: {
 
   const { data: measurements, error: measurementError } = await supabaseAdmin
     .from("measurements")
-    .select("id,question_id")
+    .select("id,question_id,response_text")
     .eq("org_id", args.orgId)
     .eq("run_id", args.runId)
     .in("question_id", questionIds);
@@ -476,46 +475,35 @@ export async function fetchBroadSearchObservation(args: {
     ),
   ];
 
-  const [mentionsResult, verificationsResult, attributionsResult] =
-    mentionIds.length > 0
-      ? await Promise.all([
-          supabaseAdmin
-            .from("measurement_mentions")
-            .select("id,measurement_id,matched_business_id,position")
-            .eq("org_id", args.orgId)
-            .in("id", mentionIds),
-          supabaseAdmin
-            .from("measurement_entity_verifications")
-            .select(
-              "measurement_mention_id,verification_status,verified_count_as_business",
-            )
-            .eq("org_id", args.orgId)
-            .eq("business_id", args.businessId)
-            .in("measurement_mention_id", mentionIds),
-          supabaseAdmin
-            .from("measurement_citation_attributions")
-            .select("measurement_id,canonical_key,domain,attribution_level")
-            .eq("org_id", args.orgId)
-            .eq("business_id", args.businessId)
-            .eq("source_run_id", args.runId)
-            .in("measurement_id", measurementIds)
-            .limit(2000),
-        ])
-      : [
-          { data: [], error: null },
-          { data: [], error: null },
-          { data: [], error: null },
-        ];
+  const emptyLegacyRows = { data: [], error: null };
+  const [mentionsResult, verificationsResult, attributionsResult] = await Promise.all([
+    mentionIds.length ? supabaseAdmin.from("measurement_mentions")
+      .select("id,measurement_id,matched_business_id,position")
+      .eq("org_id", args.orgId)
+      .in("id", mentionIds) : emptyLegacyRows,
+    mentionIds.length ? supabaseAdmin.from("measurement_entity_verifications")
+      .select("measurement_mention_id,verification_status,verified_count_as_business")
+      .eq("org_id", args.orgId)
+      .eq("business_id", args.businessId)
+      .in("measurement_mention_id", mentionIds) : emptyLegacyRows,
+    supabaseAdmin.from("measurement_citation_attributions")
+      .select("measurement_id,canonical_key,domain,attribution_level", { count: "exact" })
+      .eq("org_id", args.orgId)
+      .eq("business_id", args.businessId)
+      .eq("source_run_id", args.runId)
+      .in("attribution_level", ["direct", "section"])
+      .in("measurement_id", measurementIds),
+  ]);
 
   if (
     mentionsResult.error ||
     verificationsResult.error ||
-    attributionsResult.error
+    attributionsResult.error || attributionsResult.count !== attributionsResult.data?.length
   ) {
     return null;
   }
 
-  return buildBroadSearchObservation({
+  const observation = buildBroadSearchObservation({
     businessId: args.businessId,
     questions: questions as QuestionRow[],
     measurements: measurements as MeasurementRow[],
@@ -530,4 +518,15 @@ export async function fetchBroadSearchObservation(args: {
     promotedCompetitorCanonicalKeys: args.promotedCompetitorCanonicalKeys,
     mergeCanonicalAliases: args.mergeCanonicalAliases,
   });
+  const validIds = new Set((facts ?? []).filter(row => factObject(row.facts)?.["valid"] === true).map(row => row.measurement_id));
+  if (validIds.size === 0) return observation;
+  const citations = await supabaseAdmin.from("measurement_citations")
+    .select("measurement_id,title,url,domain", { count: "exact" })
+    .eq("org_id", args.orgId)
+    .in("measurement_id", [...validIds]);
+  if (!citations.error && citations.data && citations.count === citations.data.length) {
+    const answers = new Map(measurements.map(row => [row.id, row.response_text ?? ""]));
+    observation.citedPages = scopedCitedPages(citations.data, validIds, answers);
+  }
+  return observation;
 }

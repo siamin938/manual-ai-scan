@@ -99,6 +99,8 @@ export type EntityFactsV2ReadBroadSearchObservationDTO = {
   independentWebLinkedCompetitorCount: number;
   repeatedIndependentWebLinkedCompetitorCount: number;
   sourcePatterns: EntityFactsV2ReadBroadSearchSourcePatternDTO[];
+  /** Saved citations in valid broad answers, independent of confirmed business identity. */
+  citedPages?: import("./diagnostic-source-links").CitedPage[];
 };
 
 export type EntityFactsV2ReadTargetSourceDTO = {

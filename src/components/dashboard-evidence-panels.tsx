@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { siteDisplayName, type CitedPage } from "@/lib/diagnostic-source-links";
+import { Check, ChevronRight, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EvidencePopup, QuestionMatrix } from "@/components/diagnostic-layout";
 import type { EntityFactsV2ReadBroadSearchObservationDTO, EntityFactsV2ReadQuestionAreaDTO, EntityFactsV2ReadQuestionLocationDTO } from "@/lib/entity-facts-v2-read-gateway.types";
@@ -27,19 +28,39 @@ export function QuestionScopeEvidence({ questions, locations, enabled }: {questi
   return <QuestionMatrix questions={questions} locations={locations} enabled={enabled} scopes={null} headline="실제 질문별 등장 결과" />;
 }
 
+function BroadCitationPages({ pages, printExpanded }: { pages: CitedPage[] | undefined; printExpanded: boolean }) {
+  if (!pages?.length) return <p className="diagnostic-state-note">{pages ? "저장된 인용 페이지가 없습니다." : "이 측정의 인용 페이지 목록을 확인할 수 없습니다."}</p>;
+  const row = (page: CitedPage) => <li key={page.url} className="min-w-0 rounded-lg border bg-card px-3 py-2">
+    <a href={page.url} target="_blank" rel="noopener noreferrer" className="flex items-start justify-between gap-3 py-1 text-sm font-semibold text-primary">
+      <span className="min-w-0 break-words">{page.profileName ?? page.title}</span><ExternalLink size={15} aria-label="새 창" className="mt-0.5 shrink-0"/>
+    </a>
+    <p className="text-sm text-muted-foreground">{siteDisplayName(page.domain)} / 답변 {page.responseCount}개에서 인용</p>
+    {!!page.namedResponseCount && <p className="text-sm font-medium">그중 {page.namedResponseCount}개 답변 본문에서 프로필의 업체명도 확인</p>}
+  </li>;
+  return <div className="mt-4 space-y-2"><h3>넓은 지역 답변에 실제로 인용된 페이지</h3>
+    <p className="diagnostic-state-note">페이지별 인용 횟수입니다. 한 답변에서 같은 페이지를 여러 번 인용해도 한 번으로 셉니다.</p>
+    <ul className="grid gap-2">{pages.slice(0, 3).map(row)}</ul>
+    {pages.length > 3 && <details open={printExpanded || undefined}><summary className="cursor-pointer py-2 text-sm text-primary">나머지 인용 페이지 {pages.length - 3}개 보기</summary><ul className="grid gap-2">{pages.slice(3).map(row)}</ul></details>}
+  </div>;
+}
+
 export function BroadCompetitorEvidence({ observation, printExpanded = false }: { observation: EntityFactsV2ReadBroadSearchObservationDTO; printExpanded?: boolean }) {
   const [selection, setSelection] = useState<"single" | "repeated">(() => observation.singleObservationCompetitors.length > 0 ? "single" : "repeated");
   const [expanded, setExpanded] = useState(false);
   const groups = [{key:"single" as const, label:"한 번 등장", heading:"넓은 범위 검색에서 추가로 한 번 확인된 업체", rows:observation.singleObservationCompetitors}, {key:"repeated" as const, label:"두 번 이상 등장", heading:"넓은 범위 검색에서 두 번 이상 확인된 업체", rows:observation.repeatedCompetitors}];
   return <section className="diagnostic-business-view" aria-label="넓은 범위 검색 업체 분류">
     <h2>넓은 지역 검색에 나온 다른 업체</h2><p className="diagnostic-state-note">이번 측정 · 넓은 지역 질문의 유효 AI 답변 {observation.validCount}개</p>
+    {observation.observedCompetitorCount === 0 ? <p className="mt-3 rounded-lg border bg-card p-3 text-sm">
+      이 답변에서 다른 업체의 등장을 확정할 근거가 부족했습니다. 아래에서 AI가 인용한 페이지를 확인하세요.
+    </p> : <>
     <div className="diagnostic-choices no-print">{groups.map(group => <Button key={group.key} variant="ghost" className="broad-choice" aria-pressed={selection === group.key} onClick={() => { setSelection(group.key); setExpanded(false); }}><span><small>{group.label}</small><strong>{group.rows.length}곳</strong></span>{selection === group.key ? <Check aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}</Button>)}</div>
     {groups.map(group => <div key={group.key} className={!printExpanded && selection !== group.key ? "broad-evidence-list hidden space-y-3 print:block" : "broad-evidence-list space-y-3"} data-classification={group.key}>
       <h3>{group.heading} <span>{group.rows.length}곳</span></h3><div className="diagnostic-business-grid">
         {group.rows.length === 0 && <p>이 분류에서 확인된 업체가 없습니다.</p>}
         {group.rows.map((row,index) => <article key={row.name} className={`diagnostic-business-card${!expanded && !printExpanded && !isCompetitorInitiallyVisible(group.key, index) ? " diagnostic-extra-row" : ""}`}><div><h4>{row.name}</h4>{row.top3ResponseCount > 0 && <span className="diagnostic-top3-badge">{group.key === "single" ? "상위 3곳" : `상위 3곳 ${row.top3ResponseCount}회`}</span>}</div><p className="diagnostic-business-count">{observation.validCount}개 답변 중 <strong>{row.responseCount}회 등장</strong></p><p>{row.strongestIndependentSource ? `독립 웹 ${row.strongestIndependentSource.domain} · ${row.strongestIndependentSource.responseCount}개 답변` : "독립 웹 출처 미확인"}</p><p className="diagnostic-state-note">검색 상황 {row.intentCount}종에서 관찰</p></article>)}
       </div>{group.key === "single" && group.rows.length > 8 && <Button variant="outline" className="no-print" onClick={() => setExpanded(!expanded)}>{expanded ? "접기" : `나머지 업체 보기 (${group.rows.length}곳)`}</Button>}
-    </div>)}<p className="diagnostic-state-note">저장된 업체와 독립 출처의 관찰 근거이며 추천 원인을 뜻하지 않습니다. 한 번의 등장은 반복 패턴이 아닌 추가 관찰입니다.</p>
+    </div>)}</>}
+    <BroadCitationPages pages={observation.citedPages} printExpanded={printExpanded}/>
   </section>;
 }
 

@@ -13,6 +13,7 @@ export type ActionOpportunityEvidenceResponse =
       ok: true;
       highVisibilityExamples: ActionOpportunityEvidenceExample[];
       currentRunReferences: CurrentRunSourceReference[];
+      peerPageReferences: CurrentRunSourceReference[];
     }
   | { ok: false; error: "FORBIDDEN" | "INTERNAL_ERROR" };
 
@@ -22,6 +23,7 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
     orgId: string;
     businessId: string;
     highVisibilityThresholdPct: number;
+    expectedRunId?: string;
   }) => {
     if (
       !input?.orgId ||
@@ -34,6 +36,7 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
     return {
       orgId: input.orgId,
       businessId: input.businessId,
+      ...(typeof input.expectedRunId === "string" ? { expectedRunId: input.expectedRunId } : {}),
       highVisibilityThresholdPct: Math.max(
         0,
         Math.min(100, input.highVisibilityThresholdPct),
@@ -57,6 +60,7 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
         ok: true,
         highVisibilityExamples: result.highVisibilityExamples,
         currentRunReferences: result.currentRunReferences,
+        peerPageReferences: result.peerPageReferences,
       };
     } catch {
       // Optional evidence must never break the main dashboard.
@@ -64,6 +68,7 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
         ok: true,
         highVisibilityExamples: [],
         currentRunReferences: [],
+        peerPageReferences: [],
       };
     }
   });
