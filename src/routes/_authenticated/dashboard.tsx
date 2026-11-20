@@ -1235,14 +1235,12 @@ function DashboardPage() {
   const firstPriority = actionOpportunityModel?.items[0];
   const peerPages = actionEvidenceQuery.data?.peerPageReferences ?? [];
   const repeatedPeers = dto ? repeatedPeerEvidence(dto, peerPages) : [];
-  const ownChannel = { profile_directory: "naver_place", owned_web_presence: "owned_domain", blog_presence: "naver_blog" } as const;
-  const ownType = firstPriority && Object.prototype.hasOwnProperty.call(ownChannel, firstPriority.kind)
-    ? ownChannel[firstPriority.kind as keyof typeof ownChannel] : null;
-  const ownPage = firstPartyResult?.ok && ownType
-    ? firstPartyResult.publicPages?.find(page => page.sourceType === ownType) : undefined;
   const matchingDomains = new Set(peerPages.filter(group => group.sourceGroupKey === firstPriority?.sourceGroupKey).map(group => group.domain));
-  const comparableSources = repeatedPeers.flatMap(peer => peer.sources.filter(source => source.url && matchingDomains.has(source.domain))
-    .map(source => ({ name: peer.name, appearances: peer.responseCount, ...source })))
+  const comparableSources = repeatedPeers.flatMap(peer => peer.sources.flatMap(source =>
+    source.url && matchingDomains.has(source.domain)
+      ? [{ name: peer.name, appearances: peer.responseCount, domain: source.domain, count: source.count, url: source.url }]
+      : [],
+  ))
     .sort((a, b) => b.count - a.count || b.appearances - a.appearances || a.name.localeCompare(b.name, "ko"));
   const distinctSites = new Set<string>();
   const priorityEvidence: PriorityEvidence | null = firstPriority ? {
@@ -1252,7 +1250,6 @@ function DashboardPage() {
     highEntitySharePct: firstPriority.highEntitySharePct,
     targetConnected: benchmark?.sourceGroups.find(group => group.key === firstPriority.sourceGroupKey)?.targetConnected ?? null,
     sites: firstPriority.sites,
-    ...(ownPage ? { ownPage } : {}),
     peerExamples: comparableSources.filter(source => {
       if (distinctSites.has(source.domain)) return false;
       distinctSites.add(source.domain);
@@ -2491,9 +2488,6 @@ function DashboardSummary({
   return (
     <section className="space-y-4" aria-label="사장님용 10초 요약">
       <DiagnosticSummaryLayout actionDto={actionDto} printExpanded={printExpanded} priority={priority} summary={summary} questions={questionAreas} intentOrder={intentOrder} locations={questionLocations} enabled={scopeEvidenceAvailable} observation={broadObservation} benchmark={benchmark}
-        actionTitle={priority?.title ?? summary.opportunities[0]?.title ?? observations[0]?.title ?? "저장된 질문과 답변 확인"}
-        actionEvidence={summary.opportunities[0]?.observation ?? observations[0]?.recommendedCheck ?? "현재 자료에서는 우선 확인할 대상을 정하기 어렵습니다."}
-        onAction={() => onShowDetail(summary.opportunities.length > 0 ? "priorities" : observations[0]?.id === "repeated_competitor" ? "businesses" : observations[0]?.id.startsWith("verified_page") ? "sources" : "questions")}
         onTopic={onShowDetail} />
       {showQa && <details id="diagnostic-operator-qa" tabIndex={-1} className="diagnostic-topic" open>
         <summary><h2>요약 관찰·QA 원자료</h2><span className="text-base font-normal text-muted-foreground">전용 근거와 검토 도구</span></summary>

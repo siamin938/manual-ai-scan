@@ -80,17 +80,17 @@ function Podium() {
   return <svg className="diagnostic-podium" viewBox="0 0 100 100" aria-hidden="true"><path d="m50 8 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" fill="none" stroke="currentColor" strokeWidth="2"/><rect className="podium-low" x="5" y="52" width="26" height="25" rx="4"/><rect className="podium-high" x="36" y="31" width="28" height="46" rx="4"/><rect className="podium-low" x="69" y="60" width="24" height="17" rx="4"/></svg>;
 }
 
-export function DiagnosticSummaryLayout({ summary, questions, locations, enabled, observation, benchmark, actionTitle, actionEvidence, onAction, onTopic, intentOrder, priority = null, actionDto, printExpanded = false }: {
+export function DiagnosticSummaryLayout({ summary, questions, locations, enabled, observation, benchmark, onTopic, intentOrder, priority = null, actionDto, printExpanded = false }: {
   summary: EntityFactsV2DashboardSummaryViewModel; questions: readonly EntityFactsV2ReadQuestionAreaDTO[]; locations: readonly EntityFactsV2ReadQuestionLocationDTO[]; enabled: boolean;
   observation: EntityFactsV2ReadBroadSearchObservationDTO | null; benchmark: VisibilityBenchmarkDTO | null;
-  actionTitle: string; actionEvidence: string; onAction: () => void; onTopic: (topic: string) => void;
+  onTopic: (topic: string) => void;
   intentOrder?: readonly string[]; priority?: PriorityEvidence | null; actionDto?: import("@/lib/entity-facts-v2-read-gateway.types").EntityFactsV2ReadGatewayDTO; printExpanded?: boolean;
 }) {
   const hasCounts = summary.visibility.count !== null && summary.visibility.total !== null;
   return <div className="diagnostic-summary-layout"><div className="diagnostic-summary-top">
     <section className="diagnostic-result" aria-label="이번 진단 결과"><p>AI 답변 {summary.visibility.total ?? "확인 중"}{summary.visibility.total !== null ? "개 중" : ""}</p><div className="diagnostic-result-number"><strong data-digits={String(summary.visibility.count ?? "").length}>{hasCounts ? summary.visibility.count : "–"}</strong><span>{hasCounts ? "개에 등장" : "결과 확인 중"}</span><Podium /></div><div className="diagnostic-result-footer"><Star aria-hidden="true"/><span>{summary.top3.count === null ? "상위 3곳 결과 확인 중" : `등장한 답변 중 ${summary.top3.count}개에서 상위 3곳`}</span></div></section>
     <QuestionMatrix questions={questions} locations={locations} enabled={enabled} scopes={summary.searchScopes} {...(intentOrder ? { intentOrder } : {})} headline={enabled && summary.searchScopeObservation && hasVerifiedBroadAbsence(summary.searchScopes) ? "조건을 좁혔을 때만 등장" : "어떤 범위의 질문에서 나왔나요?"} />
-  </div>{actionDto && <DiagnosticActionGuide key={`${actionDto.business.id}:${actionDto.scope.runId}`} priority={priority} dto={actionDto} original={actionEvidence} compact printExpanded={printExpanded}/>}
+  </div>{actionDto && <DiagnosticActionGuide key={`${actionDto.business.id}:${actionDto.scope.runId}`} priority={priority} dto={actionDto} compact printExpanded={printExpanded}/>}
     <div className="diagnostic-summary-tiles"><Button variant="outline" className="diagnostic-link-tile" onClick={() => onTopic("businesses")}><span className="diagnostic-tile-icon"><Store/></span><span><strong>넓은 지역에 나온 업체</strong><small>{observation ? `한 번 등장 ${observation.singleObservationCompetitors.length}곳 / 반복 등장 ${observation.repeatedCompetitors.length}곳` : "넓은 지역 분류 자료 없음"}</small></span><ChevronRight/></Button><Button variant="outline" className="diagnostic-link-tile diagnostic-source-tile" onClick={() => onTopic("sources")}><span className="diagnostic-tile-icon"><Link2/></span><span><strong>자주 등장한 업체의 출처</strong><small>{benchmark ? `최근 ${benchmark.windowDays}일 / 자동차 업체 ${benchmark.highVisibilityEntityCount}곳` : "시장 표본 자료 없음"}</small></span><ChevronRight/></Button></div>
   </div>;
 }
