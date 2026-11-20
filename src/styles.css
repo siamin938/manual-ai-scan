@@ -251,3 +251,47 @@
   }
 }
 
+
+/* Dashboard presentation only: all diagnostic values retain their existing contracts. */
+.dashboard-toolbar { min-width: 0; }
+.diagnostic-topic { border-top: 1px solid var(--border); min-width: 0; scroll-margin-top: 24px; }
+.diagnostic-topic > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  min-height: 64px;
+  padding: 16px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.diagnostic-topic > summary::-webkit-details-marker { display: none; }
+.diagnostic-topic > summary::after { content: '+'; font-size: 24px; color: var(--primary); }
+.diagnostic-topic[open] > summary::after { content: '−'; }
+.diagnostic-topic > summary h2 { font-size: 20px; font-weight: 700; flex: 1 1 240px; }
+.diagnostic-topic-content { padding: 8px 0 28px; min-width: 0; }
+.diagnostic-topic .report-kicker { display: none; }
+.diagnostic-topic [data-slot="card"] { border-radius: 8px; box-shadow: none; }
+.print-report { word-break: keep-all; overflow-wrap: anywhere; }
+.print-report button, .print-report summary, .print-report a { min-height: 44px; }
+.print-report :is(button, summary, a, [role="combobox"]):focus-visible {
+  outline: 3px solid var(--ring); outline-offset: 3px;
+}
+.diagnostic-topic-content :is(p, li, td) { font-size: 16px; line-height: 1.75; }
+.diagnostic-topic-content table { min-width: 580px; }
+.diagnostic-topic-content td { max-width: 340px; white-space: normal; overflow-wrap: anywhere; }
+.diagnostic-questions summary { display: flex; align-items: center; font-size: 16px; }
+.diagnostic-topic-content [data-slot="card-header"] { background: var(--card); }
+.diagnostic-topic-content [class*="rounded-xl"] { border-radius: 8px; }
+.diagnostic-topic-content a { display: inline-flex; align-items: center; }
+.diagnostic-topic-content [data-slot="card"] { min-width: 0; }
+.print-report > header { background: var(--card); }
+@media print {
+  .diagnostic-topic, .diagnostic-topic-content { display: block !important; }
+  .diagnostic-topic > summary { break-after: avoid; }
+  .diagnostic-topic > summary::after { display: none; }
+  .diagnostic-topic-content table { min-width: 0; }
+  .diagnostic-topic-content :is(p, li, td) { font-size: 10.5pt; }
+  .diagnostic-topic-content [class*="overflow"] { overflow: visible !important; }
+}

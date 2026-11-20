@@ -13,30 +13,32 @@ const stylesSource = readFileSync(
 );
 
 describe("dashboard owner productization layer", () => {
-  it("keeps Top3 as supporting context while promoting broad-search visibility in the summary KPIs", () => {
-    expect(dashboardSource).toContain('scopes ? "넓은 범위 검색" : "상위 3곳 확정"');
-    expect(dashboardSource).toContain('scopes ? "상세 조건 검색" : "내 업체 관련 페이지"');
-    expect(dashboardSource).toContain("compactSummaryCount(summary.visibility)");
+  it("keeps existing counts while presenting scope denominators separately", () => {
+    expect(dashboardSource).toContain('scope.kind === "core" ? "넓은 지역 질문" : "상세 조건 질문"');
+    expect(dashboardSource).toContain("`${scope.validCount}개 중 ${scope.confirmedCount}개`");
+    expect(dashboardSource).toContain("{summary.visibility.total}개");
+    expect(dashboardSource).toContain("{summary.visibility.count}개");
     expect(dashboardSource).not.toContain('label="상위 3곳에 나온 답변"');
     expect(dashboardSource).toContain("summary.top3");
     expect(dashboardSource).toContain('label="확정 상위 3곳 노출률"');
   });
 
-  it("restores the original prominent owner-facing question, exposure and Top3 headline", () => {
-    expect(dashboardSource).toContain('{summary.visibility.total}번 물어봤더니 내 업체는{" "}');
-    expect(dashboardSource).toContain('<strong className="text-primary">{summary.visibility.count}번</strong> 나왔고, 그중{" "}');
-    expect(dashboardSource).toContain('<strong className="text-primary">{summary.top3.count}번</strong>은{" "}');
-    expect(dashboardSource).toContain('<strong className="text-primary">상위 3곳</strong> 안에 나왔습니다.');
+  it("uses valid-answer counts with Top3 as conditional supporting context", () => {
+    expect(dashboardSource).toContain("{summary.visibility.total}개");
+    expect(dashboardSource).toContain("{summary.visibility.count}개");
+    expect(dashboardSource).toContain("summary.top3.count === summary.visibility.count");
+    expect(dashboardSource).toContain("번 모두 상위 3곳 안에 들었어요.");
     expect(dashboardSource).toContain('summary.heroVariant === "visible_no_top3"');
     expect(dashboardSource).toContain('summary.heroVariant === "not_visible"');
     expect(dashboardSource).toContain("이번 측정의 핵심 결과를 확인하고 있습니다.");
-    expect(dashboardSource).toContain('<BarChart3 aria-hidden="true" />');
+    expect(dashboardSource).toContain('aria-label="먼저 확인할 일"');
     expect(dashboardSource).not.toContain('String(summary.visibility.total) + "개 질문 중 "');
   });
 
-  it("keeps the ten-second summary to three KPIs and no more than two fact statements", () => {
+  it("retains secondary observations below the conclusion and first existing opportunity", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
-    expect(dashboardSource).toContain('compactSummarySearchScopes(summary)');
+    expect(dashboardSource).toContain("summary.searchScopes.filter((scope)");
+    expect(dashboardSource).toContain("summary.opportunities[0].observation");
     expect(dashboardSource).toContain("어떤 종류의 질문에서 내 업체가 나왔나요?");
     expect(dashboardSource).toContain("ownerSearchContextLabel(context.intentType)");
     expect(dashboardSource).toContain("ownerSearchContextAnswerText(context.confirmedCount, context.validCount)");
@@ -58,13 +60,13 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).not.toContain('SummaryKpiCard');
   });
 
-  it("tightens spacing only in the ten-second summary without moving the detailed report", () => {
+  it("keeps summary spacing and compact toolbar while grouping the detailed report", () => {
     expect(dashboardSource).toContain(
       'view === "summary"\n          ? "print-page print-report space-y-6 lg:space-y-7"\n          : "print-page print-report space-y-8 lg:space-y-10"',
     );
-    expect(dashboardSource).toContain('border-b border-border pb-6');
+    expect(dashboardSource).toContain('dashboard-toolbar border-b border-border pb-5');
     expect(dashboardSource).toContain('function DashboardSummary({');
-    expect(dashboardSource).toContain('{summary.visibility.total}번 물어봤더니 내 업체는{" "}');
+    expect(dashboardSource).toContain("{summary.visibility.total}개");
   });
 
   it("uses the factual other-business label for both visible and zero exposure runs", () => {
@@ -75,7 +77,7 @@ describe("dashboard owner productization layer", () => {
     expect(summaryView).toContain("summary.topCompetitors.map(");
   });
 
-  it("preserves the original hero and two side-by-side question and competitor cards", () => {
+  it("preserves secondary question and competitor observations inside the disclosure", () => {
     expect(dashboardSource).toContain('aria-label="이번 측정의 검색 상황과 관찰 업체"');
     expect(dashboardSource).toContain('className="grid gap-3 md:grid-cols-2"');
     expect(dashboardSource).toContain("이번 측정에서 확정 노출된 질문 유형이 없습니다.");
@@ -84,7 +86,7 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("이번 측정에서 관찰된 다른 업체");
     expect(dashboardSource).not.toContain("{item.evidence}");
     expect(dashboardSource).toContain('summary.heroVariant === "visible_top3"');
-    expect(dashboardSource).toContain('<BarChart3 aria-hidden="true" />');
+    expect(dashboardSource).toContain('aria-label="먼저 확인할 일"');
   });
 
   it("retains detailed evidence, scope comparisons and non-causal disclaimers", () => {
@@ -122,7 +124,7 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("printWindow.print()");
     expect(dashboardSource).not.toContain('window.open("", "_blank")');
     expect(dashboardSource).not.toContain('print?: "1"');
-    expect(dashboardSource).toContain("대상 업체 · {model.businessName}");
+    expect(dashboardSource).toContain("대상 업체 · {model?.businessName}");
     expect(dashboardSource).toContain("report-section print-avoid-break");
     expect(dashboardSource).toContain("no-print flex flex-col items-center");
     expect(dashboardSource).toContain('className="no-print max-h-[90vh] overflow-y-auto sm:max-w-4xl"');
@@ -150,5 +152,29 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain("최근 측정의 메인 노출률은 내 업체로 확정된 응답만 계산합니다.");
     expect(dashboardSource).toContain("이전 측정 비교는 같은 질문과 측정 조건");
     expect(dashboardSource).not.toContain("측정 기준 보기");
+  });
+
+  it("opens questions first, navigates to existing evidence and preserves hidden content for print", () => {
+    expect(dashboardSource).toContain('useState("questions")');
+    expect(dashboardSource).toContain('onShowDetail(summary.opportunities.length > 0 ? "priorities"');
+    expect(dashboardSource).toContain('params={{ runId: dto.scope.runId }}');
+    for (const topic of ["questions", "businesses", "sources", "comparison", "priorities", "method"]) {
+      expect(dashboardSource).toContain(`id="diagnostic-${topic}"`);
+      expect(dashboardSource).toContain(`open={printExpanded || detailTopic === "${topic}"}`);
+    }
+    expect(dashboardSource).toContain('flushSync(() => setPrintExpanded(true))');
+    expect(dashboardSource).toContain('report.querySelectorAll("details")');
+    expect(dashboardSource).toContain('(showAllCompetitors || printExpanded)');
+    expect(dashboardSource).toContain('(showTargetExposureCitationSources || printExpanded)');
+    expect(dashboardSource).toContain('(showAllCitationSources || printExpanded)');
+  });
+
+  it("does not treat missing denominators as zero or add an empty verified page card for zero visibility", () => {
+    expect(dashboardSource).toContain('scope.validCount > 0 ?');
+    expect(dashboardSource).toContain('"유효 답변 없음"');
+    expect(dashboardSource).toContain('summary.searchScopes ?');
+    expect(dashboardSource).toContain('summary.heroVariant !== "not_visible" &&');
+    expect(dashboardSource).toContain('summary.verifiedPageStatus === "pending"');
+    expect(dashboardSource).toContain('summary.verifiedPageStatus === "not_verified"');
   });
 });

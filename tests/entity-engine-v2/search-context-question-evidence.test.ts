@@ -131,7 +131,7 @@ describe("Current Run: search context categories and exact saved questions", () 
     })).toBe("확정 1 · 추가 확인 1");
   });
 
-  it("keeps original v2 chart bars authoritative and only adds a collapsed explanation", () => {
+  it("keeps original v2 chart bars authoritative and exposes printable saved-question evidence", () => {
     const at = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
     const dashboard = at("src/routes/_authenticated/dashboard.tsx");
     const helper = at("src/lib/search-context-question-evidence.ts");
@@ -142,7 +142,7 @@ describe("Current Run: search context categories and exact saved questions", () 
     expect(dashboard).toContain("질문 표현이 비슷해도 다른 유형에 포함될 수");
     expect(dashboard).toContain("group.questions.map((question)");
     expect(dashboard).toContain("searchContextQuestionEvidenceLabel(question)");
-    expect(dashboard).toContain('className="no-print mt-4 rounded-lg border bg-card/70 px-3 py-3 sm:px-4"');
+    expect(dashboard).toContain('className="diagnostic-questions mt-4 border-t pt-4"');
     expect(dashboard).toContain('dataKey="confirmed"');
     expect(dashboard).toContain('dataKey="unresolved"');
     expect(dashboard).toContain('dataKey="missing"');

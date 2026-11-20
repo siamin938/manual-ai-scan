@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   createFileRoute,
   Link,
@@ -7,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, BarChart3, Printer, Search, Users } from "lucide-react";
+import { ArrowRight, Printer, Search, Users } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -70,8 +71,6 @@ import { Button } from "@/components/ui/button";
 import {
   buildCompactSummaryInsights,
   type CompactSummaryInsight,
-  compactSummaryCount,
-  compactSummarySearchScopes,
   ownerSearchContextLabel,
   ownerSearchContextAnswerText,
 } from "@/lib/dashboard-compact-insights";
@@ -503,7 +502,7 @@ function SearchContextChart({
   return (
     <div>
       <div
-        className="h-[26rem] w-full sm:h-[24rem]"
+        className="h-[26rem] min-w-[560px] sm:h-[24rem]"
         role="img"
         aria-label="검색 상황별 확정 노출, 추가 확인, 노출 미확인 건수 비교"
       >
@@ -577,7 +576,7 @@ function SearchContextChart({
           노출 미확인
         </span>
       </div>
-      <details className="no-print mt-4 rounded-lg border bg-card/70 px-3 py-3 sm:px-4">
+      <details className="diagnostic-questions mt-4 border-t pt-4" open>
         <summary className="cursor-pointer text-sm font-semibold">
           검색 상황별 실제 질문 {groups.reduce((sum, group) => sum + group.questionCount, 0)}개 확인
         </summary>
@@ -782,6 +781,7 @@ function openPrintableSnapshot(title: string): boolean {
 
   const report = source.cloneNode(true) as HTMLElement;
   report.querySelectorAll(".no-print").forEach((node) => node.remove());
+  report.querySelectorAll("details").forEach((node) => node.setAttribute("open", ""));
 
   const styles = Array.from(
     document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
@@ -861,6 +861,25 @@ function openPrintableSnapshot(title: string): boolean {
 function DashboardPage() {
   const { view: requestedView } = Route.useSearch();
   const view = requestedView ?? "summary";
+  const [detailTopic, setDetailTopic] = useState("questions");
+  const [printExpanded, setPrintExpanded] = useState(false);
+  useEffect(() => {
+    if (view !== "detail") return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`diagnostic-${detailTopic}`)?.scrollIntoView({ block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [view, detailTopic]);
+  useEffect(() => {
+    const beforePrint = () => flushSync(() => setPrintExpanded(true));
+    const afterPrint = () => setPrintExpanded(false);
+    window.addEventListener("beforeprint", beforePrint);
+    window.addEventListener("afterprint", afterPrint);
+    return () => {
+      window.removeEventListener("beforeprint", beforePrint);
+      window.removeEventListener("afterprint", afterPrint);
+    };
+  }, []);
   const navigate = useNavigate({ from: "/dashboard" });
   const { activeOrgId, session } = useOrg();
   const businesses = useClientBusinessSelection(activeOrgId);
@@ -1216,7 +1235,8 @@ function DashboardPage() {
         broadSearchObservation: dto?.broadSearchObservation ?? null,
       })
     : null;
-  const setDashboardView = (nextView: "summary" | "detail") => {
+  const setDashboardView = (nextView: "summary" | "detail", topic = "questions") => {
+    setDetailTopic(topic);
     void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
   };
   const printDashboardReport = () => {
@@ -1228,16 +1248,20 @@ function DashboardPage() {
       view,
     });
 
-    if (openPrintableSnapshot(title)) return;
-
-    // Popup blocking fallback: print the current document.
-    const originalTitle = document.title;
-    document.title = title;
+    flushSync(() => setPrintExpanded(true));
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
+        if (openPrintableSnapshot(title)) {
+          setPrintExpanded(false);
+          return;
+        }
+        // Popup blocking fallback: print the current document.
+        const originalTitle = document.title;
+        document.title = title;
         window.print();
         window.setTimeout(() => {
           document.title = originalTitle;
+          setPrintExpanded(false);
         }, 1500);
       });
     });
@@ -1251,41 +1275,30 @@ function DashboardPage() {
           : "print-page print-report space-y-8 lg:space-y-10"
       }
     >
-      <div className="border-b border-border pb-6 lg:flex lg:items-end lg:justify-between lg:gap-8">
-        <div className="max-w-3xl">
-          <p className="report-kicker mb-3">
-            {view === "summary" ? "AI VISIBILITY OVERVIEW" : "AI VISIBILITY REPORT"}
-          </p>
-          <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
-            {view === "summary" ? "AI 노출 요약" : "내 AI 노출 진단"}
-          </h1>
-          <p className="mt-3 text-base leading-7 text-muted-foreground">
-            {view === "summary"
-              ? "이번 측정의 핵심 지표와 주요 관찰 결과를 한 화면에서 확인할 수 있습니다."
-              : isUnifiedDiagnostic
-                ? "내 업체에 맞춘 24개 질문으로 대표 노출·관찰 업체·출처·기간 변화를 한 번에 확인합니다."
-                : "내 업체에서 중요하게 보는 맞춤 검색 결과를 먼저 보여드리고, 기본 진단은 비교 기준으로 따로 제공합니다."}
-          </p>
-          {model?.businessName && (
-            <p className="mt-2 text-sm font-medium text-foreground">
-              대상 업체 · {model.businessName}
-            </p>
-          )}
+      <header className="dashboard-toolbar border-b border-border pb-5">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold">AI 노출 진단</h1>
+          <div className="no-print flex min-w-0 flex-wrap items-center gap-3">
+            <BusinessSelector
+              options={businesses.options}
+              value={businesses.selectedBusinessId}
+              onChange={businesses.select}
+              isLoading={businesses.isLoading}
+              isError={businesses.isError}
+            />
+          </div>
         </div>
-        <div className="no-print mt-5 flex min-w-0 flex-col gap-3 lg:mt-0 lg:items-end">
-          {dto && model && (
-            <div className="flex flex-col gap-1 sm:items-end">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-center gap-2 sm:w-auto"
-                onClick={printDashboardReport}
-              >
-                <Printer aria-hidden="true" />
-                인쇄·PDF 저장
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-base text-muted-foreground">
+            {model ? `측정일 ${formatSeoul(model.measuredAt)}` : "최근 완료된 진단을 확인합니다"}
+            <span className="hidden print:inline"> 대상 업체 · {model?.businessName}</span>
+          </p>
+          <div className="no-print flex flex-wrap items-center gap-2">
+            {dto && model && (
+              <Button type="button" variant="outline" className="min-h-11 gap-2" onClick={printDashboardReport}>
+                <Printer aria-hidden="true" />인쇄·PDF 저장
               </Button>
-            </div>
-          )}
+            )}
           {privateV1AdminAllowed && dto && model && activeOrgId && businessId && (
             <Button
               type="button"
@@ -1307,39 +1320,22 @@ function DashboardPage() {
               }}
             >
               {privateV1Selected
-                ? "v1.0 비공개 검수 닫기"
-                : "관리자 전용 · v1.0 비공개 검수"}
+                ? "관리자 도구 닫기"
+                : "관리자 도구"}
             </Button>
           )}
-          <div className="inline-flex w-full rounded-lg border bg-muted/40 p-1 sm:w-auto" aria-label="진단 보기 방식">
-            <Button
-              type="button"
-              variant={view === "summary" ? "default" : "ghost"}
-              className="flex-1 shadow-none sm:flex-none"
-              onClick={() => setDashboardView("summary")}
-            >
-              핵심 요약
-            </Button>
-            <Button
-              type="button"
-              variant={view === "detail" ? "default" : "ghost"}
-              className="flex-1 shadow-none sm:flex-none"
-              onClick={() => setDashboardView("detail")}
-            >
-              상세 분석
-            </Button>
-          </div>
-          <div className="min-w-0 rounded-lg border border-border bg-card p-3">
-            <BusinessSelector
-              options={businesses.options}
-              value={businesses.selectedBusinessId}
-              onChange={businesses.select}
-              isLoading={businesses.isLoading}
-              isError={businesses.isError}
-            />
+
           </div>
         </div>
-      </div>
+        <div className="no-print mt-5 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:inline-grid sm:min-w-80" aria-label="진단 보기 방식">
+          <Button type="button" variant={view === "summary" ? "default" : "ghost"} aria-pressed={view === "summary"} className="min-h-12 text-base shadow-none" onClick={() => setDashboardView("summary")}>
+            핵심 요약
+          </Button>
+          <Button type="button" variant={view === "detail" ? "default" : "ghost"} aria-pressed={view === "detail"} className="min-h-12 text-base shadow-none" onClick={() => setDashboardView("detail")}>
+            상세 분석
+          </Button>
+        </div>
+      </header>
 
       <Dialog
         open={privateV1AdminAllowed && privateV1Selected}
@@ -1502,7 +1498,7 @@ function DashboardPage() {
                 }
               : undefined
           }
-          onShowDetail={() => setDashboardView("detail")}
+          onShowDetail={(topic) => setDashboardView("detail", topic)}
           onReviewEvidence={
             privateV1AdminAllowed && activeOrgId && businessId && dto
               ? (insight) => {
@@ -1520,42 +1516,36 @@ function DashboardPage() {
 
       {dto && model && view === "detail" && (
         <>
-          <div className="grid overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:gap-px">
-            <MetricCard
-              highlight
-              label="확정 AI 노출률"
-              value={pctRange(
-                model.metricCards.visibility.lowerPct,
-                model.metricCards.visibility.lowerPct,
+          <p className="text-base text-muted-foreground">저장된 질문과 실제 답변의 근거를 확인하세요. 같은 측정의 결과를 주제별로 모았습니다.</p>
+          <details id="diagnostic-questions" className="diagnostic-topic" open={printExpanded || detailTopic === "questions"}>
+            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "questions" ? "" : "questions"); }}>
+              <h2>어떤 질문에서 나왔나요?</h2>
+              <span className="text-base font-normal text-muted-foreground">검색 유형과 실제 저장 질문</span>
+            </summary>
+            <div className="diagnostic-topic-content space-y-6">
+          <Card className="report-section print-avoid-break">
+            <CardHeader className="border-b bg-muted/20">
+              <p className="report-kicker">SEARCH CONTEXT</p>
+              <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+                어떤 검색 상황에서 보였나요?
+                <BaselineBadge label={detailBasisLabel} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <p className="mb-3 text-xs text-muted-foreground">
+                이번 측정에서 질문을 만들 때 지정한 검색 목적별로 확정 노출을 비교합니다.
+                예를 들어 1/3은 해당 유형의 유효 AI 답변 3개 중 내 업체가 확정 등장한 답변이 1개라는 뜻입니다.
+                아래에서 각 유형의 실제 질문을 확인할 수 있습니다.
+              </p>
+              {model.questionGroups.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  질문군 요약이 아직 없습니다.
+                </p>
+              ) : (
+                <SearchContextChart groups={model.questionGroups} questions={dto.questionAreas} />
               )}
-              note={
-                model.metricCards.visibility.unresolvedCount > 0
-                  ? `유효 응답 ${model.metricCards.visibility.validCount}건 중 확정 노출 ${model.metricCards.visibility.confirmedCount}건 · 추가 확인 ${model.metricCards.visibility.unresolvedCount}건`
-                  : `유효 응답 ${model.metricCards.visibility.validCount}건 중 확정 노출 ${model.metricCards.visibility.confirmedCount}건`
-              }
-            />
-            <MetricCard
-              label="확정 상위 3곳 노출률"
-              value={pctRange(model.metricCards.top3.lowerPct, model.metricCards.top3.lowerPct)}
-              note={
-                model.metricCards.top3.unresolvedCount > 0
-                  ? `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건 · 상위 3곳 여부 추가 확인 ${model.metricCards.top3.unresolvedCount}건`
-                  : `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건`
-              }
-            />
-            <MetricCard
-              label="함께 관찰된 업체"
-              value={`${model.metricCards.competitorCount}곳`}
-              note="이번 측정에서 업체로 확인된 항목"
-            />
-            <MetricCard
-              label="실제 인용 출처"
-              value={
-                dto.citationSources ? `${model.metricCards.citationSourceCount}개` : "준비 중"
-              }
-              note="이번 24개 AI 답변 전체의 인용 출처 수 · 내 업체 성과 점수는 아닙니다"
-            />
-          </div>
+            </CardContent>
+          </Card>
 
           {unifiedLayerSummary && (
             <UnifiedDiagnosticLayerSummaryCard
@@ -1566,183 +1556,6 @@ function DashboardPage() {
             />
           )}
 
-          {actionOpportunityModel && (
-            <ActionOpportunitySection
-              model={actionOpportunityModel}
-              evidenceExamples={actionEvidenceExamples}
-              currentRunReferences={currentRunReferences}
-              basisLabel={detailBasisLabel}
-            />
-          )}
-
-          {comparisonModel && (
-            <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />
-          )}
-          {(comparisonQuery.isError || (comparisonResult && !comparisonResult.ok)) && (
-            <Card className="report-section">
-              <CardContent className="py-5 text-sm text-muted-foreground">
-                이전 측정 비교 정보를 불러오지 못했습니다. 최근 측정 결과에는 영향이 없습니다.
-              </CardContent>
-            </Card>
-          )}
-
-          <p className="border-b border-border pb-5 text-sm text-muted-foreground">
-            분석에 사용한 유효 AI 답변 {model.recentSummary.validCount}건 · 최근 측정{" "}
-            {formatSeoul(model.measuredAt)}
-            {model.recentSummary.invalidCount > 0
-              ? ` · 제외 ${model.recentSummary.invalidCount}건`
-              : ""}
-          </p>
-
-          <Card className="report-section">
-            <CardHeader className="border-b bg-muted/20">
-              <p className="report-kicker">OBSERVED BUSINESSES</p>
-              <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
-                {model.competitors.heading}
-                <BaselineBadge label={detailBasisLabel} />
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <p className="mb-3 text-xs text-muted-foreground">
-                이번 측정의 AI 답변에서 업체로 확인된 항목입니다. 같은 업체가 여러 답변에서 보인
-                횟수를 함께 표시합니다.
-              </p>
-              {model.competitors.rows.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  함께 관찰된 다른 업체가 없습니다.
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>업체</TableHead>
-                      <TableHead>AI 답변에서 관찰</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {model.competitors.rows
-                      .slice(0, showAllCompetitors ? model.competitors.rows.length : 6)
-                      .map((c) => (
-                        <TableRow key={c.name}>
-                          <TableCell className="text-sm font-medium">
-                            {c.name}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            <span className="tabular-nums">{c.responseCount}건</span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              질문 {c.questionCount}개 · 상위 3곳 안에서 {c.top3ResponseCount}건
-                              관찰
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              )}
-              {model.competitors.rows.length > 6 && (
-                <div className="mt-3 flex justify-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setExpandedCompetitorBusinessId(showAllCompetitors ? null : businessId)
-                    }
-                  >
-                    {showAllCompetitors ? "접기" : `전체 ${model.competitors.rows.length}곳 보기`}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="report-section">
-            <CardHeader className="border-b bg-muted/20">
-              <p className="report-kicker">CITED SOURCES</p>
-              <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
-                {model.citationSources.heading}
-                <BaselineBadge label={detailBasisLabel} />
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              <p className="mb-3 text-xs leading-5 text-muted-foreground">
-                이번 측정의 최종 AI 답변에 실제 citation으로 남은 출처를 도메인별로 묶었습니다.
-                검색 과정에서만 참고된 후보 출처는 포함하지 않습니다. 위쪽일수록 더 많은 서로 다른
-                AI 답변에서 반복 인용된 출처입니다. 특정 업체와 연결됐다는 뜻은 아니며, 아래
-                ‘업체 연결까지 확인된 출처’에서 별도로 확인합니다.
-              </p>
-              <p className="mb-3 rounded-md bg-muted/35 px-3 py-2 text-xs leading-5 text-muted-foreground">
-                ‘인용된 답변 수’는 이 출처가 한 번 이상 인용된 AI 답변 수이고, ‘전체 인용 횟수’는
-                답변 안에서 확인된 citation의 합계입니다.
-              </p>
-              {model.citationSources.rows.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  이번 측정의 최종 AI 답변에서 인용된 출처가 확인되지 않았습니다.
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>출처</TableHead>
-                      <TableHead>인용된 답변 수</TableHead>
-                      <TableHead>전체 인용 횟수</TableHead>
-                      <TableHead className="text-right">예시</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {model.citationSources.rows
-                      .slice(0, showAllCitationSources ? model.citationSources.rows.length : 8)
-                      .map((source) => (
-                        <TableRow key={source.domain}>
-                          <TableCell className="text-sm font-medium">
-                            {siteDisplayName(source.domain)}
-                            {siteDisplayName(source.domain) !== source.domain && (
-                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                                {source.domain}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {source.responseCount}개 답변
-                          </TableCell>
-                          <TableCell className="text-sm tabular-nums">
-                            {source.citationCount}회
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <a
-                              href={source.sampleUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-sm text-primary underline-offset-4 hover:underline"
-                            >
-                              인용 페이지 예시 보기 ↗
-                            </a>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              )}
-              {model.citationSources.rows.length > 8 && (
-                <div className="mt-3 flex justify-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      setExpandedCitationSourceBusinessId(
-                        showAllCitationSources ? null : businessId,
-                      )
-                    }
-                  >
-                    {showAllCitationSources
-                      ? "접기"
-                      : `전체 ${model.citationSources.rows.length}개 출처 보기`}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid items-start gap-6 lg:grid-cols-2">
             <Card className="report-section">
               <CardHeader className="border-b bg-muted/20">
                 <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
@@ -1762,7 +1575,7 @@ function DashboardPage() {
                   </p>
                 ) : (
                   weakQuestionRows
-                    .slice(0, showAllWeakQuestions ? weakQuestionRows.length : 6)
+                    .slice(0, (showAllWeakQuestions || printExpanded) ? weakQuestionRows.length : 6)
                     .map((q) => (
                       <div key={q.questionId} className="rounded-md border p-3">
                         <div className="flex items-start justify-between gap-3">
@@ -1794,7 +1607,7 @@ function DashboardPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() =>
-                        setExpandedWeakQuestionBusinessId(showAllWeakQuestions ? null : businessId)
+                        setExpandedWeakQuestionBusinessId((showAllWeakQuestions || printExpanded) ? null : businessId)
                       }
                     >
                       {showAllWeakQuestions
@@ -1806,6 +1619,85 @@ function DashboardPage() {
               </CardContent>
             </Card>
 
+            <Button asChild variant="outline" className="no-print min-h-11"><Link to="/runs/$runId" params={{ runId: dto.scope.runId }}>질문별 실제 답변과 인용 보기<ArrowRight aria-hidden="true" /></Link></Button>
+            </div>
+          </details>
+          <details id="diagnostic-businesses" className="diagnostic-topic" open={printExpanded || detailTopic === "businesses"}>
+            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "businesses" ? "" : "businesses"); }}>
+              <h2>어떤 업체가 함께 나왔나요?</h2>
+              <span className="text-base font-normal text-muted-foreground">업체로 확인된 관찰 결과</span>
+            </summary>
+            <div className="diagnostic-topic-content space-y-6">
+          <Card className="report-section">
+            <CardHeader className="border-b bg-muted/20">
+              <p className="report-kicker">OBSERVED BUSINESSES</p>
+              <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
+                {model.competitors.heading}
+                <BaselineBadge label={detailBasisLabel} />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <p className="mb-3 text-xs text-muted-foreground">
+                이번 측정의 AI 답변에서 업체로 확인된 항목입니다. 같은 업체가 여러 답변에서 보인
+                횟수를 함께 표시합니다.
+              </p>
+              {model.competitors.rows.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  함께 관찰된 다른 업체가 없습니다.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>업체</TableHead>
+                      <TableHead>AI 답변에서 관찰</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {model.competitors.rows
+                      .slice(0, (showAllCompetitors || printExpanded) ? model.competitors.rows.length : 6)
+                      .map((c) => (
+                        <TableRow key={c.name}>
+                          <TableCell className="text-sm font-medium">
+                            {c.name}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <span className="tabular-nums">{c.responseCount}건</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              질문 {c.questionCount}개 · 상위 3곳 안에서 {c.top3ResponseCount}건
+                              관찰
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              )}
+              {model.competitors.rows.length > 6 && (
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setExpandedCompetitorBusinessId((showAllCompetitors || printExpanded) ? null : businessId)
+                    }
+                  >
+                    {(showAllCompetitors || printExpanded) ? "접기" : `전체 ${model.competitors.rows.length}곳 보기`}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+
+            </div>
+          </details>
+          <details id="diagnostic-sources" className="diagnostic-topic" open={printExpanded || detailTopic === "sources"}>
+            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "sources" ? "" : "sources"); }}>
+              <h2>AI가 인용한 출처는 어디인가요?</h2>
+              <span className="text-base font-normal text-muted-foreground">관련 확인 페이지와 전체 인용 출처 구분</span>
+            </summary>
+            <div className="diagnostic-topic-content space-y-6">
             <Card className="report-section">
               <CardHeader className="border-b bg-muted/20">
                 <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
@@ -1890,7 +1782,7 @@ function DashboardPage() {
                               {verifiedTargetCitationPages
                                 .slice(
                                   0,
-                                  showAllVerifiedTargetCitationPages
+                                  (showAllVerifiedTargetCitationPages || printExpanded)
                                     ? verifiedTargetCitationPages.length
                                     : 6,
                                 )
@@ -2029,7 +1921,7 @@ function DashboardPage() {
                             ? "AI 답변 내 근접 단서 접기"
                             : `AI 답변 내 근접 단서 ${targetReferenceSources.length}개 보기`}
                         </Button>
-                        {showTargetReferenceSources && (
+                        {(showTargetReferenceSources || printExpanded) && (
                           <div className="rounded-lg border bg-muted/10 p-3">
                             <p className="mb-2 text-xs leading-5 text-muted-foreground">
                               AI 답변에서 내 업체명과 citation이 가까운 위치에서 관찰됐지만 반복 기준을 충족하지
@@ -2089,7 +1981,7 @@ function DashboardPage() {
                           : `함께 인용된 전체 출처 ${targetExposureCitationSourceCount}개 보기 · 참고`}
                       </Button>
 
-                      {showTargetExposureCitationSources && (
+                      {(showTargetExposureCitationSources || printExpanded) && (
                         <div className="rounded-lg border bg-muted/10 p-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-sm font-semibold">
@@ -2129,7 +2021,7 @@ function DashboardPage() {
                                   {targetExposureCitationSources
                                     .slice(
                                       0,
-                                      showAllTargetExposureCitationSources
+                                      (showAllTargetExposureCitationSources || printExpanded)
                                         ? targetExposureCitationSources.length
                                         : 5,
                                     )
@@ -2261,7 +2153,7 @@ function DashboardPage() {
                             ? "기타 확정 연결 접기"
                             : `기타 확정 연결 ${otherConfirmedSources.length}개 보기`}
                         </Button>
-                        {showOtherConfirmedSources && (
+                        {(showOtherConfirmedSources || printExpanded) && (
                           <div className="rounded-lg border bg-muted/10 p-3">
                             <p className="mb-2 text-xs leading-5 text-muted-foreground">
                               채용·공공·뉴스처럼 연결 자체는 확인됐지만 업체 비교에는 상대적으로
@@ -2300,7 +2192,7 @@ function DashboardPage() {
                             ? "타업체 연결 단서 접기"
                             : `타업체 연결 단서 ${linkedClueSources.length}개 보기`}
                         </Button>
-                        {showLinkedClues && (
+                        {(showLinkedClues || printExpanded) && (
                           <div className="rounded-lg border bg-muted/10 p-3">
                             <p className="mb-2 text-xs leading-5 text-muted-foreground">
                               확정 연결 기준을 통과하지 않은 타업체 보조 단서입니다.
@@ -2324,33 +2216,186 @@ function DashboardPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-
-          <Card className="report-section print-avoid-break">
+          <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
-              <p className="report-kicker">SEARCH CONTEXT</p>
+              <p className="report-kicker">CITED SOURCES</p>
               <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
-                어떤 검색 상황에서 보였나요?
+                {model.citationSources.heading}
                 <BaselineBadge label={detailBasisLabel} />
               </CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
-              <p className="mb-3 text-xs text-muted-foreground">
-                이번 측정에서 질문을 만들 때 지정한 검색 목적별로 확정 노출을 비교합니다.
-                예를 들어 1/3은 해당 유형의 유효 AI 답변 3개 중 내 업체가 확정 등장한 답변이 1개라는 뜻입니다.
-                아래에서 각 유형의 실제 질문을 확인할 수 있습니다.
+              <p className="mb-3 text-xs leading-5 text-muted-foreground">
+                이번 측정의 최종 AI 답변에 실제 citation으로 남은 출처를 도메인별로 묶었습니다.
+                검색 과정에서만 참고된 후보 출처는 포함하지 않습니다. 위쪽일수록 더 많은 서로 다른
+                AI 답변에서 반복 인용된 출처입니다. 특정 업체와 연결됐다는 뜻은 아니며, 아래
+                ‘업체 연결까지 확인된 출처’에서 별도로 확인합니다.
               </p>
-              {model.questionGroups.length === 0 ? (
+              <p className="mb-3 rounded-md bg-muted/35 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                ‘인용된 답변 수’는 이 출처가 한 번 이상 인용된 AI 답변 수이고, ‘전체 인용 횟수’는
+                답변 안에서 확인된 citation의 합계입니다.
+              </p>
+              {model.citationSources.rows.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  질문군 요약이 아직 없습니다.
+                  이번 측정의 최종 AI 답변에서 인용된 출처가 확인되지 않았습니다.
                 </p>
               ) : (
-                <SearchContextChart groups={model.questionGroups} questions={dto.questionAreas} />
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>출처</TableHead>
+                      <TableHead>인용된 답변 수</TableHead>
+                      <TableHead>전체 인용 횟수</TableHead>
+                      <TableHead className="text-right">예시</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {model.citationSources.rows
+                      .slice(0, (showAllCitationSources || printExpanded) ? model.citationSources.rows.length : 8)
+                      .map((source) => (
+                        <TableRow key={source.domain}>
+                          <TableCell className="text-sm font-medium">
+                            {siteDisplayName(source.domain)}
+                            {siteDisplayName(source.domain) !== source.domain && (
+                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                {source.domain}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {source.responseCount}개 답변
+                          </TableCell>
+                          <TableCell className="text-sm tabular-nums">
+                            {source.citationCount}회
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <a
+                              href={source.sampleUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sm text-primary underline-offset-4 hover:underline"
+                            >
+                              인용 페이지 예시 보기 ↗
+                            </a>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              )}
+              {model.citationSources.rows.length > 8 && (
+                <div className="mt-3 flex justify-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setExpandedCitationSourceBusinessId(
+                        (showAllCitationSources || printExpanded) ? null : businessId,
+                      )
+                    }
+                  >
+                    {showAllCitationSources
+                      ? "접기"
+                      : `전체 ${model.citationSources.rows.length}개 출처 보기`}
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>
 
+
+            </div>
+          </details>
+          <details id="diagnostic-comparison" className="diagnostic-topic" open={printExpanded || detailTopic === "comparison"}>
+            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "comparison" ? "" : "comparison"); }}>
+              <h2>지난번과 달라졌나요?</h2>
+              <span className="text-base font-normal text-muted-foreground">동일 조건이 확인된 측정만 비교</span>
+            </summary>
+            <div className="diagnostic-topic-content space-y-6">
+          {comparisonModel && (
+            <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />
+          )}
+          {(comparisonQuery.isError || (comparisonResult && !comparisonResult.ok)) && (
+            <Card className="report-section">
+              <CardContent className="py-5 text-sm text-muted-foreground">
+                이전 측정 비교 정보를 불러오지 못했습니다. 최근 측정 결과에는 영향이 없습니다.
+              </CardContent>
+            </Card>
+          )}
+
+
+            </div>
+          </details>
+          <details id="diagnostic-priorities" className="diagnostic-topic" open={printExpanded || detailTopic === "priorities"}>
+            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "priorities" ? "" : "priorities"); }}>
+              <h2>어디부터 확인하면 좋을까요?</h2>
+              <span className="text-base font-normal text-muted-foreground">관찰 근거와 시장 참고 자료</span>
+            </summary>
+            <div className="diagnostic-topic-content space-y-6">
+          {actionOpportunityModel && (
+            <ActionOpportunitySection
+              model={actionOpportunityModel}
+              evidenceExamples={actionEvidenceExamples}
+              currentRunReferences={currentRunReferences}
+              basisLabel={detailBasisLabel}
+            />
+          )}
+
           {benchmark && <BenchmarkCard benchmark={benchmark} basisLabel={detailBasisLabel} />}
+
+
+            </div>
+          </details>
+          <details id="diagnostic-method" className="diagnostic-topic" open={printExpanded || detailTopic === "method"}>
+            <summary onClick={(event) => { event.preventDefault(); setDetailTopic(detailTopic === "method" ? "" : "method"); }}>
+              <h2>측정 기준과 분석 방법</h2>
+              <span className="text-base font-normal text-muted-foreground">전체 지표와 결과의 해석 범위</span>
+            </summary>
+            <div className="diagnostic-topic-content space-y-6">
+          <p className="border-b border-border pb-5 text-sm text-muted-foreground">
+            분석에 사용한 유효 AI 답변 {model.recentSummary.validCount}건 · 최근 측정{" "}
+            {formatSeoul(model.measuredAt)}
+            {model.recentSummary.invalidCount > 0
+              ? ` · 제외 ${model.recentSummary.invalidCount}건`
+              : ""}
+          </p>
+
+          <div className="grid overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:gap-px">
+            <MetricCard
+              highlight
+              label="확정 AI 노출률"
+              value={pctRange(
+                model.metricCards.visibility.lowerPct,
+                model.metricCards.visibility.lowerPct,
+              )}
+              note={
+                model.metricCards.visibility.unresolvedCount > 0
+                  ? `유효 응답 ${model.metricCards.visibility.validCount}건 중 확정 노출 ${model.metricCards.visibility.confirmedCount}건 · 추가 확인 ${model.metricCards.visibility.unresolvedCount}건`
+                  : `유효 응답 ${model.metricCards.visibility.validCount}건 중 확정 노출 ${model.metricCards.visibility.confirmedCount}건`
+              }
+            />
+            <MetricCard
+              label="확정 상위 3곳 노출률"
+              value={pctRange(model.metricCards.top3.lowerPct, model.metricCards.top3.lowerPct)}
+              note={
+                model.metricCards.top3.unresolvedCount > 0
+                  ? `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건 · 상위 3곳 여부 추가 확인 ${model.metricCards.top3.unresolvedCount}건`
+                  : `유효 응답 ${model.metricCards.top3.validCount}건 중 상위 3곳 확정 ${model.metricCards.top3.confirmedCount}건`
+              }
+            />
+            <MetricCard
+              label="함께 관찰된 업체"
+              value={`${model.metricCards.competitorCount}곳`}
+              note="이번 측정에서 업체로 확인된 항목"
+            />
+            <MetricCard
+              label="실제 인용 출처"
+              value={
+                dto.citationSources ? `${model.metricCards.citationSourceCount}개` : "준비 중"
+              }
+              note="이번 24개 AI 답변 전체의 인용 출처 수 · 내 업체 성과 점수는 아닙니다"
+            />
+          </div>
 
           <Card className="report-section">
             <CardHeader className="border-b bg-muted/20">
@@ -2375,6 +2420,9 @@ function DashboardPage() {
               </p>
             </CardContent>
           </Card>
+
+            </div>
+          </details>
         </>
       )}
     </div>
@@ -2389,10 +2437,10 @@ function DashboardSummary({
 }: {
   summary: EntityFactsV2DashboardSummaryViewModel;
   customerEvidenceQaScope?: V1CustomerQaScope | undefined;
-  onShowDetail: () => void;
+  onShowDetail: (topic?: string) => void;
   onReviewEvidence?: ((insight: CompactSummaryInsight) => void) | undefined;
 }) {
-  const scopes = compactSummarySearchScopes(summary);
+
   const observations = buildCompactSummaryInsights(summary);
   const hasHeroCounts =
     summary.visibility.total !== null &&
@@ -2409,80 +2457,72 @@ function DashboardSummary({
 
   return (
     <section className="space-y-4" aria-label="사장님용 10초 요약">
-      <div className="rounded-xl border border-primary/20 bg-accent/70 px-5 py-6 sm:px-7 sm:py-7">
-        <div className="flex items-start gap-4">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <BarChart3 aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            {summary.heroVariant === "visible_top3" && hasHeroCounts ? (
-              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
-                {summary.visibility.total}번 물어봤더니 내 업체는{" "}
-                <strong className="text-primary">{summary.visibility.count}번</strong> 나왔고, 그중{" "}
-                <strong className="text-primary">{summary.top3.count}번</strong>은{" "}
-                <strong className="text-primary">상위 3곳</strong> 안에 나왔습니다.
-              </p>
-            ) : summary.heroVariant === "visible_no_top3" && hasHeroCounts ? (
-              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
-                {summary.visibility.total}번 중 내 업체는{" "}
-                <strong className="text-primary">{summary.visibility.count}번</strong> 나왔지만,{" "}
-                <strong className="text-primary">상위 3곳</strong>에서는 아직 확인되지 않았습니다.
-              </p>
-            ) : summary.heroVariant === "not_visible" && hasHeroCounts ? (
-              <p className="text-xl font-semibold leading-8 sm:text-2xl sm:leading-9">
-                {summary.visibility.total}번 물어봤지만 이번 측정에서는{" "}
-                <strong className="text-primary">내 업체가 확인되지 않았습니다.</strong>
-              </p>
-            ) : (
-              <p className="text-xl font-semibold leading-8 sm:text-2xl">
-                이번 측정의 핵심 결과를 확인하고 있습니다.
-              </p>
-            )}
-            <p className="mt-2 text-sm text-muted-foreground">
-              이번 측정 기준 · AI 답변 {summary.visibility.total ?? "확인 중"}건 분석
+      <div className="grid items-start gap-6 border-b border-border pb-7 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:gap-10">
+        <div className="min-w-0 py-2">
+          <p className="mb-3 text-base font-medium text-muted-foreground">이번 진단 결과</p>
+          {hasHeroCounts ? (
+            <h2 className="text-3xl font-bold leading-relaxed sm:text-4xl">
+              AI 답변 <strong className="text-primary tabular-nums">{summary.visibility.total}개</strong> 중<br />
+              <strong className="text-primary tabular-nums">{summary.visibility.count}개</strong>에 우리 업체가 나왔어요
+            </h2>
+          ) : (
+            <h2 className="text-2xl font-bold leading-relaxed">이번 측정의 핵심 결과를 확인하고 있습니다.</h2>
+          )}
+          {summary.heroVariant === "visible_top3" && hasHeroCounts && (
+            <p className="mt-4 text-lg leading-7">
+              {summary.top3.count === summary.visibility.count
+                ? `등장한 ${summary.visibility.count}번 모두 상위 3곳 안에 들었어요.`
+                : `등장한 답변 중 ${summary.top3.count}개에서 상위 3곳 안에 들었어요.`}
             </p>
-          </div>
+          )}
+          {summary.heroVariant === "visible_no_top3" && hasHeroCounts && (
+            <p className="mt-4 text-lg">상위 3곳 안에서는 아직 확인되지 않았어요.</p>
+          )}
+          {summary.heroVariant === "not_visible" && hasHeroCounts && (
+            <p className="mt-4 text-base text-muted-foreground">이번 유효 답변에서 확정 등장이 없었습니다. 모든 AI 검색에서 보이지 않는다는 뜻은 아닙니다.</p>
+          )}
+          <p className="mt-3 text-base text-muted-foreground">업체로 확인된 등장만 표시합니다. 등장 여부가 추천이나 노출 보장을 뜻하지는 않습니다.</p>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
-            <p className="text-xs text-muted-foreground">확정 노출</p>
-            <p className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
-              {compactSummaryCount(summary.visibility)}
-            </p>
-          </div>
-          <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
-            <p className="text-xs text-muted-foreground">
-              {scopes ? "넓은 범위 검색" : "상위 3곳 확정"}
-            </p>
-            <p className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
-              {scopes
-                ? String(scopes.core.confirmedCount) + "/" + String(scopes.core.validCount)
-                : compactSummaryCount(summary.top3)}
-            </p>
-          </div>
-          <div className="min-w-0 rounded-lg border bg-card/95 p-3 sm:p-4">
-            <p className="text-xs text-muted-foreground">
-              {scopes ? "상세 조건 검색" : "내 업체 관련 페이지"}
-            </p>
-            <p className="mt-2 text-xl font-semibold tabular-nums sm:text-2xl">
-              {scopes
-                ? String(scopes.custom.confirmedCount) + "/" + String(scopes.custom.validCount)
-                : pageLabel}
-            </p>
-          </div>
-        </div>
-        {scopes ? (
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            넓은 범위 검색은 광역 지역·주력 서비스를 묻는 8개 질문,
-            상세 조건 검색은 상세 지역·선택 조건을 반영한 16개 질문입니다.
-          </p>
-        ) : (
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            이번 측정은 넓은 범위·상세 조건 검색을 안전하게 분리할 수 없어 다른 확정 지표를 표시합니다.
-          </p>
-        )}
+        <aside className="min-w-0 border-l-4 border-primary bg-accent/40 p-5" aria-label="먼저 확인할 일">
+          <h3 className="text-lg font-bold">먼저 확인해 보세요</h3>
+          {summary.opportunities[0] ? (
+            <><p className="mt-3 text-lg font-semibold">{summary.opportunities[0].title}</p><p className="mt-2 text-base leading-7 text-muted-foreground">{summary.opportunities[0].observation}</p></>
+          ) : observations[0] ? (
+            <><p className="mt-3 text-lg font-semibold">{observations[0].title}</p><p className="mt-2 text-base leading-7 text-muted-foreground">{observations[0].recommendedCheck}</p></>
+          ) : (
+            <p className="mt-3 text-base text-muted-foreground">현재 자료에서는 우선 확인할 대상을 정하기 어렵습니다. 저장된 질문과 답변을 먼저 확인하세요.</p>
+          )}
+          <Button type="button" variant="outline" className="no-print mt-5 min-h-11 w-full whitespace-normal text-base" onClick={() => onShowDetail(summary.opportunities.length > 0 ? "priorities" : observations[0]?.id === "repeated_competitor" ? "businesses" : observations[0]?.id.startsWith("verified_page") ? "sources" : "questions")}>
+            실제 관찰 근거 보기<ArrowRight aria-hidden="true" />
+          </Button>
+        </aside>
       </div>
-
+      <section className="py-3" aria-label="검색 범위별 확정 등장">
+        <h3 className="text-xl font-bold">어떤 범위의 질문에서 나왔나요?</h3>
+        {summary.searchScopes ? (
+          <div className="mt-5 space-y-6">
+            {summary.searchScopes.filter((scope) => scope.kind !== "overall").slice().reverse().map((scope) => (
+              <div key={scope.kind}>
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-base font-semibold">{scope.kind === "core" ? "넓은 지역 질문" : "상세 조건 질문"}</p>
+                  <p className="text-lg font-semibold tabular-nums">{scope.validCount > 0 ? `${scope.validCount}개 중 ${scope.confirmedCount}개` : "유효 답변 없음"}</p>
+                </div>
+                {scope.validCount > 0 && (
+                  <div className="h-3 overflow-hidden rounded-sm bg-muted" role="progressbar" aria-label={scope.kind === "core" ? "넓은 지역 질문 확정 등장" : "상세 조건 질문 확정 등장"} aria-valuemin={0} aria-valuemax={scope.validCount} aria-valuenow={scope.confirmedCount}>
+                    <div className={scope.kind === "core" ? "h-full bg-primary" : "h-full bg-chart-2"} style={{ width: percentOf(scope.confirmedCount, scope.validCount) + "%" }} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-base text-muted-foreground">이 측정은 검색 범위를 구분할 자료가 없습니다. 상세 분석에서 저장된 질문을 확인하세요.</p>
+        )}
+        <p className="mt-4 text-base text-muted-foreground">각 분모는 해당 범위의 유효 답변 수입니다. 무응답과 미측정은 확정 등장 0개와 다릅니다.</p>
+      </section>
+      <details className="diagnostic-topic">
+        <summary><h2>추가 관찰과 확인 사항</h2><span className="text-base font-normal text-muted-foreground">다른 업체와 인용 페이지</span></summary>
+        <div className="diagnostic-topic-content space-y-5">
       <div className="grid gap-3 md:grid-cols-2" aria-label="이번 측정의 검색 상황과 관찰 업체">
         <div className="rounded-xl border bg-card p-4 sm:p-5">
           <div className="flex items-center gap-2">
@@ -2609,8 +2649,8 @@ function DashboardSummary({
         </div>
       </div>
 
-      <div
-        className="rounded-xl border bg-card px-4 py-4 sm:px-5"
+      {summary.heroVariant !== "not_visible" && <div
+        className="rounded-lg border bg-card px-4 py-4 sm:px-5"
         aria-label="이번 측정의 인용 페이지 검증"
       >
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -2628,7 +2668,7 @@ function DashboardSummary({
           </div>
           <p className="shrink-0 text-2xl font-semibold tabular-nums">{pageLabel}</p>
         </div>
-      </div>
+      </div>}
 
       <div className="rounded-xl border bg-card p-4 sm:p-5">
         <h3 className="font-semibold">
@@ -2689,8 +2729,10 @@ function DashboardSummary({
         </p>
       </div>
 
+        </div>
+      </details>
       <div className="no-print flex flex-col items-center gap-2 pt-2 text-center">
-        <Button type="button" size="lg" onClick={onShowDetail}>
+        <Button type="button" size="lg" onClick={() => onShowDetail("questions")}>
           상세 분석 보기
           <ArrowRight aria-hidden="true" />
         </Button>
