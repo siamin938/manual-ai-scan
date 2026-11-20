@@ -1,5 +1,7 @@
 import { describe,expect,it } from "vitest";
-import { nextMeasurementQuestion, actionGuideCopy, actionWritingHintKind } from "../../src/components/diagnostic-action-guide";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { DiagnosticActionGuide, nextMeasurementQuestion, actionGuideCopy, actionWritingHintKind } from "../../src/components/diagnostic-action-guide";
 import type { PriorityEvidence } from "../../src/components/diagnostic-priority-evidence";
 import type { EntityFactsV2ReadGatewayDTO } from "../../src/lib/entity-facts-v2-read-gateway.types";
 type Input = Pick<EntityFactsV2ReadGatewayDTO, "questionAreas"|"questionGroups"|"questionLocations">;
@@ -50,4 +52,35 @@ describe("execution guide saved evidence boundaries",()=>{
   expect(actionWritingHintKind(priority,{...savedQuestion,intentType:"unknown",questionText:"가격 비교"})).toBeNull();
  });
  it.each(Object.keys(actionGuideCopy) as (keyof typeof actionGuideCopy)[])("preserves %s source proposal with a saved hint",kind=>expect(actionWritingHintKind({...priority,kind},savedQuestion)).toBe("location"));
+});
+
+describe("customer source actions", () => {
+  const dto = {
+    ...input([]),
+    overview: { validCount: 2, confirmedMentionCount: 1 },
+    business: { name: "측정 지점", region: null, city: null },
+  } as EntityFactsV2ReadGatewayDTO;
+  const priority = {
+    kind: "profile_directory" as const, title: "", sourceGroupLabel: "", highEntityCount: 1,
+    highVisibilityEntityCount: 2, highEntitySharePct: 50, targetConnected: false, sites: [],
+    ownPage: { sourceType: "naver_place", url: "https://registered.example.com/place" },
+  };
+  function guide(pages: NonNullable<PriorityEvidence["peerExamples"]>) {
+    return renderToStaticMarkup(createElement(DiagnosticActionGuide, {
+      dto, priority: { ...priority, peerExamples: pages },
+    }));
+  }
+  it("links only the cited example, with the peer, platform and confirmed answer count", () => {
+    const url = "https://daangn.com/kr/local-profile/example";
+    const html = guide([{ name: "비교 정비소", domain: "daangn.com", count: 2, url }]);
+    expect(html.match(/href="/g)).toHaveLength(1);
+    for (const value of [url, "비교 정비소", "당근", "함께 나온 답변 2개"]) expect(html).toContain(value);
+    expect(html).not.toContain(priority.ownPage.url);
+  });
+  it("omits the link group and redundant disclosures without an eligible citation", () => {
+    const html = guide([]);
+    for (const value of ['href="', "함께 인용된 페이지", "이 일을 추천한 이유", "저장된 관찰 원문", "판정 기준과 원자료"]) {
+      expect(html).not.toContain(value);
+    }
+  });
 });

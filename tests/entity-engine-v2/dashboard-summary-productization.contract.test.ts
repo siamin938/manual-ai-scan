@@ -41,7 +41,7 @@ describe("dashboard owner productization layer", () => {
   it("retains secondary observations below the conclusion and first existing opportunity", () => {
     expect(dashboardSource).toContain('buildCompactSummaryInsights(summary)');
     expect(layoutSource).toContain("scopes={summary.searchScopes}");
-    expect(dashboardSource).toContain("summary.opportunities[0]?.observation");
+    expect(layoutSource).toContain("priority={priority} dto={actionDto}");
     expect(dashboardSource).toContain("어떤 종류의 질문에서 내 업체가 나왔나요?");
     expect(dashboardSource).toContain("ownerSearchContextLabel(context.intentType)");
     expect(dashboardSource).toContain("ownerSearchContextAnswerText(context.confirmedCount, context.validCount)");
@@ -159,16 +159,23 @@ describe("dashboard owner productization layer", () => {
 
   it("opens questions first, navigates to existing evidence and preserves hidden content for print", () => {
     expect(dashboardSource).toContain('useState("questions")');
-    expect(dashboardSource).toContain('onShowDetail(summary.opportunities.length > 0 ? "priorities"');
+    expect(dashboardSource).toContain('onTopic={onShowDetail}');
     expect(dashboardSource).toContain('params={{ runId: dto.scope.runId }}');
     for (const topic of ["questions", "businesses", "sources", "comparison", "priorities", "method"]) {
       expect(dashboardSource).toContain(`<EvidenceArchive topic="${topic}">`);
       expect(evidenceSource).toContain(` ${topic}:`);
     }
+    expect(dashboardSource).toContain("entryTopic={detailTopic}");
+    expect(dashboardSource).not.toContain("setEvidenceEntry");
     expect(evidenceSource).toContain('id={`diagnostic-${key}`}');
     expect(evidenceSource).toContain('window.addEventListener("hashchange", enter)');
-    expect(evidenceSource).toContain('context.print || context.topic === topic');
-    expect(evidenceSource).toContain('print: true');
+    expect(evidenceSource).toContain('useContext(PrintArchiveContext)');
+    expect(evidenceSource).toContain('{printExpanded && <div className="evidence-print-archive">');
+    expect(evidenceSource).toContain('<PrintArchiveContext.Provider value={true}>');
+    for (const label of ["상세 근거 보기", "전체 업체·넓은 지역 근거 보기", "전체 출처 보기", "측정 기준 자세히"]) {
+      expect(evidenceSource).not.toContain(label);
+    }
+    expect(evidenceSource).toContain('<QuestionResults questions={popupQuestions}');
     expect(dashboardSource).toContain('flushSync(() => setPrintExpanded(true))');
     expect(dashboardSource).toContain('report.querySelectorAll("details")');
     expect(dashboardSource).toContain('(showAllCompetitors || printExpanded)');
