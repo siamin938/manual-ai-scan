@@ -1,3 +1,4 @@
+import { savedSourceUrl } from "./diagnostic-source-links";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { FirstPartySourceType } from "@/lib/first-party-source-classifier";
@@ -9,7 +10,7 @@ const SOURCE_TYPES = new Set<FirstPartySourceType>([
 ]);
 
 export type VerifiedFirstPartySourceTypesResponse =
-  | { ok: true; sourceTypes: FirstPartySourceType[] }
+  | { ok: true; sourceTypes: FirstPartySourceType[]; publicPages: { sourceType: FirstPartySourceType; url: string }[] }
   | {
       ok: false;
       error:
@@ -21,8 +22,7 @@ export type VerifiedFirstPartySourceTypesResponse =
 /**
  * Dashboard-safe first-party registry reader.
  *
- * Returns only verified source-type labels. Registry ids, URLs, hosts and
- * matching details stay server-side.
+ * Returns verified labels and their public destinations for this business only.
  */
 export const getVerifiedFirstPartySourceTypes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -53,7 +53,7 @@ export const getVerifiedFirstPartySourceTypes = createServerFn({ method: "POST" 
 
       const { data: rows, error } = await context.supabase
         .from("business_first_party_sources")
-        .select("source_type")
+        .select("source_type,canonical_url,normalized_host")
         .eq("org_id", data.orgId)
         .eq("business_id", data.businessId)
         .eq("active", true)
@@ -75,6 +75,11 @@ export const getVerifiedFirstPartySourceTypes = createServerFn({ method: "POST" 
         ),
       );
 
-      return { ok: true, sourceTypes };
+      const publicPages = (rows ?? []).flatMap(row => {
+        const sourceType = sourceTypes.find(type => type === row.source_type);
+        const url = savedSourceUrl(row.canonical_url, row.normalized_host);
+        return sourceType && url ? [{ sourceType, url }] : [];
+      }).sort((a, b) => a.url.localeCompare(b.url));
+      return { ok: true, sourceTypes, publicPages };
     },
   );

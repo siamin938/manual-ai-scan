@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type ReactNode } from "react";
-import { ChevronUp, ChevronRight, MapPin } from "lucide-react";
+import { siteDisplayName } from "@/lib/diagnostic-source-links";
+import { ChevronUp, ChevronRight, MapPin, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildSearchContextQuestionEvidence } from "@/lib/search-context-question-evidence";
 import type { EntityFactsV2ReadGatewayDTO } from "@/lib/entity-facts-v2-read-gateway.types";
@@ -40,6 +41,25 @@ export function nextMeasurementQuestion(dto: Pick<EntityFactsV2ReadGatewayDTO, "
   const rows = dto.questionAreas.filter(q => ids.has(q.questionId) && q.validCount > 0 && q.confirmedMentionCount === 0 && q.unresolvedTargetCount === 0);
   return rows.find(q => locations.has(q.questionId) && locations.get(q.questionId) !== null) ?? rows[0] ?? null;
 }
+function ActionSourceLinks({ priority, validCount, targetCount }: { priority: PriorityEvidence; validCount: number; targetCount: number }) {
+  const own = priority.ownPage;
+  const pages = priority.peerExamples ?? [];
+  if (!own && !pages.length) return null;
+  const ownLabels: Record<string, string> = {
+    naver_place: "내 네이버 플레이스 확인하기", owned_domain: "내 홈페이지 확인하기", naver_blog: "내 네이버 블로그 확인하기",
+  };
+  return <div className="my-3 space-y-3 rounded-xl border bg-card p-4">
+    {own && <a href={own.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+      {ownLabels[own.sourceType] ?? "내 업체 페이지 확인하기"}<ExternalLink size={15} aria-label="새 창"/>
+    </a>}
+    {pages.length > 0 && <div><h4 className="text-sm font-semibold">이번 측정에서 반복 등장한 업체 사례</h4>
+      <p className="mt-1 text-sm text-muted-foreground">전체 답변 {validCount}개에서 내 업체는 {targetCount}회 등장했습니다.</p>
+      <ul className="mt-2 space-y-2">{pages.map(page => <li key={page.domain} className="flex flex-wrap items-center justify-between gap-1 rounded-lg bg-muted/50 px-3 py-2">
+        <div className="text-sm"><strong>{page.name}</strong> {page.appearances}회 등장<br/><span className="text-muted-foreground">{siteDisplayName(page.domain)} 출처가 함께 나온 답변 {page.count}개</span></div>
+        <a href={page.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 py-2 text-sm font-semibold text-primary underline underline-offset-4">{siteDisplayName(page.domain)} 사례 보기 <ExternalLink size={13} aria-label="새 창"/></a>
+      </li>)}</ul></div>}
+  </div>;
+}
 export function ActionGuideReason({ priority, original, printExpanded = false }: { priority: PriorityEvidence | null; original: string; printExpanded?: boolean }) {
   const copy = guideCopyFor(priority);
   return <details className="action-guide-reason" {...(printExpanded ? {open:true} : {})}><summary>이 일을 추천한 이유</summary>{priority && copy ? <>
@@ -68,6 +88,7 @@ export function DiagnosticActionGuide({ priority, dto, original = "", archive, c
     {expanded && <div id={panelId} ref={panel} tabIndex={-1} className="action-guide-panel">
       <h3>{compact ? "실행 방법" : title}</h3>
       {valid && copy ? <ol className="action-guide-steps"><li><span>1</span><div>{copy.where} {branch ? <><strong>{branch}</strong> 표시가 현재 지점 정보와 맞는지 살펴보세요.</> : "현재 지점명과 지역 표시를 살펴보세요."}</div></li><li><span>2</span><div>{copy.task}{hintKind && <> {writingHints[hintKind]}</>}</div></li><li><span>3</span><div>정보가 반영된 뒤 같은 질문으로 다시 측정해 변화를 비교하세요.</div></li></ol> : <p>{task}</p>}
+      {valid && priority && copy && <ActionSourceLinks priority={priority} validCount={dto.overview.validCount} targetCount={dto.overview.confirmedMentionCount}/>}
       {question ? <figure className="action-guide-question" data-question-id={question.questionId}><figcaption>다음 측정에서 확인할 질문</figcaption><blockquote>{question.questionText}</blockquote><p>이번 측정에서 우리 업체가 나오지 않은 질문이에요.</p></figure> : <p>{valid ? "이번 자료에서 비교할 미등장 질문을 찾지 못했어요. 저장된 질문과 출처를 살펴보세요." : "비교할 질문은 유효 답변을 확인한 뒤 안내합니다."}</p>}
       <ActionGuideReason priority={valid ? priority : null} original={original} printExpanded={printExpanded}/>
       {archive && <details className="action-guide-original"><summary>판정 기준과 원자료</summary>{archive}</details>}

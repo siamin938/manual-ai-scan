@@ -1,3 +1,4 @@
+import { savedSourceUrl } from "./diagnostic-source-links";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { fetchEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.server";
 import { selectSafeCitationPageForEntity, type CitationPageCandidate } from "@/lib/action-opportunity-citation-selection";
@@ -25,6 +26,7 @@ export type CurrentRunSourceReference = {
 export type ActionOpportunityEvidenceResult = {
   highVisibilityExamples: ActionOpportunityEvidenceExample[];
   currentRunReferences: CurrentRunSourceReference[];
+  peerPageReferences: CurrentRunSourceReference[];
 };
 
 function sourceGroupForDomain(raw: string): string {
@@ -58,17 +60,6 @@ function sourceGroupForDomain(raw: string): string {
   return "other";
 }
 
-function safeHttpUrl(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    return u.toString();
-  } catch {
-    return null;
-  }
-}
-
 function normalizeEntitySurface(value: string): string {
   return value
     .normalize("NFKC")
@@ -88,6 +79,7 @@ export async function fetchActionOpportunityEvidence(args: {
   const empty: ActionOpportunityEvidenceResult = {
     highVisibilityExamples: [],
     currentRunReferences: [],
+    peerPageReferences: [],
   };
 
   const gateway = await fetchEntityFactsV2ReadGateway({
@@ -123,7 +115,6 @@ export async function fetchActionOpportunityEvidence(args: {
       .filter(
         (source) =>
           source.evidence !== "clue" &&
-          source.targetResponseCount === 0 &&
           source.competitorResponseCount > 0 &&
           (!args.focusDomain ||
             source.domain.toLowerCase().replace(/^www\./u, "") ===
@@ -132,7 +123,8 @@ export async function fetchActionOpportunityEvidence(args: {
       .map((source) => [
         source.domain.toLowerCase().replace(/^www\./, ""),
         {
-          responseCount: source.responseCount,
+          responseCount: source.competitorResponseCount,
+          exclusive: source.targetResponseCount === 0,
           competitorNames: new Set(
             source.linkedEntities
               .filter(
@@ -151,17 +143,17 @@ export async function fetchActionOpportunityEvidence(args: {
   if (args.expectedRunId && args.expectedRunId !== sourceRunId) {
     return empty;
   }
-  const { data: rows, error } = await supabaseAdmin
+  const { data: rows, error, count } = await supabaseAdmin
     .from("measurement_citation_attributions_actionable_v2")
-    .select("canonical_key, canonical_display_name, citation_url, domain, attribution_level")
+    .select("canonical_key, canonical_display_name, citation_url, domain, attribution_level", { count: "exact" })
     .eq("org_id", args.orgId)
     .eq("business_id", args.businessId)
     .eq("source_run_id", sourceRunId)
     .neq("canonical_key", `business:${args.businessId}`)
     .in("attribution_level", ["direct", "section"])
-    .limit(300);
+    .limit(1000);
 
-  if (error) return empty;
+  if (error || !rows || count !== rows.length) return empty;
 
   const normalized = (rows ?? [])
     .map((row) => {
@@ -173,7 +165,7 @@ export async function fetchActionOpportunityEvidence(args: {
         typeof row.domain === "string"
           ? row.domain.trim().toLowerCase().replace(/^www\./, "")
           : "";
-      const url = safeHttpUrl(row.citation_url);
+      const url = savedSourceUrl(row.citation_url, domain);
       const sourceGroupKey = sourceGroupForDomain(domain);
       const attributionLevel: "direct" | "section" =
         row.attribution_level === "direct" ? "direct" : "section";
@@ -309,7 +301,7 @@ export async function fetchActionOpportunityEvidence(args: {
     }
   }
 
-  const currentRunReferences = [...groupedReferences.values()]
+  const peerPageReferences = [...groupedReferences.values()]
     .map((group) => {
       const safeEntities = [...group.entities.values()]
         .map((entity) => {
@@ -333,7 +325,7 @@ export async function fetchActionOpportunityEvidence(args: {
         domain: group.domain,
         responseCount: group.responseCount,
         entityCount: safeEntities.length,
-        entities: safeEntities.slice(0, 3),
+        entities: safeEntities,
       };
     })
     .filter((group) => group.entityCount > 0)
@@ -342,11 +334,16 @@ export async function fetchActionOpportunityEvidence(args: {
         b.entityCount - a.entityCount ||
         b.responseCount - a.responseCount ||
         a.domain.localeCompare(b.domain, "en"),
-    )
-    .slice(0, 3);
+    );
+
+  const currentRunReferences = peerPageReferences
+    .filter(group => referenceSourceByDomain.get(group.domain)?.exclusive)
+    .slice(0, 3)
+    .map(group => ({ ...group, entities: group.entities.slice(0, 3) }));
 
   return {
     highVisibilityExamples,
     currentRunReferences,
+    peerPageReferences,
   };
 }
