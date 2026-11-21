@@ -1,5 +1,14 @@
 import { useContext, useId, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import {
+  Clock,
+  ExternalLink,
+  ListChecks,
+  MessageSquare,
+  Star,
+  Tag,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { DiagnosticQuestionAnswerPanel, QuestionAnswerContext } from "./diagnostic-question-answer-panel";
 import { answerSignalLabels, type SignalKind } from "@/lib/profile-answer-signals";
 import { siteDisplayName } from "@/lib/diagnostic-source-links";
@@ -7,76 +16,141 @@ import type { EntityFactsV2ReadGatewayDTO } from "@/lib/entity-facts-v2-read-gat
 import type { PriorityEvidence } from "./diagnostic-priority-evidence";
 
 type Page = NonNullable<PriorityEvidence["peerExamples"]>[number];
+type AnswerEvidence = Page["answerEvidence"];
 const kinds = Object.keys(answerSignalLabels) as SignalKind[];
+const signalIcons: Record<SignalKind, LucideIcon> = {
+  reviews: MessageSquare,
+  rating: Star,
+  regulars: Users,
+  price: Tag,
+  included: ListChecks,
+  duration: Clock,
+};
 
-function recommendedCheck(evidence: Page["answerEvidence"]) {
-  if (evidence?.counts.regulars && (evidence.counts.reviews || evidence.counts.rating)) return "최근 후기에 어떤 작업이나 차종이 언급되는지 살펴보세요. 단골 혜택이 있다면 내 프로필에서 혜택과 이용 조건을 쉽게 찾을 수 있는지도 확인하세요.";
-  if (evidence?.counts.price || evidence?.counts.included) return "대표 작업 한 건의 가격과 부품, 공임 포함 여부를 내 업체 소개에 표시했는지 확인하세요.";
-  if (evidence?.counts.reviews || evidence?.counts.rating) return "내 프로필의 최근 후기를 열어 고객이 어떤 작업을 받았는지 살펴보세요. 후기에 자주 나오는 작업을 서비스 목록에서 쉽게 찾을 수 있게 해 주세요.";
-  if (evidence?.counts.regulars) return "내 프로필에서 단골 혜택과 이용 조건을 확인하세요. 실제 제공하는 혜택이 있다면 고객이 찾기 쉽게 소개에 적어 주세요.";
-  if (evidence?.counts.duration) return "내 업체 소개에서 대표 작업의 예상 소요 시간과 예약 조건을 찾을 수 있는지 확인하세요.";
-  return "인용 페이지에서 업체가 서비스를 어떻게 설명하는지 보고, 내 소개에 보완할 내용이 있는지 확인하세요.";
+export function sourceActionTask(evidence: AnswerEvidence) {
+  if (evidence?.counts.regulars && (evidence.counts.reviews || evidence.counts.rating)) {
+    return "최근 후기의 작업명과 단골 혜택을 확인하세요.";
+  }
+  if (evidence?.counts.price || evidence?.counts.included) {
+    return "대표 작업의 가격과 공임 포함 여부를 확인하세요.";
+  }
+  if (evidence?.counts.reviews || evidence?.counts.rating) {
+    return "최근 후기의 작업명과 서비스 목록을 함께 확인하세요.";
+  }
+  if (evidence?.counts.regulars) return "단골 혜택과 이용 조건을 확인하세요.";
+  if (evidence?.counts.duration) return "대표 작업의 소요 시간과 예약 조건을 확인하세요.";
+  return "인용 페이지의 서비스 설명과 내 업체 소개를 비교하세요.";
 }
 
 function SiteActions({ domain }: { domain: string }) {
   const host = domain.toLowerCase().replace(/^www\./u, "");
-  const linkStyle = "inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-primary underline underline-offset-4";
-  if (host === "daangn.com") return <div className="flex flex-wrap items-start gap-2">
-    <a href="https://business.daangn.com/profile/login" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">당근 비즈프로필 관리 <ExternalLink size={14} aria-label="새 창"/></a>
-    <details className="text-sm"><summary className="cursor-pointer px-2 py-2.5 text-muted-foreground">아직 등록 전이라면</summary>
-      <a href="https://business.daangn.com/profile/login" target="_blank" rel="noopener noreferrer" className={linkStyle}>당근 비즈프로필 등록하기 <ExternalLink size={14} aria-label="새 창"/></a>
+  if (host === "daangn.com") return <div className="source-official-actions">
+    <a href="https://business.daangn.com/profile/login" target="_blank" rel="noopener noreferrer" className="source-primary-action">
+      당근 비즈프로필 관리 <ExternalLink size={15} aria-label="새 창" />
+    </a>
+    <details className="source-registration">
+      <summary>아직 등록 전이라면</summary>
+      <a href="https://business.daangn.com/profile/login" target="_blank" rel="noopener noreferrer">
+        당근 비즈프로필 등록하기 <ExternalLink size={14} aria-label="새 창" />
+      </a>
     </details>
   </div>;
-  if (host === "service.mycle.co.kr" || host === "play.mycle.co.kr") return <details className="text-sm">
-    <summary className="cursor-pointer py-2 text-muted-foreground">마이클에 입점하고 싶다면</summary>
-    <a href="https://partners.mycle.co.kr/" target="_blank" rel="noopener noreferrer" className={linkStyle}>마이클 입점 신청 바로가기 <ExternalLink size={14} aria-label="새 창"/></a>
-  </details>;
+  if (host === "service.mycle.co.kr" || host === "play.mycle.co.kr") return <div className="source-official-actions">
+    <a href="https://partners.mycle.co.kr/" target="_blank" rel="noopener noreferrer" className="source-primary-action">
+      마이클 입점 신청 <ExternalLink size={15} aria-label="새 창" />
+    </a>
+  </div>;
   return null;
+}
+
+function ComparisonBar({ name, count, max, own = false }: { name: string; count: number | null; max: number; own?: boolean }) {
+  const width = count === null ? 0 : Math.max(0, Math.min(100, count / max * 100));
+  return <div className="source-comparison-row" data-value={count === null ? "unknown" : count}>
+    <div className="source-comparison-label">
+      <span>{name}{own && <small>우리 업체</small>}</span>
+      {count === null ? <strong className="source-value-unknown">미확인</strong> : <strong>{count}<small>개 답변</small></strong>}
+    </div>
+    <div className="source-comparison-track" aria-hidden="true">
+      <span data-own={own} data-unknown={count === null} style={{ width: `${width}%` }} />
+    </div>
+  </div>;
 }
 
 function SourceDetail({ page, dto }: { page: Page; dto: EntityFactsV2ReadGatewayDTO }) {
   const site = siteDisplayName(page.domain);
   const source = dto.observedSourcesStatus === "available" ? dto.observedSources.find(row => row.domain === page.domain) : null;
+  const targetCount = source?.targetResponseCount ?? null;
   const evidence = page.answerEvidence;
   const scope = useContext(QuestionAnswerContext);
   const question = evidence && dto.questionAreas.find(q => q.questionId === evidence.example.questionId);
-  const [answerOpen, setAnswerOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const id = useId();
-  return <div className="space-y-3 rounded-xl border bg-card p-4">
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <strong className="text-base">{page.name}</strong>
-      <a href={page.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-primary underline underline-offset-4">{site} 인용 페이지 보기 <ExternalLink size={14} aria-label="새 창"/></a>
+  const max = Math.max(1, page.count, targetCount ?? 0);
+  const mentionedKinds = evidence ? kinds.filter(kind => (evidence.counts[kind] ?? 0) > 0) : [];
+
+  return <div className="source-action-card">
+    <div className="source-action-lead">
+      <div>
+        <p>{site}에서 먼저 확인할 일</p>
+        <h4>{sourceActionTask(evidence)}</h4>
+      </div>
+      <SiteActions domain={page.domain} />
     </div>
-    <p className="text-sm">이번 측정에서 이 업체와 {site} 출처가 함께 나온 답변 <strong>{page.count}개</strong>{source && <> / 우리 업체와 연결된 답변 <strong>{source.targetResponseCount}개</strong></>}</p>
-    {evidence && <>
-      <h4 className="text-sm font-semibold">AI가 이 업체를 설명할 때 언급한 정보</h4>
-      <ul className="flex flex-wrap gap-2">{kinds.filter(kind => evidence.counts[kind]).map(kind =>
-        <li key={kind} className="rounded-lg bg-muted px-3 py-1.5 text-sm">{answerSignalLabels[kind]} <strong>{evidence.counts[kind]}개 답변</strong></li>)}</ul>
-      {question && <div className="rounded-lg bg-muted/50 p-3 text-sm">
-        <p className="font-semibold">{question.questionText}</p>
-        <p className="mt-1 text-muted-foreground">이 답변에 나온 항목　{evidence.example.phrases.join(", ")}</p>
-        {scope && <button type="button" aria-controls={id} aria-expanded={answerOpen} onClick={() => setAnswerOpen(!answerOpen)} className="mt-1 min-h-9 font-semibold text-primary underline underline-offset-4">{answerOpen ? "답변 접기" : "이 답변 원문 보기"}</button>}
-        {scope && answerOpen && <div id={id} className="saved-answer-panel max-h-80 overflow-y-auto"><DiagnosticQuestionAnswerPanel scope={scope} questionId={question.questionId} measurementId={evidence.example.measurementId}/></div>}
-      </div>}
-      <p className="text-xs text-muted-foreground">측정 당시 답변에서 확인한 항목입니다. 각 항목이 인용에 미친 영향은 알 수 없습니다.</p>
-    </>}
-    <div className="space-y-2 border-t pt-3">
-      <h4 className="text-sm font-semibold">내 업체에서 확인할 일</h4>
-      <p className="text-sm leading-relaxed">{recommendedCheck(evidence)}</p>
-      {page.domain === "daangn.com" && source?.targetResponseCount === 0 && <p className="text-xs text-muted-foreground">우리 업체의 실제 후기 수와 단골 수는 당근에서 확인하세요.</p>}
-      <SiteActions domain={page.domain}/>
+
+    <div className="source-infographic">
+      <section className="source-comparison" aria-label={`${site} 인용 답변 수 비교`}>
+        <h4>{site} 인용 답변</h4>
+        <ComparisonBar name={page.name} count={page.count} max={max} />
+        <ComparisonBar name={dto.business.name} count={targetCount} max={max} own />
+      </section>
+      {mentionedKinds.length > 0 && <section className="source-signals" aria-label="AI가 언급한 항목">
+        <h4>AI가 언급한 항목</h4>
+        <ul>{mentionedKinds.map(kind => {
+          const Icon = signalIcons[kind];
+          const count = evidence?.counts[kind] ?? 0;
+          return <li key={kind} aria-label={`${answerSignalLabels[kind]}가 언급된 답변 ${count}개`}>
+            <Icon aria-hidden="true" />
+            <span>{answerSignalLabels[kind]}</span>
+            <strong>{count}<small>개 답변</small></strong>
+          </li>;
+        })}</ul>
+      </section>}
     </div>
+
+    <details className="source-evidence-details" onToggle={event => setEvidenceOpen(event.currentTarget.open)}>
+      <summary aria-controls={id}>질문과 근거 보기</summary>
+      <div id={id} className="source-evidence-content">
+        <a href={page.url} target="_blank" rel="noopener noreferrer" className="source-page-link">
+          {site} 인용 페이지 보기 <ExternalLink size={14} aria-label="새 창" />
+        </a>
+        {evidence && question ? <>
+          <div className="source-evidence-question">
+            <span>저장된 질문</span>
+            <p>{question.questionText}</p>
+            {evidence.example.phrases.length > 0 && <small>이 답변에 나온 항목 · {evidence.example.phrases.join(", ")}</small>}
+          </div>
+          {scope && evidenceOpen && <div className="saved-answer-panel source-saved-answer">
+            <DiagnosticQuestionAnswerPanel scope={scope} questionId={question.questionId} measurementId={evidence.example.measurementId} />
+          </div>}
+          {!scope && <p className="source-evidence-empty">저장된 AI 답변은 로그인한 측정 화면에서 확인할 수 있습니다.</p>}
+          <p className="source-evidence-note">측정 당시 답변에서 확인한 항목이며, 인용 원인을 뜻하지는 않습니다.</p>
+        </> : <p className="source-evidence-empty">이 출처에 연결된 질문별 세부 관찰은 저장되어 있지 않습니다.</p>}
+        {page.domain === "daangn.com" && source?.targetResponseCount === 0 && <p className="source-evidence-note">우리 업체의 실제 후기 수와 단골 수는 당근에서 확인하세요.</p>}
+      </div>
+    </details>
   </div>;
 }
 
 export function DiagnosticSourceAction({ pages, dto }: { pages: readonly Page[]; dto: EntityFactsV2ReadGatewayDTO }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const current = pages.find(p => p.domain === selected) ?? pages[0];
+  const current = pages.find(page => page.domain === selected) ?? pages[0];
   if (!current) return null;
-  return <section className="my-3 space-y-3" aria-label="이번 측정의 출처별 실행 방법">
-    {pages.length > 1 && <div className="flex flex-wrap gap-2" role="group" aria-label="비교할 출처 선택">{pages.map(page =>
-      <button key={page.domain} type="button" aria-pressed={page === current} onClick={() => setSelected(page.domain)}
-        className="min-h-10 rounded-lg border px-4 text-sm font-semibold aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground">{siteDisplayName(page.domain)}</button>)}</div>}
-    <SourceDetail key={current.url} page={current} dto={dto}/>
+  return <section className="source-action" aria-label="이번 측정의 출처별 실행 방법">
+    {pages.length > 1 && <div className="source-picker" role="group" aria-label="비교할 출처 선택">
+      {pages.map(page => <button key={page.domain} type="button" aria-pressed={page === current} onClick={() => setSelected(page.domain)}>
+        {siteDisplayName(page.domain)}
+      </button>)}
+    </div>}
+    <SourceDetail key={current.url} page={current} dto={dto} />
   </section>;
 }

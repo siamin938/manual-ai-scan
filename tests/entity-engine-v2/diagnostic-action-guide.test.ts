@@ -2,6 +2,7 @@ import { describe,expect,it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DiagnosticActionGuide, nextMeasurementQuestion, actionGuideCopy, actionWritingHintKind } from "../../src/components/diagnostic-action-guide";
+import { sourceActionTask } from "../../src/components/diagnostic-source-action";
 import type { PriorityEvidence } from "../../src/components/diagnostic-priority-evidence";
 import type { EntityFactsV2ReadGatewayDTO } from "../../src/lib/entity-facts-v2-read-gateway.types";
 type Input = Pick<EntityFactsV2ReadGatewayDTO, "questionAreas"|"questionGroups"|"questionLocations">;
@@ -56,28 +57,53 @@ describe("execution guide saved evidence boundaries",()=>{
 
 describe("customer source actions", () => {
   const dto = {
-    ...input([]),
+    ...input([{ id: "local", valid: 1, confirmed: 0, unresolved: 0 }]),
     overview: { validCount: 2, confirmedMentionCount: 1 },
     business: { name: "측정 지점", region: null, city: null },
+    observedSourcesStatus: "available",
   } as EntityFactsV2ReadGatewayDTO;
   const priority = {
     kind: "profile_directory" as const, title: "", sourceGroupLabel: "", highEntityCount: 1,
     highVisibilityEntityCount: 2, highEntitySharePct: 50, targetConnected: false, sites: [],
     ownPage: { sourceType: "naver_place", url: "https://registered.example.com/place" },
   };
-  function guide(pages: NonNullable<PriorityEvidence["peerExamples"]>) {
+  function guide(pages: NonNullable<PriorityEvidence["peerExamples"]>, targetCount: number | null = null) {
+    const sourceDto = {
+      ...dto,
+      observedSources: targetCount === null ? [] : [{ domain: "daangn.com", targetResponseCount: targetCount }],
+    } as EntityFactsV2ReadGatewayDTO;
     return renderToStaticMarkup(createElement(DiagnosticActionGuide, {
-      dto, priority: { ...priority, peerExamples: pages },
+      dto: sourceDto, priority: { ...priority, peerExamples: pages },
     }));
   }
-  it("shows the cited page and official profile actions, with registration folded", () => {
+  it("shows the saved cited page and official profile actions, with registration folded", () => {
     const url = "https://daangn.com/kr/local-profile/example";
     const html = guide([{ name: "비교 정비소", domain: "daangn.com", count: 2, url }]);
     expect(html.split(`href="${url}"`)).toHaveLength(2);
     expect(html).toContain("https://business.daangn.com/profile/login");
     expect(html).toMatch(/<details[^>]*><summary[^>]*>아직 등록 전이라면<\/summary>.*?당근 비즈프로필 등록하기/u);
-    for (const value of [url, "비교 정비소", "당근", "함께 나온 답변 2개"]) expect(html.replace(/<[^>]+>/g, "") + html).toContain(value);
+    for (const value of [url, "비교 정비소", "당근 인용 답변", "질문과 근거 보기"]) expect(html.replace(/<[^>]+>/g, "") + html).toContain(value);
     expect(html).not.toContain(priority.ownPage.url);
+  });
+  it("uses observed review and regular signals for the concise action", () => {
+    const evidence = { counts: { reviews: 6, regulars: 2 }, example: { questionId: "local", measurementId: "saved-answer", phrases: ["후기 6개", "단골 2명"] } };
+    expect(sourceActionTask(evidence)).toBe("최근 후기의 작업명과 단골 혜택을 확인하세요.");
+    expect(sourceActionTask({ ...evidence, counts: { price: 3 } })).toBe("대표 작업의 가격과 공임 포함 여부를 확인하세요.");
+    const html = guide([{ name: "비교 정비소", domain: "daangn.com", count: 2, url: "https://daangn.com/kr/local-profile/example", answerEvidence: evidence }]);
+    expect(html).toContain("최근 후기의 작업명과 단골 혜택을 확인하세요.");
+    expect(html).toContain('aria-label="후기 수가 언급된 답변 6개"');
+    expect(html).toContain("저장 원문 local");
+    expect(html).toContain("후기 6개, 단골 2명");
+  });
+  it("keeps a measured zero distinct from an unavailable target count", () => {
+    const page = { name: "비교 정비소", domain: "daangn.com", count: 2, url: "https://daangn.com/kr/local-profile/example" };
+    const zero = guide([page], 0);
+    expect(zero).toContain('data-value="0"');
+    expect(zero).not.toContain('data-value="unknown"');
+    const unknown = guide([page]);
+    expect(unknown).toContain('data-value="unknown"');
+    expect(unknown).toContain("미확인");
+    expect(unknown).not.toContain('data-value="0"');
   });
   it("omits the link group and redundant disclosures without an eligible citation", () => {
     const html = guide([]);
