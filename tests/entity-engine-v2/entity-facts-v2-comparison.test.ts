@@ -18,6 +18,10 @@ const dashboardSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
   "utf8",
 );
+const comparisonCardSource = readFileSync(
+  resolve(process.cwd(), "src/components/diagnostic-comparison-card.tsx"),
+  "utf8",
+);
 
 describe("Entity Facts v2 comparison contract", () => {
   it("calculates change only from confirmed lower-bound truth", () => {
@@ -198,12 +202,11 @@ describe("Entity Facts v2 comparison contract", () => {
     expect(serverSource).toContain("searchScope = {");
     expect(serverSource).toContain("newlyConfirmedQuestionCount");
     expect(serverSource).toContain("noLongerConfirmedQuestionCount");
-    expect(dashboardSource).toContain("검색 범위별 변화");
-    expect(dashboardSource).toContain("새로 확정된 질문");
-    expect(dashboardSource).toContain(
-      "이전에는 확정됐지만 이번 측정에서 확정되지 않은 질문",
-    );
-    expect(dashboardSource).toContain("변화의 원인을");
+    expect(comparisonCardSource).toContain("검색 유형별 변화");
+    expect(comparisonCardSource).toContain("새로 등장");
+    expect(comparisonCardSource).toContain("이번에 등장 미확인");
+    expect(comparisonCardSource).toContain("이전에는 확정됐지만 이번에는 확정되지 않은 질문");
+    expect(comparisonCardSource).toContain("변화의 원인을");
   });
 
   it("wires the customer-safe comparison path into the dashboard without legacy repeat truth", () => {

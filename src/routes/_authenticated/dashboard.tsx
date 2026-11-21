@@ -3,6 +3,7 @@ import { repeatedPeerEvidence, siteDisplayName } from "@/lib/diagnostic-source-l
 import { RepeatedPeerEvidence } from "@/components/repeated-peer-evidence";
 import { DiagnosticEvidenceWorkspace, EvidenceArchive } from "@/components/diagnostic-evidence-workspace";
 import { QuestionResults } from "@/components/diagnostic-question-results";
+import { ComparisonCard } from "@/components/diagnostic-comparison-card";
 import type { PriorityEvidence } from "@/components/diagnostic-priority-evidence";
 import { DiagnosticSummaryLayout, DiagnosticTopicTabs, DiagnosticQuestions, DiagnosticHistory } from "@/components/diagnostic-layout";
 import { BroadCompetitorEvidence, BenchmarkSourceEvidence } from "@/components/dashboard-evidence-panels";
@@ -1504,7 +1505,7 @@ function DashboardPage() {
             {(detailTopic === "businesses" || printExpanded) && <RepeatedPeerEvidence rows={repeatedPeers} validCount={dto.overview.validCount} targetCount={dto.overview.confirmedMentionCount} sourcesAvailable={model.sources.available} printExpanded={printExpanded} />}
             {(detailTopic === "businesses" || printExpanded) && (dto.broadSearchObservation ? <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} /> : <p>이 측정은 넓은 지역 업체 분류 자료가 없습니다. 추가 근거에서 기존 관찰 업체를 확인하세요.</p>)}
             {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
-            {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />}</>}
+            {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} printExpanded={printExpanded} />}</>}
           </div>
           </>}
           <div className={view === "detail" || printExpanded ? "" : "hidden"}><DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={detailTopic}
@@ -2333,9 +2334,6 @@ function DashboardPage() {
           </EvidenceArchive>
           <EvidenceArchive topic="comparison">
             <div className="diagnostic-topic-content space-y-6">
-          {comparisonModel && (
-            <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} />
-          )}
           {(comparisonQuery.isError || (comparisonResult && !comparisonResult.ok)) && (
             <Card className="report-section">
               <CardContent className="py-5 text-sm text-muted-foreground">
@@ -2902,125 +2900,6 @@ function ActionOpportunitySection({
         <p className="rounded-md bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
           {model.disclaimer}
         </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ComparisonCard({
-  model,
-  basisLabel,
-}: {
-  model: ReturnType<typeof buildEntityFactsV2ComparisonViewModel>;
-  basisLabel: string;
-}) {
-  if (!model.comparisonAvailable) {
-    return (
-      <Card>
-        <CardContent className="space-y-1.5 py-4">
-          <p className="text-sm font-semibold">이전 측정 비교</p>
-          <p className="text-xs leading-5 text-muted-foreground">
-            {model.heading}. {model.description}
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="report-section">
-      <CardHeader className="border-b bg-muted/20">
-        <p className="report-kicker">측정 비교</p>
-        <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
-          {model.heading}
-          <BaselineBadge label={basisLabel} />
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4 pt-5">
-        <p className="text-sm leading-6 text-muted-foreground">{model.description}</p>
-
-        {model.comparisonAvailable && model.visibility && model.top3 && (
-          <div className="grid gap-4 md:grid-cols-2">
-            {[model.visibility, model.top3].map((metric) => (
-              <div key={metric.label} className="rounded-md border p-4">
-                <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
-                <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span className="text-2xl font-semibold tabular-nums">
-                    {metric.currentValueText}
-                  </span>
-                  {metric.deltaText && <Badge variant="outline">{metric.deltaText}</Badge>}
-                </div>
-                {metric.previousValueText && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    이전 동일 조건 측정 {metric.previousValueText}
-                  </p>
-                )}
-                {metric.comparisonSentence && (
-                  <p className="mt-3 text-sm">{metric.comparisonSentence}</p>
-                )}
-                {metric.uncertaintyText && (
-                  <p className="mt-2 text-xs text-muted-foreground">{metric.uncertaintyText}</p>
-                )}
-                {metric.maximumNotice && (
-                  <p className="mt-1 text-xs text-muted-foreground">{metric.maximumNotice}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {model.searchScope && (
-          <div className="space-y-3 rounded-lg border bg-muted/15 p-4">
-            <div>
-              <p className="text-sm font-semibold">검색 범위별 변화</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                같은 통합 24문항에서 상세 조건 검색과 넓은 범위 검색의 확정 노출만 따로 비교합니다.
-              </p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {[model.searchScope.custom, model.searchScope.core].map((metric) => (
-                <div key={metric.label} className="rounded-md border bg-card p-3">
-                  <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
-                  <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <span className="text-xl font-semibold tabular-nums">
-                      {metric.currentValueText}
-                    </span>
-                    {metric.deltaText && <Badge variant="outline">{metric.deltaText}</Badge>}
-                  </div>
-                  {metric.previousValueText && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      이전 동일 조건 측정 {metric.previousValueText}
-                    </p>
-                  )}
-                  {metric.comparisonSentence && (
-                    <p className="mt-2 text-sm leading-6">{metric.comparisonSentence}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-            <p className="text-sm">
-              새로 확정된 질문{" "}
-              <span className="font-semibold tabular-nums">
-                {model.searchScope.newlyConfirmedQuestionCount}개
-              </span>
-              {" · "}
-              이전에는 확정됐지만 이번 측정에서 확정되지 않은 질문{" "}
-              <span className="font-semibold tabular-nums">
-                {model.searchScope.noLongerConfirmedQuestionCount}개
-              </span>
-            </p>
-            <p className="text-xs leading-5 text-muted-foreground">
-              동일한 질문 세트와 측정 조건이 확인된 두 측정의 확정 여부만 비교합니다. 변화의 원인을
-              의미하지 않습니다.
-            </p>
-          </div>
-        )}
-
-        {model.trendAvailable && model.compatibleMeasurementCount !== null && (
-          <p className="text-xs text-muted-foreground">
-            동일 조건 측정 {model.compatibleMeasurementCount}회가 확인되었습니다.
-          </p>
-        )}
       </CardContent>
     </Card>
   );

@@ -456,8 +456,15 @@ describe("Entity Facts v2 comparison customer ViewModel", () => {
     expect(dashboardSource).toContain("<ComparisonCard");
     expect(dashboardSource).toContain("model={comparisonModel}");
     expect(dashboardSource).toContain("basisLabel={detailBasisLabel}");
-    expect(dashboardSource).toContain("model.comparisonAvailable");
-    expect(dashboardSource).toContain("metric.comparisonSentence");
+    expect(dashboardSource).toContain("comparisonModel?.comparisonAvailable");
+    expect(dashboardSource).toContain("@/components/diagnostic-comparison-card");
+    const comparisonCardSource = readFileSync(
+      resolve(process.cwd(), "src/components/diagnostic-comparison-card.tsx"),
+      "utf8",
+    );
+    expect(comparisonCardSource).toContain("comparison-scope-track");
+    expect(comparisonCardSource).toContain("metric.maximumNotice");
+    expect(comparisonCardSource).not.toContain("comparisonResult.data");
     expect(dashboardSource).not.toContain("comparisonResult.data.status");
     expect(dashboardSource).not.toContain("comparisonResult.data.reason");
     expect(dashboardSource).not.toContain("request_fingerprint");
