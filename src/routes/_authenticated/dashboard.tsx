@@ -1234,12 +1234,15 @@ function DashboardPage() {
   const firstPriority = actionOpportunityModel?.items[0];
   const peerPages = actionEvidenceQuery.data?.peerPageReferences ?? [];
   const repeatedPeers = dto ? repeatedPeerEvidence(dto, peerPages) : [];
-  const matchingDomains = new Set(peerPages.filter(group => group.sourceGroupKey === firstPriority?.sourceGroupKey).map(group => group.domain));
-  const comparableSources = repeatedPeers.flatMap(peer => peer.sources.flatMap(source =>
-    source.url && matchingDomains.has(source.domain)
-      ? [{ name: peer.name, appearances: peer.responseCount, domain: source.domain, count: source.count, url: source.url }]
-      : [],
-  ))
+  const matchingSites = new Map(peerPages.filter(group => group.sourceGroupKey === firstPriority?.sourceGroupKey).map(group => [group.domain, group]));
+  const comparableSources = repeatedPeers.flatMap(peer => peer.sources.flatMap(source => {
+    const site = matchingSites.get(source.domain);
+    if (!site || !source.url) return [];
+    const evidence = site.entities.find(entity => entity.entityName === peer.name && entity.url === source.url)?.answerEvidence;
+    return [{ name: peer.name, appearances: peer.responseCount, domain: source.domain, count: source.count, url: source.url,
+      ...(evidence && Object.values(evidence.counts).every(n => n > 0 && n <= source.count) ? { answerEvidence: evidence } : {}),
+    }];
+  }))
     .sort((a, b) => b.count - a.count || b.appearances - a.appearances || a.name.localeCompare(b.name, "ko"));
   const distinctSites = new Set<string>();
   const priorityEvidence: PriorityEvidence | null = firstPriority ? {

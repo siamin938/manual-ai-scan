@@ -1,3 +1,5 @@
+import { readProfileAnswerEvidence } from "./profile-answer-evidence.server";
+import { citationPageKey, type ProfileAnswerEvidence } from "./profile-answer-signals";
 import { savedSourceUrl } from "./diagnostic-source-links";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { fetchEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.server";
@@ -18,6 +20,7 @@ export type CurrentRunSourceReference = {
   entityCount: number;
   entities: Array<{
     entityName: string;
+    answerEvidence?: ProfileAnswerEvidence;
     url: string;
     attributionLevel: "direct" | "section";
   }>;
@@ -75,6 +78,7 @@ export async function fetchActionOpportunityEvidence(args: {
   expectedRunId?: string;
   /** Admin QA may narrow the source comparison to one observed domain. */
   focusDomain?: string;
+  includeAnswerEvidence?: boolean;
 }): Promise<ActionOpportunityEvidenceResult> {
   const empty: ActionOpportunityEvidenceResult = {
     highVisibilityExamples: [],
@@ -145,7 +149,7 @@ export async function fetchActionOpportunityEvidence(args: {
   }
   const { data: rows, error, count } = await supabaseAdmin
     .from("measurement_citation_attributions_actionable_v2")
-    .select("canonical_key, canonical_display_name, citation_url, domain, attribution_level", { count: "exact" })
+    .select("canonical_key, canonical_display_name, citation_url, domain, attribution_level, measurement_id, entity_start_index, entity_end_index, citation_start_index, citation_end_index", { count: "exact" })
     .eq("org_id", args.orgId)
     .eq("business_id", args.businessId)
     .eq("source_run_id", sourceRunId)
@@ -341,9 +345,17 @@ export async function fetchActionOpportunityEvidence(args: {
     .slice(0, 3)
     .map(group => ({ ...group, entities: group.entities.slice(0, 3) }));
 
+  const signals: ReadonlyMap<string, ProfileAnswerEvidence> = args.includeAnswerEvidence && peerPageReferences.length
+    ? await readProfileAnswerEvidence(args.orgId, gateway.data, rows).catch(() => new Map())
+    : new Map();
   return {
     highVisibilityExamples,
     currentRunReferences,
-    peerPageReferences,
+    peerPageReferences: signals.size ? peerPageReferences.map(group => ({ ...group,
+      entities: group.entities.map(entity => {
+        const evidence = signals.get(citationPageKey(entity.entityName, entity.url));
+        return evidence ? { ...entity, answerEvidence: evidence } : entity;
+      }),
+    })) : peerPageReferences,
   };
 }

@@ -55,7 +55,7 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
     if (!membership) return { ok: false, error: "FORBIDDEN" };
 
     try {
-      const result = await fetchActionOpportunityEvidence(data);
+      const result = await fetchActionOpportunityEvidence({ ...data, includeAnswerEvidence: !!data.expectedRunId });
       return {
         ok: true,
         highVisibilityExamples: result.highVisibilityExamples,
