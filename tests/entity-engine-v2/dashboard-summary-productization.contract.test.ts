@@ -9,6 +9,7 @@ const dashboardSource = readFileSync(
 
 const layoutSource = readFileSync(resolve(process.cwd(), "src/components/diagnostic-layout.tsx"), "utf8");
 const evidenceSource = readFileSync(resolve(process.cwd(), "src/components/diagnostic-evidence-workspace.tsx"), "utf8");
+const actionGuideSource = readFileSync(resolve(process.cwd(), "src/components/diagnostic-action-guide.tsx"), "utf8");
 
 const stylesSource = readFileSync(
   resolve(process.cwd(), "src/styles.css"),
@@ -183,6 +184,23 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('(showAllCompetitors || printExpanded)');
     expect(dashboardSource).toContain('(showTargetExposureCitationSources || printExpanded)');
     expect(dashboardSource).toContain('(showAllCitationSources || printExpanded)');
+  });
+
+  it("places one existing inline action after the first result in each detail tab without print duplication", () => {
+    const detail = dashboardSource.split("<DiagnosticTopicTabs")[1]?.split("<PrintEvidenceArchive")[0] ?? "";
+    expect(detail.indexOf('<DiagnosticQuestions')).toBeLessThan(detail.indexOf('{renderDetailAction("questions")}'));
+    expect(detail.indexOf('<RepeatedPeerEvidence')).toBeLessThan(detail.indexOf('{renderDetailAction("businesses")}'));
+    expect(detail.indexOf('{renderDetailAction("businesses")}')).toBeLessThan(detail.indexOf('<BroadCompetitorEvidence'));
+    expect(detail.indexOf('<CurrentRunSourceEvidence')).toBeLessThan(detail.indexOf('{renderDetailAction("sources")}'));
+    expect(detail.indexOf('{renderDetailAction("sources")}')).toBeLessThan(detail.indexOf('<BenchmarkSourceEvidence'));
+    expect(detail.indexOf('<DiagnosticHistory')).toBeLessThan(detail.indexOf('{renderDetailAction("comparison")}'));
+    for (const topic of ["questions", "businesses", "sources", "comparison"]) {
+      expect(detail.split(`{renderDetailAction("${topic}")}`)).toHaveLength(2);
+    }
+    expect(dashboardSource).toContain('detailTopic !== topic || (printExpanded && view !== "detail")');
+    expect(dashboardSource).toContain('key={`detail-action:${topic}:${dto.business.id}:${dto.scope.runId}`}');
+    expect(dashboardSource).toContain('priority={priorityEvidence} dto={dto} compact inline printExpanded={printExpanded}');
+    expect(actionGuideSource).toContain('id={inline ? undefined : "diagnostic-priorities"}');
   });
 
   it("does not treat missing denominators as zero or add an empty verified page card for zero visibility", () => {

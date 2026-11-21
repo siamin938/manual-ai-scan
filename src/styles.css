@@ -872,6 +872,13 @@ main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--backg
 .diagnostic-action-evidence summary { min-height:44px; display:flex; align-items:center; cursor:pointer; font-weight:650; color:var(--primary); }
 .diagnostic-action-evidence p { line-height:1.5; overflow-wrap:anywhere; }
 
+.action-guide-inline { margin-block:16px 22px; min-width:0; }
+.action-guide-inline .diagnostic-action { min-height:0; padding:14px 16px; border-radius:16px; grid-template-columns:36px minmax(0,1fr) auto; gap:12px; }
+.action-guide-inline .diagnostic-action-icon { width:36px; height:36px; border-radius:10px; }
+.action-guide-inline .diagnostic-action-icon svg { width:20px; height:20px; }
+.action-guide-inline .diagnostic-action h3 { font-size:18px; line-height:1.45; overflow-wrap:anywhere; }
+.action-guide-inline .diagnostic-eyebrow { font-size:12px; }
+.action-guide-inline .action-guide-panel { margin-top:8px; }
 .action-guide-task { color:var(--muted-foreground); font-size:16px; line-height:1.6; margin-top:8px; }
 .action-guide-panel { padding:22px; margin-top:12px; border:1px solid var(--border); border-radius:18px; background:var(--card); display:grid; gap:18px; min-width:0; }
 .action-guide-panel h3 { font-size:21px; font-weight:750; line-height:1.5; overflow-wrap:anywhere; }
@@ -887,7 +894,7 @@ main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--backg
 .action-guide-panel summary { min-height:44px; cursor:pointer; padding-block:12px; font-weight:650; }
 .action-guide-reason p + p { margin-top:8px; }
 .action-guide-panel > button { justify-self:start; min-height:44px; }
-@media(max-width:767px) { .action-guide-panel { padding:16px; } .action-guide-summary .diagnostic-action { grid-template-columns:28px minmax(0,1fr); } .action-guide-task { font-size:15px; } }
+@media(max-width:767px) { .action-guide-panel { padding:16px; } .action-guide-summary .diagnostic-action { grid-template-columns:28px minmax(0,1fr); } .action-guide-inline .diagnostic-action-icon { width:28px; height:28px; } .action-guide-inline .diagnostic-action-icon svg { width:18px; height:18px; } .action-guide-task { font-size:15px; } }
 @media print { .action-guide-panel { break-inside:auto; } .action-guide-steps li,.action-guide-question { break-inside:avoid; } }
 
 /* Source-specific action: one compact infographic, with saved evidence folded below. */

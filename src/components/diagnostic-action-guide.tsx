@@ -44,8 +44,8 @@ export function nextMeasurementQuestion(dto: Pick<EntityFactsV2ReadGatewayDTO, "
   const local = new Set((dto.questionLocations ?? []).filter(q => q.city !== null).map(q => q.questionId));
   return rows.find(q => local.has(q.questionId)) ?? rows[0] ?? null;
 }
-export function DiagnosticActionGuide({ priority, dto, compact = false, printExpanded = false }: {
-  priority: PriorityEvidence | null; dto: EntityFactsV2ReadGatewayDTO; compact?: boolean; printExpanded?: boolean;
+export function DiagnosticActionGuide({ priority, dto, compact = false, inline = false, printExpanded = false }: {
+  priority: PriorityEvidence | null; dto: EntityFactsV2ReadGatewayDTO; compact?: boolean; inline?: boolean; printExpanded?: boolean;
 }) {
   const [open,setOpen] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
@@ -64,8 +64,8 @@ export function DiagnosticActionGuide({ priority, dto, compact = false, printExp
   const expanded = !compact || open || printExpanded;
   const branch = [dto.business.name, ...new Set([dto.business.region, dto.business.city].filter(Boolean))].filter(Boolean).join(" · ");
   const collapse = () => { setOpen(false); trigger.current?.focus(); };
-  return <section className={`action-guide${compact ? " action-guide-summary" : ""}`} aria-label="먼저 할 일">
-    {compact && <div className="diagnostic-action" id="diagnostic-priorities"><div className="diagnostic-action-icon"><MapPin aria-hidden="true"/></div><div><p className="diagnostic-eyebrow">먼저 할 일</p><h3>{title}</h3><p className="action-guide-task">{leading ? "출처별 관찰 내용을 내 업체 정보와 비교해 보세요." : valid && copy ? copy.where : task}</p></div><Button ref={trigger} className="diagnostic-evidence-cta no-print" aria-expanded={expanded} aria-controls={panelId} onClick={() => { if (open) { collapse(); return; } setOpen(true); requestAnimationFrame(() => { panel.current?.scrollIntoView({block:"nearest",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"}); panel.current?.focus({preventScroll:true}); }); }}>{open ? "실행 방법 접기" : "실행 방법 보기"}{open ? <ChevronUp aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}</Button></div>}
+  return <section className={`action-guide${compact ? " action-guide-summary" : ""}${inline ? " action-guide-inline" : ""}`} aria-label="먼저 할 일">
+    {compact && <div className="diagnostic-action" id={inline ? undefined : "diagnostic-priorities"}><div className="diagnostic-action-icon"><MapPin aria-hidden="true"/></div><div><p className="diagnostic-eyebrow">먼저 할 일</p><h3>{title}</h3>{!inline && <p className="action-guide-task">{leading ? "출처별 관찰 내용을 내 업체 정보와 비교해 보세요." : valid && copy ? copy.where : task}</p>}</div><Button ref={trigger} className="diagnostic-evidence-cta no-print" aria-expanded={expanded} aria-controls={panelId} onClick={() => { if (open) { collapse(); return; } setOpen(true); requestAnimationFrame(() => { panel.current?.scrollIntoView({block:"nearest",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"}); panel.current?.focus({preventScroll:true}); }); }}>{open ? "실행 방법 접기" : "실행 방법 보기"}{open ? <ChevronUp aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}</Button></div>}
     {expanded && <div id={panelId} ref={panel} tabIndex={-1} className="action-guide-panel">
       <h3>{compact ? "실행 방법" : title}</h3>
       {leading ? <DiagnosticSourceAction pages={pages} dto={dto}/> : valid && copy ? <ol className="action-guide-steps"><li><span>1</span><div>{copy.where} {branch ? <><strong>{branch}</strong> 표시가 현재 지점 정보와 맞는지 살펴보세요.</> : "현재 지점명과 지역 표시를 살펴보세요."}</div></li><li><span>2</span><div>{copy.task}{hintKind && <> {writingHints[hintKind]}</>}</div></li><li><span>3</span><div>정보가 반영된 뒤 같은 질문으로 다시 측정해 변화를 비교하세요.</div></li></ol> : <p>{task}</p>}

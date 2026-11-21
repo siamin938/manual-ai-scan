@@ -111,4 +111,26 @@ describe("customer source actions", () => {
       expect(html).not.toContain(value);
     }
   });
+  it("reuses the summary title in a compact inline row without a duplicate summary anchor", () => {
+    const props = { dto, priority: { ...priority, peerExamples: [] }, compact: true };
+    const summary = renderToStaticMarkup(createElement(DiagnosticActionGuide, props));
+    const inline = renderToStaticMarkup(createElement(DiagnosticActionGuide, { ...props, inline: true }));
+    for (const html of [summary, inline]) expect(html).toContain(actionGuideCopy.profile_directory.title);
+    expect(summary).toContain('id="diagnostic-priorities"');
+    expect(inline).toContain("action-guide-inline");
+    expect(inline).not.toContain('id="diagnostic-priorities"');
+    expect(inline).not.toContain("action-guide-task");
+    expect(inline).not.toContain("action-guide-panel");
+    const printed = renderToStaticMarkup(createElement(DiagnosticActionGuide, { ...props, inline: true, printExpanded: true }));
+    expect(printed).toContain("action-guide-panel");
+    expect(printed).toContain("저장 원문 local");
+    expect(printed).not.toContain('id="diagnostic-priorities"');
+  });
+  it("keeps the existing empty-data fallback in the inline presentation", () => {
+    const emptyDto = { ...dto, overview: { validCount: 0, confirmedMentionCount: 0 }, questionAreas: [], questionGroups: [], questionLocations: [] } as EntityFactsV2ReadGatewayDTO;
+    const html = renderToStaticMarkup(createElement(DiagnosticActionGuide, { dto: emptyDto, priority: null, compact: true, inline: true, printExpanded: true }));
+    expect(html).toContain("답변 결과를 확인한 뒤 다음 할 일을 정해 주세요");
+    expect(html).toContain("유효한 답변이 없어 지금은 특정 채널의 개선을 권하기 어려워요.");
+    expect(html).toContain("비교할 질문은 유효 답변을 확인한 뒤 안내합니다.");
+  });
 });

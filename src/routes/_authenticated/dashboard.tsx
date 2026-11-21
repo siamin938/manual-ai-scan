@@ -3,6 +3,7 @@ import { repeatedPeerEvidence, siteDisplayName } from "@/lib/diagnostic-source-l
 import { RepeatedPeerEvidence } from "@/components/repeated-peer-evidence";
 import { CurrentRunSourceEvidence, EvidenceArchive, PrintEvidenceArchive } from "@/components/diagnostic-evidence-workspace";
 import { QuestionResults } from "@/components/diagnostic-question-results";
+import { DiagnosticActionGuide } from "@/components/diagnostic-action-guide";
 import { ComparisonCard } from "@/components/diagnostic-comparison-card";
 import type { PriorityEvidence } from "@/components/diagnostic-priority-evidence";
 import { DiagnosticSummaryLayout, DiagnosticTopicTabs, DiagnosticQuestions, DiagnosticHistory } from "@/components/diagnostic-layout";
@@ -1260,6 +1261,10 @@ function DashboardPage() {
       return true;
     }).slice(0, 2),
   } : null;
+  const renderDetailAction = (topic: "questions" | "businesses" | "sources" | "comparison") => {
+    if (!dto || detailTopic !== topic || (printExpanded && view !== "detail")) return null;
+    return <DiagnosticActionGuide key={`detail-action:${topic}:${dto.business.id}:${dto.scope.runId}`} priority={priorityEvidence} dto={dto} compact inline printExpanded={printExpanded} />;
+  };
   const setDashboardView = (nextView: "summary" | "detail", topic = "questions") => {
     setDetailTopic(["questions", "businesses", "sources", "comparison"].includes(topic) ? topic : "questions");
     void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
@@ -1522,11 +1527,15 @@ function DashboardPage() {
           <DiagnosticTopicTabs topic={detailTopic} onChange={setDetailTopic} />
           <div className="diagnostic-main-topic" id={`diagnostic-${detailTopic}`}>
             {(detailTopic === "questions" || printExpanded) && <DiagnosticQuestions key={`${dto.business.id}:${dto.scope.runId}`} groups={dto.questionGroups} questions={dto.questionAreas} />}
+            {renderDetailAction("questions")}
             {(detailTopic === "businesses" || printExpanded) && <RepeatedPeerEvidence key={`peers:${dto.business.id}:${dto.scope.runId}`} rows={repeatedPeers} validCount={dto.overview.validCount} targetCount={dto.overview.confirmedMentionCount} sourcesAvailable={model.sources.available} printExpanded={printExpanded} />}
+            {renderDetailAction("businesses")}
             {(detailTopic === "businesses" || printExpanded) && (dto.broadSearchObservation ? <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} /> : <p>이 측정은 넓은 지역 업체 분류 자료가 없습니다.</p>)}
             {(detailTopic === "sources" || printExpanded) && <CurrentRunSourceEvidence key={`current-sources:${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} printExpanded={printExpanded} />}
+            {renderDetailAction("sources")}
             {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} printExpanded={printExpanded} />}</>}
+            {renderDetailAction("comparison")}
           </div>
           </>}
           <PrintEvidenceArchive printExpanded={printExpanded}>
