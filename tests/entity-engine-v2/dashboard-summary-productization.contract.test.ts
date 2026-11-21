@@ -157,25 +157,24 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).not.toContain("측정 기준 보기");
   });
 
-  it("opens questions first, navigates to existing evidence and preserves hidden content for print", () => {
+  it("uses the existing tabs, keeps current-run citations with sources and preserves the print archive", () => {
     expect(dashboardSource).toContain('useState("questions")');
     expect(dashboardSource).toContain('onTopic={onShowDetail}');
     expect(dashboardSource).toContain('params={{ runId: dto.scope.runId }}');
     for (const topic of ["questions", "businesses", "sources", "comparison", "priorities", "method"]) {
       expect(dashboardSource).toContain(`<EvidenceArchive topic="${topic}">`);
-      expect(evidenceSource).toContain(` ${topic}:`);
     }
-    expect(dashboardSource).toContain("entryTopic={detailTopic}");
-    expect(dashboardSource).not.toContain("setEvidenceEntry");
-    expect(evidenceSource).toContain('id={`diagnostic-${key}`}');
-    expect(evidenceSource).toContain('window.addEventListener("hashchange", enter)');
+    expect(dashboardSource).not.toContain("DiagnosticEvidenceWorkspace");
+    expect(dashboardSource).not.toContain("추가 분석/근거 보기");
+    expect(dashboardSource).not.toContain("추가 근거에서");
+    expect(dashboardSource).toContain("<CurrentRunSourceEvidence");
+    expect(dashboardSource).toContain('id={`diagnostic-${detailTopic}`}');
+    expect(dashboardSource).toContain('window.addEventListener("hashchange", enter)');
+    expect(evidenceSource).toContain("이번 측정의 인용 근거");
+    expect(evidenceSource).toContain("위 시장 표본과 합산하지 않습니다");
     expect(evidenceSource).toContain('useContext(PrintArchiveContext)');
-    expect(evidenceSource).toContain('{printExpanded && <div className="evidence-print-archive">');
+    expect(evidenceSource).toContain('printExpanded ? <div className="evidence-print-archive">');
     expect(evidenceSource).toContain('<PrintArchiveContext.Provider value={true}>');
-    for (const label of ["상세 근거 보기", "전체 업체·넓은 지역 근거 보기", "전체 출처 보기", "측정 기준 자세히"]) {
-      expect(evidenceSource).not.toContain(label);
-    }
-    expect(evidenceSource).toContain('<QuestionResults questions={popupQuestions}');
     expect(dashboardSource).toContain('flushSync(() => setPrintExpanded(true))');
     expect(dashboardSource).toContain('report.querySelectorAll("details")');
     expect(dashboardSource).toContain('(showAllCompetitors || printExpanded)');

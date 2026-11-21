@@ -1,7 +1,7 @@
 import { QuestionAnswerContext } from "@/components/diagnostic-question-answer-panel";
 import { repeatedPeerEvidence, siteDisplayName } from "@/lib/diagnostic-source-links";
 import { RepeatedPeerEvidence } from "@/components/repeated-peer-evidence";
-import { DiagnosticEvidenceWorkspace, EvidenceArchive } from "@/components/diagnostic-evidence-workspace";
+import { CurrentRunSourceEvidence, EvidenceArchive, PrintEvidenceArchive } from "@/components/diagnostic-evidence-workspace";
 import { QuestionResults } from "@/components/diagnostic-question-results";
 import { ComparisonCard } from "@/components/diagnostic-comparison-card";
 import type { PriorityEvidence } from "@/components/diagnostic-priority-evidence";
@@ -1264,6 +1264,25 @@ function DashboardPage() {
     setDetailTopic(["questions", "businesses", "sources", "comparison"].includes(topic) ? topic : "questions");
     void navigate({ search: nextView === "detail" ? { view: "detail" } : {}, replace: true });
   };
+  useEffect(() => {
+    const enter = () => {
+      const topic = window.location.hash.replace("#diagnostic-", "");
+      if (topic === "priorities") {
+        if (view !== "summary") void navigate({ search: {}, replace: true });
+      } else if (["questions", "businesses", "sources", "comparison"].includes(topic)) {
+        setDetailTopic(topic);
+        if (view !== "detail") void navigate({ search: { view: "detail" }, replace: true });
+      } else {
+        return;
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.getElementById(`diagnostic-${topic}`)?.scrollIntoView({ block: "start" });
+      }));
+    };
+    enter();
+    window.addEventListener("hashchange", enter);
+    return () => window.removeEventListener("hashchange", enter);
+  }, [navigate, view]);
   const printDashboardReport = () => {
     if (!model) return;
 
@@ -1501,16 +1520,16 @@ function DashboardPage() {
         <>
           {(view === "detail" || printExpanded) && <>
           <DiagnosticTopicTabs topic={detailTopic} onChange={setDetailTopic} />
-          <div className="diagnostic-main-topic">
+          <div className="diagnostic-main-topic" id={`diagnostic-${detailTopic}`}>
             {(detailTopic === "questions" || printExpanded) && <DiagnosticQuestions key={`${dto.business.id}:${dto.scope.runId}`} groups={dto.questionGroups} questions={dto.questionAreas} />}
             {(detailTopic === "businesses" || printExpanded) && <RepeatedPeerEvidence rows={repeatedPeers} validCount={dto.overview.validCount} targetCount={dto.overview.confirmedMentionCount} sourcesAvailable={model.sources.available} printExpanded={printExpanded} />}
-            {(detailTopic === "businesses" || printExpanded) && (dto.broadSearchObservation ? <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} /> : <p>이 측정은 넓은 지역 업체 분류 자료가 없습니다. 추가 근거에서 기존 관찰 업체를 확인하세요.</p>)}
+            {(detailTopic === "businesses" || printExpanded) && (dto.broadSearchObservation ? <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} /> : <p>이 측정은 넓은 지역 업체 분류 자료가 없습니다.</p>)}
             {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
+            {(detailTopic === "sources" || printExpanded) && <CurrentRunSourceEvidence dto={dto} model={model} printExpanded={printExpanded} />}
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} printExpanded={printExpanded} />}</>}
           </div>
           </>}
-          <div className={view === "detail" || printExpanded ? "" : "hidden"}><DiagnosticEvidenceWorkspace key={`${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} summary={summaryModel} comparison={comparisonModel} comparisonError={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} printExpanded={printExpanded} entryTopic={detailTopic}
-            priority={priorityEvidence}>
+          <PrintEvidenceArchive printExpanded={printExpanded}>
           <EvidenceArchive topic="method">
       {view === "detail" && businessId && unifiedTransitionPending && (
         <Card className="border-primary/40 bg-primary/[0.03]">
@@ -2435,7 +2454,7 @@ function DashboardPage() {
 
             </div>
           </EvidenceArchive>
-          </DiagnosticEvidenceWorkspace></div>
+          </PrintEvidenceArchive>
         </>
       )}
     </div>
