@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { createCustomerMeasurementRun } from "../../src/lib/customer-measurement.server";
 
 const serverSource = readFileSync(
   resolve(process.cwd(), "src/lib/customer-measurement.server.ts"),
@@ -19,6 +20,41 @@ const migrationSource = readFileSync(
 );
 
 describe("customer measurement retry and duplicate guard contract", () => {
+  it.each([true, false])("handles a zero balance when a matching run exists = %s", async (active) => {
+    const reads: string[] = [];
+    const rows: Record<string, unknown> = {
+      organization_members: { role: "owner" },
+      businesses: { id: "business", name: "정비소" },
+      question_sets: [{ id: "set", name: "기존 질문" }],
+      questions: [{ id: "q", data_class: "public", intent_type: "service" }],
+      measurement_runs: active ? { id: "existing", total_jobs: 24 } : null,
+      provider_settings: { enabled: true, paid_account_confirmed: true, terms_reviewed: true,
+        automated_benchmark_approved: true, estimated_cost_per_request_usd: 0.01 },
+      measurement_credit_accounts: { balance: 0 },
+    };
+    const client = {
+      from(table: string) {
+        reads.push(table);
+        if (!(table in rows)) throw new Error("Unexpected read: " + table);
+        const result = { data: rows[table], error: null };
+        return {
+          select() { return this; }, eq() { return this; }, is() { return this; },
+          in() { return this; }, order() { return this; }, limit() { return this; },
+          maybeSingle() { return result; },
+          then(resolve: (value: typeof result) => void) { resolve(result); },
+        };
+      },
+    };
+    const result = await createCustomerMeasurementRun({
+      supabase: client as unknown as Parameters<typeof createCustomerMeasurementRun>[0]["supabase"],
+      userId: "user", orgId: "org", businessId: "business", questionSetId: "set",
+    });
+    expect(result).toEqual(active
+      ? { ok: true, runId: "existing", plannedJobs: 24 }
+      : { ok: false, error: "NO_MEASUREMENT_CREDIT" });
+    expect(reads.includes("measurement_credit_accounts")).toBe(!active);
+  });
+
   it("reuses same-condition queued/running customer runs before creating a new draft", () => {
     const activeLookup = serverSource.indexOf(
       '.in("status", ["queued", "running"])',

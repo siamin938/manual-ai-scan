@@ -524,11 +524,13 @@ async function processJob(
     .from("measurements")
     .select("id,provider_model,actual_cost_usd,input_tokens,output_tokens")
     .eq("job_id", job.id)
+    .eq("org_id", job.org_id)
+    .eq("run_id", job.run_id)
     .maybeSingle();
   if (existingMeasurementError) throw new Error("EXISTING_MEASUREMENT_CHECK_FAILED");
   if (existingMeasurement) {
     const recoveredCost = numberValue(existingMeasurement.actual_cost_usd);
-    await client.from("cost_events").upsert({
+    const { error: costError } = await client.from("cost_events").upsert({
       org_id: job.org_id,
       run_id: job.run_id,
       job_id: job.id,
@@ -538,15 +540,29 @@ async function processJob(
       input_tokens: existingMeasurement.input_tokens,
       output_tokens: existingMeasurement.output_tokens,
       metadata: { cost_source: "recovered_measurement", repetition_no: job.repetition_no },
-    }, { onConflict: "job_id" });
-    await client.from("measurement_jobs").update({
+    }, { onConflict: "job_id", ignoreDuplicates: true });
+    if (costError) throw new Error("COST_SAVE_FAILED");
+
+    // The worker writes the payload after the mention and source rows.
+    // A saved answer alone does not prove that those writes finished.
+    const { data: payload, error: payloadError } = await client
+      .from("provider_payloads")
+      .select("job_id")
+      .eq("job_id", job.id)
+      .eq("org_id", job.org_id)
+      .maybeSingle();
+    if (payloadError) throw new Error("RECOVERY_EVIDENCE_CHECK_FAILED");
+    if (!payload) throw new Error("INCOMPLETE_MEASUREMENT_EVIDENCE");
+
+    const { error: completeError } = await client.from("measurement_jobs").update({
       status: "completed",
       actual_cost_usd: recoveredCost,
       completed_at: new Date().toISOString(),
       locked_at: null,
       error_code: null,
       error_message: null,
-    }).eq("id", job.id);
+    }).eq("id", job.id).eq("org_id", job.org_id);
+    if (completeError) throw new Error("JOB_COMPLETE_FAILED");
     await client.rpc("refresh_run_progress", { p_run_id: job.run_id });
     return;
   }
