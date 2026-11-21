@@ -107,10 +107,10 @@ describe("Entity Facts v2 comparison contract", () => {
   });
 
   it("requires durable request fingerprints and never infers missing history", () => {
-    expect(serverSource).toContain('.from("measurement_request_contracts")');
-    expect(serverSource).toContain(
-      '.select("job_id, request_fingerprint")',
-    );
+    expect(serverSource).toContain("contract:measurement_request_contracts(request_fingerprint)");
+    expect(serverSource).toContain('.eq("contract.org_id", orgId)');
+    expect(serverSource).not.toContain("contract:measurement_request_contracts!inner");
+    expect(serverSource).not.toContain('.in("job_id", jobIds)');
     expect(serverSource).toContain("REQUEST_FINGERPRINT_RE");
     expect(serverSource).toContain(
       "Missing durable request fingerprints are never inferred",

@@ -61,11 +61,6 @@ type MeasurementParserRow = Pick<
   "run_id" | "job_id" | "parser_version"
 >;
 
-type RequestContractRow = Pick<
-  Database["public"]["Tables"]["measurement_request_contracts"]["Row"],
-  "job_id" | "request_fingerprint"
->;
-
 type AggregateStorageRow = Pick<
   Database["public"]["Tables"]["run_entity_fact_aggregates_v2"]["Row"],
   | "source_run_id"
@@ -467,27 +462,18 @@ export async function fetchEntityFactsV2Comparison(args: {
   const currentAggregate = parseAggregateSnapshot(currentAggregateRows);
   if (!currentAggregate) return { ok: false, error: "INVALID_V2_DATA" };
 
+  // The optional one-to-one join keeps jobs without a durable fingerprint
+  // visible to the verifier and bounds the request URL by run IDs.
   const { data: jobs, error: jobsError } = await supabaseAdmin
     .from("measurement_jobs")
     .select(
-      "id, run_id, question_id, provider, provider_model, repetition_no, status",
+      "id, run_id, question_id, provider, provider_model, repetition_no, status, contract:measurement_request_contracts(request_fingerprint)",
     )
     .eq("org_id", orgId)
+    .eq("contract.org_id", orgId)
     .in("run_id", runIds);
 
   if (jobsError) return { ok: false, error: "INTERNAL_ERROR" };
-
-  const jobIds = (jobs ?? []).map((job) => job.id);
-  let requestContracts: RequestContractRow[] = [];
-  if (jobIds.length > 0) {
-    const { data, error } = await supabaseAdmin
-      .from("measurement_request_contracts")
-      .select("job_id, request_fingerprint")
-      .eq("org_id", orgId)
-      .in("job_id", jobIds);
-    if (error) return { ok: false, error: "INTERNAL_ERROR" };
-    requestContracts = data ?? [];
-  }
 
   // Parser version is comparison metadata only. Legacy visibility truth fields
   // such as was_client_mentioned/client_position are deliberately never read.
@@ -506,9 +492,10 @@ export async function fetchEntityFactsV2Comparison(args: {
   const measurementsByRun = groupByRun<MeasurementParserRow>(
     measurementParsers ?? [],
   );
-  const requestContractByJobId = new Map(
-    requestContracts.map((row) => [row.job_id, row.request_fingerprint]),
-  );
+  const requestContractByJobId = new Map<string, string>();
+  for (const job of jobs ?? []) {
+    if (job.contract) requestContractByJobId.set(job.id, job.contract.request_fingerprint);
+  }
 
   const currentSignature = verifiedRunContractSignature({
     run: currentRun,

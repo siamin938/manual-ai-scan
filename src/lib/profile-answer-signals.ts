@@ -58,7 +58,15 @@ export function collectAnswerSignals(rows: readonly CitationSpan[], answers: Rea
     const phrases = signalPhrases(passage);
     const kinds = Object.keys(phrases) as SignalKind[];
     if (!kinds.length) continue;
-    const pageKey = citationPageKey(name, url);
+    // The original citation must match the stored text above. Use the same
+    // browser URL representation as the displayed page only for the lookup.
+    let displayedUrl: string;
+    try {
+      displayedUrl = new URL(url).href;
+    } catch {
+      continue;
+    }
+    const pageKey = citationPageKey(name.trim(), displayedUrl);
     const example = { questionId: answer.questionId, measurementId: id, phrases: Object.values(phrases) };
     const missing = missingQuestionIds.has(answer.questionId);
     const entry = entries.get(pageKey) ?? { ids: new Map(), example, missing };

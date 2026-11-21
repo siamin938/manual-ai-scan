@@ -4,10 +4,10 @@ import { citationPageKey, collectAnswerSignals, type CitationSpan } from "../../
 const name = "비교 정비소";
 const key = "peer";
 const url = "https://daangn.com/kr/local-profile/example";
-function fixture(id: string, description: string) {
-  const text = name + " " + description + " ([당근](" + url + "))";
+function fixture(id: string, description: string, citation = url) {
+  const text = name + " " + description + " ([당근](" + citation + "))";
   const row: CitationSpan = { measurement_id: id, canonical_key: key, canonical_display_name: name,
-    citation_url: url, entity_start_index: 0, entity_end_index: name.length,
+    citation_url: citation, entity_start_index: 0, entity_end_index: name.length,
     citation_start_index: text.indexOf("[당근]"), citation_end_index: text.length - 1 };
   return { row, answer: { questionId: "q" + id, text, confirmedKeys: [key] } };
 }
@@ -27,5 +27,15 @@ describe("stored source-specific answer evidence", () => {
     const rows = [a.row, {...b.row, citation_url: url + "2"}, {...b.row, entity_end_index: 1}, c.row];
     const answers = new Map([["1", a.answer], ["2", b.answer], ["3", {...c.answer, confirmedKeys: []}]]);
     expect(collectAnswerSignals(rows, answers, [name, "다른 정비소"], new Set()).size).toBe(0);
+  });
+
+  it("connects a verified Korean URL to its displayed link without changing the stored-text check", () => {
+    const raw = "https://daangn.com/kr/local-profile/분당점?item=엔진오일";
+    const display = new URL(raw).href;
+    const a = fixture("1", "리뷰 14건", raw);
+    const answers = new Map([["1", a.answer]]);
+    const evidence = collectAnswerSignals([a.row], answers, [name], new Set());
+    expect(evidence.get(citationPageKey(name, display))?.counts).toEqual({ reviews: 1 });
+    expect(collectAnswerSignals([{ ...a.row, citation_url: display }], answers, [name], new Set()).size).toBe(0);
   });
 });

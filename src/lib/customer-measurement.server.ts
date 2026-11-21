@@ -137,6 +137,30 @@ async function createStandaloneAuditMeasurementRun(args: {
     }
   }
 
+  // A queued run is already authorized and funded. A retry only reads its ID.
+  const baseSameConditionRunQuery = () =>
+    supabase
+      .from("measurement_runs")
+      .select("id, total_jobs")
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("question_set_id", questionSetId)
+      .eq("run_type", "audit")
+      .eq("phase", "standalone")
+      .eq("diagnostic_scope", "customer")
+      .is("experiment_id", null);
+
+  const { data: existingActiveRun, error: activeRunError } = await baseSameConditionRunQuery()
+    .in("status", ["queued", "running"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeRunError) return fail("INTERNAL_ERROR");
+  if (existingActiveRun) {
+    return { ok: true, runId: existingActiveRun.id, plannedJobs: existingActiveRun.total_jobs };
+  }
+
   // E) provider readiness (내부 설정명은 고객에게 노출하지 않음)
   const { data: providerSettings, error: psErr } = await supabase
     .from("provider_settings")
@@ -216,37 +240,16 @@ async function createStandaloneAuditMeasurementRun(args: {
   const now = new Date();
   const runName = (args.name ?? "").trim() || defaultRunName(business.name, now);
 
-  const baseSameConditionRunQuery = () =>
-    supabase
-      .from("measurement_runs")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("business_id", businessId)
-      .eq("question_set_id", questionSetId)
-      .eq("run_type", "audit")
-      .eq("phase", "standalone")
-      .eq("diagnostic_scope", "customer");
-
-  const { data: existingActiveRun } = await baseSameConditionRunQuery()
-    .in("status", ["queued", "running"])
+  const reuseSince = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
+  const { data: existingDraft, error: draftError } = await baseSameConditionRunQuery()
+    .eq("status", "draft")
+    .eq("created_by", userId)
+    .gte("created_at", reuseSince)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-
-  let runId = existingActiveRun?.id ?? null;
-
-  if (!runId) {
-    const reuseSince = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-    const { data: existingDraft } = await baseSameConditionRunQuery()
-      .eq("status", "draft")
-      .eq("created_by", userId)
-      .gte("created_at", reuseSince)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    runId = existingDraft?.id ?? null;
-  }
+  if (draftError) return fail("INTERNAL_ERROR");
+  let runId = existingDraft?.id ?? null;
 
   if (!runId) {
     // data_origin은 조직 설정값을 그대로 승계한다(NOT NULL, DB 기본값 없음).

@@ -1058,8 +1058,9 @@ function DashboardPage() {
     firstPartyResult && firstPartyResult.ok ? firstPartyResult.sourceTypes : [];
 
   const fetchActionOpportunityEvidence = useServerFn(getActionOpportunityEvidence);
+  const evidenceThresholdPct = benchmark?.thresholdPct ?? 20;
   const actionEvidenceQuery = useQuery({
-    queryKey: ["action-opportunity-evidence", activeOrgId, businessId, evidenceRunId, benchmark?.thresholdPct],
+    queryKey: ["action-opportunity-evidence", activeOrgId, businessId, evidenceRunId, evidenceThresholdPct],
     enabled: !!activeOrgId && !!businessId && !!evidenceRunId,
     retry: false,
     queryFn: async () => {
@@ -1068,7 +1069,7 @@ function DashboardPage() {
           data: {
             orgId: activeOrgId as string,
             businessId: businessId as string,
-            highVisibilityThresholdPct: benchmark?.thresholdPct ?? 20,
+            highVisibilityThresholdPct: evidenceThresholdPct,
             ...(evidenceRunId ? { expectedRunId: evidenceRunId } : {}),
           },
         });
