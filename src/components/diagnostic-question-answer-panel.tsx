@@ -7,7 +7,7 @@ import { DiagnosticAnswerText } from "./diagnostic-answer-text";
 type AnswerScope = QuestionAnswerScope & { businessName: string; userId: string };
 export const QuestionAnswerContext = createContext<AnswerScope | null>(null);
 
-export function DiagnosticQuestionAnswerPanel({ scope, questionId }: { scope: AnswerScope; questionId: string }) {
+export function DiagnosticQuestionAnswerPanel({ scope, questionId, measurementId }: { scope: AnswerScope; questionId: string; measurementId?: string }) {
   const [active, setActive] = useState(0);
   const readAnswers = useServerFn(getDiagnosticQuestionAnswers);
   const { orgId, businessId, runId, businessName, userId } = scope;
@@ -18,7 +18,7 @@ export function DiagnosticQuestionAnswerPanel({ scope, questionId }: { scope: An
   });
   if (result.isPending) return <p role="status">저장된 답변을 불러오는 중입니다…</p>;
   if (result.isError) return <p role="status">답변을 불러오지 못했습니다. <button type="button" onClick={() => void result.refetch()}>다시 시도</button></p>;
-  const answers = result.data;
+  const answers = measurementId ? result.data.filter(answer => answer.id === measurementId) : result.data;
   const answer = answers[active] ?? answers[0];
   if (!answer) return <p>이 질문에 저장된 답변이 없습니다.</p>;
   return <>

@@ -70,11 +70,13 @@ describe("customer source actions", () => {
       dto, priority: { ...priority, peerExamples: pages },
     }));
   }
-  it("links only the cited example, with the peer, platform and confirmed answer count", () => {
+  it("shows the cited page and official profile actions, with registration folded", () => {
     const url = "https://daangn.com/kr/local-profile/example";
     const html = guide([{ name: "비교 정비소", domain: "daangn.com", count: 2, url }]);
-    expect(html.match(/href="/g)).toHaveLength(1);
-    for (const value of [url, "비교 정비소", "당근", "함께 나온 답변 2개"]) expect(html).toContain(value);
+    expect(html.split(`href="${url}"`)).toHaveLength(2);
+    expect(html).toContain("https://business.daangn.com/profile/login");
+    expect(html).toMatch(/<details[^>]*><summary[^>]*>아직 등록 전이라면<\/summary>.*?당근 비즈프로필 등록하기/u);
+    for (const value of [url, "비교 정비소", "당근", "함께 나온 답변 2개"]) expect(html.replace(/<[^>]+>/g, "") + html).toContain(value);
     expect(html).not.toContain(priority.ownPage.url);
   });
   it("omits the link group and redundant disclosures without an eligible citation", () => {

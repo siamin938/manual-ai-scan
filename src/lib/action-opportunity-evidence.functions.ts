@@ -36,6 +36,7 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
     return {
       orgId: input.orgId,
       businessId: input.businessId,
+      includeAnswerEvidence: typeof input.expectedRunId === "string" && input.expectedRunId.length > 0,
       ...(typeof input.expectedRunId === "string" ? { expectedRunId: input.expectedRunId } : {}),
       highVisibilityThresholdPct: Math.max(
         0,
