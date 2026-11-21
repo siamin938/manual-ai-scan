@@ -1522,10 +1522,10 @@ function DashboardPage() {
           <DiagnosticTopicTabs topic={detailTopic} onChange={setDetailTopic} />
           <div className="diagnostic-main-topic" id={`diagnostic-${detailTopic}`}>
             {(detailTopic === "questions" || printExpanded) && <DiagnosticQuestions key={`${dto.business.id}:${dto.scope.runId}`} groups={dto.questionGroups} questions={dto.questionAreas} />}
-            {(detailTopic === "businesses" || printExpanded) && <RepeatedPeerEvidence rows={repeatedPeers} validCount={dto.overview.validCount} targetCount={dto.overview.confirmedMentionCount} sourcesAvailable={model.sources.available} printExpanded={printExpanded} />}
+            {(detailTopic === "businesses" || printExpanded) && <RepeatedPeerEvidence key={`peers:${dto.business.id}:${dto.scope.runId}`} rows={repeatedPeers} validCount={dto.overview.validCount} targetCount={dto.overview.confirmedMentionCount} sourcesAvailable={model.sources.available} printExpanded={printExpanded} />}
             {(detailTopic === "businesses" || printExpanded) && (dto.broadSearchObservation ? <BroadCompetitorEvidence key={`${dto.business.id}:${dto.scope.runId}`} observation={dto.broadSearchObservation} printExpanded={printExpanded} /> : <p>이 측정은 넓은 지역 업체 분류 자료가 없습니다.</p>)}
+            {(detailTopic === "sources" || printExpanded) && <CurrentRunSourceEvidence key={`current-sources:${dto.business.id}:${dto.scope.runId}`} dto={dto} model={model} printExpanded={printExpanded} />}
             {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
-            {(detailTopic === "sources" || printExpanded) && <CurrentRunSourceEvidence dto={dto} model={model} printExpanded={printExpanded} />}
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} printExpanded={printExpanded} />}</>}
           </div>
           </>}

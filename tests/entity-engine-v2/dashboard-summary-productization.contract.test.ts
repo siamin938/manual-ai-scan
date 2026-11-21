@@ -168,10 +168,12 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).not.toContain("추가 분석/근거 보기");
     expect(dashboardSource).not.toContain("추가 근거에서");
     expect(dashboardSource).toContain("<CurrentRunSourceEvidence");
+    expect(dashboardSource.indexOf('<CurrentRunSourceEvidence key=')).toBeLessThan(dashboardSource.indexOf('<BenchmarkSourceEvidence key='));
+    expect(dashboardSource).toContain('<RepeatedPeerEvidence key={`peers:${dto.business.id}:${dto.scope.runId}`}');
     expect(dashboardSource).toContain('id={`diagnostic-${detailTopic}`}');
     expect(dashboardSource).toContain('window.addEventListener("hashchange", enter)');
-    expect(evidenceSource).toContain("이번 측정의 인용 근거");
-    expect(evidenceSource).toContain("위 시장 표본과 합산하지 않습니다");
+    expect(evidenceSource).toContain("우리 업체는 어디에 나왔나요?");
+    expect(evidenceSource).toContain("아래 시장 표본과 합산하지 않는 이번 측정의 저장된 근거입니다");
     expect(evidenceSource).toContain('useContext(PrintArchiveContext)');
     expect(evidenceSource).toContain('printExpanded ? <div className="evidence-print-archive">');
     expect(evidenceSource).toContain('<PrintArchiveContext.Provider value={true}>');
