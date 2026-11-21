@@ -42,7 +42,7 @@ type CurrentRunSourceRow = {
 type CurrentRunSourceCategory = {
   key: "pages" | "direct" | "together" | "clues";
   label: string;
-  unit: "페이지" | "도메인";
+  unit: "개" | "곳";
   value: number | null;
   state: SourceState;
   description: string;
@@ -54,29 +54,29 @@ export function currentRunSourceCategories(dto: EntityFactsV2ReadGatewayDTO, mod
   const metrics = sourceCardMetrics(model);
   return [
     {
-      key: "pages", label: "업체가 확인된 페이지", unit: "페이지", value: metrics.pages,
+      key: "pages", label: "업체가 확인된 페이지", unit: "개", value: metrics.pages,
       state: metrics.pages === null ? metrics.pageState : null,
-      description: "실제 인용 페이지의 내용에서 우리 업체 관련성을 확인한 페이지입니다.",
+      description: "페이지 내용에서 우리 업체를 확인했어요.",
       rows: model.verifiedTargetCitationPages.rows, icon: ShieldCheck,
     },
     {
-      key: "direct", label: "AI 답변에서 직접 연결", unit: "도메인", value: metrics.direct,
+      key: "direct", label: "AI 답변에서 직접 연결", unit: "곳", value: metrics.direct,
       state: metrics.direct === null ? "미수집" : null,
-      description: "AI 답변에서 우리 업체와 이 출처 도메인의 연결이 함께 확인됐습니다.",
+      description: "AI 답변에서 우리 업체와 직접 연결된 사이트예요.",
       rows: model.sources.rows.filter(row => row.evidence !== "clue" && row.targetResponseCount > 0), icon: Link2,
     },
     {
-      key: "together", label: "같은 답변에 나온 출처", unit: "도메인",
+      key: "together", label: "같은 답변에 나온 출처", unit: "곳",
       value: model.targetExposureCitationSources.available ? model.targetExposureCitationSources.rows.length : null,
       state: model.targetExposureCitationSources.available ? null : "미수집",
-      description: "우리 업체가 나온 답변에 함께 인용된 출처입니다. 우리 업체와 직접 연결됐다는 뜻은 아닙니다.",
+      description: "우리 업체가 나온 답변에서 함께 인용된 사이트로, 직접 연결을 뜻하지는 않아요.",
       rows: model.targetExposureCitationSources.rows, icon: Quote,
     },
     {
-      key: "clues", label: "연결 단서", unit: "도메인",
+      key: "clues", label: "추가 확인할 출처", unit: "곳",
       value: dto.targetReferenceSources ? model.targetReferenceSources.rows.length : null,
       state: dto.targetReferenceSources ? null : "미수집",
-      description: "우리 업체와의 연결을 살펴볼 단서이며, 직접 연결로 확정한 출처는 아닙니다.",
+      description: "우리 업체와의 연결을 추가로 확인할 사이트예요.",
       rows: model.targetReferenceSources.rows, icon: Search,
     },
   ];
@@ -91,7 +91,7 @@ function CurrentRunSourceRows({ rows, all = false }: { rows: readonly CurrentRun
     const title = row.title?.trim() || row.domain;
     return <li key={`${row.domain}:${row.sampleUrl ?? "text"}:${index}`}>
       <div><strong>{title}</strong><span>{title !== row.domain ? `${row.domain} · ` : ""}답변 {row.responseCount}개</span></div>
-      {row.sampleUrl ? <a href={row.sampleUrl} target="_blank" rel="noopener noreferrer" aria-label={`${title} 저장된 출처를 새 창에서 열기`}><span>링크</span><ExternalLink aria-hidden="true" /></a> : null}
+      {row.sampleUrl ? <a href={row.sampleUrl} target="_blank" rel="noopener noreferrer" aria-label={`${title} 원문을 새 창에서 열기`}><span>원문 보기</span><ExternalLink aria-hidden="true" /></a> : null}
     </li>;
   })}</ul>;
 }
@@ -114,7 +114,7 @@ export function CurrentRunSourceEvidence({ dto, model, printExpanded = false }: 
   const showAll = expanded || printExpanded;
 
   return <section className="current-run-source-evidence" aria-label="우리 업체의 이번 측정 인용 근거">
-    <header className="current-run-source-heading"><p>우리 업체 · 이번 측정</p><h2>우리 업체는 어디에 나왔나요?</h2><span>아래 시장 표본과 합산하지 않는 이번 측정의 저장된 근거입니다.</span></header>
+    <header className="current-run-source-heading"><p>우리 업체 · 이번 측정</p><h2>우리 업체는 어디에 나왔나요?</h2></header>
     <div className="current-run-source-choices no-print" aria-label="우리 업체 출처 분류">{categories.map(category => {
       const Icon = category.icon;
       const active = selected.key === category.key;

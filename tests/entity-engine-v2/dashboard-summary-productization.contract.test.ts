@@ -173,7 +173,8 @@ describe("dashboard owner productization layer", () => {
     expect(dashboardSource).toContain('id={`diagnostic-${detailTopic}`}');
     expect(dashboardSource).toContain('window.addEventListener("hashchange", enter)');
     expect(evidenceSource).toContain("우리 업체는 어디에 나왔나요?");
-    expect(evidenceSource).toContain("아래 시장 표본과 합산하지 않는 이번 측정의 저장된 근거입니다");
+    expect(evidenceSource).not.toContain("아래 시장 표본과 합산하지 않는 이번 측정의 저장된 근거입니다");
+    expect(evidenceSource).toContain("추가 확인할 출처");
     expect(evidenceSource).toContain('useContext(PrintArchiveContext)');
     expect(evidenceSource).toContain('printExpanded ? <div className="evidence-print-archive">');
     expect(evidenceSource).toContain('<PrintArchiveContext.Provider value={true}>');

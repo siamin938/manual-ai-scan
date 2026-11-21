@@ -51,12 +51,21 @@ describe("supplemental evidence boundaries", () => {
     const dto = { targetReferenceSources: [] } as never;
     const categories = currentRunSourceCategories(dto, model);
     expect(categories.map(category => category.value)).toEqual([5, 1, 5, 0]);
-    expect(categories.map(category => category.unit)).toEqual(["페이지", "도메인", "도메인", "도메인"]);
+    expect(categories.map(category => category.unit)).toEqual(["개", "곳", "곳", "곳"]);
     expect(initialCurrentRunSourceCategory(categories)).toBe("pages");
 
     const html = renderToStaticMarkup(createElement(CurrentRunSourceEvidence, { dto, model }));
     const screen = html.split("current-run-source-print")[0] ?? "";
     expect(screen).toContain("우리 업체는 어디에 나왔나요?");
+    expect(screen).toContain('<strong>5</strong><small>개</small>');
+    expect(screen).toContain('<strong>1</strong><small>곳</small>');
+    expect(screen).toContain('<strong>5</strong><small>곳</small>');
+    expect(screen).toContain('<strong>0</strong><small>곳</small>');
+    expect(screen).toContain("추가 확인할 출처");
+    expect(screen).toContain("페이지 내용에서 우리 업체를 확인했어요.");
+    expect(screen).not.toContain("아래 시장 표본과 합산하지 않는");
+    expect(screen).not.toContain("도메인");
+    expect(screen).toContain("원문 보기");
     expect(screen).toContain("저장된 페이지 1");
     expect(screen).toContain("https://page-0.example/saved");
     expect(screen).not.toContain("저장된 페이지 3");
@@ -102,7 +111,7 @@ describe("supplemental evidence boundaries", () => {
       targetExposureCitationSources: { available: true, rows: [{ domain: "together.example", responseCount: 1, citationCount: 1, sampleUrl: "" }] },
     } as never;
     const html = renderToStaticMarkup(createElement(CurrentRunSourceEvidence, { dto: { targetReferenceSources: [{}] } as never, model, printExpanded: true }));
-    for (const label of ["업체가 확인된 페이지", "AI 답변에서 직접 연결", "같은 답변에 나온 출처", "연결 단서"]) expect(html).toContain(label);
+    for (const label of ["업체가 확인된 페이지", "AI 답변에서 직접 연결", "같은 답변에 나온 출처", "추가 확인할 출처"]) expect(html).toContain(label);
     expect(html).toContain("미검증");
     expect(html).toContain("clue.example");
     expect(html).toContain("together.example");

@@ -6,8 +6,8 @@ import { siteDisplayName, type repeatedPeerEvidence } from "@/lib/diagnostic-sou
 type Peer = ReturnType<typeof repeatedPeerEvidence>[number];
 
 function PeerSources({ peer, sourcesAvailable }: { peer: Peer; sourcesAvailable: boolean }) {
-  return <section className="peer-source-panel" aria-label={`${peer.name}와 함께 인용된 출처`}>
-    <h3>{peer.name}와 함께 인용된 출처</h3>
+  return <section className="peer-source-panel" aria-label={`${peer.name} 등장 답변의 출처`}>
+    <h3>{peer.name} 등장 답변의 출처</h3>
     {peer.sources.length ? <ul className="peer-source-list">{peer.sources.map(source => <li key={source.domain}>
       <div>{source.url ? <a href={source.url} target="_blank" rel="noopener noreferrer">{siteDisplayName(source.domain)}<ExternalLink aria-hidden="true" /><span className="sr-only">새 창에서 열기</span></a> : <strong>{siteDisplayName(source.domain)}</strong>}<span>함께 인용된 답변 {source.count}개</span></div>
     </li>)}</ul> : <p>{sourcesAvailable ? "이 업체와 연결된 출처는 확인되지 않았습니다." : "이 측정의 업체 출처 기록을 확인할 수 없습니다."}</p>}
@@ -21,7 +21,7 @@ export function RepeatedPeerEvidence({ rows, validCount, targetCount, sourcesAva
   const selectedPeer = rows.find(peer => peer.name === selectedName) ?? rows[0] ?? null;
   const card = (peer: Peer) => {
     const active = selectedPeer?.name === peer.name;
-    return <Button key={peer.name} variant="outline" className="peer-choice" aria-pressed={active} aria-controls="repeated-peer-source-panel" aria-label={`${peer.name}: ${peer.responseCount}개 답변에 등장, 함께 인용된 출처 보기`} onClick={() => setSelectedName(peer.name)}>
+    return <Button key={peer.name} variant="outline" className="peer-choice" aria-pressed={active} aria-controls="repeated-peer-source-panel" aria-label={`${peer.name} 등장 답변의 출처 보기, ${peer.responseCount}개 답변에 등장`} onClick={() => setSelectedName(peer.name)}>
       <span className="peer-choice-top"><Store aria-hidden="true" />{active ? <Check aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}</span>
       <span className="peer-choice-value"><strong>{peer.responseCount}</strong><small>개 답변에 등장</small></span>
       <span className="peer-choice-name">{peer.name}</span>
