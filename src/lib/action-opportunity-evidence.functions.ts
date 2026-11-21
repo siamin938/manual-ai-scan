@@ -36,6 +36,7 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
     return {
       orgId: input.orgId,
       businessId: input.businessId,
+      includeAnswerEvidence: typeof input.expectedRunId === "string" && input.expectedRunId.length > 0,
       ...(typeof input.expectedRunId === "string" ? { expectedRunId: input.expectedRunId } : {}),
       highVisibilityThresholdPct: Math.max(
         0,
@@ -55,7 +56,7 @@ export const getActionOpportunityEvidence = createServerFn({ method: "POST" })
     if (!membership) return { ok: false, error: "FORBIDDEN" };
 
     try {
-      const result = await fetchActionOpportunityEvidence({ ...data, includeAnswerEvidence: !!data.expectedRunId });
+      const result = await fetchActionOpportunityEvidence(data);
       return {
         ok: true,
         highVisibilityExamples: result.highVisibilityExamples,
