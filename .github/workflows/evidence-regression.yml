@@ -64,5 +64,7 @@ jobs:
           PYCODE
           psql -v ON_ERROR_STOP=1 -f /tmp/entity-classifiers.sql
           psql -v ON_ERROR_STOP=1 -f tests/regression/entity-description-contracts.sql
+      - name: Worker polling PostgreSQL regression
+        run: psql -v ON_ERROR_STOP=1 -v migration=supabase/migrations/20261121132231_optimize_measurement_poll_and_event_lookup.sql -f tests/regression/measurement-worker-poll.sql
       - name: Production build
         run: bun run build
