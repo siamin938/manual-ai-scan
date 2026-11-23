@@ -34,7 +34,7 @@ export function WebsiteLaunchComparison({ review, printExpanded = false }: {
         </table>
         {review.added.length > 0 ? <>
           <h3>새로 등장한 질문 {review.added.length}개</h3>
-          <p>이 중 {linked}개 답변에서 {review.host}를 우리 업체 설명에 직접 인용했어요.</p>
+          <p>이 중 {linked}개 답변에서 공식 홈페이지를 직접 인용했어요. ({review.host})</p>
           <details className="launch-questions" open={printExpanded || undefined}><summary>실제 질문 보기</summary>
             <ul>{review.added.map(q => <li key={q.id}>
               {scope ? <button type="button" aria-expanded={selected === q.id} onClick={() => setSelected(selected === q.id ? null : q.id)}>
