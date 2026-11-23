@@ -1,3 +1,4 @@
+import { readWebsiteLaunchReview } from "./reviewed-website-launch";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -215,7 +216,7 @@ export async function fetchEntityFactsV2ReadGateway(args: {
 
   const { data: business, error: businessError } = await supabaseAdmin
     .from("businesses")
-    .select("id, name, category, region, city")
+    .select("id, name, category, region, city, websiteLaunch:metadata->reviewed_website_launch_v1")
     .eq("id", businessId)
     .eq("org_id", orgId)
     .eq("is_client_business", true)
@@ -630,6 +631,9 @@ export async function fetchEntityFactsV2ReadGateway(args: {
   });
 
   if (!gatewayResponse.ok) return gatewayResponse;
+
+  const launchReview = readWebsiteLaunchReview(business.websiteLaunch, orgId, businessId);
+  if (launchReview) gatewayResponse.data.websiteLaunch = launchReview;
 
   // Read-layer competitor supplement only. This never mutates stored v2 facts or
   // target metrics. A failure or baseline mismatch falls back to the core v2 list.

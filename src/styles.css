@@ -996,3 +996,33 @@ main:has(> .diagnostic-page) { max-width:none; padding:0; background:var(--backg
   .question-answer-trigger,.saved-answer-panel:not([hidden]) { padding:12px; }
 }
 @media print { .question-answer-affordance,.saved-answer-panel { display:none !important; } }
+
+.website-launch { margin-block: 1rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--card); }
+.website-launch > details > summary { min-height: 60px; padding: .8rem 1rem; display: flex; align-items: center; gap: .75rem; cursor: pointer; }
+.website-launch > details > summary::-webkit-details-marker { display: none; }
+.website-launch summary:focus-visible, .website-launch button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: .4rem; }
+.website-launch .launch-icon { color: var(--primary); flex: 0 0 1.25rem; }
+.launch-label { flex: 1; display: grid; }
+.launch-label small, .launch-result small, .launch-body p, .launch-body th small { color: var(--muted-foreground); font-size: .86rem; }
+.launch-result { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.launch-result svg, .launch-chevron { width: 1rem; height: 1rem; }
+.launch-result b { color: var(--primary); }
+.website-launch > details[open] .launch-chevron { transform: rotate(180deg); }
+.launch-body { padding: 0 1rem 1rem; }
+.launch-body table { margin: .5rem 0 1rem; width: 100%; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.launch-body td, .launch-body th { text-align: end; padding: .5rem .3rem; border-bottom: 1px solid var(--border); }
+.launch-body th:first-child { text-align: start; }
+.launch-body th small { font-weight: 400; }
+.launch-body h3 { font-weight: 700; }
+.launch-body .launch-questions > summary, .launch-test-proof > summary { cursor: pointer; padding-block: .65rem; color: var(--primary); font-weight: 600; }
+.launch-questions li { padding-block: .3rem; border-top: 1px solid var(--border); }
+.launch-questions button { display: flex; width: 100%; align-items: center; gap: .5rem; justify-content: space-between; text-align: left; min-height: 44px; }
+.launch-questions button small { flex: none; color: var(--primary); }
+.launch-note { margin-top: .75rem; }
+@media (max-width: 480px) {
+  .website-launch > details > summary { display: grid; grid-template-columns: 1.25rem 1fr 1rem; gap: .25rem .6rem; }
+  .launch-icon { grid-area: 1 / 1; align-self: start; }
+  .launch-label { grid-area: 1 / 2; }
+  .launch-result { grid-area: 2 / 2; }
+  .launch-chevron { grid-area: 1 / 3; }
+}

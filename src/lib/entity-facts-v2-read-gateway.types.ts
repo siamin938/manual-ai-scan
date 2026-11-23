@@ -194,6 +194,7 @@ export type EntityFactsV2ReadVerifiedTargetCitationPageStatus =
   | "not_verified";
 
 export type EntityFactsV2ReadGatewayDTO = {
+  websiteLaunch?: import("./reviewed-website-launch").ReviewedWebsiteLaunch;
   gatewayVersion: typeof ENTITY_FACTS_V2_READ_GATEWAY_VERSION;
   generatedAt: string;
   business: EntityFactsV2ReadBusinessDTO;
