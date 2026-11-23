@@ -36,6 +36,13 @@ export type EntityFactsV2ComparisonRunPointDTO = {
   top3: EntityFactsV2ComparisonMetricSnapshot;
 };
 
+export type EntityFactsV2ComparisonSearchScopeDTO = {
+  custom: EntityFactsV2ComparisonMetricDTO;
+  core: EntityFactsV2ComparisonMetricDTO;
+  newlyConfirmedQuestionCount: number;
+  noLongerConfirmedQuestionCount: number;
+};
+
 export type EntityFactsV2ComparisonDTO = {
   version: typeof ENTITY_FACTS_V2_COMPARISON_VERSION;
   generatedAt: string;
@@ -50,6 +57,8 @@ export type EntityFactsV2ComparisonDTO = {
   series: EntityFactsV2ComparisonRunPointDTO[];
   visibility: EntityFactsV2ComparisonMetricDTO | null;
   top3: EntityFactsV2ComparisonMetricDTO | null;
+  /** Optional additive detail for unified 24-question comparisons only. */
+  searchScope?: EntityFactsV2ComparisonSearchScopeDTO | null;
 };
 
 export type EntityFactsV2ComparisonError =
@@ -70,11 +79,15 @@ export function buildEntityFactsV2MetricComparison(
   current: EntityFactsV2ComparisonMetricSnapshot,
   previous: EntityFactsV2ComparisonMetricSnapshot | null,
 ): EntityFactsV2ComparisonMetricDTO {
+  const currentConfirmedPct =
+    current.validCount > 0 ? (100 * current.confirmedCount) / current.validCount : null;
+  const previousConfirmedPct =
+    previous && previous.validCount > 0
+      ? (100 * previous.confirmedCount) / previous.validCount
+      : null;
   const confirmedDeltaPctPoints =
-    previous !== null &&
-    current.confirmedPct !== null &&
-    previous.confirmedPct !== null
-      ? roundPctPoints(current.confirmedPct - previous.confirmedPct)
+    currentConfirmedPct !== null && previousConfirmedPct !== null
+      ? roundPctPoints(currentConfirmedPct - previousConfirmedPct)
       : null;
 
   return {

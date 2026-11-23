@@ -18,6 +18,10 @@ const dashboardSource = readFileSync(
   resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
   "utf8",
 );
+const comparisonCardSource = readFileSync(
+  resolve(process.cwd(), "src/components/diagnostic-comparison-card.tsx"),
+  "utf8",
+);
 
 describe("Entity Facts v2 comparison contract", () => {
   it("calculates change only from confirmed lower-bound truth", () => {
@@ -42,6 +46,27 @@ describe("Entity Facts v2 comparison contract", () => {
     expect(result.current.confirmedPct).toBe(16.67);
     expect(result.current.maxPct).toBe(25);
     expect(result.previous?.confirmedPct).toBe(29.17);
+  });
+
+  it("calculates percentage-point change from exact counts, not rounded display percentages", () => {
+    const result = buildEntityFactsV2MetricComparison(
+      {
+        validCount: 24,
+        confirmedCount: 2,
+        unresolvedCount: 0,
+        confirmedPct: 8.33,
+        maxPct: 8.33,
+      },
+      {
+        validCount: 24,
+        confirmedCount: 1,
+        unresolvedCount: 0,
+        confirmedPct: 4.17,
+        maxPct: 4.17,
+      },
+    );
+
+    expect(result.confirmedDeltaPctPoints).toBe(4.17);
   });
 
   it("does not invent a delta without a verified previous run", () => {
@@ -82,10 +107,10 @@ describe("Entity Facts v2 comparison contract", () => {
   });
 
   it("requires durable request fingerprints and never infers missing history", () => {
-    expect(serverSource).toContain('.from("measurement_request_contracts")');
-    expect(serverSource).toContain(
-      '.select("job_id, request_fingerprint")',
-    );
+    expect(serverSource).toContain("contract:measurement_request_contracts(request_fingerprint)");
+    expect(serverSource).toContain('.eq("contract.org_id", orgId)');
+    expect(serverSource).not.toContain("contract:measurement_request_contracts!inner");
+    expect(serverSource).not.toContain('.in("job_id", jobIds)');
     expect(serverSource).toContain("REQUEST_FINGERPRINT_RE");
     expect(serverSource).toContain(
       "Missing durable request fingerprints are never inferred",
@@ -165,6 +190,23 @@ describe("Entity Facts v2 comparison contract", () => {
     expect(functionsSource).toContain(
       'if (!membership) return { ok: false, error: "FORBIDDEN" };',
     );
+  });
+
+  it("adds unified search-scope detail only after verified compatible-run matching", () => {
+    expect(serverSource).toContain("buildUnifiedDiagnosticLayerSummary");
+    expect(serverSource).toContain("questionChangeCounts");
+    expect(serverSource).toContain('.from("questions")');
+    expect(serverSource).toContain('.select("id, city")');
+    expect(serverSource).toContain("currentUnifiedSet?.id === currentRun.question_set_id");
+    expect(serverSource).toContain("Search-scope detail is supplemental");
+    expect(serverSource).toContain("searchScope = {");
+    expect(serverSource).toContain("newlyConfirmedQuestionCount");
+    expect(serverSource).toContain("noLongerConfirmedQuestionCount");
+    expect(comparisonCardSource).toContain("검색 유형별 변화");
+    expect(comparisonCardSource).toContain("새로 등장");
+    expect(comparisonCardSource).toContain("이번에 등장 미확인");
+    expect(comparisonCardSource).toContain("이전에는 확정됐지만 이번에는 확정되지 않은 질문");
+    expect(comparisonCardSource).toContain("변화의 원인을");
   });
 
   it("wires the customer-safe comparison path into the dashboard without legacy repeat truth", () => {

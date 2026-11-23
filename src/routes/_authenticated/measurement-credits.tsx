@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, type SearchSchemaInput } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -24,7 +24,14 @@ import {
   type CreditOrgDTO,
 } from "@/lib/measurement-credit-admin.functions";
 
+type MeasurementCreditsSearch = { org?: string };
+type MeasurementCreditsSearchInput = SearchSchemaInput & { org?: string };
+
 export const Route = createFileRoute("/_authenticated/measurement-credits")({
+  validateSearch: (search: MeasurementCreditsSearchInput): MeasurementCreditsSearch => {
+    const org = typeof search["org"] === "string" ? search["org"].trim() : "";
+    return org ? { org } : {};
+  },
   component: MeasurementCreditsPage,
   head: () => ({
     meta: [
@@ -70,6 +77,7 @@ function newReferenceKey(): string {
 }
 
 function MeasurementCreditsPage() {
+  const { org: requestedOrgId } = Route.useSearch();
   const queryClient = useQueryClient();
   const fetchOverview = useServerFn(getMeasurementCreditAdminOverview);
   const fetchLedger = useServerFn(getMeasurementCreditAdminLedger);
@@ -83,13 +91,14 @@ function MeasurementCreditsPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 280);
+    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 400);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
   const overviewQuery = useQuery({
     queryKey: ["measurement-credit-admin-overview", searchQuery],
     queryFn: () => fetchOverview({ data: { query: searchQuery } }),
+    placeholderData: (previousData) => previousData,
     retry: false,
   });
 
@@ -133,7 +142,18 @@ function MeasurementCreditsPage() {
     },
   });
 
-  if (overviewQuery.isLoading) {
+  const availableOrgs = overviewQuery.data?.ok
+    ? overviewQuery.data.overview.organizations
+    : [];
+
+  useEffect(() => {
+    if (!requestedOrgId || selectedOrgId) return;
+    if (availableOrgs.some((org) => org.orgId === requestedOrgId)) {
+      setSelectedOrgId(requestedOrgId);
+    }
+  }, [requestedOrgId, selectedOrgId, availableOrgs]);
+
+  if (overviewQuery.isPending && !overviewQuery.data) {
     return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
   }
 
@@ -177,11 +197,20 @@ function MeasurementCreditsPage() {
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="조직명·가입자 이름·이메일 검색"
             />
-            <p className="text-xs text-muted-foreground">
-              {searchQuery
-                ? `검색 결과 ${overview.overview.totalMatches}건`
-                : `총 ${overview.overview.totalMatches}개 조직`}
-            </p>
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <p>
+                {overviewQuery.isFetching && searchQuery
+                  ? "검색 중…"
+                  : searchQuery
+                    ? `검색 결과 ${overview.overview.totalMatches}건`
+                    : `총 ${overview.overview.totalMatches}개 조직`}
+              </p>
+              {overviewQuery.isFetching && (
+                <span className="shrink-0" aria-live="polite">
+                  결과 갱신 중
+                </span>
+              )}
+            </div>
             {orgs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {searchQuery ? "검색 결과가 없습니다." : "표시할 조직이 없습니다."}

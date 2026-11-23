@@ -12,12 +12,16 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as SampleReportRouteImport } from './routes/sample-report'
 import { Route as AuthenticatedBusinessesRouteImport } from './routes/_authenticated/businesses'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDataAssetsRouteImport } from './routes/_authenticated/data-assets'
 import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticated/insights'
+import { Route as AuthenticatedInternalObservationPipelineRouteImport } from './routes/_authenticated/internal-observation-pipeline'
 import { Route as AuthenticatedManualChecksRouteImport } from './routes/_authenticated/manual-checks'
 import { Route as AuthenticatedMeasurementCreditsRouteImport } from './routes/_authenticated/measurement-credits'
+import { Route as AuthenticatedMeasurementHistoryRouteImport } from './routes/_authenticated/measurement-history'
+import { Route as AuthenticatedPilotOpsRouteImport } from './routes/_authenticated/pilot-ops'
 import { Route as AuthenticatedProfileCoverageRouteImport } from './routes/_authenticated/profile-coverage'
 import { Route as AuthenticatedQuestionsRouteImport } from './routes/_authenticated/questions'
 import { Route as AuthenticatedExperimentsIndexRouteImport } from './routes/_authenticated/experiments.index'
@@ -41,6 +45,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SampleReportRoute = SampleReportRouteImport.update({
+  id: '/sample-report',
+  path: '/sample-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedBusinessesRoute = AuthenticatedBusinessesRouteImport.update({
   id: '/businesses',
   path: '/businesses',
@@ -61,6 +70,12 @@ const AuthenticatedInsightsRoute = AuthenticatedInsightsRouteImport.update({
   path: '/insights',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedInternalObservationPipelineRoute =
+  AuthenticatedInternalObservationPipelineRouteImport.update({
+    id: '/internal-observation-pipeline',
+    path: '/internal-observation-pipeline',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedManualChecksRoute =
   AuthenticatedManualChecksRouteImport.update({
     id: '/manual-checks',
@@ -73,6 +88,17 @@ const AuthenticatedMeasurementCreditsRoute =
     path: '/measurement-credits',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMeasurementHistoryRoute =
+  AuthenticatedMeasurementHistoryRouteImport.update({
+    id: '/measurement-history',
+    path: '/measurement-history',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPilotOpsRoute = AuthenticatedPilotOpsRouteImport.update({
+  id: '/pilot-ops',
+  path: '/pilot-ops',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProfileCoverageRoute =
   AuthenticatedProfileCoverageRouteImport.update({
     id: '/profile-coverage',
@@ -122,12 +148,16 @@ const AuthenticatedRunsRunIdRoute = AuthenticatedRunsRunIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/sample-report': typeof SampleReportRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/data-assets': typeof AuthenticatedDataAssetsRoute
   '/insights': typeof AuthenticatedInsightsRoute
+  '/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
+  '/measurement-history': typeof AuthenticatedMeasurementHistoryRoute
+  '/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -140,12 +170,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/sample-report': typeof SampleReportRoute
   '/businesses': typeof AuthenticatedBusinessesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/data-assets': typeof AuthenticatedDataAssetsRoute
   '/insights': typeof AuthenticatedInsightsRoute
+  '/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/manual-checks': typeof AuthenticatedManualChecksRoute
   '/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
+  '/measurement-history': typeof AuthenticatedMeasurementHistoryRoute
+  '/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/questions': typeof AuthenticatedQuestionsRoute
   '/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -160,12 +194,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/sample-report': typeof SampleReportRoute
   '/_authenticated/businesses': typeof AuthenticatedBusinessesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/data-assets': typeof AuthenticatedDataAssetsRoute
   '/_authenticated/insights': typeof AuthenticatedInsightsRoute
+  '/_authenticated/internal-observation-pipeline': typeof AuthenticatedInternalObservationPipelineRoute
   '/_authenticated/manual-checks': typeof AuthenticatedManualChecksRoute
   '/_authenticated/measurement-credits': typeof AuthenticatedMeasurementCreditsRoute
+  '/_authenticated/measurement-history': typeof AuthenticatedMeasurementHistoryRoute
+  '/_authenticated/pilot-ops': typeof AuthenticatedPilotOpsRoute
   '/_authenticated/profile-coverage': typeof AuthenticatedProfileCoverageRoute
   '/_authenticated/questions': typeof AuthenticatedQuestionsRoute
   '/_authenticated/experiments/$experimentId': typeof AuthenticatedExperimentsExperimentIdRoute
@@ -180,12 +218,16 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/sample-report'
     | '/businesses'
     | '/dashboard'
     | '/data-assets'
     | '/insights'
+    | '/internal-observation-pipeline'
     | '/manual-checks'
     | '/measurement-credits'
+    | '/measurement-history'
+    | '/pilot-ops'
     | '/profile-coverage'
     | '/questions'
     | '/experiments/$experimentId'
@@ -198,12 +240,16 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/sample-report'
     | '/businesses'
     | '/dashboard'
     | '/data-assets'
     | '/insights'
+    | '/internal-observation-pipeline'
     | '/manual-checks'
     | '/measurement-credits'
+    | '/measurement-history'
+    | '/pilot-ops'
     | '/profile-coverage'
     | '/questions'
     | '/experiments/$experimentId'
@@ -217,12 +263,16 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/sample-report'
     | '/_authenticated/businesses'
     | '/_authenticated/dashboard'
     | '/_authenticated/data-assets'
     | '/_authenticated/insights'
+    | '/_authenticated/internal-observation-pipeline'
     | '/_authenticated/manual-checks'
     | '/_authenticated/measurement-credits'
+    | '/_authenticated/measurement-history'
+    | '/_authenticated/pilot-ops'
     | '/_authenticated/profile-coverage'
     | '/_authenticated/questions'
     | '/_authenticated/experiments/$experimentId'
@@ -237,6 +287,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  SampleReportRoute: typeof SampleReportRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -260,6 +311,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sample-report': {
+      id: '/sample-report'
+      path: '/sample-report'
+      fullPath: '/sample-report'
+      preLoaderRoute: typeof SampleReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/businesses': {
@@ -290,6 +348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInsightsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/internal-observation-pipeline': {
+      id: '/_authenticated/internal-observation-pipeline'
+      path: '/internal-observation-pipeline'
+      fullPath: '/internal-observation-pipeline'
+      preLoaderRoute: typeof AuthenticatedInternalObservationPipelineRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/manual-checks': {
       id: '/_authenticated/manual-checks'
       path: '/manual-checks'
@@ -302,6 +367,20 @@ declare module '@tanstack/react-router' {
       path: '/measurement-credits'
       fullPath: '/measurement-credits'
       preLoaderRoute: typeof AuthenticatedMeasurementCreditsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/measurement-history': {
+      id: '/_authenticated/measurement-history'
+      path: '/measurement-history'
+      fullPath: '/measurement-history'
+      preLoaderRoute: typeof AuthenticatedMeasurementHistoryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/pilot-ops': {
+      id: '/_authenticated/pilot-ops'
+      path: '/pilot-ops'
+      fullPath: '/pilot-ops'
+      preLoaderRoute: typeof AuthenticatedPilotOpsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/profile-coverage': {
@@ -368,8 +447,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDataAssetsRoute: typeof AuthenticatedDataAssetsRoute
   AuthenticatedInsightsRoute: typeof AuthenticatedInsightsRoute
+  AuthenticatedInternalObservationPipelineRoute: typeof AuthenticatedInternalObservationPipelineRoute
   AuthenticatedManualChecksRoute: typeof AuthenticatedManualChecksRoute
   AuthenticatedMeasurementCreditsRoute: typeof AuthenticatedMeasurementCreditsRoute
+  AuthenticatedMeasurementHistoryRoute: typeof AuthenticatedMeasurementHistoryRoute
+  AuthenticatedPilotOpsRoute: typeof AuthenticatedPilotOpsRoute
   AuthenticatedProfileCoverageRoute: typeof AuthenticatedProfileCoverageRoute
   AuthenticatedQuestionsRoute: typeof AuthenticatedQuestionsRoute
   AuthenticatedExperimentsExperimentIdRoute: typeof AuthenticatedExperimentsExperimentIdRoute
@@ -385,8 +467,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDataAssetsRoute: AuthenticatedDataAssetsRoute,
   AuthenticatedInsightsRoute: AuthenticatedInsightsRoute,
+  AuthenticatedInternalObservationPipelineRoute:
+    AuthenticatedInternalObservationPipelineRoute,
   AuthenticatedManualChecksRoute: AuthenticatedManualChecksRoute,
   AuthenticatedMeasurementCreditsRoute: AuthenticatedMeasurementCreditsRoute,
+  AuthenticatedMeasurementHistoryRoute: AuthenticatedMeasurementHistoryRoute,
+  AuthenticatedPilotOpsRoute: AuthenticatedPilotOpsRoute,
   AuthenticatedProfileCoverageRoute: AuthenticatedProfileCoverageRoute,
   AuthenticatedQuestionsRoute: AuthenticatedQuestionsRoute,
   AuthenticatedExperimentsExperimentIdRoute:
@@ -405,6 +491,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  SampleReportRoute: SampleReportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,15 +1,14 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { BusinessSelection } from "@/lib/client-business-selection";
+import { TARGET_BUSINESS_STORAGE_PREFIX } from "@/lib/session-privacy";
 
 /**
  * 인증 영역 전체에서 공유되는 "대상 업체 선택" 상태.
  * - org별로 분리해서 저장하고, 다른 org의 businessId는 절대 재사용하지 않는다.
  * - 여기 저장된 id는 신뢰하지 않고, 사용하는 쪽에서 현재 org의 유효한 업체 목록과 대조한다.
  */
-const STORAGE_PREFIX = "ai-visibility-lab.target-business.";
-
 function storageKey(orgId: string) {
-  return `${STORAGE_PREFIX}${orgId}`;
+  return `${TARGET_BUSINESS_STORAGE_PREFIX}${orgId}`;
 }
 
 function readStored(orgId: string): string | null {

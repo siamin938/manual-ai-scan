@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
@@ -6,10 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { canViewDataAssetAdmin } from "@/lib/data-asset-admin.functions";
 import { useOrg } from "@/lib/org";
 
-import {
-  BusinessSelector,
-  useClientBusinessSelection,
-} from "@/components/business-selector";
+import { BusinessSelector, useClientBusinessSelection } from "@/components/business-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -38,11 +41,20 @@ import {
   INTENT_LABELS,
   buildInsertPayloads,
   dedupeForSave,
+  resolveQuestionLocation,
   isAllowedIntent,
   mapSuggestError,
   toCandidates,
   type SuggestionCandidate,
 } from "@/lib/question-suggestions";
+import {
+  UNIFIED_DIAGNOSTIC_SET_PREFIX,
+  buildCustomQuestionSetSignature,
+  buildUnifiedDiagnosticQuestionCandidates,
+  isUnifiedDiagnosticSetName,
+  naturalizeQuestionLocation,
+  validateCustomQuestionInput,
+} from "@/lib/custom-question-suggestions";
 
 export const Route = createFileRoute("/_authenticated/questions")({
   head: () => ({
@@ -50,10 +62,13 @@ export const Route = createFileRoute("/_authenticated/questions")({
       { title: "검색 질문 · 차보임 CHABOIM" },
       {
         name: "description",
-        content: "AI 측정에 사용할 표준 검색 질문을 만들고 확인합니다.",
+        content: "내 업체 AI 진단에 사용할 24개 검색 질문을 만들고 확인합니다.",
       },
       { property: "og:title", content: "검색 질문 · 차보임 CHABOIM" },
-      { property: "og:description", content: "AI 측정에 사용할 표준 검색 질문을 만들고 확인합니다." },
+      {
+        property: "og:description",
+        content: "내 업체 AI 진단에 사용할 24개 검색 질문을 만들고 확인합니다.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -84,7 +99,10 @@ function QuestionsPage() {
 
   const [setId, setSetId] = useState("");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<{ id: string; prompt_text: string }>({ id: "", prompt_text: "" });
+  const [form, setForm] = useState<{ id: string; prompt_text: string }>({
+    id: "",
+    prompt_text: "",
+  });
 
   // --- AI 질문 인벤토리 생성 상태 ---
   const [openConfirmAi, setOpenConfirmAi] = useState(false);
@@ -92,6 +110,17 @@ function QuestionsPage() {
   const [candidates, setCandidates] = useState<SuggestionCandidate[]>([]);
   const [newSetName, setNewSetName] = useState("");
   const [genMode, setGenMode] = useState<"default" | "internal_remeasurement">("default");
+
+  // --- 통합 AI 진단 질문 v0.2: 사용자 확인 입력만 사용, LLM 추론 없음 ---
+  const [openCustom, setOpenCustom] = useState(false);
+  const [openCustomReview, setOpenCustomReview] = useState(false);
+  const [customForm, setCustomForm] = useState({
+    service: "",
+    brandModel: "",
+    customerNeed: "",
+  });
+  const [customCandidates, setCustomCandidates] = useState<SuggestionCandidate[]>([]);
+  const [customSetName, setCustomSetName] = useState("");
 
   const checkInternalAccess = useServerFn(canViewDataAssetAdmin);
   const { data: internalAccess } = useQuery({
@@ -107,20 +136,89 @@ function QuestionsPage() {
   });
   const isInternalOperator = internalAccess === true;
 
-
   const { data: selectedBusiness = null } = useQuery({
     queryKey: ["business-locale", activeOrgId, businessId],
     enabled: !!activeOrgId && !!businessId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("businesses")
-        .select("id, name, region, city")
+        .select("id, name, category, region, city")
         .eq("id", businessId)
         .maybeSingle();
       if (error) throw error;
       return data;
     },
   });
+
+  const diagnosticCoreLocation =
+    selectedBusiness?.region ?? selectedBusiness?.city ?? "";
+  const diagnosticDetailLocation =
+    selectedBusiness?.city ?? selectedBusiness?.region ?? "";
+  const diagnosticCoreLabel = naturalizeQuestionLocation(diagnosticCoreLocation);
+  const diagnosticDetailLabel = naturalizeQuestionLocation(diagnosticDetailLocation);
+  const hasDistinctDiagnosticLocations =
+    !!diagnosticCoreLabel &&
+    !!diagnosticDetailLabel &&
+    diagnosticCoreLabel !== diagnosticDetailLabel;
+
+  const openCustomBuilder = () => {
+    if (!selectedBusiness) {
+      toast.error("업체 정보를 먼저 불러와 주세요.");
+      return;
+    }
+    const hasCity = !!selectedBusiness.city?.trim();
+    const hasRegion = !!selectedBusiness.region?.trim();
+    if (!hasCity && !hasRegion) {
+      toast.error("등록된 지역 정보가 없어 맞춤 질문을 만들 수 없습니다.");
+      return;
+    }
+    setCustomForm({ service: "", brandModel: "", customerNeed: "" });
+    setCustomCandidates([]);
+    setOpenCustom(true);
+  };
+
+  const createCustomCandidates = () => {
+    const businessName = selectedBusiness?.name ?? "";
+    const validation = validateCustomQuestionInput(
+      {
+        location: diagnosticCoreLocation,
+        service: customForm.service,
+        brandModel: customForm.brandModel,
+        customerNeed: customForm.customerNeed,
+      },
+      businessName,
+    );
+
+    if (!validation.ok) {
+      const message =
+        validation.error === "SERVICE_REQUIRED"
+          ? "주력 서비스를 입력해 주세요."
+          : validation.error === "LOCATION_REQUIRED"
+            ? "측정 지역을 확인해 주세요."
+            : validation.error === "BUSINESS_NAME_INCLUDED"
+              ? "맞춤 입력에는 내 업체명을 넣지 말아 주세요."
+              : "입력값이 너무 깁니다. 각 항목은 80자 이내로 입력해 주세요.";
+      toast.error(message);
+      return;
+    }
+
+    const list = buildUnifiedDiagnosticQuestionCandidates(
+      validation.value,
+      businessName,
+      selectedBusiness?.category ?? null,
+      diagnosticDetailLocation,
+    );
+    if (list.length !== 24) {
+      toast.error("AI 진단 질문 24개를 완성하지 못했습니다. 입력값을 확인해 주세요.");
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    setCustomCandidates(list);
+    setCustomSetName(`${UNIFIED_DIAGNOSTIC_SET_PREFIX}${businessName || "업체"} · ${today}`);
+    setOpenCustom(false);
+    setOpenCustomReview(true);
+  };
 
   const { data: sets = [] } = useQuery({
     queryKey: ["question-sets", activeOrgId, businessId],
@@ -131,27 +229,48 @@ function QuestionsPage() {
         .select("id, name, active")
         .eq("org_id", activeOrgId!)
         .eq("business_id", businessId)
+        .eq("active", true)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  const setIds = useMemo(() => sets.map((s) => s.id), [sets]);
+  const currentUnifiedSet =
+    sets.find((set) => isUnifiedDiagnosticSetName(set.name)) ?? null;
+  const legacySets = useMemo(
+    () => sets.filter((set) => !isUnifiedDiagnosticSetName(set.name)),
+    [sets],
+  );
+  const primarySets = useMemo(
+    () => (currentUnifiedSet ? [currentUnifiedSet] : sets),
+    [currentUnifiedSet, sets],
+  );
+  const setIds = useMemo(() => primarySets.map((s) => s.id), [primarySets]);
 
-  /** 선택 업체의 전체 질문 현황(인벤토리 요약용). */
-  const { data: allQuestions = [] } = useQuery({
-    queryKey: ["questions-inventory", activeOrgId, businessId, setIds.join(",")],
-    enabled: !!activeOrgId && setIds.length > 0,
+  const { data: completedUnifiedRun = null } = useQuery({
+    queryKey: ["completed-unified-run", activeOrgId, businessId, currentUnifiedSet?.id],
+    enabled: !!activeOrgId && !!businessId && !!currentUnifiedSet?.id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("questions")
-        .select("id, intent_type, active, data_class, question_set_id")
-        .in("question_set_id", setIds);
+        .from("measurement_runs")
+        .select("id, completed_at")
+        .eq("org_id", activeOrgId!)
+        .eq("business_id", businessId)
+        .eq("question_set_id", currentUnifiedSet!.id)
+        .eq("run_type", "audit")
+        .eq("phase", "standalone")
+        .eq("diagnostic_scope", "customer")
+        .eq("status", "completed")
+        .is("experiment_id", null)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
-      return data ?? [];
+      return data ?? null;
     },
   });
+  const hasCompletedUnifiedRun = !!completedUnifiedRun;
 
   /** 첫 측정이 시작된 질문 세트(UI 잠금 판단용, 읽기 전용). */
   const { data: lockedSetIds = [] } = useQuery({
@@ -189,10 +308,11 @@ function QuestionsPage() {
   });
 
   useEffect(() => {
-    if (setId && !setIds.includes(setId)) setSetId("");
+    if (!setIds.includes(setId)) setSetId(setIds[0] ?? "");
   }, [setId, setIds]);
 
-  const activeQuestions = allQuestions.filter((q) => q.active);
+  const selectedSet = primarySets.find((set) => set.id === setId) ?? null;
+  const activeQuestions = questions.filter((q) => q.active);
   const intentCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const q of activeQuestions) {
@@ -301,6 +421,7 @@ function QuestionsPage() {
       qc.invalidateQueries({ queryKey: ["question-sets", activeOrgId, businessId] });
       qc.invalidateQueries({ queryKey: ["questions-inventory", activeOrgId, businessId] });
       qc.invalidateQueries({ queryKey: ["questions", activeOrgId, res.destSetId] });
+      qc.invalidateQueries({ queryKey: ["current-unified-run", activeOrgId, businessId] });
     },
     onError: (e: Error) => {
       if (e.message === "ALL_DUPLICATE") {
@@ -315,6 +436,130 @@ function QuestionsPage() {
     },
   });
 
+  const saveCustomSuggestions = useMutation({
+    mutationFn: async () => {
+      const selected = customCandidates.filter((candidate) => candidate.selected);
+      if (customCandidates.length !== 24 || selected.length !== 24) {
+        throw new Error("INCOMPLETE_DIAGNOSTIC_SET");
+      }
+      if (!customSetName.trim()) throw new Error("NO_SET_NAME");
+
+      const { kept } = dedupeForSave(selected, []);
+      if (kept.length !== 24) throw new Error("INCOMPLETE_DIAGNOSTIC_SET");
+
+      const region = selectedBusiness?.region ?? null;
+      const city = selectedBusiness?.city ?? null;
+      const selectedSignature = buildCustomQuestionSetSignature(
+        kept.map((candidate) => {
+          const location = resolveQuestionLocation(candidate.promptText, region, city);
+          return {
+            promptText: candidate.promptText,
+            intentType: candidate.intentType,
+            region: location.region,
+            city: location.city,
+          };
+        }),
+      );
+
+      const { data: existingSets, error: existingSetsError } = await supabase
+        .from("question_sets")
+        .select("id, name")
+        .eq("org_id", activeOrgId!)
+        .eq("business_id", businessId)
+        .eq("active", true)
+        .like("name", `${UNIFIED_DIAGNOSTIC_SET_PREFIX}%`);
+      if (existingSetsError) throw existingSetsError;
+
+      const existingSetIds = (existingSets ?? []).map((set) => set.id);
+      if (existingSetIds.length > 0) {
+        const { data: existingQuestions, error: existingQuestionsError } = await supabase
+          .from("questions")
+          .select("question_set_id, prompt_text, intent_type, region, city")
+          .in("question_set_id", existingSetIds)
+          .eq("active", true);
+        if (existingQuestionsError) throw existingQuestionsError;
+
+        const rowsBySet = new Map<
+          string,
+          Array<{
+            promptText: string;
+            intentType: string;
+            region: string | null;
+            city: string | null;
+          }>
+        >();
+        for (const row of existingQuestions ?? []) {
+          const rows = rowsBySet.get(row.question_set_id) ?? [];
+          rows.push({
+            promptText: row.prompt_text,
+            intentType: row.intent_type,
+            region: row.region,
+            city: row.city,
+          });
+          rowsBySet.set(row.question_set_id, rows);
+        }
+
+        const duplicateSet = (existingSets ?? []).find((set) => {
+          const rows = rowsBySet.get(set.id) ?? [];
+          return (
+            rows.length === kept.length &&
+            buildCustomQuestionSetSignature(rows) === selectedSignature
+          );
+        });
+        if (duplicateSet) {
+          return { destSetId: duplicateSet.id as string, inserted: kept.length, reused: true };
+        }
+      }
+
+      const { data, error: setErr } = await supabase
+        .from("question_sets")
+        .insert({
+          org_id: activeOrgId!,
+          business_id: businessId,
+          name: customSetName.trim(),
+        })
+        .select("id")
+        .single();
+      if (setErr) throw setErr;
+      const destSetId = data.id as string;
+
+      const payloads = buildInsertPayloads(kept, {
+        orgId: activeOrgId!,
+        questionSetId: destSetId,
+        region,
+        city,
+      });
+      const { error } = await supabase.from("questions").insert(payloads);
+      if (error) throw error;
+
+      return { destSetId, inserted: kept.length, reused: false };
+    },
+    onSuccess: (res) => {
+      if (res.reused) {
+        toast.success("같은 AI 진단 질문 세트가 이미 있어 기존 세트를 선택했습니다.");
+      } else {
+        toast.success(`AI 진단 질문 ${res.inserted}개를 저장했습니다.`);
+      }
+      setOpenCustomReview(false);
+      setCustomCandidates([]);
+      setSetId(res.destSetId);
+      qc.invalidateQueries({ queryKey: ["question-sets", activeOrgId, businessId] });
+      qc.invalidateQueries({ queryKey: ["questions-inventory", activeOrgId, businessId] });
+      qc.invalidateQueries({ queryKey: ["questions", activeOrgId, res.destSetId] });
+    },
+    onError: (e: Error) => {
+      if (e.message === "INCOMPLETE_DIAGNOSTIC_SET") {
+        toast.error("AI 진단은 24개 질문 전체가 한 세트로 저장되어야 합니다.");
+        return;
+      }
+      if (e.message === "NO_SET_NAME") {
+        toast.error("질문 세트 이름을 입력해 주세요.");
+        return;
+      }
+      toast.error(`AI 진단 질문 저장 실패: ${e.message}`);
+    },
+  });
+
   const candidateIntentCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of candidates) map.set(c.intentType, (map.get(c.intentType) ?? 0) + 1);
@@ -326,7 +571,8 @@ function QuestionsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">검색 질문</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          고객이 AI에 실제로 물어볼 만한 질문을 만들고, 측정에 사용할 질문을 확인합니다.
+          내 업체에서 중요하게 보는 AI 검색을 24개 질문으로 구성하고, 같은 질문 세트로 진단과
+          변화를 확인합니다.
         </p>
       </div>
 
@@ -339,60 +585,121 @@ function QuestionsPage() {
             isLoading={businessSelection.isLoading}
             isError={businessSelection.isError}
           />
-          <div className="ml-auto flex items-center gap-3">
-            {canWrite ? (
-              <>
-                <Button
-                  disabled={!businessId}
-                  onClick={() => {
-                    setGenMode("default");
-                    setOpenConfirmAi(true);
-                  }}
-                >
-                  추천 검색 질문 만들기
-                </Button>
-                {isInternalOperator && (
-                  <Button
-                    variant="outline"
-                    disabled={!businessId}
-                    onClick={() => {
-                      setGenMode("internal_remeasurement");
-                      setOpenConfirmAi(true);
-                    }}
-                  >
-                    최신 Market 질문 새 세트 만들기
-                  </Button>
-                )}
-              </>
-            ) : (
+          {!canWrite && (
+            <div className="ml-auto">
               <Badge variant="secondary">조회 전용 권한</Badge>
-            )}
-          </div>
-
-          <p className="w-full text-xs text-muted-foreground">
-            지역·추천·서비스·후기·신뢰·비교·가격·탐색 등 다양한 상황의 검색 질문 24개를 자동으로 만듭니다.
-          </p>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {canWrite && (
+        <Card className="border-primary/50 shadow-sm">
+          <CardHeader className="space-y-1.5 pb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">내 업체 AI 진단</CardTitle>
+              <Badge>
+                {currentUnifiedSet
+                  ? hasCompletedUnifiedRun
+                    ? "대표 진단 사용 중"
+                    : "첫 측정 필요"
+                  : legacySets.length > 0
+                    ? "새 방식으로 전환"
+                    : "추천"}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {currentUnifiedSet
+                ? "현재 통합 24문항이 이 업체의 새 진단 기준으로 설정되어 있습니다."
+                : "지역 · 주력 서비스 · 중요 브랜드/차종을 반영해 8개 검색 상황별 3개씩 총 24개 질문을 만듭니다."}
+            </p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {currentUnifiedSet
+                ? hasCompletedUnifiedRun
+                  ? "새 통합 진단 결과가 대표 진단으로 사용되고 있습니다. 이전 맞춤·기본 진단 기록은 측정 이력에 그대로 보존됩니다."
+                  : "질문 준비는 완료됐습니다. 첫 통합 측정을 완료하면 새 결과가 대표 진단으로 전환됩니다. 이전 진단 기록은 그대로 보존됩니다."
+                : legacySets.length > 0
+                  ? "기존 맞춤·기본 진단 기록은 삭제되지 않습니다. 통합 24문항을 만들면 이후 새 측정은 이 질문 세트로 진행됩니다."
+                  : "사장님이 직접 확인한 정보만 사용하며, 이 한 세트로 대표 노출·관찰 업체·출처·기간 비교를 확인합니다."}
+            </p>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {currentUnifiedSet ? (
+              <Button asChild>
+                <Link to={hasCompletedUnifiedRun ? "/dashboard" : "/runs"}>
+                  {hasCompletedUnifiedRun ? "AI 노출 진단 보기" : "첫 통합 진단 측정하기"}
+                </Link>
+              </Button>
+            ) : (
+              <Button disabled={!businessId} onClick={openCustomBuilder}>
+                {legacySets.length > 0
+                  ? "통합 AI 진단으로 전환하기"
+                  : "내 업체 AI 진단 24문항 만들기"}
+              </Button>
+            )}
+            {!businessId && (
+              <p className="mt-2 text-xs text-muted-foreground">먼저 업체를 선택해 주세요.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {isInternalOperator && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-4 py-3">
+          <p className="text-xs font-medium text-muted-foreground">운영자 도구</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!businessId}
+              onClick={() => {
+                setGenMode("default");
+                setOpenConfirmAi(true);
+              }}
+            >
+              이전 기본 24문항 만들기
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!businessId}
+              onClick={() => {
+                setGenMode("internal_remeasurement");
+                setOpenConfirmAi(true);
+              }}
+            >
+              최신 Market 질문 새 세트 만들기
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">질문 세트</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">현재 질문 세트</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold tabular-nums">{sets.length}</CardContent>
+          <CardContent>
+            <p className="truncate text-base font-semibold" title={selectedSet?.name ?? undefined}>
+              {selectedSet?.name ?? "선택된 세트 없음"}
+            </p>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">활성 질문</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">질문 수</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold tabular-nums">{activeQuestions.length}</CardContent>
+          <CardContent className="text-2xl font-semibold tabular-nums">
+            {activeQuestions.length}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">질문군</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">검색 상황</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold tabular-nums">{intentCounts.length}</CardContent>
+          <CardContent className="text-2xl font-semibold tabular-nums">
+            {intentCounts.length}
+          </CardContent>
         </Card>
       </div>
 
@@ -403,7 +710,7 @@ function QuestionsPage() {
         <CardContent className="flex flex-wrap gap-2">
           {intentCounts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              아직 질문이 없습니다. 추천 검색 질문 만들기로 시작하세요.
+              질문 세트를 선택하면 검색 상황별 질문 수가 표시됩니다.
             </p>
           ) : (
             intentCounts.map(([intent, count]) => (
@@ -428,7 +735,7 @@ function QuestionsPage() {
                   <SelectValue placeholder="질문 세트 선택" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sets.map((s) => (
+                  {primarySets.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
                     </SelectItem>
@@ -438,6 +745,11 @@ function QuestionsPage() {
             </div>
             {setId && isSetLocked && <Badge variant="outline">측정 기준 고정</Badge>}
           </div>
+          {currentUnifiedSet && legacySets.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              이전 질문 세트 {legacySets.length}개는 과거 측정 이력과 함께 보존되며 새 측정에는 사용되지 않습니다.
+            </p>
+          )}
 
           {setId && (
             <p className="text-xs text-muted-foreground">
@@ -493,7 +805,10 @@ function QuestionsPage() {
                 ))}
                 {questions.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={canWrite ? 5 : 4} className="py-8 text-center text-sm text-muted-foreground">
+                    <TableCell
+                      colSpan={canWrite ? 5 : 4}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
                       질문 세트를 선택하면 질문 목록이 표시됩니다.
                     </TableCell>
                   </TableRow>
@@ -535,7 +850,164 @@ function QuestionsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={openConfirmAi} onOpenChange={(v) => !suggestAi.isPending && setOpenConfirmAi(v)}>
+      <Dialog open={openCustom} onOpenChange={setOpenCustom}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>내 업체 AI 진단 24문항 만들기</DialogTitle>
+            <DialogDescription>
+              AI가 업체 특징을 추측하지 않습니다. 사장님이 확인한 정보만 조합해 24개 진단 질문을
+              만듭니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+              <Label>진단 지역</Label>
+              {hasDistinctDiagnosticLocations ? (
+                <>
+                  <p className="text-sm">
+                    기준 검색 8문항 · <span className="font-medium">{diagnosticCoreLabel}</span>
+                  </p>
+                  <p className="text-sm">
+                    맞춤 검색 16문항 · <span className="font-medium">{diagnosticDetailLabel}</span>
+                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    넓은 시장에서의 노출과 실제 영업 지역에서의 노출을 한 번의 진단으로 함께
+                    확인합니다.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">{diagnosticCoreLabel || diagnosticDetailLabel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    등록된 지역을 24개 질문 전체에 사용합니다.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom-service">주력 서비스</Label>
+              <Input
+                id="custom-service"
+                placeholder="예: 신차패키지, 타이어 교체, 엔진오일"
+                value={customForm.service}
+                onChange={(e) => setCustomForm({ ...customForm, service: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                고객이 실제로 검색할 만한 넓은 서비스 표현을 입력해 주세요. 예: 엔진오일, 튜닝, 신차패키지. ‘튜닝’처럼 단독으로 의미가 넓은 표현은 측정 질문에서 자동차 문맥으로만 보정합니다.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom-brand">중요 브랜드·차종 (선택)</Label>
+              <Input
+                id="custom-brand"
+                placeholder="예: 테슬라, 테슬라 모델Y, 테슬라 모델3"
+                value={customForm.brandModel}
+                onChange={(e) => setCustomForm({ ...customForm, brandModel: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                특정 브랜드·차종 검색까지 확인하고 싶을 때만 입력해 주세요. 여러 개라면 쉼표로 구분하며 최대 4개까지 반영합니다.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom-need">중요 고객 니즈 (선택)</Label>
+              <Input
+                id="custom-need"
+                placeholder="예: 출고 후 한 번에 시공, 주말 상담"
+                value={customForm.customerNeed}
+                onChange={(e) => setCustomForm({ ...customForm, customerNeed: e.target.value })}
+              />
+            </div>
+
+            <div className="rounded-md border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
+              8개 검색 상황마다 3개씩 총 24문항으로 구성합니다. 별도의 기본 질문 세트를 만들
+              필요가 없으며, 내 업체명이 포함된 입력은 차단합니다.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenCustom(false)}>
+              취소
+            </Button>
+            <Button onClick={createCustomCandidates}>24개 질문 검토하기</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openCustomReview}
+        onOpenChange={(value) => !saveCustomSuggestions.isPending && setOpenCustomReview(value)}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>AI 진단 질문 검토 ({customCandidates.length}개)</DialogTitle>
+            <DialogDescription>
+              24개 전체가 하나의 진단 세트로 저장됩니다. 질문 문구를 확인한 뒤 저장하세요.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
+            {hasDistinctDiagnosticLocations ? (
+              <>
+                <p>기준 검색 지역: {diagnosticCoreLabel}</p>
+                <p>맞춤 검색 지역: {diagnosticDetailLabel}</p>
+              </>
+            ) : (
+              <p>지역: {diagnosticCoreLabel || diagnosticDetailLabel}</p>
+            )}
+            <p>서비스: {customForm.service || "-"}</p>
+            {customForm.brandModel && <p>브랜드·차종: {customForm.brandModel}</p>}
+            {customForm.customerNeed && <p>고객 니즈: {customForm.customerNeed}</p>}
+          </div>
+
+          <div className="space-y-1 rounded-md border bg-muted/20 p-3">
+            <p className="text-xs font-medium text-muted-foreground">질문 세트</p>
+            <p className="text-sm font-medium">{customSetName}</p>
+          </div>
+
+          <div className="divide-y rounded-md border">
+            {customCandidates.map((candidate, index) => (
+              <div key={candidate.id} className="flex items-start gap-3 p-3">
+                <span className="mt-0.5 w-6 shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {index + 1}
+                </span>
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm">{candidate.promptText}</p>
+                  <span className="text-xs text-muted-foreground">
+                    {intentLabel(candidate.intentType)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs leading-5 text-muted-foreground">
+            이 24문항이 하나의 AI 진단 기준이 됩니다. 첫 측정을 시작하면 정확한 반복 비교를 위해
+            질문 문구가 고정됩니다.
+          </p>
+
+          <DialogFooter>
+            <Button
+              onClick={() => saveCustomSuggestions.mutate()}
+              disabled={
+                saveCustomSuggestions.isPending ||
+                !customSetName.trim() ||
+                customCandidates.length !== 24
+              }
+            >
+              {saveCustomSuggestions.isPending ? "저장 중…" : "24개 질문 저장"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={openConfirmAi}
+        onOpenChange={(v) => !suggestAi.isPending && setOpenConfirmAi(v)}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -558,22 +1030,33 @@ function QuestionsPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenConfirmAi(false)} disabled={suggestAi.isPending}>
+            <Button
+              variant="outline"
+              onClick={() => setOpenConfirmAi(false)}
+              disabled={suggestAi.isPending}
+            >
               취소
             </Button>
-            <Button onClick={() => suggestAi.mutate()} disabled={suggestAi.isPending || !businessId}>
+            <Button
+              onClick={() => suggestAi.mutate()}
+              disabled={suggestAi.isPending || !businessId}
+            >
               {suggestAi.isPending ? "질문 만드는 중..." : "24개 질문 만들기"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={openReview} onOpenChange={(v) => !saveSuggestions.isPending && setOpenReview(v)}>
+      <Dialog
+        open={openReview}
+        onOpenChange={(v) => !saveSuggestions.isPending && setOpenReview(v)}
+      >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>생성된 질문 검토 ({candidates.length}개)</DialogTitle>
             <DialogDescription>
-              24개 질문은 하나의 표준 질문 세트로 저장됩니다. 문구 수정은 첫 측정 전에 할 수 있습니다.
+              24개 질문은 하나의 표준 질문 세트로 저장됩니다. 문구 수정은 첫 측정 전에 할 수
+              있습니다.
             </DialogDescription>
           </DialogHeader>
 
@@ -603,8 +1086,12 @@ function QuestionsPage() {
                 <div className="flex-1 space-y-1">
                   <p className="text-sm">{c.promptText}</p>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{intentLabel(c.intentType)}</span>
-                    {c.containsBusinessName && <Badge variant="destructive">업체명 포함 · 수정 권장</Badge>}
+                    <span className="text-xs text-muted-foreground">
+                      {intentLabel(c.intentType)}
+                    </span>
+                    {c.containsBusinessName && (
+                      <Badge variant="destructive">업체명 포함 · 수정 권장</Badge>
+                    )}
                   </div>
                 </div>
               </div>

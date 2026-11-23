@@ -276,24 +276,42 @@ describe("Entity Facts v2 priority View Model", () => {
     }
   });
 
-  it("wires only the v2-native priority ViewModel into the dashboard", () => {
+  it("keeps the legacy priority ViewModel isolated while the dashboard uses Action Opportunity v0.1", () => {
     const dashboardSource = readFileSync(
       resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx"),
       "utf8",
     );
     expect(dashboardSource).toContain(
+      'import { buildActionOpportunityEngineV01 } from "@/lib/action-opportunity-engine-v01";',
+    );
+    expect(dashboardSource).toContain(
+      'import { getVerifiedFirstPartySourceTypes } from "@/lib/first-party-source-registry.functions";',
+    );
+    expect(dashboardSource).toContain("<ActionOpportunitySection");
+    expect(dashboardSource).toContain("model={actionOpportunityModel}");
+    expect(dashboardSource).toContain(
+      "evidenceExamples={actionEvidenceExamples}",
+    );
+    expect(dashboardSource).toContain("실제로 비교할 수 있는 같은 채널 사례");
+    expect(dashboardSource).toContain("sameChannelEntityKeys");
+    expect(dashboardSource).toContain("lowValueComparisonSourceDomain(example.domain)");
+    expect(dashboardSource).toContain(
+      "!sameChannelEntityKeys.has(normalizeQuestion(example.entityName))",
+    );
+    expect(dashboardSource).toContain("dedupedEvidenceExamples.length > 0");
+    expect(dashboardSource).toContain(
+      "위 동일 채널 사례와 겹치지 않는 다른 업체 사례만 표시합니다.",
+    );
+    expect(dashboardSource).toContain("실제 페이지 보기 ↗");
+    expect(dashboardSource).toContain("확인해볼 차이");
+    expect(dashboardSource).not.toContain("<CurrentRunReferenceSection");
+    expect(dashboardSource).not.toContain("MeasurementStatusBar");
+    expect(dashboardSource).toContain("SearchContextChart");
+    expect(dashboardSource).toContain("BenchmarkCard");
+    expect(dashboardSource).not.toContain(
       'import { buildEntityFactsV2PriorityViewModel } from "@/lib/entity-facts-v2-priority.viewmodel";',
     );
-    expect(dashboardSource).toContain(
-      "const priorityModel = dto ? buildEntityFactsV2PriorityViewModel(dto) : null;",
-    );
-    expect(dashboardSource).toContain(
-      "<PrioritySection model={priorityModel} />",
-    );
-    expect(dashboardSource).toContain("model.heading");
-    expect(dashboardSource).toContain("왜 먼저 보나요?");
-    expect(dashboardSource).toContain("무엇을 확인하면 되나요?");
-    expect(dashboardSource).not.toContain("ActionRecommendationsSection");
+    expect(dashboardSource).not.toContain("<PrioritySection");
     expect(dashboardSource).not.toContain("getActionRecommendations");
     expect(dashboardSource).not.toContain("visibility-actions");
     expect(dashboardSource).not.toContain("was_client_mentioned");

@@ -1,7 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  clearStoredTargetBusinessSelections,
+  shouldDiscardCustomerState,
+} from "@/lib/session-privacy";
 
 export type AppRole = "owner" | "admin" | "analyst" | "client_viewer";
 
@@ -25,17 +29,59 @@ type OrgContextValue = {
 const OrgContext = createContext<OrgContextValue | null>(null);
 
 export function useSession() {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setReady(true);
+    let disposed = false;
+    let eventRevision = 0;
+    let previousUserId: string | null = null;
+
+    const acceptSession = (event: string, nextSession: Session | null) => {
+      if (disposed) return;
+      const nextUserId = nextSession?.user.id ?? null;
+
+      if (shouldDiscardCustomerState(event, previousUserId, nextUserId)) {
+        // Clear tenant data before updating the visible identity. A new user
+        // must never inherit the previous user's React Query result cache.
+        queryClient.clear();
+        if (typeof window !== "undefined") {
+          try {
+            clearStoredTargetBusinessSelections(window.localStorage);
+          } catch {
+            // Disabled storage must never prevent logging out.
+          }
+        }
+      }
+
+      previousUserId = nextUserId;
+      setSession(nextSession);
+    };
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      eventRevision += 1;
+      acceptSession(event, s);
     });
-    return () => sub.subscription.unsubscribe();
-  }, []);
+
+    // The initial read may finish AFTER an auth event in another tab. Never
+    // reapply that older session over an already-observed SIGNED_OUT/IN event.
+    const initialRevision = eventRevision;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (disposed) return;
+      if (eventRevision === initialRevision) {
+        acceptSession("INITIAL_READ", data.session);
+      }
+      setReady(true);
+    }).catch(() => {
+      if (!disposed) setReady(true);
+    });
+
+    return () => {
+      disposed = true;
+      sub.subscription.unsubscribe();
+    };
+  }, [queryClient]);
 
   return { session, ready };
 }

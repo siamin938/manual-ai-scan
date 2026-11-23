@@ -37,7 +37,8 @@
   - 프론트 구조 변경
   - 타입체크 / 테스트 / 빌드
   - GitHub diff/commit 단위로 검수해야 하는 큰 코드 작업
-- Lovable은 UI/프론트 작업 중 Lovable에서 처리하는 편이 더 단순하거나 Preview 확인이 중요한 경우에만 최소 사용합니다.
+- 진단 로직, 집계, 데이터 연결과 코드 수정은 Codex가 GitHub에서 직접 구현하고 검증합니다. Lovable에는 디자인, 간단한 화면 수정과 미리보기 확인을 맡깁니다.
+- 미리보기 적용 전에는 Lovable의 현재 커밋과 연결된 GitHub 브랜치를 대조합니다. 공개 사이트 발행은 별도 요청이 있을 때 진행합니다.
 - GitHub는 ChatGPT와 Codex가 공유하는 코드 기준점입니다. Codex가 실제 코드 작업을 완료하면 GitHub의 diff/commit을 기준으로 ChatGPT가 검수할 수 있어야 합니다.
 - Codex는 모든 요청을 자신이 직접 처리해야 한다고 가정하지 않습니다. Supabase 직접 작업이나 Lovable 직접 작업이 더 안전하고 단순한 경우, 그 이유와 권장 경로를 보고합니다.
 - 사용자가 도구 선택을 묻지 않았는데 기술 스택 선택을 사용자에게 떠넘기지 않습니다.
@@ -254,6 +255,26 @@ Lovable 작업 후:
 - diff를 직접 검토합니다.
 - `src/integrations/supabase/types.ts`에 요청과 무관한 자동 포맷 변경이 생기면 직전 정상 내용과 비교해 불필요한 diff를 제거합니다.
 
+### Preview Runtime Gate
+
+GitHub 변경이 Lovable Preview에 동기화된 뒤에는 **Preview가 `ready`라는 상태만으로 QA 완료로 보지 않습니다.**
+최근 Preview 프로세스 재생성 시 `SUPABASE_SERVICE_ROLE_KEY`가 누락되어 서버 함수가 실패한 사례가 반복 확인됐으므로, 다음 순서를 고정합니다.
+
+1. Lovable Preview가 최신 GitHub commit SHA까지 동기화됐는지 확인합니다.
+2. Preview/Vite 프로세스에 `SUPABASE_SERVICE_ROLE_KEY`가 **존재하는지만** 확인합니다. 값 자체는 절대 출력하거나 로그에 남기지 않습니다.
+3. 키가 누락됐으면 소스/DB를 수정하지 말고 Supabase secrets를 다시 연결한 뒤 **Preview 서버만 재시작**합니다.
+4. 재시작 후 새 Preview/Vite 프로세스에서 키 존재 여부를 다시 확인합니다.
+5. `/dashboard`가 200인지 확인하고, 새 서버 로그에
+   `Missing Supabase environment variable(s): SUPABASE_SERVICE_ROLE_KEY`
+   가 다시 발생하지 않는지 확인합니다.
+6. 위 Gate를 통과한 뒤에만 실제 화면 QA를 사용자에게 요청합니다.
+
+추가 원칙:
+- Preview Runtime Gate 복구는 코드 수정이 아닙니다. 환경변수 재연결과 Preview 서버 재시작만 수행합니다.
+- 이 복구를 위해 Publish/Deploy, DB/Edge 변경, 새 Git commit을 만들지 않습니다.
+- GitHub 변경 직후 Preview가 재생성된 경우에는 **항상** 이 Gate를 다시 실행합니다.
+- 동일 증상(`진단 요청이 실패했습니다`, `The app encountered an error`)이 나오면 먼저 런타임 키 누락 여부를 확인하고, 앱 로직을 추측해서 수정하지 않습니다.
+
 ## 14. 배포 / 보안
 
 - 기본 작업 범위는 Preview까지입니다.
@@ -276,8 +297,9 @@ Lovable 작업 후:
 7. UI가 필요한 경우에만 프론트를 최소 수정합니다.
 8. 요청 밖 파일 변경 여부를 diff로 확인합니다.
 9. 타입체크·테스트·빌드를 실행합니다.
-10. Preview까지만 반영합니다.
-11. 프로덕션은 별도 승인을 받습니다.
+10. Preview가 최신 commit을 받은 뒤 **Preview Runtime Gate**를 통과시킵니다.
+11. Runtime Gate 통과 후 실제 화면 QA를 진행합니다.
+12. 프로덕션은 별도 승인을 받습니다.
 
 ## 16. 문서 우선순위
 

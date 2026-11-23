@@ -189,6 +189,7 @@ Deno.serve(async (request) => {
     return json({ ok: false, error: "INVALID_REQUEST" }, 400);
   }
   const runId = body.runId.trim();
+  const refreshRequested = body.refresh === true;
 
   const { data: contextRaw, error: contextError } = await db.rpc(
     "get_entity_facts_v2_runtime_context_v01",
@@ -211,10 +212,24 @@ Deno.serve(async (request) => {
   }
 
   try {
+    const existingIsFullyMaterialized =
+      context.existing.measurementFactCount === context.dataset.rows.length &&
+      context.existing.aggregateRowCount === 1 &&
+      context.existing.observedSourceRowCount === 1 &&
+      context.existing.competitorSourceClueRowCount === 1;
+    const buildExisting = refreshRequested && existingIsFullyMaterialized
+      ? {
+        measurementFactCount: 0,
+        aggregateRowCount: 0,
+        observedSourceRowCount: 0,
+        competitorSourceClueRowCount: 0,
+      }
+      : context.existing;
+
     const result = await buildEntityFactsV2RuntimeMaterialization({
       dataset: context.dataset,
       run: context.run,
-      existing: context.existing,
+      existing: buildExisting,
       materializationId: crypto.randomUUID(),
     });
 
@@ -228,8 +243,12 @@ Deno.serve(async (request) => {
       });
     }
 
+    const refreshExisting = refreshRequested && existingIsFullyMaterialized;
+    const writeRpc = refreshExisting
+      ? "refresh_entity_facts_v2_runtime_materialization_v01"
+      : "commit_entity_facts_v2_runtime_materialization_v01";
     const { data: commitResult, error: commitError } = await db.rpc(
-      "commit_entity_facts_v2_runtime_materialization_v01",
+      writeRpc,
       {
         p_run_id: result.runId,
         p_materialization_id: result.materializationId,
@@ -254,6 +273,7 @@ Deno.serve(async (request) => {
     return json({
       ok: true,
       idempotent,
+      refreshed: refreshExisting,
       runId: result.runId,
       engineVersion: result.engineVersion,
       measurementFactCount: result.measurementRows.length,

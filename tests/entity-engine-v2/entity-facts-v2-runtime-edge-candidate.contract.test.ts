@@ -250,6 +250,10 @@ describe("Entity Facts v2 runtime Edge candidate contract", () => {
     expect(source).toContain(
       '"commit_entity_facts_v2_runtime_materialization_v01"',
     );
+    expect(source).toContain(
+      '"refresh_entity_facts_v2_runtime_materialization_v01"',
+    );
+    expect(source).toContain("body.refresh === true");
     expect(source).toContain("buildEntityFactsV2RuntimeMaterialization");
     expect(source).not.toMatch(
       /\.from\("(?:measurement_entity_facts_v2|run_entity_fact_aggregates_v2|run_observed_source_aggregates_v2|run_competitor_source_clue_aggregates_v2)"\)\.insert/gu,
@@ -281,6 +285,10 @@ describe("Entity Facts v2 runtime Edge candidate contract", () => {
 
     expect(rpcSql).toContain("pg_advisory_xact_lock");
     expect(rpcSql).toContain("RUNTIME_V2_PARTIAL_EXISTING_STATE");
+    expect(rpcSql).toContain("refresh_entity_facts_v2_runtime_materialization_v01");
+    expect(rpcSql).toContain("RUNTIME_V2_REFRESH_REQUIRES_FULL_EXISTING_STATE");
+    expect(rpcSql).not.toContain("DELETE FROM public.measurement_entity_facts_v2");
+    expect(rpcSql).not.toContain("max(materialization_id)");
     expect(rpcSql).toContain("RUNTIME_V2_POSTPROCESS_NOT_READY");
     expect(rpcSql).toContain("RUNTIME_V2_CITATION_ATTRIBUTION_NOT_READY");
     expect(rpcSql).toContain(

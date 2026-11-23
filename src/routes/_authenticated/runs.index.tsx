@@ -8,6 +8,7 @@ import { useActiveTargetBusiness } from "@/lib/active-business";
 import { formatSeoul } from "@/lib/format";
 import { startCustomerMeasurement } from "@/lib/customer-measurement.functions";
 import { customerErrorMessage } from "@/lib/customer-measurement.helpers";
+import { isUnifiedDiagnosticSetName } from "@/lib/custom-question-suggestions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,12 +76,61 @@ export function runStatusVariant(status: string): "default" | "secondary" | "des
   return "secondary";
 }
 
+type RunQuestionSet = { id: string; name: string };
+export type RunQuestionSetKind = "unified" | "custom" | "baseline" | "other";
+
+/** v0.1 naming convention: 이 접두사로 생성된 세트만 맞춤 질문으로 구분한다. */
+const CUSTOM_QUESTION_SET_PREFIX = "맞춤 질문 · ";
+
+export function isCustomRunQuestionSet(name: string): boolean {
+  return name.startsWith(CUSTOM_QUESTION_SET_PREFIX);
+}
+
+export function choosePreferredRunQuestionSetId(sets: RunQuestionSet[]): string {
+  return (
+    sets.find((set) => isUnifiedDiagnosticSetName(set.name))?.id ??
+    sets.find((set) => isCustomRunQuestionSet(set.name))?.id ??
+    sets[0]?.id ??
+    ""
+  );
+}
+
+export function selectCustomerRunQuestionSets<T extends RunQuestionSet>(sets: readonly T[]): T[] {
+  const newestUnifiedSet = sets.find((set) => isUnifiedDiagnosticSetName(set.name));
+  return newestUnifiedSet ? [newestUnifiedSet] : [...sets];
+}
+
+export function getRunQuestionSetKind(name: string, activeCount: number): RunQuestionSetKind {
+  if (isUnifiedDiagnosticSetName(name) && activeCount === 24) return "unified";
+  if (isCustomRunQuestionSet(name)) return "custom";
+  if (activeCount === 24) return "baseline";
+  return "other";
+}
+
+/** 진단 유형별 자동 측정명 접미사. 신규 unified가 기본 고객 경로다. */
+export function formatAutoRunName(
+  businessName: string,
+  kind: RunQuestionSetKind,
+  date: string,
+): string {
+  const label =
+    kind === "unified"
+      ? "AI 진단"
+      : kind === "custom"
+        ? "맞춤 진단"
+        : kind === "baseline"
+          ? "기본 진단"
+          : "측정";
+  return `${businessName} ${label} ${date}`;
+}
+
 type RunRow = {
   id: string;
   name: string;
   run_type: string;
   phase: string;
   business_id: string;
+  question_set_id: string;
   status: string;
   total_jobs: number;
   completed_jobs: number;
@@ -95,11 +145,11 @@ function RunsPage() {
     queryKey: ["runs", activeOrgId],
     enabled: !!activeOrgId,
     queryFn: async () => {
-      const [runs, biz] = await Promise.all([
+      const [runs, biz, questionSets] = await Promise.all([
         supabase
           .from("measurement_runs")
           .select(
-            "id, name, business_id, status, run_type, phase, total_jobs, completed_jobs, failed_jobs, created_at",
+            "id, name, business_id, question_set_id, status, run_type, phase, total_jobs, completed_jobs, failed_jobs, created_at",
           )
           .eq("org_id", activeOrgId!)
           .eq("run_type", "audit")
@@ -107,11 +157,16 @@ function RunsPage() {
           .order("created_at", { ascending: false })
           .limit(100),
         supabase.from("businesses").select("id, name").eq("org_id", activeOrgId!),
+        supabase.from("question_sets").select("id, name").eq("org_id", activeOrgId!),
       ]);
       if (runs.error) throw runs.error;
       if (biz.error) throw biz.error;
+      if (questionSets.error) throw questionSets.error;
       const names = new Map((biz.data ?? []).map((b) => [b.id, b.name]));
-      return { runs: (runs.data ?? []) as unknown as RunRow[], names };
+      const questionSetNames = new Map(
+        (questionSets.data ?? []).map((set) => [set.id, set.name]),
+      );
+      return { runs: (runs.data ?? []) as unknown as RunRow[], names, questionSetNames };
     },
   });
 
@@ -159,7 +214,10 @@ function RunsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {runsQuery.data!.runs.map((r) => (
+                  {runsQuery.data!.runs.map((r) => {
+                    const questionSetName = runsQuery.data!.questionSetNames.get(r.question_set_id);
+                    const kind = getRunQuestionSetKind(questionSetName ?? "", r.total_jobs);
+                    return (
                     <TableRow key={r.id}>
                       <TableCell>
                         <Link
@@ -169,6 +227,33 @@ function RunsPage() {
                         >
                           {r.name}
                         </Link>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <Badge
+                            variant={
+                              kind === "unified"
+                                ? "default"
+                                : kind === "baseline"
+                                  ? "outline"
+                                  : "secondary"
+                            }
+                          >
+                            {kind === "unified"
+                              ? "AI 진단"
+                              : kind === "custom"
+                                ? "이전 맞춤 진단"
+                                : kind === "baseline"
+                                  ? "이전 기본 진단"
+                                  : "일반 측정"}
+                          </Badge>
+                          {kind === "unified" ? (
+                            <span className="text-xs text-muted-foreground">대표 진단</span>
+                          ) : kind === "baseline" ? (
+                            <span className="text-xs text-muted-foreground">이전 비교 기준</span>
+                          ) : null}
+                        </div>
+                        {questionSetName ? (
+                          <p className="mt-1 text-xs text-muted-foreground">질문 세트 · {questionSetName}</p>
+                        ) : null}
                       </TableCell>
                       <TableCell>{runsQuery.data!.names.get(r.business_id) ?? "-"}</TableCell>
                       <TableCell>
@@ -176,14 +261,15 @@ function RunsPage() {
                           {RUN_STATUS_LABELS[r.status] ?? r.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{r.total_jobs}</TableCell>
+                      <TableCell className="text-right">{r.total_jobs}문항</TableCell>
                       <TableCell className="text-right">{r.completed_jobs}</TableCell>
                       <TableCell className="text-right">{r.failed_jobs}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatSeoul(r.created_at)}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -204,6 +290,13 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
   const [businessId, setBusinessId] = useState("");
   const [questionSetId, setQuestionSetId] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  /** 사용자가 측정명을 직접 수정했는지 여부. true면 세트/업체 변경 시 자동 이름으로 덮어쓰지 않는다. */
+  const [nameTouched, setNameTouched] = useState(false);
+
+  /** Dialog를 새로 열 때 자동 이름 상태를 초기화한다. */
+  useEffect(() => {
+    if (open) setNameTouched(false);
+  }, [open]);
 
   const meta = useQuery({
     queryKey: ["run-form-meta", activeOrgId],
@@ -253,17 +346,68 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     },
   });
 
-  const sets = (meta.data?.sets ?? []).filter((s) => s.business_id === businessId);
+  const businessSets = useMemo(
+    () => (meta.data?.sets ?? []).filter((s) => s.business_id === businessId),
+    [meta.data?.sets, businessId],
+  );
+  /**
+   * 통합 24문항 세트가 생긴 업체는 고객 측정 경로를 그 세트 하나로 수렴시킨다.
+   * 과거 맞춤/기본 세트는 측정 이력에서만 보존한다.
+   */
+  const sets = useMemo(
+    () => selectCustomerRunQuestionSets(businessSets),
+    [businessSets],
+  );
   const selectedBusinessName = (meta.data?.businesses ?? []).find((b) => b.id === businessId)?.name ?? "";
 
-  /** 측정명 기본값 제안: 업체명 + 날짜. 사용자가 직접 수정할 수 있다. */
+  /** 조회 결과는 최신순이다. 같은 업체의 수동 선택은 유지하고, 새 업체는 통합 AI 진단 세트를 최우선한다. */
   useEffect(() => {
-    if (!selectedBusinessName) return;
-    const suggestion = `${selectedBusinessName} 측정 ${new Date().toISOString().slice(0, 10)}`;
-    setName((prev) => (prev.trim() ? prev : suggestion));
-  }, [selectedBusinessName]);
+    if (!open || !businessId || sets.length === 0) return;
+    setQuestionSetId((current) =>
+      sets.some((set) => set.id === current) ? current : choosePreferredRunQuestionSetId(sets),
+    );
+  }, [open, businessId, sets]);
+
+  /** 업체가 바뀌면 새 업체 기준 자동 이름으로 다시 제안할 수 있도록 수동 수정 상태를 초기화한다. */
+  useEffect(() => {
+    setNameTouched(false);
+  }, [businessId]);
 
   const activeCount = questions.data?.length ?? 0;
+  const selectedSet = sets.find((set) => set.id === questionSetId);
+  const selectedSetKind = selectedSet
+    ? getRunQuestionSetKind(selectedSet.name, activeCount)
+    : "other";
+  const selectedSetPresentation =
+    selectedSetKind === "unified"
+      ? {
+          badge: "대표 진단",
+          description: "내 업체에 맞춘 24개 AI 진단 질문으로 측정합니다.",
+          type: "내 업체 AI 진단",
+        }
+      : selectedSetKind === "custom"
+        ? {
+            badge: "이전 방식",
+            description: "이전에 만든 맞춤 8문항 세트로 측정합니다.",
+            type: "이전 맞춤 진단",
+          }
+        : selectedSetKind === "baseline"
+          ? {
+              badge: "이전 방식",
+              description: "이전에 만든 기본 24문항 세트로 측정합니다.",
+              type: "이전 기본 진단",
+            }
+          : {
+              badge: "질문 세트",
+              description: "선택한 질문 세트로 측정합니다.",
+              type: "선택 질문 세트",
+            };
+
+  /** 자동 측정명 제안: 사용자가 직접 수정하기 전까지 선택한 진단 유형에 맞춰 갱신한다. */
+  useEffect(() => {
+    if (nameTouched || !selectedBusinessName) return;
+    setName(formatAutoRunName(selectedBusinessName, selectedSetKind, new Date().toISOString().slice(0, 10)));
+  }, [nameTouched, selectedBusinessName, selectedSetKind]);
 
   /** 측정권 잔여 조회. 로딩/조회 실패는 0회로 오인하지 않도록 null로 둔다. */
   const credit = useQuery({
@@ -288,7 +432,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
     if (!questionSetId) list.push("질문 세트를 선택하세요.");
     if (questionSetId && !questions.isLoading && activeCount === 0)
       list.push("측정할 활성 질문이 없습니다.");
-    if (creditBalance !== null && creditBalance < 1) list.push("AI 노출 측정권이 없습니다.");
+    if (creditBalance !== null && creditBalance < 1) list.push("AI 노출 측정권이 없습니다. 차보임 운영자에게 측정권을 요청해 주세요.");
     return list;
   }, [session, businessId, questionSetId, activeCount, questions.isLoading, creditBalance]);
 
@@ -331,7 +475,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
         <DialogHeader>
           <DialogTitle>새 측정 시작</DialogTitle>
           <DialogDescription>
-            AI가 같은 질문으로 시장의 추천·경쟁업체·출처를 확인합니다.
+            선택한 질문 세트로 AI 노출을 측정합니다. 새 통합 24문항 세트가 대표 진단 기준입니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -341,7 +485,10 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
             <Input
               id="run-name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setNameTouched(true);
+                setName(e.target.value);
+              }}
               placeholder="예: 판교 매장 8월 측정"
             />
           </div>
@@ -378,13 +525,24 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               <SelectContent>
                 {sets.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.name}
+                    {s.name}{" "}
+                    {isUnifiedDiagnosticSetName(s.name)
+                      ? "(대표 진단)"
+                      : isCustomRunQuestionSet(s.name)
+                        ? "(이전 맞춤)"
+                        : "(이전 기본/기타)"}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {questionSetId && (
-              <p className="text-xs text-muted-foreground">활성 질문 {activeCount}개</p>
+              <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+                <Badge variant={selectedSetKind === "unified" ? "default" : "outline"}>
+                  {selectedSetPresentation.badge}
+                </Badge>
+                <p className="text-sm text-foreground">{selectedSetPresentation.description}</p>
+                <p className="text-xs text-muted-foreground">활성 질문 {activeCount}개</p>
+              </div>
             )}
           </div>
 
@@ -394,8 +552,8 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
               <span className="font-medium">{activeCount}개</span>
             </div>
             <div className="mt-1 flex justify-between">
-              <span className="text-muted-foreground">측정 방식</span>
-              <span className="font-medium">기본 측정</span>
+              <span className="text-muted-foreground">진단 유형</span>
+              <span className="font-medium">{selectedSetPresentation.type}</span>
             </div>
             <div className="mt-1 flex justify-between">
               <span className="text-muted-foreground">차감 예정 측정권</span>
@@ -423,7 +581,7 @@ function NewRunDialog({ onCreated }: { onCreated: () => void }) {
           )}
 
           <p className="text-xs text-muted-foreground">
-            같은 조건으로 다시 시작해도 중복 측정은 생성되지 않습니다.
+            같은 조건의 최근 측정이 이미 준비·진행 중이면 해당 측정을 이어서 사용합니다.
           </p>
         </div>
 

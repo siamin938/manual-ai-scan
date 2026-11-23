@@ -3,6 +3,7 @@ export const ENTITY_FACTS_V2_READ_FACT_VERSION = "0.3" as const;
 export const ENTITY_FACTS_V2_READ_AGGREGATE_VERSION = "0.1" as const;
 export const ENTITY_FACTS_V2_READ_ENGINE_VERSION =
   "entity-facts-v2:mef0.3:hist0.1:te0.3:src0.1:agg0.1:mat0.1" as const;
+export const ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION = "0.1.1" as const;
 
 export type EntityFactsV2ReadError =
   | "FORBIDDEN"
@@ -53,6 +54,55 @@ export type EntityFactsV2ReadCompetitorDTO = {
   top3ResponseCount: number;
 };
 
+
+export type EntityFactsV2ReadBroadSearchSourceDTO = {
+  domain: string;
+  responseCount: number;
+  directAttributionCount: number;
+};
+
+export type EntityFactsV2ReadBroadSearchSourcePatternDTO = {
+  key:
+    | "independent_web"
+    | "shared_profile"
+    | "community"
+    | "auto_platform"
+    | "video_platform"
+    | "news"
+    | "job_board"
+    | "public_information"
+    | "brand_or_manufacturer"
+    | "marketplace_or_directory";
+  label: string;
+  competitorCount: number;
+};
+
+export type EntityFactsV2ReadBroadSearchCompetitorDTO = {
+  name: string;
+  responseCount: number;
+  questionCount: number;
+  intentCount: number;
+  top3ResponseCount: number;
+  strongestIndependentSource: EntityFactsV2ReadBroadSearchSourceDTO | null;
+};
+
+export type EntityFactsV2ReadBroadSearchObservationDTO = {
+  version: "0.2";
+  validCount: number;
+  targetConfirmedCount: number;
+  targetTop3Count: number;
+  targetIndependentSourceResponseCount: number;
+  targetIndependentSources: EntityFactsV2ReadBroadSearchSourceDTO[];
+  repeatedCompetitors: EntityFactsV2ReadBroadSearchCompetitorDTO[];
+  singleObservationCompetitors: EntityFactsV2ReadBroadSearchCompetitorDTO[];
+  observedCompetitorCount: number;
+  independentWebLinkedCompetitorCount: number;
+  repeatedIndependentWebLinkedCompetitorCount: number;
+  sourcePatterns: EntityFactsV2ReadBroadSearchSourcePatternDTO[];
+  /** Saved citations in valid broad answers, independent of confirmed business identity. */
+  citedPages?: import("./diagnostic-source-links").CitedPage[];
+};
+
 export type EntityFactsV2ReadTargetSourceDTO = {
   domain: string;
   responseCount: number;
@@ -77,6 +127,36 @@ export type EntityFactsV2ReadObservedSourceDTO = {
   linkedEntities: EntityFactsV2ReadObservedSourceEntityDTO[];
 };
 
+export type EntityFactsV2ReadCitationSourceDTO = {
+  domain: string;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+};
+
+export type EntityFactsV2ReadTargetReferenceSourceDTO = {
+  domain: string;
+  responseCount: number;
+  sampleUrl: string;
+};
+
+export type EntityFactsV2ReadTargetExposureCitationSourceDTO = {
+  domain: string;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+};
+
+export type EntityFactsV2ReadVerifiedTargetCitationPageDTO = {
+  domain: string;
+  title: string | null;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+  confidence: "high" | "medium";
+  basisLabel: string;
+};
+
 export type EntityFactsV2ReadObservedSourcesStatus =
   | "available"
   | "not_materialized";
@@ -92,6 +172,9 @@ export type EntityFactsV2ReadBusinessDTO = {
 export type EntityFactsV2ReadScopeDTO = {
   runId: string;
   runName: string;
+  /** Optional metadata for legacy snapshot compatibility. */
+  questionSetId?: string | undefined;
+  questionSetName?: string | undefined;
   measuredAt: string;
   providers: string[];
   repetitions: number;
@@ -100,16 +183,63 @@ export type EntityFactsV2ReadScopeDTO = {
   failedJobs: number;
 };
 
+export type EntityFactsV2ReadQuestionLocationDTO = {
+  questionId: string;
+  city: string | null;
+};
+
+export type EntityFactsV2ReadVerifiedTargetCitationPageStatus =
+  | "complete"
+  | "pending"
+  | "not_verified";
+
 export type EntityFactsV2ReadGatewayDTO = {
+  websiteLaunch?: import("./reviewed-website-launch").ReviewedWebsiteLaunch;
   gatewayVersion: typeof ENTITY_FACTS_V2_READ_GATEWAY_VERSION;
   generatedAt: string;
   business: EntityFactsV2ReadBusinessDTO;
   scope: EntityFactsV2ReadScopeDTO;
+  /** Optional supplemental metadata. Missing data must never block the core dashboard. */
+  questionLocations?: EntityFactsV2ReadQuestionLocationDTO[];
   overview: EntityFactsV2ReadOverviewDTO;
   questionGroups: EntityFactsV2ReadQuestionGroupDTO[];
   questionAreas: EntityFactsV2ReadQuestionAreaDTO[];
+  /**
+   * Customer-visible confirmed competitor rows. The server may append the
+   * exact-run cross-response supplement after the core v2 snapshot is built.
+   */
   competitors: EntityFactsV2ReadCompetitorDTO[];
+  /**
+   * Read-only comparison inside the wide Core search layer. This summarizes
+   * repeated confirmed competitors and co-observed independent web sources.
+   * It is descriptive evidence only and never changes target visibility truth.
+   */
+  broadSearchObservation?: EntityFactsV2ReadBroadSearchObservationDTO;
   targetSources: EntityFactsV2ReadTargetSourceDTO[];
+  /** Supplemental final-answer citation summary for the exact representative run. */
+  citationSources?: EntityFactsV2ReadCitationSourceDTO[];
+  /**
+   * Advisory target-link clues from close section-level citation attribution that
+   * did not satisfy the repeated-evidence promotion rule. Never treat as confirmed.
+   */
+  targetReferenceSources?: EntityFactsV2ReadTargetReferenceSourceDTO[];
+  /**
+   * Final-answer citations observed specifically inside measurements where v2
+   * confirmed targetSeen=true. This is co-observation only, not target attribution.
+   */
+  targetExposureCitationSources?: EntityFactsV2ReadTargetExposureCitationSourceDTO[];
+  /**
+   * Cited pages whose own page-level content was independently confirmed to
+   * concern the current target business. Advisory only; never changes v2 truth.
+   */
+  verifiedTargetCitationPages?: EntityFactsV2ReadVerifiedTargetCitationPageDTO[];
+  /**
+   * Lifecycle of page-level citation verification for this exact representative Run.
+   * - complete: verifier completed; rows may legitimately be empty
+   * - pending: verifier was triggered but has not completed yet
+   * - not_verified: this Run has no verifier trigger (typically a pre-feature legacy Run)
+   */
+  verifiedTargetCitationPageStatus?: EntityFactsV2ReadVerifiedTargetCitationPageStatus;
   observedSourcesStatus: EntityFactsV2ReadObservedSourcesStatus;
   observedSources: EntityFactsV2ReadObservedSourceDTO[];
 };
@@ -137,6 +267,35 @@ function normalizeCompetitorDisplaySurface(value: string): string {
     .replace(/[^0-9a-z가-힣]/giu, "");
 }
 
+function normalizeCompetitorDisplaySurfaceWithoutCorporateMarker(
+  value: string,
+): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/(?:\(주\)|주식회사)/gu, "")
+    .replace(/[^0-9a-z가-힣]/giu, "");
+}
+
+/**
+ * Mirrors the persisted canonicalization brand-core rule used by
+ * get_auto_business_brand_core_v01. This is intentionally used only for
+ * priority-1 canonical_display_name evidence that is already bound to the
+ * exact canonical_key in storage. Weaker mention/alias evidence remains
+ * exact-surface only.
+ */
+function normalizePersistedCanonicalBrandCoreSurface(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/(?:\(주\)|주식회사)/gu, "")
+    .replace(/[^0-9a-z가-힣]/giu, "")
+    .replace(
+      /(?:ppf|필름|랩핑|래핑|썬팅|틴팅|tinting|tint|wrapping|wrap|디테일링|코팅|세차)$/iu,
+      "",
+    );
+}
+
 function autoCanonicalSurface(value: string): string | null {
   const key = value.trim();
   if (!key.startsWith("auto:")) return null;
@@ -159,11 +318,22 @@ export function pickEntityFactsV2AutoCompetitorDisplayName(
   const counts = new Map<string, { label: string; priority: number; count: number }>();
   for (const item of evidence) {
     const label = typeof item.label === "string" ? item.label.trim() : "";
+    const normalizedLabel = normalizeCompetitorDisplaySurface(label);
+    const normalizedWithoutCorporateMarker =
+      normalizeCompetitorDisplaySurfaceWithoutCorporateMarker(label);
+
+    const persistedCanonicalBrandCore =
+      item.priority === 1
+        ? normalizePersistedCanonicalBrandCoreSurface(label)
+        : null;
+
     if (
       !label ||
       !Number.isInteger(item.priority) ||
       item.priority < 1 ||
-      normalizeCompetitorDisplaySurface(label) !== expectedSurface
+      (normalizedLabel !== expectedSurface &&
+        normalizedWithoutCorporateMarker !== expectedSurface &&
+        persistedCanonicalBrandCore !== expectedSurface)
     ) {
       continue;
     }

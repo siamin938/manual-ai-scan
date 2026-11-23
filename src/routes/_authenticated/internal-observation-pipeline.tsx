@@ -1,0 +1,3474 @@
+import { useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  buildActionOpportunityV1Preview,
+  type ActionOpportunityV1Item,
+} from "@/lib/action-opportunity-v1.rules";
+import { splitActionOpportunityV1Items } from "@/lib/action-opportunity-v1.presentation";
+import { buildCustomerPreviewV1Model } from "@/lib/action-opportunity-v1.customer-preview.viewmodel";
+import { ActionOpportunityV1CustomerPreview } from "@/components/action-opportunity-v1-customer-preview";
+import { formatSeoul } from "@/lib/format";
+import { buildVerifiedTargetCitationPageSummary } from "@/lib/verified-target-citation-page-summary";
+import {
+  AUTOMOTIVE_CATEGORY_OPTIONS,
+  INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION,
+  INTERNAL_OBSERVATION_SERVICE_OPTIONS,
+} from "@/lib/automotive-service-options";
+import { INTENT_LABELS, isAllowedIntent } from "@/lib/question-suggestions";
+import {
+  enqueueInternalObservationCandidate,
+  getInternalObservationPipelineOverview,
+  prepareInternalObservationCandidate,
+  previewInternalObservationCandidate,
+  type InternalObservationPipelineItemDTO,
+  type InternalObservationPipelineStatus,
+} from "@/lib/internal-observation-pipeline.functions";
+import {
+  approveInternalObservationExecution,
+  previewInternalObservationExecutionPlan,
+  type InternalObservationExecutionBlocker,
+} from "@/lib/internal-observation-execution.functions";
+import { reconcileInternalObservationPipeline } from "@/lib/internal-observation-reconciliation.functions";
+import {
+  getInternalObservationSchedulerDryRun,
+  type InternalObservationSchedulerBlocker,
+} from "@/lib/internal-observation-scheduler.functions";
+import {
+  confirmInternalObservationSchedulerActivation,
+  getInternalObservationSchedulerOperations,
+  pauseInternalObservationScheduler,
+  requestInternalObservationSchedulerActivation,
+  stopInternalObservationScheduler,
+  type SchedulerActivationBlocker,
+} from "@/lib/internal-observation-scheduler-operations.functions";
+import { getPilotOpsAdminResult } from "@/lib/pilot-ops-admin-detail.functions";
+import {
+  searchActionOpportunityV1QaBusinesses,
+  getActionOpportunityV1QaReferences,
+} from "@/lib/action-opportunity-v1.qa.functions";
+import {
+  getInternalObservationDiscoveryPreview,
+  type InternalObservationDiscoveryCandidateDTO,
+  type InternalObservationDiscoveryDuplicateStatus,
+} from "@/lib/internal-observation-discovery.functions";
+import {
+  getInternalObservationDiscoveryReviewQueue,
+  saveInternalObservationDiscoveryCandidate,
+  updateInternalObservationDiscoveryReview,
+  type InternalObservationDiscoveryReviewStatus,
+} from "@/lib/internal-observation-discovery-review.functions";
+import {
+  confirmInternalObservationDiscoveryPromotion,
+  previewInternalObservationDiscoveryPromotion,
+  type InternalObservationDiscoveryPromotionBlocker,
+} from "@/lib/internal-observation-discovery-promotion.functions";
+import {
+  getInternalObservationDiscoveryRecurringOverview,
+  runInternalObservationDiscoveryScheduleNow,
+  saveInternalObservationDiscoverySchedule,
+  setInternalObservationDiscoveryScheduleEnabled,
+  type InternalObservationDiscoveryCadence,
+} from "@/lib/internal-observation-discovery-recurring.functions";
+
+export const Route = createFileRoute("/_authenticated/internal-observation-pipeline")({
+  component: InternalObservationPipelinePage,
+  head: () => ({
+    meta: [
+      { title: "내부 데이터 수집 | 차보임" },
+      {
+        name: "description",
+        content: "차보임 내부 관찰용 업체 후보를 등록하고 통합 24문항까지 안전하게 준비합니다.",
+      },
+    ],
+  }),
+});
+
+const STATUS_LABELS: Record<InternalObservationPipelineStatus, string> = {
+  pending: "준비 대기",
+  preparing: "준비 중",
+  ready_to_measure: "측정 준비 완료",
+  blocked: "확인 필요",
+  failed: "준비 실패",
+  measuring: "측정 중",
+  postprocessing: "후처리 중",
+  completed: "완료",
+  cancelled: "취소",
+};
+
+function statusVariant(
+  status: InternalObservationPipelineStatus,
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "ready_to_measure" || status === "completed") return "default";
+  if (status === "preparing" || status === "measuring" || status === "postprocessing") return "secondary";
+  if (status === "blocked" || status === "failed") return "destructive";
+  return "outline";
+}
+
+function readinessText(item: InternalObservationPipelineItemDTO): string {
+  if (!item.readiness) return "-";
+  if (!item.readiness.providerReady) return "Provider 확인 필요";
+  if (item.readiness.creditBalance < 1) return "측정권 필요";
+  return `측정권 ${item.readiness.creditBalance}회 · 자동 실행 ${item.readiness.executionEnabled ? "ON" : "OFF"}`;
+}
+
+function errorLabel(code: string | null): string {
+  switch (code) {
+    case "NO_MEASUREMENT_CREDIT":
+      return "측정권 없음";
+    case "PROVIDER_NOT_READY":
+      return "Provider 준비 필요";
+    case "EXISTING_BUSINESS_INACTIVE":
+      return "기존 업체 비활성";
+    case "EXISTING_UNIFIED_SET_INVALID":
+      return "기존 통합 질문 확인 필요";
+    case "INVALID_QUESTION_CONTRACT":
+      return "24문항 계약 확인 필요";
+    case "ENTITY_FACTS_PENDING":
+      return "Entity Facts v2 후처리 대기";
+    case "ENTITY_FACTS_CHECK_RETRY":
+      return "Entity Facts v2 재확인";
+    case "ENTITY_FACTS_INVALID":
+      return "Entity Facts v2 계약 확인 필요";
+    case "ENTITY_FACTS_RUN_MISMATCH":
+      return "대표 Run 불일치";
+    case "RUN_INCOMPLETE":
+      return "24/24 측정 계약 미충족";
+    case "RUN_FAILED":
+      return "Run 실패";
+    case "RUN_CANCELLED":
+      return "Run 취소";
+    default:
+      return code ?? "-";
+  }
+}
+
+function intentLabel(intent: string): string {
+  return isAllowedIntent(intent) ? INTENT_LABELS[intent] : intent;
+}
+
+function previewBusinessAction(action: "create" | "reuse" | "blocked"): string {
+  if (action === "create") return "새 업체 생성";
+  if (action === "reuse") return "기존 업체 재사용";
+  return "업체 상태 확인 필요";
+}
+
+function previewQuestionAction(action: "create" | "reuse" | "blocked"): string {
+  if (action === "create") return "새 통합 24문항 생성";
+  if (action === "reuse") return "기존 통합 24문항 재사용";
+  return "기존 질문 세트 확인 필요";
+}
+
+function previewBlockerLabel(code: string | null): string {
+  if (code === "EXISTING_BUSINESS_INACTIVE") {
+    return "동일 업체가 비활성 상태입니다. 자동으로 재활성화하지 않습니다.";
+  }
+  if (code === "EXISTING_UNIFIED_SET_INVALID") {
+    return "기존 통합 질문 세트가 24문항 계약과 일치하지 않습니다. 자동으로 수정하지 않습니다.";
+  }
+  return code ? "기존 데이터 상태를 확인해 주세요." : "";
+}
+
+function activationBlockerLabel(code: SchedulerActivationBlocker): string {
+  switch (code) {
+    case "STATE_ALREADY_RUNNING":
+      return "이미 자동 실행 중입니다.";
+    case "EXECUTOR_NOT_READY":
+      return "자동 실행 준비 Gate가 아직 승인되지 않았습니다.";
+    case "ACTOR_NOT_CONFIGURED":
+      return "Scheduler actor 설정이 필요합니다.";
+    case "CRON_NOT_AVAILABLE":
+      return "정기 tick Cron이 준비되지 않았습니다.";
+    case "NO_PLANNED_CANDIDATE":
+      return "현재 오늘 계획에 포함되는 후보가 없습니다.";
+    case "NO_DISPATCH_SLOT":
+      return "현재 즉시 실행 가능한 동시 실행 슬롯이 없습니다.";
+    case "OPERATOR_WRITE_ROLE_REQUIRED":
+      return "현재 운영자 계정에 이 내부 조직의 실행 권한이 없습니다.";
+  }
+}
+
+function schedulerBlockerLabel(code: InternalObservationSchedulerBlocker): string {
+  switch (code) {
+    case "CANDIDATE_DATA_INVALID":
+      return "후보 연결 정보 확인 필요";
+    case "BUSINESS_NOT_AVAILABLE":
+      return "업체 상태 확인 필요";
+    case "QUESTION_SET_NOT_AVAILABLE":
+      return "통합 질문 세트 확인 필요";
+    case "INVALID_QUESTION_CONTRACT":
+      return "24문항 계약 확인 필요";
+    case "SAME_CONDITION_RUN_ACTIVE":
+      return "동일 조건 Run 진행 중";
+    case "PROVIDER_NOT_READY":
+      return "Provider 준비 필요";
+    case "NO_MEASUREMENT_CREDIT":
+      return "측정권 부족";
+    case "DAILY_PIPELINE_RUN_LIMIT":
+      return "오늘 내부 실행 한도 초과";
+    case "DAILY_USAGE_LIMIT":
+      return "오늘 요청 한도 초과";
+    case "MONTHLY_USAGE_LIMIT":
+      return "월 예산 한도 초과";
+  }
+}
+
+function executionBlockerLabel(code: InternalObservationExecutionBlocker): string {
+  switch (code) {
+    case "ITEM_NOT_READY":
+      return "이 후보는 현재 측정 실행 승인 상태가 아닙니다.";
+    case "INTERNAL_OBSERVATION_ORG_REQUIRED":
+      return "내부 관찰 조직에서만 실행할 수 있습니다.";
+    case "BUSINESS_NOT_AVAILABLE":
+      return "대상 업체가 비활성 또는 사용할 수 없는 상태입니다.";
+    case "QUESTION_SET_NOT_AVAILABLE":
+      return "현재 통합 질문 세트를 사용할 수 없습니다.";
+    case "INVALID_QUESTION_CONTRACT":
+      return "통합 질문 세트가 24문항 계약과 일치하지 않습니다.";
+    case "PROVIDER_NOT_READY":
+      return "OpenAI Provider 자동 측정 설정을 확인해 주세요.";
+    case "NO_MEASUREMENT_CREDIT":
+      return "측정권이 없습니다.";
+    case "OPERATOR_MEMBERSHIP_REQUIRED":
+      return "현재 운영자 계정에 이 내부 조직의 측정 실행 권한이 없습니다.";
+    case "SAME_CONDITION_RUN_ACTIVE":
+      return "같은 업체·질문 세트의 진행 중 Run이 이미 있습니다.";
+    case "CONCURRENT_RUN_LIMIT":
+      return "현재 동시 실행 한도에 도달했습니다.";
+    case "DAILY_PIPELINE_RUN_LIMIT":
+      return "오늘 내부 파이프라인 실행 한도에 도달했습니다.";
+    case "DAILY_USAGE_LIMIT":
+      return "조직의 오늘 요청 한도를 초과합니다.";
+    case "MONTHLY_USAGE_LIMIT":
+      return "조직의 월 예산 한도를 초과합니다.";
+    case "PLAN_NOT_AVAILABLE":
+      return "실행 계획을 계산할 수 없습니다.";
+  }
+}
+
+function discoveryDuplicateLabel(
+  status: InternalObservationDiscoveryDuplicateStatus,
+): string {
+  switch (status) {
+    case "existing_business_exact":
+      return "기존 업체 일치";
+    case "existing_pipeline_exact":
+      return "기존 후보 일치";
+    case "existing_domain_overlap":
+      return "공개 도메인 중복";
+    case "none":
+      return "신규 후보";
+  }
+}
+
+function discoveryDuplicateVariant(
+  status: InternalObservationDiscoveryDuplicateStatus,
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "none") return "outline";
+  if (status === "existing_domain_overlap") return "secondary";
+  return "destructive";
+}
+
+function discoveryReviewLabel(
+  status: InternalObservationDiscoveryReviewStatus,
+): string {
+  switch (status) {
+    case "needs_review":
+      return "검토 대기";
+    case "approved":
+      return "승인";
+    case "rejected":
+      return "제외";
+    case "duplicate":
+      return "중복";
+    case "needs_identity_review":
+      return "지점 확인 필요";
+  }
+}
+
+function discoveryReviewVariant(
+  status: InternalObservationDiscoveryReviewStatus,
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "approved") return "default";
+  if (status === "needs_identity_review") return "secondary";
+  if (status === "rejected" || status === "duplicate") return "destructive";
+  return "outline";
+}
+
+function discoveryPromotionBlockerLabel(
+  blocker: InternalObservationDiscoveryPromotionBlocker,
+): string {
+  switch (blocker) {
+    case "REVIEW_NOT_APPROVED":
+      return "Review Queue에서 먼저 승인해야 합니다.";
+    case "ALREADY_PROMOTED":
+      return "이미 기존 수집 파이프라인으로 승격된 후보입니다.";
+    case "PUBLIC_EVIDENCE_MISSING":
+      return "검증된 공개 근거가 없어 승격할 수 없습니다.";
+    case "BUSINESS_IDENTITY_AMBIGUOUS":
+      return "같은 업체 identity와 일치하는 기존 업체가 여러 곳이라 확인이 필요합니다.";
+    case "EXISTING_BUSINESS_INACTIVE":
+      return "동일 업체가 비활성 상태라 자동 재활성화하지 않습니다.";
+  }
+}
+
+function usd(value: number): string {
+  return `${value.toFixed(2)}`;
+}
+
+function metricCountText(
+  confirmed: number,
+  valid: number,
+  lowerPct: number | null,
+  upperPct: number | null,
+): string {
+  if (valid <= 0 || lowerPct === null || upperPct === null) return `${confirmed}/${valid}`;
+  const pctText =
+    lowerPct === upperPct
+      ? `${Math.round(lowerPct * 100) / 100}%`
+      : `${Math.round(lowerPct * 100) / 100}~${Math.round(upperPct * 100) / 100}%`;
+  return `${confirmed}/${valid} · ${pctText}`;
+}
+
+type ActionOpportunityV1AdminCitationLink = {
+  entityName: string;
+  url: string;
+};
+
+function ActionOpportunityV1AdminCard({
+  opportunity,
+  citationLinks,
+  citationPending,
+}: {
+  opportunity: ActionOpportunityV1Item;
+  citationLinks: readonly ActionOpportunityV1AdminCitationLink[];
+  citationPending: boolean;
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={opportunity.priority === "high" ? "default" : "secondary"}>
+          {opportunity.priority === "high" ? "우선 확인" : "검토"}
+        </Badge>
+        <p className="text-sm font-semibold leading-6 text-foreground">
+          {opportunity.title}
+        </p>
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">현재 관찰</p>
+        <p className="text-sm leading-6">{opportunity.observation}</p>
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">어떤 의미인가요?</p>
+        <p className="text-sm leading-6 text-foreground/80">{opportunity.whyItMatters}</p>
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">확인해 볼 항목</p>
+        <p className="text-sm leading-6 text-foreground/90">{opportunity.recommendedCheck}</p>
+      </div>
+      <div className="space-y-2 rounded-md border bg-background p-3">
+        <p className="text-sm font-semibold">실제 측정 근거</p>
+        {opportunity.evidence.map((evidence, index) => (
+          <div
+            key={evidence.label + index}
+            className="flex flex-wrap gap-x-2 text-sm leading-6"
+          >
+            <span className="shrink-0 text-muted-foreground">{evidence.label}</span>
+            <span className="font-medium break-words">{evidence.value}</span>
+          </div>
+        ))}
+      </div>
+      {opportunity.id === "competitor_source_difference" && (
+        <div className="space-y-2 rounded-md border bg-background p-3">
+          <p className="text-sm font-semibold">AI 답변에서 실제 인용된 페이지</p>
+          {citationPending ? (
+            <p className="text-sm text-muted-foreground">
+              동일 측정의 인용 페이지를 확인하는 중…
+            </p>
+          ) : citationLinks.length > 0 ? (
+            <div className="space-y-2">
+              {citationLinks.map((entity, index) => (
+                <a
+                  key={entity.url + index}
+                  href={entity.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-sm font-medium leading-6 text-primary underline underline-offset-2 break-all"
+                >
+                  인용 페이지 열기 · {entity.entityName} ↗
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              동일 대표 측정에서 연결된 인용 페이지 URL을 확인하지 못했습니다.
+            </p>
+          )}
+          <p className="text-xs leading-5 text-muted-foreground">
+            인용된 URL과 업체의 연결 관찰만 보여줍니다. 해당 업체의 공식 페이지나
+            노출 원인으로 검증된 것은 아닙니다.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InternalObservationPipelinePage() {
+  const qc = useQueryClient();
+  const fetchOverview = useServerFn(getInternalObservationPipelineOverview);
+  const enqueueCandidate = useServerFn(enqueueInternalObservationCandidate);
+  const previewCandidate = useServerFn(previewInternalObservationCandidate);
+  const prepareCandidate = useServerFn(prepareInternalObservationCandidate);
+  const previewExecutionPlan = useServerFn(previewInternalObservationExecutionPlan);
+  const approveExecution = useServerFn(approveInternalObservationExecution);
+  const reconcilePipeline = useServerFn(reconcileInternalObservationPipeline);
+  const fetchSchedulerDryRun = useServerFn(getInternalObservationSchedulerDryRun);
+  const fetchSchedulerOperations = useServerFn(getInternalObservationSchedulerOperations);
+  const requestSchedulerActivation = useServerFn(requestInternalObservationSchedulerActivation);
+  const confirmSchedulerActivation = useServerFn(confirmInternalObservationSchedulerActivation);
+  const pauseScheduler = useServerFn(pauseInternalObservationScheduler);
+  const stopScheduler = useServerFn(stopInternalObservationScheduler);
+  const fetchAdminResult = useServerFn(getPilotOpsAdminResult);
+  const searchQaBusinesses = useServerFn(searchActionOpportunityV1QaBusinesses);
+  const fetchQaReferences = useServerFn(getActionOpportunityV1QaReferences);
+  const fetchDiscoveryPreview = useServerFn(getInternalObservationDiscoveryPreview);
+  const fetchDiscoveryReviewQueue = useServerFn(
+    getInternalObservationDiscoveryReviewQueue,
+  );
+  const saveDiscoveryCandidate = useServerFn(
+    saveInternalObservationDiscoveryCandidate,
+  );
+  const updateDiscoveryReview = useServerFn(
+    updateInternalObservationDiscoveryReview,
+  );
+  const previewDiscoveryPromotion = useServerFn(
+    previewInternalObservationDiscoveryPromotion,
+  );
+  const confirmDiscoveryPromotion = useServerFn(
+    confirmInternalObservationDiscoveryPromotion,
+  );
+  const fetchDiscoveryRecurringOverview = useServerFn(
+    getInternalObservationDiscoveryRecurringOverview,
+  );
+  const saveDiscoverySchedule = useServerFn(
+    saveInternalObservationDiscoverySchedule,
+  );
+  const runDiscoveryScheduleNow = useServerFn(
+    runInternalObservationDiscoveryScheduleNow,
+  );
+  const setDiscoveryScheduleEnabled = useServerFn(
+    setInternalObservationDiscoveryScheduleEnabled,
+  );
+
+  const [orgId, setOrgId] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [category, setCategory] = useState("");
+  const [region, setRegion] = useState("");
+  const [city, setCity] = useState("");
+  const [serviceSelect, setServiceSelect] = useState("");
+  const [serviceCustom, setServiceCustom] = useState("");
+  const [brandModel, setBrandModel] = useState("");
+  const [customerNeed, setCustomerNeed] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [naverPlaceUrl, setNaverPlaceUrl] = useState("");
+  const [sourceLabel, setSourceLabel] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewItemId, setPreviewItemId] = useState<string | null>(null);
+  const [executionOpen, setExecutionOpen] = useState(false);
+  const [executionItemId, setExecutionItemId] = useState<string | null>(null);
+  const [resultTarget, setResultTarget] = useState<
+    Pick<InternalObservationPipelineItemDTO, "orgId" | "businessId" | "businessName" | "runId"> | null
+  >(null);
+  const [resultDisplayMode, setResultDisplayMode] = useState<"operator" | "customer">("operator");
+  const [qaBusinessSearch, setQaBusinessSearch] = useState("");
+  const [activationConfirmation, setActivationConfirmation] = useState("");
+  const [discoveryCategory, setDiscoveryCategory] = useState("");
+  const [discoveryRegion, setDiscoveryRegion] = useState("");
+  const [discoveryCity, setDiscoveryCity] = useState("");
+  const [discoveryServiceSelect, setDiscoveryServiceSelect] = useState("");
+  const [discoveryServiceCustom, setDiscoveryServiceCustom] = useState("");
+  const [discoveryBrandModel, setDiscoveryBrandModel] = useState("");
+  const [discoveryDesiredCount, setDiscoveryDesiredCount] = useState("5");
+  const [promotionOpen, setPromotionOpen] = useState(false);
+  const [promotionReviewItemId, setPromotionReviewItemId] = useState<string | null>(
+    null,
+  );
+  const [recurringName, setRecurringName] = useState("");
+  const [recurringCadence, setRecurringCadence] =
+    useState<InternalObservationDiscoveryCadence>("weekly");
+  const [recurringRunHourKst, setRecurringRunHourKst] = useState("9");
+  const [recurringWeekdayIso, setRecurringWeekdayIso] = useState("1");
+
+  const service =
+    serviceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
+      ? serviceCustom.trim()
+      : serviceSelect;
+
+  const discoveryService =
+    discoveryServiceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION
+      ? discoveryServiceCustom.trim()
+      : discoveryServiceSelect;
+
+  const overviewQuery = useQuery({
+    queryKey: ["internal-observation-pipeline-overview"],
+    queryFn: () => fetchOverview({ data: undefined }),
+    retry: false,
+    refetchInterval: 15000,
+  });
+
+  const overview = overviewQuery.data?.ok ? overviewQuery.data.overview : null;
+
+  const schedulerQuery = useQuery({
+    queryKey: ["internal-observation-scheduler-dry-run", orgId],
+    enabled: !!orgId,
+    retry: false,
+    refetchInterval: 15000,
+    queryFn: () => fetchSchedulerDryRun({ data: { orgId } }),
+  });
+
+  const schedulerOpsQuery = useQuery({
+    queryKey: ["internal-observation-scheduler-operations", orgId],
+    enabled: !!orgId,
+    retry: false,
+    refetchInterval: 15000,
+    queryFn: () => fetchSchedulerOperations({ data: { orgId } }),
+  });
+
+  const discoveryReviewQuery = useQuery({
+    queryKey: ["internal-observation-discovery-review", orgId],
+    enabled: !!orgId,
+    retry: false,
+    refetchInterval: 15000,
+    queryFn: () => fetchDiscoveryReviewQueue({ data: { orgId } }),
+  });
+
+  const latestDiscoveryReviewQuery = (() => {
+    if (!discoveryReviewQuery.data?.ok) return null;
+    const latest = [...discoveryReviewQuery.data.overview.items].sort((a, b) =>
+      b.lastSeenAt.localeCompare(a.lastSeenAt),
+    )[0];
+    return latest?.discoveryQuery ?? null;
+  })();
+
+  const hasCurrentDiscoveryQuery =
+    discoveryCategory.trim().length > 0 &&
+    discoveryRegion.trim().length > 0 &&
+    discoveryService.trim().length > 0;
+
+  const recurringDiscoveryQuery = hasCurrentDiscoveryQuery
+    ? {
+        category: discoveryCategory.trim(),
+        service: discoveryService.trim(),
+        region: discoveryRegion.trim(),
+        city: discoveryCity.trim() || null,
+        brandModel: discoveryBrandModel.trim() || null,
+        desiredCount: Number(discoveryDesiredCount),
+      }
+    : latestDiscoveryReviewQuery;
+
+  const recurringDiscoveryQuerySource = hasCurrentDiscoveryQuery
+    ? "현재 Discovery 입력"
+    : latestDiscoveryReviewQuery
+      ? "최근 Review Queue 조건"
+      : null;
+
+  const discoveryRecurringQuery = useQuery({
+    queryKey: ["internal-observation-discovery-recurring", orgId],
+    enabled: !!orgId,
+    retry: false,
+    refetchInterval: 15000,
+    queryFn: () => fetchDiscoveryRecurringOverview({ data: { orgId } }),
+  });
+
+  const qaBusinessQuery = useQuery({
+    queryKey: ["action-opportunity-v1-qa-businesses", orgId, qaBusinessSearch.trim()],
+    enabled: !!orgId && qaBusinessSearch.trim().length >= 2,
+    retry: false,
+    queryFn: () =>
+      searchQaBusinesses({
+        data: { orgId, query: qaBusinessSearch.trim() },
+      }),
+  });
+  const qaBusinesses = qaBusinessQuery.data?.ok
+    ? qaBusinessQuery.data.businesses
+    : [];
+
+  const resultQuery = useQuery({
+    queryKey: [
+      "internal-observation-pipeline-result",
+      resultTarget?.orgId,
+      resultTarget?.businessId,
+    ],
+    enabled: !!resultTarget?.orgId && !!resultTarget?.businessId,
+    retry: false,
+    queryFn: () =>
+      fetchAdminResult({
+        data: {
+          orgId: resultTarget!.orgId,
+          businessId: resultTarget!.businessId!,
+        },
+      }),
+  });
+
+  const verifiedPageSummary = resultQuery.data?.ok
+    ? buildVerifiedTargetCitationPageSummary(resultQuery.data.data)
+    : null;
+
+  // The pipeline row may reference an older Run than the current gateway
+  // representative. In that case, never label newer facts as this row's QA.
+  const actionOpportunityRunMismatch =
+    resultQuery.data?.ok === true &&
+    !!resultTarget?.runId &&
+    resultTarget.runId !== resultQuery.data.data.scope.runId;
+  const actionOpportunityPreview =
+    resultQuery.data?.ok && !actionOpportunityRunMismatch
+      ? buildActionOpportunityV1Preview(resultQuery.data.data)
+      : null;
+
+  const comparisonSourceDomain = actionOpportunityPreview?.items
+    .find((opportunity) => opportunity.id === "competitor_source_difference")
+    ?.evidence.find((row) => row.label === "출처")?.value ?? null;
+  const qaReferenceQuery = useQuery({
+    queryKey: [
+      "action-opportunity-v1-qa-references",
+      resultTarget?.orgId,
+      resultTarget?.businessId,
+      actionOpportunityPreview?.runId,
+      comparisonSourceDomain,
+    ],
+    enabled:
+      !!resultTarget?.orgId &&
+      !!resultTarget?.businessId &&
+      !!actionOpportunityPreview?.runId &&
+      !!comparisonSourceDomain,
+    retry: false,
+    queryFn: () =>
+      fetchQaReferences({
+        data: {
+          orgId: resultTarget!.orgId,
+          businessId: resultTarget!.businessId!,
+          runId: actionOpportunityPreview!.runId,
+          sourceDomain: comparisonSourceDomain!,
+        },
+      }),
+  });
+
+  const actionOpportunityPresentation = actionOpportunityPreview
+    ? splitActionOpportunityV1Items(actionOpportunityPreview.items)
+    : { primary: [], additional: [] };
+  const customerPreviewModel =
+    resultQuery.data?.ok && actionOpportunityPreview
+      ? buildCustomerPreviewV1Model(resultQuery.data.data, actionOpportunityPreview)
+      : null;
+  const qaCitationLinks: ActionOpportunityV1AdminCitationLink[] =
+    qaReferenceQuery.data?.ok
+      ? qaReferenceQuery.data.currentRunReferences.flatMap((source) =>
+          source.entities.map((entity) => ({
+            entityName: entity.entityName,
+            url: entity.url,
+          })),
+        )
+      : [];
+  const qaCitationPending = qaReferenceQuery.isPending || qaReferenceQuery.isFetching;
+
+  useEffect(() => {
+    if (orgId || !overview?.organizations.length) return;
+    setOrgId(overview.organizations[0]!.orgId);
+  }, [orgId, overview?.organizations]);
+
+  const discoveryMutation = useMutation({
+    mutationFn: () =>
+      fetchDiscoveryPreview({
+        data: {
+          orgId,
+          category: discoveryCategory,
+          service: discoveryService,
+          region: discoveryRegion,
+          city: discoveryCity || null,
+          brandModel: discoveryBrandModel || null,
+          desiredCount: Number(discoveryDesiredCount),
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "INVALID_INPUT"
+            ? "탐색 조건을 확인해 주세요."
+            : res.error === "FORBIDDEN"
+              ? "내부 Discovery Preview 권한이 없습니다."
+              : res.error === "NOT_AVAILABLE"
+                ? "Discovery 응답 형식을 확인하지 못했습니다. 다시 시도해 주세요."
+                : "Discovery 실행 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+        return;
+      }
+      toast.success(
+        `공개 후보 ${res.preview.candidates.length}곳을 읽기 전용으로 확인했습니다.`,
+      );
+    },
+    onError: () => toast.error("Discovery Preview 중 오류가 발생했습니다."),
+  });
+
+  const saveDiscoveryMutation = useMutation({
+    mutationFn: (candidate: InternalObservationDiscoveryCandidateDTO) => {
+      if (!discoveryPreview) {
+        throw new Error("DISCOVERY_PREVIEW_NOT_AVAILABLE");
+      }
+      return saveDiscoveryCandidate({
+        data: {
+          orgId,
+          previewGeneratedAt: discoveryPreview.generatedAt,
+          query: discoveryPreview.query,
+          candidate,
+        },
+      });
+    },
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "FORBIDDEN"
+            ? "Discovery Review Queue 저장 권한이 없습니다."
+            : res.error === "INVALID_INPUT"
+              ? "후보 데이터가 바뀌어 저장하지 못했습니다. 다시 탐색해 주세요."
+              : res.error === "IDENTITY_AMBIGUOUS"
+                ? "같은 공개 URL과 연결된 기존 후보가 여러 개라 자동 병합하지 않았습니다."
+                : "검토 후보를 저장하지 못했습니다.",
+        );
+        return;
+      }
+      toast.success(
+        res.idempotent
+          ? "이미 저장된 후보의 공개 근거를 최신 상태로 갱신했습니다."
+          : "검토 후보로 저장했습니다.",
+      );
+      discoveryReviewQuery.refetch();
+    },
+    onError: () => toast.error("검토 후보 저장 중 오류가 발생했습니다."),
+  });
+
+  const updateDiscoveryReviewMutation = useMutation({
+    mutationFn: (args: {
+      itemId: string;
+      reviewStatus: InternalObservationDiscoveryReviewStatus;
+    }) =>
+      updateDiscoveryReview({
+        data: {
+          orgId,
+          itemId: args.itemId,
+          reviewStatus: args.reviewStatus,
+          reviewNote: null,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "ALREADY_PROMOTED"
+            ? "이미 기존 파이프라인으로 승격된 후보입니다."
+            : "검토 상태를 변경하지 못했습니다.",
+        );
+        discoveryReviewQuery.refetch();
+        return;
+      }
+      toast.success(
+        `${res.item.businessName} · ${discoveryReviewLabel(res.item.reviewStatus)}`,
+      );
+      discoveryReviewQuery.refetch();
+    },
+    onError: () => toast.error("검토 상태 변경 중 오류가 발생했습니다."),
+  });
+
+  const promotionPreviewMutation = useMutation({
+    mutationFn: (reviewItemId: string) =>
+      previewDiscoveryPromotion({
+        data: {
+          orgId,
+          reviewItemId,
+        },
+      }),
+    onError: () => toast.error("승격 미리보기를 불러오지 못했습니다."),
+  });
+
+  const confirmPromotionMutation = useMutation({
+    mutationFn: (args: {
+      reviewItemId: string;
+      planHash: string;
+      confirmation: string;
+    }) =>
+      confirmDiscoveryPromotion({
+        data: {
+          orgId,
+          reviewItemId: args.reviewItemId,
+          planHash: args.planHash,
+          confirmation: args.confirmation,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        if (res.error === "PLAN_CHANGED" && res.plan) {
+          toast.warning("후보 또는 기존 데이터 상태가 바뀌었습니다. 승격 계획을 다시 확인해 주세요.");
+          promotionPreviewMutation.reset();
+          promotionPreviewMutation.mutate(res.plan.reviewItemId);
+          return;
+        }
+        toast.error(
+          res.error === "PLAN_BLOCKED"
+            ? "현재 상태에서는 이 후보를 승격할 수 없습니다."
+            : res.error === "INVALID_CONFIRMATION"
+              ? "승격 확인이 올바르지 않습니다."
+              : "후보를 기존 수집 파이프라인으로 승격하지 못했습니다.",
+        );
+        return;
+      }
+
+      toast.success(
+        res.idempotent
+          ? "이미 존재하는 기존 수집 후보와 안전하게 연결했습니다."
+          : "기존 수집 파이프라인에 준비 대기 후보 1건을 생성했습니다.",
+      );
+      setPromotionOpen(false);
+      setPromotionReviewItemId(null);
+      promotionPreviewMutation.reset();
+      discoveryReviewQuery.refetch();
+      qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+    },
+    onError: () => toast.error("승격 처리 중 오류가 발생했습니다."),
+  });
+
+  const saveDiscoveryScheduleMutation = useMutation({
+    mutationFn: () => {
+      if (!recurringDiscoveryQuery) {
+        throw new Error("RECURRING_DISCOVERY_QUERY_NOT_AVAILABLE");
+      }
+      return saveDiscoverySchedule({
+        data: {
+          orgId,
+          name: recurringName,
+          category: recurringDiscoveryQuery.category,
+          service: recurringDiscoveryQuery.service,
+          region: recurringDiscoveryQuery.region,
+          city: recurringDiscoveryQuery.city,
+          brandModel: recurringDiscoveryQuery.brandModel,
+          desiredCount: recurringDiscoveryQuery.desiredCount,
+          cadence: recurringCadence,
+          runHourKst: Number(recurringRunHourKst),
+          weekdayIso:
+            recurringCadence === "weekly"
+              ? Number(recurringWeekdayIso)
+              : null,
+        },
+      });
+    },
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("반복 Discovery 프로필을 저장하지 못했습니다.");
+        return;
+      }
+      toast.success(
+        res.idempotent
+          ? "같은 반복 탐색 조건의 프로필을 갱신했습니다."
+          : "반복 Discovery 프로필을 자동 실행 OFF 상태로 저장했습니다.",
+      );
+      setRecurringName("");
+      discoveryRecurringQuery.refetch();
+    },
+    onError: () => toast.error("반복 Discovery 프로필 저장 중 오류가 발생했습니다."),
+  });
+
+  const runDiscoveryScheduleNowMutation = useMutation({
+    mutationFn: (scheduleId: string) =>
+      runDiscoveryScheduleNow({
+        data: {
+          orgId,
+          scheduleId,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("Discovery 배치를 실행하지 못했습니다.");
+        discoveryRecurringQuery.refetch();
+        return;
+      }
+      toast.success(
+        `탐색 완료 · 신규 ${res.newCount}곳 · 변경 ${res.changedCount}곳 · 동일 ${res.unchangedCount}곳`,
+      );
+      discoveryRecurringQuery.refetch();
+      discoveryReviewQuery.refetch();
+    },
+    onError: () => toast.error("Discovery 배치 실행 중 오류가 발생했습니다."),
+  });
+
+  const setDiscoveryScheduleEnabledMutation = useMutation({
+    mutationFn: (args: { scheduleId: string; enabled: boolean }) =>
+      setDiscoveryScheduleEnabled({
+        data: {
+          orgId,
+          scheduleId: args.scheduleId,
+          enabled: args.enabled,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("반복 대상 상태를 변경하지 못했습니다.");
+        return;
+      }
+      toast.success(
+        res.schedule.enabled
+          ? "반복 탐색 대상으로 표시했습니다. 글로벌 자동 반복 Gate는 별도입니다."
+          : "반복 탐색 대상에서 제외했습니다.",
+      );
+      discoveryRecurringQuery.refetch();
+    },
+    onError: () => toast.error("반복 대상 상태 변경 중 오류가 발생했습니다."),
+  });
+
+  const enqueueMutation = useMutation({
+    mutationFn: () =>
+      enqueueCandidate({
+        data: {
+          orgId,
+          businessName,
+          category,
+          region,
+          city: city || null,
+          service,
+          brandModel: brandModel || null,
+          customerNeed: customerNeed || null,
+          websiteUrl: websiteUrl || null,
+          naverPlaceUrl: naverPlaceUrl || null,
+          googleMapsUrl: null,
+          address: null,
+          aliases: [],
+          sourceLabel: sourceLabel || "운영자 등록",
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "INVALID_ORG"
+            ? "내부 관찰 조직만 선택할 수 있습니다."
+            : res.error === "INVALID_INPUT"
+              ? "후보 입력값을 확인해 주세요."
+              : "후보를 등록하지 못했습니다.",
+        );
+        return;
+      }
+      toast.success(res.idempotent ? "이미 같은 후보가 등록되어 있습니다." : "내부 수집 후보를 등록했습니다.");
+      if (!res.idempotent) {
+        setBusinessName("");
+        setCategory("");
+        setRegion("");
+        setCity("");
+        setServiceSelect("");
+        setServiceCustom("");
+        setBrandModel("");
+        setCustomerNeed("");
+        setWebsiteUrl("");
+        setNaverPlaceUrl("");
+        setSourceLabel("");
+      }
+      qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+    },
+    onError: () => toast.error("후보를 등록하지 못했습니다."),
+  });
+
+  const previewMutation = useMutation({
+    mutationFn: (itemId: string) => previewCandidate({ data: { itemId } }),
+    onError: () => toast.error("준비 미리보기를 불러오지 못했습니다."),
+  });
+
+  const prepareMutation = useMutation({
+    mutationFn: (itemId: string) => prepareCandidate({ data: { itemId } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("후보 준비를 완료하지 못했습니다.");
+      } else if (res.status === "ready_to_measure") {
+        toast.success("업체와 통합 24문항 준비가 완료되었습니다.");
+      } else {
+        toast.warning("업체와 질문은 준비됐지만 측정 준비 조건을 확인해야 합니다.");
+      }
+      setPreviewOpen(false);
+      setPreviewItemId(null);
+      previewMutation.reset();
+      qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+    },
+    onError: () => toast.error("후보 준비 중 오류가 발생했습니다."),
+  });
+
+  const executionPlanMutation = useMutation({
+    mutationFn: (itemId: string) => previewExecutionPlan({ data: { itemId } }),
+    onError: () => toast.error("측정 실행 계획을 불러오지 못했습니다."),
+  });
+
+  const requestActivationMutation = useMutation({
+    mutationFn: () => requestSchedulerActivation({ data: { orgId } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "PLAN_BLOCKED"
+            ? "현재 조건에서는 자동 실행 활성화를 요청할 수 없습니다."
+            : "활성화 요청을 만들지 못했습니다.",
+        );
+        schedulerOpsQuery.refetch();
+        return;
+      }
+      setActivationConfirmation("");
+      toast.success("활성화 요청을 만들었습니다. 10분 안에 최종 확인해 주세요.");
+      schedulerOpsQuery.refetch();
+    },
+    onError: () => toast.error("활성화 요청 중 오류가 발생했습니다."),
+  });
+
+  const confirmActivationMutation = useMutation({
+    mutationFn: (requestId: string) =>
+      confirmSchedulerActivation({
+        data: {
+          orgId,
+          requestId,
+          confirmation: activationConfirmation,
+        },
+      }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error(
+          res.error === "PLAN_CHANGED"
+            ? "실행 조건이 바뀌었습니다. 활성화 계획을 다시 확인해 주세요."
+            : res.error === "INVALID_CONFIRMATION"
+              ? "확인 문구가 일치하지 않습니다."
+              : "자동 실행을 활성화하지 못했습니다.",
+        );
+        schedulerOpsQuery.refetch();
+        schedulerQuery.refetch();
+        return;
+      }
+      setActivationConfirmation("");
+      toast.success("Guarded Scheduler가 활성화되었습니다.");
+      schedulerOpsQuery.refetch();
+      schedulerQuery.refetch();
+      overviewQuery.refetch();
+    },
+    onError: () => toast.error("자동 실행 활성화 중 오류가 발생했습니다."),
+  });
+
+  const pauseSchedulerMutation = useMutation({
+    mutationFn: () => pauseScheduler({ data: { orgId } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("자동 실행을 일시정지하지 못했습니다.");
+        return;
+      }
+      toast.success("자동 실행을 일시정지했습니다. 진행 중인 Run은 취소하지 않습니다.");
+      schedulerOpsQuery.refetch();
+      schedulerQuery.refetch();
+    },
+    onError: () => toast.error("일시정지 중 오류가 발생했습니다."),
+  });
+
+  const stopSchedulerMutation = useMutation({
+    mutationFn: () => stopScheduler({ data: { orgId } }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("자동 실행을 중지하지 못했습니다.");
+        return;
+      }
+      setActivationConfirmation("");
+      toast.success("자동 실행을 중지했습니다. 진행 중인 Run은 취소하지 않습니다.");
+      schedulerOpsQuery.refetch();
+      schedulerQuery.refetch();
+    },
+    onError: () => toast.error("자동 실행 중지 중 오류가 발생했습니다."),
+  });
+
+  const reconcileMutation = useMutation({
+    mutationFn: () => reconcilePipeline({ data: {} }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        toast.error("파이프라인 상태를 동기화하지 못했습니다.");
+        return;
+      }
+      if (res.completed > 0) {
+        toast.success(`완료 ${res.completed}건을 결과 준비 완료로 반영했습니다.`);
+      } else if (res.postprocessing > 0) {
+        toast.message(`후처리 대기 ${res.postprocessing}건을 확인했습니다.`);
+      } else {
+        toast.message("현재 파이프라인 상태를 확인했습니다.");
+      }
+      qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+    },
+    onError: () => toast.error("파이프라인 상태 동기화 중 오류가 발생했습니다."),
+  });
+
+  const approveExecutionMutation = useMutation({
+    mutationFn: (args: { itemId: string; planHash: string }) =>
+      approveExecution({ data: args }),
+    onSuccess: (res) => {
+      if (!res.ok) {
+        if (res.error === "PLAN_CHANGED" && res.plan) {
+          toast.warning("측정권·예산·실행 상태가 바뀌었습니다. 새 실행 계획을 다시 확인해 주세요.");
+          executionPlanMutation.reset();
+          executionPlanMutation.mutate(res.plan.itemId);
+          return;
+        }
+        if (res.error === "PLAN_BLOCKED") {
+          toast.error("현재 조건에서는 측정을 시작할 수 없습니다.");
+          return;
+        }
+        toast.error(
+          res.error === "RUN_START_FAILED"
+            ? "실행 승인 직후 조건이 바뀌어 측정을 시작하지 못했습니다."
+            : "측정을 시작하지 못했습니다.",
+        );
+        qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+        return;
+      }
+
+      toast.success(`측정을 시작했습니다. ${res.plannedJobs}개 Job이 준비됩니다.`);
+      setExecutionOpen(false);
+      setExecutionItemId(null);
+      executionPlanMutation.reset();
+      qc.invalidateQueries({ queryKey: ["internal-observation-pipeline-overview"] });
+    },
+    onError: () => toast.error("측정 실행 승인 중 오류가 발생했습니다."),
+  });
+
+  const openPreview = (itemId: string) => {
+    setPreviewItemId(itemId);
+    setPreviewOpen(true);
+    previewMutation.reset();
+    previewMutation.mutate(itemId);
+  };
+
+  const openExecutionPlan = (itemId: string) => {
+    setExecutionItemId(itemId);
+    setExecutionOpen(true);
+    executionPlanMutation.reset();
+    executionPlanMutation.mutate(itemId);
+  };
+
+  const openPromotionPreview = (reviewItemId: string) => {
+    setPromotionReviewItemId(reviewItemId);
+    setPromotionOpen(true);
+    promotionPreviewMutation.reset();
+    promotionPreviewMutation.mutate(reviewItemId);
+  };
+
+  if (overviewQuery.isLoading && !overviewQuery.data) {
+    return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
+  }
+
+  if (!overview) {
+    return (
+      <p className="py-16 text-center text-sm text-muted-foreground">
+        이 화면을 볼 권한이 없거나 내부 파이프라인을 불러오지 못했습니다.
+      </p>
+    );
+  }
+
+  const selectedOrg = overview.organizations.find((org) => org.orgId === orgId) ?? null;
+  const pendingCount = overview.items.filter((item) => item.status === "pending").length;
+  const readyCount = overview.items.filter((item) => item.status === "ready_to_measure").length;
+  const blockedCount = overview.items.filter(
+    (item) => item.status === "blocked" || item.status === "failed",
+  ).length;
+
+  const canSubmit =
+    !!orgId &&
+    businessName.trim().length > 0 &&
+    category.trim().length > 0 &&
+    region.trim().length > 0 &&
+    service.trim().length > 0 &&
+    !enqueueMutation.isPending;
+
+  const preview =
+    previewMutation.data?.ok && previewItemId === previewMutation.data.preview.itemId
+      ? previewMutation.data.preview
+      : null;
+
+  const executionPlan =
+    executionPlanMutation.data?.ok &&
+    executionItemId === executionPlanMutation.data.plan.itemId
+      ? executionPlanMutation.data.plan
+      : null;
+
+  const schedulerPlan = schedulerQuery.data?.ok ? schedulerQuery.data.plan : null;
+  const schedulerOps = schedulerOpsQuery.data?.ok ? schedulerOpsQuery.data.data : null;
+  const discoveryPreview = discoveryMutation.data?.ok
+    ? discoveryMutation.data.preview
+    : null;
+  const discoveryReviewItems = discoveryReviewQuery.data?.ok
+    ? discoveryReviewQuery.data.overview.items
+    : [];
+  const discoveryNeedsReviewCount = discoveryReviewItems.filter(
+    (item) =>
+      item.reviewStatus === "needs_review" ||
+      item.reviewStatus === "needs_identity_review",
+  ).length;
+  const discoveryApprovedCount = discoveryReviewItems.filter(
+    (item) => item.reviewStatus === "approved",
+  ).length;
+  const discoveryRecurringOverview = discoveryRecurringQuery.data?.ok
+    ? discoveryRecurringQuery.data.overview
+    : null;
+  const discoverySchedules = discoveryRecurringOverview?.schedules ?? [];
+  const discoveryRecentBatches = discoveryRecurringOverview?.recentBatches ?? [];
+  const discoveryRecentChanges = discoveryRecurringOverview?.recentChanges ?? [];
+  const discoveryCount = Number(discoveryDesiredCount);
+  const recurringHour = Number(recurringRunHourKst);
+  const recurringWeekday = Number(recurringWeekdayIso);
+  const recurringDesiredCount =
+    recurringDiscoveryQuery?.desiredCount ?? Number.NaN;
+  const canSaveRecurringSchedule =
+    !!orgId &&
+    recurringName.trim().length > 0 &&
+    !!recurringDiscoveryQuery &&
+    recurringDiscoveryQuery.category.trim().length > 0 &&
+    recurringDiscoveryQuery.region.trim().length > 0 &&
+    recurringDiscoveryQuery.service.trim().length > 0 &&
+    Number.isInteger(recurringDesiredCount) &&
+    recurringDesiredCount >= 1 &&
+    recurringDesiredCount <= 8 &&
+    Number.isInteger(recurringHour) &&
+    recurringHour >= 0 &&
+    recurringHour <= 23 &&
+    (recurringCadence === "daily" ||
+      (Number.isInteger(recurringWeekday) &&
+        recurringWeekday >= 1 &&
+        recurringWeekday <= 7)) &&
+    !saveDiscoveryScheduleMutation.isPending;
+  const promotionPlan =
+    promotionPreviewMutation.data?.ok &&
+    promotionReviewItemId === promotionPreviewMutation.data.plan.reviewItemId
+      ? promotionPreviewMutation.data.plan
+      : null;
+  const canDiscover =
+    !!orgId &&
+    discoveryCategory.trim().length > 0 &&
+    discoveryRegion.trim().length > 0 &&
+    discoveryService.trim().length > 0 &&
+    Number.isInteger(discoveryCount) &&
+    discoveryCount >= 1 &&
+    discoveryCount <= 8 &&
+    !discoveryMutation.isPending;
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">내부 데이터 수집</h1>
+          <Badge variant="secondary">내부 운영자 전용</Badge>
+          <Badge variant="outline">Pipeline v0.8 Validated</Badge>
+          <Badge variant="outline">Discovery v0.9.1 Preview</Badge>
+          <Badge variant="outline">v0.9.2 Review Queue</Badge>
+          <Badge variant="outline">v0.9.3 Guarded Promotion</Badge>
+          <Badge variant="outline">v0.9.4 Recurring Discovery</Badge>
+        </div>
+        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+          v0.8 자동 순차 실행을 검증했고, 공개 웹 후보는 v0.9.1 Preview에서 찾은 뒤
+          v0.9.2 Review Queue에 선택적으로 저장·검토합니다. 승인해도 아직 측정 파이프라인으로
+          자동 승격하지 않습니다.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          기준 시각 {formatSeoul(overview.generatedAt)}
+        </p>
+      </header>
+
+      <Card className="border-primary/25 bg-primary/[0.03]">
+        <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold">
+              Guarded Scheduler · {schedulerOps?.plan.schedulerState === "running" ? "RUNNING" : schedulerOps?.plan.schedulerState === "paused" ? "PAUSED" : "OFF"}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              실행기 배포는 {schedulerOps?.plan.executorDeployed ? "완료" : "대기"}, 실제 자동 실행 준비 Gate는{" "}
+              {schedulerOps?.plan.executorReady ? "통과" : "차단"} 상태입니다.
+              활성화되더라도 1곳 실행 → 완료·실패 정리 → 다음 1곳 순서만 허용합니다.
+            </p>
+          </div>
+          <Badge variant={selectedOrg?.executionEnabled ? "destructive" : "outline"} className="w-fit">
+            자동 측정 {selectedOrg?.executionEnabled ? "ON" : "OFF"}
+          </Badge>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-3 sm:grid-cols-3">
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-xs text-muted-foreground">준비 대기</p>
+            <p className="mt-2 text-2xl font-bold tabular-nums">{pendingCount}건</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-xs text-muted-foreground">측정 준비 완료</p>
+            <p className="mt-2 text-2xl font-bold tabular-nums">{readyCount}건</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-xs text-muted-foreground">확인 필요</p>
+            <p className="mt-2 text-2xl font-bold tabular-nums">{blockedCount}건</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      {schedulerPlan && (
+        <Card className="border-dashed">
+          <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-base">자동 스케줄 Dry-run</CardTitle>
+                <Badge variant="outline">실행 없음</Badge>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                오래 준비된 후보부터 순서대로 계산합니다. 이 계획을 보는 것만으로는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={schedulerQuery.isFetching}
+              onClick={() => schedulerQuery.refetch()}
+            >
+              {schedulerQuery.isFetching ? "계산 중…" : "Dry-run 다시 계산"}
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">오늘 실행 슬롯</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">
+                  {schedulerPlan.pipelineRunsToday}/{schedulerPlan.dailyRunLimit}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  남음 {schedulerPlan.dailySlotsRemaining}곳
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">동시 실행</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">
+                  {schedulerPlan.activeRunCount}/{schedulerPlan.concurrentRunLimit}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  지금 시작 가능 {schedulerPlan.dispatchSlotsNow}곳
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">측정권</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">
+                  {schedulerPlan.creditBalance}회
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  계획 후 {schedulerPlan.plannedCreditBalanceAfter}회
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">오늘 계획</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">
+                  {schedulerPlan.plannedCandidateCount}곳
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  지금 dispatch {schedulerPlan.dispatchNowCount}곳
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">계획 비용</p>
+                <p className="mt-2 text-lg font-semibold">
+                  {usd(schedulerPlan.estimatedCostUsdTotal)}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  최대 예약 {usd(schedulerPlan.maxCostUsdTotal)}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-muted/10 p-4">
+              <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                <p>
+                  정책 · <span className="font-medium">오래 준비된 후보 우선</span>
+                </p>
+                <p>
+                  자동 실행 ·{" "}
+                  <span className="font-medium">
+                    {schedulerPlan.automaticExecutionEnabled ? "ON" : "OFF"}
+                  </span>
+                </p>
+                <p>
+                  Scheduler actor ·{" "}
+                  <span className="font-medium">
+                    {schedulerPlan.schedulerActorConfigured ? "설정됨" : "미설정"}
+                  </span>
+                </p>
+                <p>
+                  요청량 ·{" "}
+                  <span className="font-medium tabular-nums">
+                    {schedulerPlan.dailyRequestsUsed} →{" "}
+                    {schedulerPlan.projectedDailyRequestsAfter}/
+                    {schedulerPlan.dailyRequestLimit}
+                  </span>
+                </p>
+                <p>
+                  월 최대 ·{" "}
+                  <span className="font-medium tabular-nums">
+                    {usd(schedulerPlan.projectedMonthlyCostUsdAfter)} /{" "}
+                    {usd(schedulerPlan.monthlyBudgetUsd)}
+                  </span>
+                </p>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                최근 자동 tick ·{" "}
+                {schedulerPlan.lastSchedulerTickAt
+                  ? `${formatSeoul(schedulerPlan.lastSchedulerTickAt)} · ${schedulerPlan.lastSchedulerResult ?? "-"}`
+                  : "아직 실행 없음"}
+              </p>
+            </div>
+
+            {schedulerPlan.candidates.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                현재 측정 준비 완료 상태의 후보가 없어 오늘 Dry-run 실행 계획은 비어 있습니다.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">순서</TableHead>
+                      <TableHead>후보 업체</TableHead>
+                      <TableHead>계획</TableHead>
+                      <TableHead>비용</TableHead>
+                      <TableHead>계획 후 상태</TableHead>
+                      <TableHead>제외 사유</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {schedulerPlan.candidates.map((candidate) => (
+                      <TableRow key={candidate.itemId}>
+                        <TableCell className="align-top font-medium tabular-nums">
+                          {candidate.sequence ?? "-"}
+                        </TableCell>
+                        <TableCell className="min-w-52 align-top">
+                          <p className="font-medium">{candidate.businessName}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {candidate.region}
+                            {candidate.city ? ` ${candidate.city}` : ""} · {candidate.service}
+                          </p>
+                        </TableCell>
+                        <TableCell className="min-w-32 align-top">
+                          {candidate.planned ? (
+                            <div className="space-y-1">
+                              <Badge variant="secondary">오늘 계획</Badge>
+                              {candidate.dispatchNow && (
+                                <p className="text-xs text-muted-foreground">지금 시작 가능</p>
+                              )}
+                            </div>
+                          ) : (
+                            <Badge variant="outline">계획 제외</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="align-top text-sm">
+                          <p>{candidate.plannedJobs} jobs</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {usd(candidate.estimatedCostUsd)} · 최대 {usd(candidate.maxCostUsd)}
+                          </p>
+                        </TableCell>
+                        <TableCell className="min-w-40 align-top text-xs text-muted-foreground">
+                          {candidate.planned ? (
+                            <>
+                              <p>측정권 {candidate.creditBalanceAfter}회</p>
+                              <p className="mt-1">
+                                요청 {candidate.projectedDailyRequestsAfter}/
+                                {schedulerPlan.dailyRequestLimit}
+                              </p>
+                            </>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell className="min-w-48 align-top">
+                          {candidate.blockers.length === 0 ? (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          ) : (
+                            <div className="space-y-1">
+                              {candidate.blockers.map((blocker) => (
+                                <p key={blocker} className="text-xs text-muted-foreground">
+                                  · {schedulerBlockerLabel(blocker)}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              v0.5 Guarded Scheduler는 동일한 Dry-run 순서를 사용하며, master switch OFF 상태에서는 어떤 후보도 claim하거나 측정하지 않습니다.
+              ON 이후에도 한 번에 1건만 원자적으로 claim하고 이전 Run이 완료·실패로 정리된 뒤에만 다음 후보를 시작합니다.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {schedulerOps && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-base">자동 실행 제어</CardTitle>
+                  <Badge
+                    variant={
+                      schedulerOps.plan.schedulerState === "running"
+                        ? "default"
+                        : schedulerOps.plan.schedulerState === "paused"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    {schedulerOps.plan.schedulerState === "running"
+                      ? "RUNNING"
+                      : schedulerOps.plan.schedulerState === "paused"
+                        ? "PAUSED"
+                        : "OFF"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  활성화는 계획 고정 → 요청 생성 → 확인 문구 입력의 2단계를 모두 통과해야 합니다.
+                  일시정지·중지는 진행 중 Run을 강제로 취소하지 않고 다음 후보 시작만 막습니다.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {schedulerOps.plan.schedulerState === "running" ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={pauseSchedulerMutation.isPending}
+                      onClick={() => pauseSchedulerMutation.mutate()}
+                    >
+                      일시정지
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={stopSchedulerMutation.isPending}
+                      onClick={() => stopSchedulerMutation.mutate()}
+                    >
+                      자동 실행 중지
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={
+                      !schedulerOps.plan.canRequestActivation ||
+                      requestActivationMutation.isPending ||
+                      !!schedulerOps.pendingRequest
+                    }
+                    onClick={() => requestActivationMutation.mutate()}
+                  >
+                    활성화 요청 만들기
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">실행기</p>
+                <p className="mt-2 font-semibold">
+                  {!schedulerOps.plan.executorDeployed
+                    ? "배포 대기"
+                    : schedulerOps.plan.executorReady
+                      ? "배포·QA 완료"
+                      : "배포 완료 · QA 대기"}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">Cron</p>
+                <p className="mt-2 font-semibold">
+                  {schedulerOps.plan.cronJobExists
+                    ? schedulerOps.plan.cronActive
+                      ? "활성"
+                      : "비활성"
+                    : "없음"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {schedulerOps.plan.cronSchedule ?? "-"}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">Scheduler actor</p>
+                <p className="mt-2 font-semibold">
+                  {schedulerOps.plan.schedulerActorConfigured ? "설정됨" : "미설정"}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground">활성화 계획</p>
+                <p className="mt-2 font-semibold">
+                  오늘 {schedulerOps.plan.dryRun.plannedCandidateCount}곳 · 즉시{" "}
+                  {schedulerOps.plan.dryRun.dispatchNowCount}곳
+                </p>
+              </div>
+            </div>
+
+            {schedulerOps.plan.blockers.length > 0 && schedulerOps.plan.schedulerState !== "running" && (
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <p className="text-sm font-semibold">현재 활성화 차단 조건</p>
+                <div className="mt-2 space-y-1">
+                  {schedulerOps.plan.blockers.map((blocker) => (
+                    <p key={blocker} className="text-sm text-muted-foreground">
+                      · {activationBlockerLabel(blocker)}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {schedulerOps.pendingRequest && (
+              <div className="rounded-lg border border-primary/25 bg-primary/[0.03] p-4">
+                <p className="text-sm font-semibold">활성화 요청 생성됨</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  만료 {formatSeoul(schedulerOps.pendingRequest.expiresAt)} · 계획이 바뀌면 최종 활성화가 자동 거부됩니다.
+                </p>
+                {schedulerOps.pendingRequest.requestedByCurrentUser ? (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      value={activationConfirmation}
+                      onChange={(event) => setActivationConfirmation(event.target.value)}
+                      placeholder={schedulerOps.plan.confirmText}
+                      disabled={confirmActivationMutation.isPending}
+                    />
+                    <Button
+                      className="shrink-0"
+                      disabled={
+                        activationConfirmation.trim() !== schedulerOps.plan.confirmText ||
+                        confirmActivationMutation.isPending
+                      }
+                      onClick={() =>
+                        confirmActivationMutation.mutate(
+                          schedulerOps.pendingRequest!.requestId,
+                        )
+                      }
+                    >
+                      {confirmActivationMutation.isPending
+                        ? "최종 확인 중…"
+                        : "최종 활성화"}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    다른 운영자가 만든 요청입니다. 요청 생성자가 최종 확인해야 합니다.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p className="text-[11px] leading-5 text-muted-foreground">
+              실행기 배포 여부와 별개로 executor_ready가 false인 동안 자동 실행 활성화는 차단됩니다.
+              Cron job도 최종 활성화 전까지 비활성 상태를 유지합니다.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-dashed">
+        <CardHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base">공개 업체 Discovery Preview</CardTitle>
+            <Badge variant="outline">v0.9.1</Badge>
+            <Badge variant="secondary">읽기 전용</Badge>
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">
+            지역·서비스 조건으로 공개 웹에서 실제 업체 후보와 근거 URL을 찾습니다.
+            이 단계에서는 업체·후보·질문·Run·Job을 저장하지 않고 측정권도 차감하지 않습니다.
+            OpenAI 웹 검색 호출만 발생합니다.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label>내부 관찰 조직</Label>
+              <Select value={orgId} onValueChange={setOrgId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="조직 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {overview.organizations.map((org) => (
+                    <SelectItem key={org.orgId} value={org.orgId}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>업종</Label>
+              <Select value={discoveryCategory} onValueChange={setDiscoveryCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="업종 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUTOMOTIVE_CATEGORY_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>주력 서비스</Label>
+              <Select
+                value={discoveryServiceSelect}
+                onValueChange={(value) => {
+                  setDiscoveryServiceSelect(value);
+                  if (value !== INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION) {
+                    setDiscoveryServiceCustom("");
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="서비스 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INTERNAL_OBSERVATION_SERVICE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {discoveryServiceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION && (
+                <Input
+                  value={discoveryServiceCustom}
+                  onChange={(event) => setDiscoveryServiceCustom(event.target.value)}
+                  placeholder="서비스 직접 입력"
+                />
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="discovery-region">기준 지역</Label>
+              <Input
+                id="discovery-region"
+                value={discoveryRegion}
+                onChange={(event) => setDiscoveryRegion(event.target.value)}
+                placeholder="예: 경기"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="discovery-city">상세 지역 (선택)</Label>
+              <Input
+                id="discovery-city"
+                value={discoveryCity}
+                onChange={(event) => setDiscoveryCity(event.target.value)}
+                placeholder="예: 안산"
+              />
+            </div>
+
+            <div className="space-y-1.5 md:col-span-2">
+              <Label htmlFor="discovery-brand">브랜드·차종 포커스 (선택)</Label>
+              <Input
+                id="discovery-brand"
+                value={discoveryBrandModel}
+                onChange={(event) => setDiscoveryBrandModel(event.target.value)}
+                placeholder="예: 테슬라 모델Y / 수입차"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="discovery-count">후보 수</Label>
+              <Input
+                id="discovery-count"
+                type="number"
+                min={1}
+                max={8}
+                value={discoveryDesiredCount}
+                onChange={(event) => setDiscoveryDesiredCount(event.target.value)}
+              />
+            </div>
+
+            <div className="flex items-end">
+              <Button
+                className="w-full"
+                disabled={!canDiscover}
+                onClick={() => discoveryMutation.mutate()}
+              >
+                {discoveryMutation.isPending ? "공개 웹 탐색 중…" : "공개 후보 찾기"}
+              </Button>
+            </div>
+          </div>
+
+          {discoveryPreview && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">Preview 자체 저장 없음</Badge>
+                <Badge variant="secondary">
+                  Review Queue {discoveryReviewItems.length}건
+                </Badge>
+                <span>후보 {discoveryPreview.candidates.length}곳</span>
+                <span>· 공개 검색 근거 {discoveryPreview.publicSourceCount}개</span>
+                <span>· 측정권 차감 없음</span>
+              </div>
+
+              {discoveryPreview.candidates.length === 0 ? (
+                <p className="rounded-lg border p-5 text-sm text-muted-foreground">
+                  검증 가능한 공개 근거가 있는 후보를 찾지 못했습니다. 지역이나 서비스를 조금 넓혀 다시 확인해 주세요.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {discoveryPreview.candidates.map((candidate) => (
+                    <div
+                      key={`${candidate.name}|${candidate.websiteUrl ?? ""}`}
+                      className="rounded-lg border p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold">{candidate.name}</p>
+                            <Badge
+                              variant={discoveryDuplicateVariant(candidate.duplicateStatus)}
+                            >
+                              {discoveryDuplicateLabel(candidate.duplicateStatus)}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {candidate.category} · {candidate.region}
+                            {candidate.city ? ` ${candidate.city}` : ""} · {candidate.service}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {candidate.websiteUrl && (
+                            <a
+                              href={candidate.websiteUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs underline underline-offset-4"
+                            >
+                              공개 사이트 보기
+                            </a>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={saveDiscoveryMutation.isPending}
+                            onClick={() => saveDiscoveryMutation.mutate(candidate)}
+                          >
+                            {saveDiscoveryMutation.isPending &&
+                            saveDiscoveryMutation.variables?.name === candidate.name
+                              ? "저장 중…"
+                              : "검토 후보로 저장"}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {candidate.duplicateWarnings.length > 0 && (
+                        <div className="mt-3 rounded-md bg-muted/30 p-3">
+                          {candidate.duplicateWarnings.map((warning) => (
+                            <p key={warning} className="text-xs text-muted-foreground">
+                              · {warning}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-3 space-y-2">
+                        <p className="text-xs font-medium">공개 근거</p>
+                        {candidate.evidence.map((evidence) => (
+                          <div key={evidence.url} className="text-xs leading-5">
+                            <a
+                              href={evidence.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline underline-offset-4"
+                            >
+                              {evidence.title || evidence.domain}
+                            </a>
+                            {evidence.note && (
+                              <span className="ml-2 text-muted-foreground">
+                                {evidence.note}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+                        Preview 결과는 자동 등록하지 않습니다. 필요 후보만 Review Queue에 저장하고,
+                        승인 이후에도 v0.9.3 전까지 기존 측정 파이프라인으로 자동 이동하지 않습니다.
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">Discovery Review Queue</CardTitle>
+              <Badge variant="outline">v0.9.2</Badge>
+              <Badge variant="secondary">측정 연결 없음</Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              공개 후보 중 저장한 업체만 검토합니다. 승인·제외·중복·지점 확인 필요 상태를
+              기록하지만, 승인만으로 업체 등록·24문항 준비·Run 생성·측정권 차감은 발생하지 않습니다.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={discoveryReviewQuery.isFetching}
+            onClick={() => discoveryReviewQuery.refetch()}
+          >
+            {discoveryReviewQuery.isFetching ? "불러오는 중…" : "Queue 새로고침"}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border p-4">
+              <p className="text-xs text-muted-foreground">전체 저장 후보</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums">
+                {discoveryReviewItems.length}곳
+              </p>
+            </div>
+            <div className="rounded-lg border p-4">
+              <p className="text-xs text-muted-foreground">검토 필요</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums">
+                {discoveryNeedsReviewCount}곳
+              </p>
+            </div>
+            <div className="rounded-lg border p-4">
+              <p className="text-xs text-muted-foreground">승인</p>
+              <p className="mt-2 text-2xl font-bold tabular-nums">
+                {discoveryApprovedCount}곳
+              </p>
+            </div>
+          </div>
+
+          {discoveryReviewQuery.isLoading && !discoveryReviewQuery.data ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              검토 후보를 불러오는 중…
+            </p>
+          ) : discoveryReviewItems.length === 0 ? (
+            <p className="rounded-lg border py-8 text-center text-sm text-muted-foreground">
+              저장된 검토 후보가 없습니다. 위 Discovery Preview에서 필요한 업체만 저장해 주세요.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>후보 업체</TableHead>
+                    <TableHead>공개 근거</TableHead>
+                    <TableHead>중복 신호</TableHead>
+                    <TableHead>검토 상태</TableHead>
+                    <TableHead>최근 발견</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {discoveryReviewItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="min-w-56 align-top">
+                        <p className="font-medium">{item.businessName}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {item.category} · {item.region}
+                          {item.city ? ` ${item.city}` : ""} · {item.service}
+                        </p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          아직 기존 수집 파이프라인으로 승격되지 않음
+                        </p>
+                      </TableCell>
+                      <TableCell className="min-w-52 align-top">
+                        <p className="text-sm">
+                          검증 URL {item.sourceEvidence.length}개
+                        </p>
+                        {item.sourceEvidence[0] && (
+                          <a
+                            href={item.sourceEvidence[0].url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 block max-w-56 truncate text-xs underline underline-offset-4"
+                            title={item.sourceEvidence[0].title ?? item.sourceEvidence[0].url}
+                          >
+                            {item.sourceEvidence[0].title ??
+                              item.sourceEvidence[0].domain}
+                          </a>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-44 align-top">
+                        <Badge variant={discoveryDuplicateVariant(item.duplicateStatus)}>
+                          {discoveryDuplicateLabel(item.duplicateStatus)}
+                        </Badge>
+                        {item.duplicateWarnings.slice(0, 2).map((warning) => (
+                          <p
+                            key={warning}
+                            className="mt-1 text-[11px] leading-4 text-muted-foreground"
+                          >
+                            {warning}
+                          </p>
+                        ))}
+                      </TableCell>
+                      <TableCell className="min-w-48 align-top">
+                        <div className="space-y-2">
+                          <Badge variant={discoveryReviewVariant(item.reviewStatus)}>
+                            {discoveryReviewLabel(item.reviewStatus)}
+                          </Badge>
+                          <Select
+                            value={item.reviewStatus}
+                            disabled={
+                              updateDiscoveryReviewMutation.isPending ||
+                              item.promotedPipelineItemId !== null
+                            }
+                            onValueChange={(value) =>
+                              updateDiscoveryReviewMutation.mutate({
+                                itemId: item.id,
+                                reviewStatus:
+                                  value as InternalObservationDiscoveryReviewStatus,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="needs_review">검토 대기</SelectItem>
+                              <SelectItem value="approved">승인</SelectItem>
+                              <SelectItem value="rejected">제외</SelectItem>
+                              <SelectItem value="duplicate">중복</SelectItem>
+                              <SelectItem value="needs_identity_review">
+                                지점 확인 필요
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          {item.promotedPipelineItemId ? (
+                            <Badge variant="secondary">승격 완료</Badge>
+                          ) : item.reviewStatus === "approved" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full"
+                              disabled={promotionPreviewMutation.isPending}
+                              onClick={() => openPromotionPreview(item.id)}
+                            >
+                              승격 미리보기
+                            </Button>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="min-w-36 align-top text-xs text-muted-foreground">
+                        {formatSeoul(item.lastSeenAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            v0.9.2의 ‘승인’은 검토 결과만 저장합니다. v0.9.3 승격은 별도 미리보기와 명시적 확인을
+            거쳐 기존 수집 파이프라인의 준비 대기(pending) 후보까지만 생성합니다.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={promotionOpen}
+        onOpenChange={(open) => {
+          setPromotionOpen(open);
+          if (!open) {
+            setPromotionReviewItemId(null);
+            promotionPreviewMutation.reset();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Discovery 후보 승격 미리보기</DialogTitle>
+            <DialogDescription>
+              최신 업체 identity와 기존 수집 후보를 다시 확인합니다. 승격해도 24문항 준비나
+              측정은 시작하지 않습니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {promotionPreviewMutation.isPending && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              최신 승격 조건을 확인하는 중…
+            </p>
+          )}
+
+          {promotionPreviewMutation.data &&
+            !promotionPreviewMutation.data.ok && (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                승격 계획을 불러오지 못했습니다.
+              </p>
+            )}
+
+          {promotionPlan && (
+            <div className="space-y-4">
+              <div className="rounded-lg border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">{promotionPlan.businessName}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {promotionPlan.category} · {promotionPlan.region}
+                      {promotionPlan.city ? ` ${promotionPlan.city}` : ""} ·{" "}
+                      {promotionPlan.service}
+                    </p>
+                  </div>
+                  <Badge variant={promotionPlan.canPromote ? "default" : "destructive"}>
+                    {promotionPlan.canPromote ? "승격 가능" : "확인 필요"}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">승격 결과</p>
+                  <p className="mt-2 font-semibold">
+                    {promotionPlan.action === "create_pending_candidate"
+                      ? "기존 수집 파이프라인에 pending 후보 생성"
+                      : "이미 존재하는 동일 후보와 연결"}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">공개 근거</p>
+                  <p className="mt-2 font-semibold tabular-nums">
+                    {promotionPlan.sourceEvidenceCount}개 URL
+                  </p>
+                </div>
+              </div>
+
+              {promotionPlan.existingBusiness && (
+                <div className="rounded-lg border p-4 text-sm">
+                  <p className="font-medium">기존 업체 identity 일치</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {promotionPlan.existingBusiness.name} ·{" "}
+                    {promotionPlan.existingBusiness.active ? "활성" : "비활성"}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    활성 업체 1곳과 정확히 일치하면 이후 기존 24문항 준비 단계에서 재사용 여부를
+                    다시 미리보기합니다.
+                  </p>
+                </div>
+              )}
+
+              {promotionPlan.existingPipelineItemId && (
+                <div className="rounded-lg bg-muted/30 p-4 text-sm">
+                  동일 조건의 기존 수집 후보가 있어 새 후보를 만들지 않고 기존 후보에 연결합니다.
+                </div>
+              )}
+
+              {promotionPlan.blockers.length > 0 && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="text-sm font-semibold text-destructive">승격 차단 조건</p>
+                  <div className="mt-2 space-y-1">
+                    {promotionPlan.blockers.map((blocker) => (
+                      <p key={blocker} className="text-xs text-destructive">
+                        · {discoveryPromotionBlockerLabel(blocker)}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg bg-muted/30 p-4 text-xs leading-5 text-muted-foreground">
+                <p>승격 시 측정권 차감: 없음</p>
+                <p>Run 생성: 없음 · Job 생성: 없음</p>
+                <p>통합 24문항 생성: 없음</p>
+                <p>
+                  승격 뒤 기존 ‘준비 미리보기 → 준비 실행’ 단계를 별도로 거쳐야
+                  ready_to_measure가 됩니다.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPromotionOpen(false)}
+              disabled={confirmPromotionMutation.isPending}
+            >
+              취소
+            </Button>
+            <Button
+              disabled={
+                !promotionPlan?.canPromote ||
+                confirmPromotionMutation.isPending
+              }
+              onClick={() => {
+                if (!promotionPlan) return;
+                confirmPromotionMutation.mutate({
+                  reviewItemId: promotionPlan.reviewItemId,
+                  planHash: promotionPlan.planHash,
+                  confirmation: promotionPlan.confirmationText,
+                });
+              }}
+            >
+              {confirmPromotionMutation.isPending
+                ? "승격 중…"
+                : "기존 파이프라인으로 승격"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Card className="border-dashed">
+        <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-base">Recurring Discovery</CardTitle>
+              <Badge variant="outline">v0.9.4</Badge>
+              <Badge
+                variant={
+                  discoveryRecurringOverview?.globalCron.active
+                    ? "destructive"
+                    : "secondary"
+                }
+              >
+                글로벌 자동 반복{" "}
+                {discoveryRecurringOverview?.globalCron.active ? "ON" : "OFF"}
+              </Badge>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              같은 지역·서비스를 반복 탐색해 신규·변경·동일 후보를 구분합니다.
+              신규·변경 후보는 Review Queue에만 반영하며 자동 승인·자동 승격·자동 측정은 하지 않습니다.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={discoveryRecurringQuery.isFetching}
+            onClick={() => discoveryRecurringQuery.refetch()}
+          >
+            {discoveryRecurringQuery.isFetching ? "확인 중…" : "반복 탐색 상태 새로고침"}
+          </Button>
+        </CardHeader>
+
+        <CardContent className="space-y-5">
+          <div className="rounded-lg border bg-muted/20 p-4">
+            <p className="text-sm font-semibold">반복 탐색 프로필 만들기</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              현재 Discovery 입력이 있으면 그 조건을 사용하고, 페이지 새로고침 등으로 입력이
+              비어 있으면 Review Queue의 가장 최근 Discovery 조건을 자동으로 재사용합니다.
+              프로필은 자동 실행 OFF로 저장되며, 먼저 수동 1회 실행으로 결과를 검증합니다.
+            </p>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="space-y-1.5 xl:col-span-2">
+                <Label htmlFor="recurring-name">프로필 이름</Label>
+                <Input
+                  id="recurring-name"
+                  value={recurringName}
+                  onChange={(event) => setRecurringName(event.target.value)}
+                  placeholder="예: 안산 PPF 주간 후보 탐색"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>주기</Label>
+                <Select
+                  value={recurringCadence}
+                  onValueChange={(value) =>
+                    setRecurringCadence(value as InternalObservationDiscoveryCadence)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">매일</SelectItem>
+                    <SelectItem value="weekly">매주</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {recurringCadence === "weekly" && (
+                <div className="space-y-1.5">
+                  <Label>요일</Label>
+                  <Select
+                    value={recurringWeekdayIso}
+                    onValueChange={setRecurringWeekdayIso}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">월요일</SelectItem>
+                      <SelectItem value="2">화요일</SelectItem>
+                      <SelectItem value="3">수요일</SelectItem>
+                      <SelectItem value="4">목요일</SelectItem>
+                      <SelectItem value="5">금요일</SelectItem>
+                      <SelectItem value="6">토요일</SelectItem>
+                      <SelectItem value="7">일요일</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="recurring-hour">실행 시각(KST)</Label>
+                <Input
+                  id="recurring-hour"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={recurringRunHourKst}
+                  onChange={(event) => setRecurringRunHourKst(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-md bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
+              {recurringDiscoveryQuery ? (
+                <>
+                  {recurringDiscoveryQuerySource} · {recurringDiscoveryQuery.category} ·{" "}
+                  {recurringDiscoveryQuery.region}
+                  {recurringDiscoveryQuery.city
+                    ? ` ${recurringDiscoveryQuery.city}`
+                    : ""}{" "}
+                  · {recurringDiscoveryQuery.service} · 후보{" "}
+                  {recurringDiscoveryQuery.desiredCount}곳
+                </>
+              ) : (
+                <>
+                  반복 탐색 조건 없음 · 위 Discovery Preview를 실행하거나 Review Queue에 저장된
+                  후보가 있어야 합니다.
+                </>
+              )}
+            </div>
+
+            <Button
+              className="mt-3"
+              variant="outline"
+              disabled={!canSaveRecurringSchedule}
+              onClick={() => saveDiscoveryScheduleMutation.mutate()}
+            >
+              {saveDiscoveryScheduleMutation.isPending
+                ? "프로필 저장 중…"
+                : "반복 탐색 프로필 저장 · 자동 OFF"}
+            </Button>
+          </div>
+
+          {discoverySchedules.length === 0 ? (
+            <p className="rounded-lg border py-8 text-center text-sm text-muted-foreground">
+              저장된 반복 탐색 프로필이 없습니다.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>탐색 프로필</TableHead>
+                    <TableHead>주기</TableHead>
+                    <TableHead>반복 대상</TableHead>
+                    <TableHead>최근 결과</TableHead>
+                    <TableHead>작업</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {discoverySchedules.map((schedule) => (
+                    <TableRow key={schedule.id}>
+                      <TableCell className="min-w-60 align-top">
+                        <p className="font-medium">{schedule.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {schedule.category} · {schedule.region}
+                          {schedule.city ? ` ${schedule.city}` : ""} ·{" "}
+                          {schedule.service} · 후보 {schedule.desiredCount}곳
+                        </p>
+                      </TableCell>
+                      <TableCell className="min-w-32 align-top text-sm">
+                        {schedule.cadence === "daily"
+                          ? `매일 ${schedule.runHourKst}시`
+                          : `매주 ${["", "월", "화", "수", "목", "금", "토", "일"][schedule.weekdayIso ?? 0]}요일 ${schedule.runHourKst}시`}
+                      </TableCell>
+                      <TableCell className="min-w-32 align-top">
+                        <Badge variant={schedule.enabled ? "default" : "outline"}>
+                          {schedule.enabled ? "대상 포함" : "대상 제외"}
+                        </Badge>
+                        {!discoveryRecurringOverview?.globalCron.active && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            글로벌 Gate OFF
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-40 align-top text-xs text-muted-foreground">
+                        {schedule.lastCompletedAt
+                          ? formatSeoul(schedule.lastCompletedAt)
+                          : "아직 실행 없음"}
+                        {schedule.lastStatus && (
+                          <p className="mt-1">
+                            {schedule.lastStatus === "completed" ? "완료" : "실패"}
+                            {schedule.lastErrorCode
+                              ? ` · ${schedule.lastErrorCode}`
+                              : ""}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-44 align-top">
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={runDiscoveryScheduleNowMutation.isPending}
+                            onClick={() =>
+                              runDiscoveryScheduleNowMutation.mutate(schedule.id)
+                            }
+                          >
+                            {runDiscoveryScheduleNowMutation.isPending &&
+                            runDiscoveryScheduleNowMutation.variables === schedule.id
+                              ? "탐색 중…"
+                              : "지금 1회 실행"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={setDiscoveryScheduleEnabledMutation.isPending}
+                            onClick={() =>
+                              setDiscoveryScheduleEnabledMutation.mutate({
+                                scheduleId: schedule.id,
+                                enabled: !schedule.enabled,
+                              })
+                            }
+                          >
+                            {schedule.enabled ? "반복 대상 제외" : "반복 대상 포함"}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {discoveryRecentBatches.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">최근 Discovery 배치</p>
+              <div className="grid gap-2 md:grid-cols-2">
+                {discoveryRecentBatches.slice(0, 6).map((batch) => (
+                  <div key={batch.id} className="rounded-lg border p-3 text-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium">
+                        {batch.triggerSource === "manual" ? "수동 1회" : "예약 실행"}
+                      </span>
+                      <Badge
+                        variant={
+                          batch.status === "completed"
+                            ? "outline"
+                            : batch.status === "failed"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {batch.status === "completed"
+                          ? "완료"
+                          : batch.status === "failed"
+                            ? "실패"
+                            : "진행 중"}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-muted-foreground">
+                      {formatSeoul(batch.startedAt)}
+                    </p>
+                    {batch.status === "completed" && (
+                      <p className="mt-1">
+                        신규 {batch.newCount ?? 0} · 변경{" "}
+                        {batch.changedCount ?? 0} · 동일{" "}
+                        {batch.unchangedCount ?? 0}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {discoveryRecentChanges.length > 0 && (
+            <div className="rounded-lg border p-4">
+              <p className="text-sm font-semibold">최근 신규·변경 후보</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {discoveryRecentChanges.slice(0, 12).map((change) => (
+                  <Badge
+                    key={`${change.batchId}|${change.businessName}`}
+                    variant={change.classification === "new" ? "default" : "secondary"}
+                  >
+                    {change.classification === "new" ? "신규" : "변경"} ·{" "}
+                    {change.businessName}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[11px] leading-5 text-muted-foreground">
+            글로벌 자동 반복 Cron은 현재 별도 Gate입니다. 프로필을 ‘반복 대상 포함’으로 바꿔도
+            글로벌 Gate가 OFF이면 자동 웹 검색은 실행되지 않습니다. 수동 ‘지금 1회 실행’만
+            OpenAI 웹 검색 호출을 발생시킵니다.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">내부 수집 후보 추가</CardTitle>
+          <p className="text-xs leading-5 text-muted-foreground">
+            업종과 주력 서비스는 표준 목록을 사용하고, 서비스가 목록에 없을 때만 직접 입력합니다.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-1.5">
+            <Label>내부 관찰 조직</Label>
+            <Select value={orgId} onValueChange={setOrgId}>
+              <SelectTrigger>
+                <SelectValue placeholder="조직 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {overview.organizations.map((org) => (
+                  <SelectItem key={org.orgId} value={org.orgId}>
+                    {org.name} · 측정권 {org.creditBalance}회
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pipeline-business-name">업체명</Label>
+            <Input
+              id="pipeline-business-name"
+              value={businessName}
+              onChange={(event) => setBusinessName(event.target.value)}
+              placeholder="예: 샘플오토 판교점"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>업종</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="업종 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {AUTOMOTIVE_CATEGORY_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>주력 서비스</Label>
+            <Select
+              value={serviceSelect}
+              onValueChange={(value) => {
+                setServiceSelect(value);
+                if (value !== INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION) {
+                  setServiceCustom("");
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="서비스 선택" />
+              </SelectTrigger>
+              <SelectContent>
+                {INTERNAL_OBSERVATION_SERVICE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {serviceSelect === INTERNAL_OBSERVATION_CUSTOM_SERVICE_OPTION && (
+              <Input
+                value={serviceCustom}
+                onChange={(event) => setServiceCustom(event.target.value)}
+                placeholder="서비스를 직접 입력해 주세요"
+              />
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pipeline-region">기준 지역</Label>
+            <Input
+              id="pipeline-region"
+              value={region}
+              onChange={(event) => setRegion(event.target.value)}
+              placeholder="예: 경기"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pipeline-city">상세 지역</Label>
+            <Input
+              id="pipeline-city"
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+              placeholder="예: 성남시 분당구"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pipeline-brand">브랜드·차종 (선택)</Label>
+            <Input
+              id="pipeline-brand"
+              value={brandModel}
+              onChange={(event) => setBrandModel(event.target.value)}
+              placeholder="쉼표로 여러 개 입력 가능"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pipeline-need">고객 니즈 (선택)</Label>
+            <Input
+              id="pipeline-need"
+              value={customerNeed}
+              onChange={(event) => setCustomerNeed(event.target.value)}
+              placeholder="예: 보증, 당일 시공"
+            />
+          </div>
+
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="pipeline-website">홈페이지 (선택)</Label>
+            <Input
+              id="pipeline-website"
+              value={websiteUrl}
+              onChange={(event) => setWebsiteUrl(event.target.value)}
+              placeholder="https://example.com"
+            />
+          </div>
+
+          <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor="pipeline-naver">네이버 플레이스 (선택)</Label>
+            <Input
+              id="pipeline-naver"
+              value={naverPlaceUrl}
+              onChange={(event) => setNaverPlaceUrl(event.target.value)}
+              placeholder="https://..."
+            />
+          </div>
+
+          <div className="space-y-1.5 md:col-span-2 xl:col-span-3">
+            <Label htmlFor="pipeline-source">후보 출처 메모 (선택)</Label>
+            <Input
+              id="pipeline-source"
+              value={sourceLabel}
+              onChange={(event) => setSourceLabel(event.target.value)}
+              placeholder="예: 운영자 수동 후보 / 향후 Work 조사"
+            />
+          </div>
+
+          <div className="flex items-end">
+            <Button className="w-full" disabled={!canSubmit} onClick={() => enqueueMutation.mutate()}>
+              {enqueueMutation.isPending ? "등록 중…" : "후보 등록"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Action Opportunity v1.0 · 내부 실측 QA</CardTitle>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            수집 파이프라인 목록에 없는 기존 업체도 이름으로 검색해 대표 Run의 분석 결과를
+            읽기 전용으로 검수합니다. 고객 화면 미노출 · 새 측정 및 측정권 차감 없음
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Label htmlFor="action-opportunity-v1-qa-search">기존 업체 검색</Label>
+          <Input
+            id="action-opportunity-v1-qa-search"
+            value={qaBusinessSearch}
+            onChange={(event) => setQaBusinessSearch(event.target.value)}
+            placeholder="업체명 두 글자 이상 입력 (예: 카스페이스)"
+          />
+          {qaBusinessSearch.trim().length < 2 ? (
+            <p className="text-xs text-muted-foreground">
+              내부 관찰 조직을 선택한 후 업체명을 검색해 주세요.
+            </p>
+          ) : qaBusinessQuery.isPending ? (
+            <p className="text-xs text-muted-foreground">기존 업체 검색 중…</p>
+          ) : !qaBusinessQuery.data || !qaBusinessQuery.data.ok ? (
+            <p className="text-xs text-muted-foreground">
+              업체 목록을 불러오지 못했습니다. 운영자 권한과 선택 조직을 확인해 주세요.
+            </p>
+          ) : qaBusinesses.length === 0 ? (
+            <p className="text-xs text-muted-foreground">일치하는 활성 업체가 없습니다.</p>
+          ) : (
+            <div className="space-y-2">
+              {qaBusinesses.map((business) => (
+                <div
+                  key={business.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium">{business.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {[business.category, business.region, business.city].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setResultDisplayMode("operator");
+                      setResultTarget({
+                        orgId,
+                        businessId: business.id,
+                        businessName: business.name,
+                        runId: null,
+                      });
+                    }}
+                  >
+                    분석 미리보기
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setResultDisplayMode("customer");
+                      setResultTarget({
+                        orgId,
+                        businessId: business.id,
+                        businessName: business.name,
+                        runId: null,
+                      });
+                    }}
+                  >
+                    고객 화면 미리보기
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <CardTitle className="text-base">수집 파이프라인</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              화면은 15초마다 측정 종료와 Entity Facts v2 준비 여부를 자동 확인합니다. 필요하면 수동으로 다시 동기화할 수 있습니다.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={reconcileMutation.isPending}
+            onClick={() => reconcileMutation.mutate()}
+          >
+            {reconcileMutation.isPending ? "동기화 중…" : "상태 동기화"}
+          </Button>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {overview.items.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              등록된 내부 수집 후보가 없습니다.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>후보 업체</TableHead>
+                  <TableHead>조직</TableHead>
+                  <TableHead>상태</TableHead>
+                  <TableHead>질문/측정 준비</TableHead>
+                  <TableHead>오류·확인</TableHead>
+                  <TableHead>등록 시각</TableHead>
+                  <TableHead className="text-right">작업</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {overview.items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="min-w-56 align-top">
+                      <p className="font-medium">{item.businessName}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {item.category} · {item.region}
+                        {item.city ? ` ${item.city}` : ""} · {item.service}
+                      </p>
+                      {(item.brandModel || item.customerNeed) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {[item.brandModel, item.customerNeed].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="min-w-36 align-top text-sm">{item.orgName}</TableCell>
+                    <TableCell className="min-w-32 align-top">
+                      <Badge variant={statusVariant(item.status)}>{STATUS_LABELS[item.status]}</Badge>
+                    </TableCell>
+                    <TableCell className="min-w-52 align-top">
+                      <p className="text-sm">{readinessText(item)}</p>
+                      {item.questionSetId && (
+                        <p className="mt-1 text-xs text-muted-foreground">통합 24문항 준비됨</p>
+                      )}
+                      {item.readiness && !item.readiness.executionEnabled && (
+                        <p className="mt-1 text-xs text-muted-foreground">자동 실행 잠금 유지</p>
+                      )}
+                    </TableCell>
+                    <TableCell className="min-w-40 align-top">
+                      <p className="text-sm">{errorLabel(item.errorCode)}</p>
+                      {item.errorMessage && (
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {item.errorMessage}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap align-top text-xs text-muted-foreground">
+                      {formatSeoul(item.createdAt)}
+                    </TableCell>
+                    <TableCell className="align-top text-right">
+                      {(item.status === "pending" ||
+                        item.status === "blocked" ||
+                        (item.status === "failed" && !item.runId)) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={previewMutation.isPending || prepareMutation.isPending}
+                          onClick={() => openPreview(item.id)}
+                        >
+                          준비 미리보기
+                        </Button>
+                      )}
+                      {item.status === "ready_to_measure" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={executionPlanMutation.isPending || approveExecutionMutation.isPending}
+                          onClick={() => openExecutionPlan(item.id)}
+                        >
+                          실행 계획 보기
+                        </Button>
+                      )}
+                      {item.status === "measuring" && item.runId && (
+                        <Badge variant="secondary">Run 진행 중</Badge>
+                      )}
+                      {item.status === "postprocessing" && item.runId && (
+                        <Badge variant="secondary">결과 후처리 중</Badge>
+                      )}
+                      {item.status === "completed" && item.businessId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setResultTarget(item)}
+                        >
+                          결과 보기
+                        </Button>
+                      )}
+                      {item.status === "failed" && (
+                        <Badge variant="destructive">자동 재시도 없음</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={!!resultTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResultTarget(null);
+            setResultDisplayMode("operator");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              내부 수집 결과{resultTarget ? ` · ${resultTarget.businessName}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              완료된 파이프라인 Run의 Entity Facts v2 결과를 읽기 전용으로 확인합니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div
+            role="group"
+            aria-label="비공개 미리보기 모드 전환"
+            className="flex flex-wrap gap-2 rounded-lg border bg-muted/30 p-2"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={resultDisplayMode === "operator" ? "default" : "outline"}
+              aria-pressed={resultDisplayMode === "operator"}
+              onClick={() => setResultDisplayMode("operator")}
+            >
+              운영자 분석
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={resultDisplayMode === "customer" ? "default" : "outline"}
+              aria-pressed={resultDisplayMode === "customer"}
+              onClick={() => setResultDisplayMode("customer")}
+            >
+              고객 화면 미리보기
+            </Button>
+          </div>
+
+          {resultQuery.isLoading ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">결과를 불러오는 중…</p>
+          ) : !resultQuery.data || !resultQuery.data.ok ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              완료 상태이지만 결과를 불러오지 못했습니다. 상태 동기화를 다시 실행해 주세요.
+            </p>
+          ) : resultDisplayMode === "customer" ? (
+            customerPreviewModel ? (
+              <ActionOpportunityV1CustomerPreview
+                model={customerPreviewModel}
+                citedPages={qaCitationLinks}
+                citedPagesLoading={qaCitationPending}
+              />
+            ) : (
+              <p className="rounded-lg border p-5 text-sm leading-6 text-muted-foreground">
+                동일한 대표 측정의 분석 결과가 확인되지 않아 고객 화면을 미리 표시하지 않습니다.
+                운영자 분석에서 측정 범위를 확인해 주세요.
+              </p>
+            )
+          ) : (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">확정 노출</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {metricCountText(
+                      resultQuery.data.data.overview.confirmedMentionCount,
+                      resultQuery.data.data.overview.validCount,
+                      resultQuery.data.data.overview.visibilityLowerBoundPct,
+                      resultQuery.data.data.overview.visibilityUpperBoundPct,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">상위 3곳</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {metricCountText(
+                      resultQuery.data.data.overview.confirmedTop3Count,
+                      resultQuery.data.data.overview.validCount,
+                      resultQuery.data.data.overview.top3LowerBoundPct,
+                      resultQuery.data.data.overview.top3UpperBoundPct,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">관찰 업체</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {resultQuery.data.data.competitors.length}곳
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">내 업체 관련 페이지</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {verifiedPageSummary?.label ?? "미검증"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium">{resultQuery.data.data.scope.runName}</p>
+                  <Badge variant="outline">
+                    {resultQuery.data.data.scope.completedJobs}/{resultQuery.data.data.scope.totalJobs}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatSeoul(resultQuery.data.data.scope.measuredAt)} · 실패{" "}
+                  {resultQuery.data.data.scope.failedJobs}
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">검색 상황</p>
+                  <div className="mt-3 space-y-2">
+                    {resultQuery.data.data.questionGroups.map((group) => (
+                      <div key={group.intentType} className="flex items-center justify-between gap-3 text-sm">
+                        <span>{intentLabel(group.intentType)}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {group.confirmedMentionCount}/{group.validCount}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">함께 관찰된 업체</p>
+                  <div className="mt-3 space-y-2">
+                    {resultQuery.data.data.competitors.slice(0, 5).map((competitor) => (
+                      <div key={competitor.name} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate">{competitor.name}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {competitor.responseCount}회
+                        </span>
+                      </div>
+                    ))}
+                    {resultQuery.data.data.competitors.length === 0 && (
+                      <p className="text-sm text-muted-foreground">확정 관찰 업체가 없습니다.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {actionOpportunityRunMismatch && (
+                <p className="rounded-md border p-3 text-sm text-muted-foreground">
+                  선택한 파이프라인 Run과 현재 대표 Run이 다릅니다. 잘못된 측정 결과가
+                  이 항목의 근거로 표시되지 않도록 v1.0 미리보기를 숨겼습니다.
+                </p>
+              )}
+              {actionOpportunityPreview && (
+                <section className="space-y-3 rounded-lg border p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">Action Opportunity v1.0</p>
+                    <Badge variant="outline">내부 dry-run · 고객 화면 미노출</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    현재 대표 Run만 사용 · {actionOpportunityPreview.runId}
+                  </p>
+                  {actionOpportunityPresentation.primary.length === 0 ? (
+                    <p className="rounded-md border px-4 py-5 text-sm text-muted-foreground">
+                      이번 측정에서 규칙 기반으로 확인할 항목이 없습니다.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold">
+                          먼저 살펴볼 항목 {actionOpportunityPresentation.primary.length}개
+                        </p>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          이번 측정의 관찰 내용을 순서대로 정리했습니다.
+                          AI 노출 개선 효과나 원인에 대한 순위는 아닙니다.
+                        </p>
+                      </div>
+                      {actionOpportunityPresentation.primary.map((opportunity) => (
+                        <ActionOpportunityV1AdminCard
+                          key={opportunity.id}
+                          opportunity={opportunity}
+                          citationLinks={qaCitationLinks}
+                          citationPending={qaCitationPending}
+                        />
+                      ))}
+                      {actionOpportunityPresentation.additional.length > 0 && (
+                        <details className="group rounded-lg border bg-background">
+                          <summary className="cursor-pointer list-none px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-sm font-semibold">
+                                그 밖에 확인할 관찰 {actionOpportunityPresentation.additional.length}개
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                <span className="group-open:hidden">펼쳐보기 ▾</span>
+                                <span className="hidden group-open:inline">접기 ▴</span>
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                              {actionOpportunityPresentation.additional
+                                .map((item) => item.title)
+                                .join(" · ")}
+                            </p>
+                          </summary>
+                          <div className="space-y-3 border-t px-3 py-3">
+                            {actionOpportunityPresentation.additional.map((opportunity) => (
+                              <ActionOpportunityV1AdminCard
+                                key={opportunity.id}
+                                opportunity={opportunity}
+                                citationLinks={qaCitationLinks}
+                                citationPending={qaCitationPending}
+                              />
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {actionOpportunityPreview.disclaimer}
+                  </p>
+                </section>
+              )}
+
+              <p className="text-xs leading-5 text-muted-foreground">
+                이 결과는 내부 데이터 축적용 관찰 결과입니다. 관찰 업체와 출처 연결은 인과관계를 의미하지 않습니다.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={executionOpen}
+        onOpenChange={(open) => {
+          if (approveExecutionMutation.isPending) return;
+          setExecutionOpen(open);
+          if (!open) {
+            setExecutionItemId(null);
+            executionPlanMutation.reset();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              측정 실행 계획{executionPlan ? ` · ${executionPlan.businessName}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              이 화면을 보는 것만으로는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.
+              마지막 승인 버튼을 눌렀을 때만 측정을 시작합니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {executionPlanMutation.isPending ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              측정권·예산·동시 실행·중복 Run 상태를 확인하는 중…
+            </p>
+          ) : !executionPlanMutation.data || !executionPlanMutation.data.ok || !executionPlan ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              실행 계획을 만들 수 없습니다. 파이프라인 상태를 다시 확인해 주세요.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">실행 규모</p>
+                  <p className="mt-2 text-lg font-semibold">{executionPlan.plannedJobs} jobs</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {executionPlan.provider} · 반복 {executionPlan.repetitions}회
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">예상 원가</p>
+                  <p className="mt-2 text-lg font-semibold">{usd(executionPlan.estimatedCostUsd)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    내부 최대 예약 {usd(executionPlan.maxCostUsd)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">측정권</p>
+                  <p className="mt-2 text-lg font-semibold tabular-nums">
+                    {executionPlan.creditBefore}회 → {executionPlan.creditAfter}회
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    실제 차감은 기존 Job 생성 트리거가 담당
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">자동 실행</p>
+                  <p className="mt-2 text-lg font-semibold">
+                    {executionPlan.automaticExecutionEnabled ? "ON" : "OFF"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    이번 건은 수동 승인
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">요청 한도</p>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">오늘 사용</span>
+                      <span className="tabular-nums">
+                        {executionPlan.dailyRequestsUsed}/{executionPlan.dailyRequestLimit}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">승인 후 예상</span>
+                      <span className="tabular-nums">
+                        {executionPlan.projectedDailyRequests}/{executionPlan.dailyRequestLimit}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">오늘 내부 실행</span>
+                      <span className="tabular-nums">
+                        {executionPlan.pipelineRunsToday}/{executionPlan.dailyPipelineRunLimit}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4">
+                  <p className="text-sm font-semibold">예산·동시 실행</p>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">월 실제+예약</span>
+                      <span className="tabular-nums">
+                        {usd(executionPlan.monthlyActualCostUsd + executionPlan.monthlyReservedCostUsd)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">승인 후 최대</span>
+                      <span className="tabular-nums">
+                        {usd(executionPlan.projectedMonthlyCostUsd)} / {usd(executionPlan.monthlyBudgetUsd)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">진행 중 Run</span>
+                      <span className="tabular-nums">
+                        {executionPlan.activeRunCount}/{executionPlan.concurrentRunLimit}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <p className="text-sm font-semibold">실행 대상</p>
+                <p className="mt-2 text-sm">
+                  {executionPlan.businessName} · {executionPlan.questionSetName}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  동일 조건 active Run ·{" "}
+                  {executionPlan.sameConditionRun
+                    ? `${executionPlan.sameConditionRun.status} · ${executionPlan.sameConditionRun.runId}`
+                    : "없음"}
+                </p>
+              </div>
+
+              {executionPlan.blockers.length > 0 ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="text-sm font-semibold">실행 차단 조건</p>
+                  <div className="mt-2 space-y-1">
+                    {executionPlan.blockers.map((blocker) => (
+                      <p key={blocker} className="text-sm text-muted-foreground">
+                        · {executionBlockerLabel(blocker)}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-primary/25 bg-primary/[0.03] p-4">
+                  <p className="text-sm font-semibold">실행 가능</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    현재 측정권·예산·동시 실행·중복 Run 조건을 모두 통과했습니다.
+                    승인 시 서버가 조건을 다시 계산하고 동일한 경우에만 측정을 시작합니다.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={approveExecutionMutation.isPending}
+              onClick={() => setExecutionOpen(false)}
+            >
+              취소
+            </Button>
+            <Button
+              disabled={!executionPlan?.canApprove || approveExecutionMutation.isPending}
+              onClick={() => {
+                if (!executionPlan?.canApprove) return;
+                approveExecutionMutation.mutate({
+                  itemId: executionPlan.itemId,
+                  planHash: executionPlan.planHash,
+                });
+              }}
+            >
+              {approveExecutionMutation.isPending ? "승인 처리 중…" : "측정 실행 승인"}
+            </Button>
+          </DialogFooter>
+          <p className="text-center text-[11px] text-muted-foreground">
+            승인 직전에 계획 fingerprint를 재검증합니다. 조건이 바뀌면 실행하지 않고 새 계획을 요구합니다.
+          </p>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={previewOpen}
+        onOpenChange={(open) => {
+          if (prepareMutation.isPending) return;
+          setPreviewOpen(open);
+          if (!open) {
+            setPreviewItemId(null);
+            previewMutation.reset();
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>준비 미리보기{preview ? ` · ${preview.businessName}` : ""}</DialogTitle>
+            <DialogDescription>
+              아직 업체나 질문을 생성하지 않습니다. 아래 내용을 확인한 뒤 준비를 실행하세요.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewMutation.isPending ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              기존 업체·질문 세트와 생성될 24문항을 확인하는 중…
+            </p>
+          ) : !previewMutation.data || !previewMutation.data.ok || !preview ? (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              미리보기를 만들 수 없습니다. 후보 입력과 기존 데이터 상태를 확인해 주세요.
+            </p>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">업체 처리</p>
+                  <p className="mt-2 font-semibold">{previewBusinessAction(preview.businessAction)}</p>
+                  {preview.existingBusinessName && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {preview.existingBusinessName}
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">질문 처리</p>
+                  <p className="mt-2 font-semibold">{previewQuestionAction(preview.questionSetAction)}</p>
+                  {preview.existingQuestionSetName && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {preview.existingQuestionSetName}
+                      {preview.existingQuestionCount !== null
+                        ? ` · ${preview.existingQuestionCount}문항`
+                        : ""}
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">측정 준비</p>
+                  <p className="mt-2 font-semibold">
+                    {preview.readiness.providerReady ? "Provider 준비됨" : "Provider 확인 필요"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    측정권 {preview.readiness.creditBalance}회 · 자동 측정{" "}
+                    {preview.readiness.executionEnabled ? "ON" : "OFF"}
+                  </p>
+                </div>
+              </div>
+
+              {preview.blockerCode && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                  <p className="text-sm font-semibold">자동 준비 중단</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {previewBlockerLabel(preview.blockerCode)}
+                  </p>
+                </div>
+              )}
+
+              {!preview.readiness.providerReady || preview.readiness.creditBalance < 1 ? (
+                <div className="rounded-lg border bg-muted/20 p-4">
+                  <p className="text-sm font-semibold">측정 준비 조건</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    업체와 질문 준비는 가능하지만 실제 측정을 시작하려면{" "}
+                    {!preview.readiness.providerReady ? "Provider 설정" : ""}
+                    {!preview.readiness.providerReady && preview.readiness.creditBalance < 1 ? "과 " : ""}
+                    {preview.readiness.creditBalance < 1 ? "측정권" : ""}을 먼저 확인해야 합니다.
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="rounded-lg border">
+                <div className="border-b px-4 py-3">
+                  <p className="font-semibold">생성 기준 24문항</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    기존 유효 질문 세트를 재사용하는 경우에도 현재 입력 기준으로 생성될 문항을 비교용으로 보여줍니다.
+                  </p>
+                </div>
+                <div className="max-h-[42vh] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead className="w-28">검색 상황</TableHead>
+                        <TableHead>질문</TableHead>
+                        <TableHead className="w-36">측정 지역</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {preview.questions.map((question) => (
+                        <TableRow key={question.index}>
+                          <TableCell className="text-xs tabular-nums">{question.index}</TableCell>
+                          <TableCell className="text-xs">
+                            {intentLabel(question.intentType)}
+                          </TableCell>
+                          <TableCell className="text-sm">{question.promptText}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {[question.region, question.city].filter(Boolean).join(" ") || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={prepareMutation.isPending}
+              onClick={() => setPreviewOpen(false)}
+            >
+              취소
+            </Button>
+            <Button
+              disabled={!preview?.canPrepare || prepareMutation.isPending}
+              onClick={() => {
+                if (!preview?.canPrepare) return;
+                prepareMutation.mutate(preview.itemId);
+              }}
+            >
+              {prepareMutation.isPending ? "준비 중…" : "확인하고 준비"}
+            </Button>
+          </DialogFooter>
+          <p className="text-center text-[11px] text-muted-foreground">
+            이 단계에서는 Run 생성, AI 호출, 측정권 차감이 발생하지 않습니다.
+          </p>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

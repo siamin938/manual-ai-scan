@@ -2,7 +2,9 @@
  * 고객용 standalone audit 측정 생성 (서버 전용).
  *
  * SECURITY CONTRACT
- * - 인증된 사용자 클라이언트(RLS)만 사용. service_role 미사용.
+ * - 일반 고객 경로는 인증된 사용자 클라이언트(RLS) + 조직 write-role을 요구한다.
+ * - 내부 자동 스케줄러는 internal_observation 조직 + 명시적 scheduler actor write-role 검증 후
+ *   동일한 측정 코어를 service-role client로 재사용한다.
  * - provider / 단가 / max_cost_usd / repetitions는 서버에서만 결정하고 DTO로 반환하지 않는다.
  * - 실패는 구조화된 에러코드만 반환하고 내부 설정명/SQL/비용을 노출하지 않는다.
  */
@@ -10,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import {
   CUSTOMER_RUN_REPETITIONS,
+  CUSTOMER_STANDARD_QUESTION_COUNT,
   calcEstimatedCostUsd,
   calcInternalMaxCostUsd,
   calcPlannedJobs,
@@ -18,6 +21,11 @@ import {
   type CreateCustomerMeasurementResult,
   type CustomerMeasurementErrorCode,
 } from "./customer-measurement.helpers";
+import {
+  UNIFIED_DIAGNOSTIC_SET_PREFIX,
+  hasUnifiedDiagnosticIntentShape,
+  isUnifiedDiagnosticSetName,
+} from "./custom-question-suggestions";
 
 type UserClient = SupabaseClient<Database>;
 
@@ -27,24 +35,53 @@ function fail(error: CustomerMeasurementErrorCode): CreateCustomerMeasurementRes
   return { ok: false, error };
 }
 
-export async function createCustomerMeasurementRun(args: {
+type MeasurementAuthorizationMode =
+  | "user_membership"
+  | "trusted_internal_scheduler";
+
+async function createStandaloneAuditMeasurementRun(args: {
   supabase: UserClient;
   userId: string;
   orgId: string;
   businessId: string;
   questionSetId: string;
   name?: string | null;
+  authorizationMode: MeasurementAuthorizationMode;
 }): Promise<CreateCustomerMeasurementResult> {
-  const { supabase, userId, orgId, businessId, questionSetId } = args;
+  const {
+    supabase,
+    userId,
+    orgId,
+    businessId,
+    questionSetId,
+    authorizationMode,
+  } = args;
 
-  // A) membership + write role
+  // A) authorization
   const { data: membership, error: memErr } = await supabase
     .from("organization_members")
     .select("role")
     .eq("org_id", orgId)
     .eq("user_id", userId)
     .maybeSingle();
-  if (memErr || !membership || !WRITE_ROLES.has(String(membership.role))) return fail("FORBIDDEN");
+  if (memErr || !membership || !WRITE_ROLES.has(String(membership.role))) {
+    return fail("FORBIDDEN");
+  }
+
+  if (authorizationMode === "trusted_internal_scheduler") {
+    const { data: schedulerOrg, error: schedulerOrgErr } = await supabase
+      .from("organizations")
+      .select("measurement_data_origin")
+      .eq("id", orgId)
+      .maybeSingle();
+    if (
+      schedulerOrgErr ||
+      !schedulerOrg ||
+      schedulerOrg.measurement_data_origin !== "internal_observation"
+    ) {
+      return fail("FORBIDDEN");
+    }
+  }
 
   // B) business scope
   const { data: business, error: bizErr } = await supabase
@@ -57,21 +94,32 @@ export async function createCustomerMeasurementRun(args: {
     .maybeSingle();
   if (bizErr || !business) return fail("INVALID_BUSINESS");
 
-  // C) question set scope
-  const { data: questionSet, error: setErr } = await supabase
+  // C) question set scope.
+  // 통합 AI 진단 세트가 하나라도 생긴 업체는 서버에서도 legacy 세트로 새 고객 측정을 만들지 않는다.
+  // UI 선택 제한만 믿지 않고 direct call도 같은 계약으로 fail-closed 한다.
+  const { data: activeQuestionSets, error: setErr } = await supabase
     .from("question_sets")
-    .select("id")
-    .eq("id", questionSetId)
+    .select("id, name, created_at")
     .eq("org_id", orgId)
     .eq("business_id", businessId)
     .eq("active", true)
-    .maybeSingle();
-  if (setErr || !questionSet) return fail("INVALID_QUESTION_SET");
+    .order("created_at", { ascending: false });
+  if (setErr) return fail("INTERNAL_ERROR");
 
-  // D) active questions, fail-closed on non-public data_class
+  const questionSet = (activeQuestionSets ?? []).find((set) => set.id === questionSetId);
+  if (!questionSet) return fail("INVALID_QUESTION_SET");
+
+  const newestUnifiedSet = (activeQuestionSets ?? []).find((set) =>
+    set.name.startsWith(UNIFIED_DIAGNOSTIC_SET_PREFIX),
+  );
+  if (newestUnifiedSet && questionSet.id !== newestUnifiedSet.id) {
+    return fail("INVALID_QUESTION_SET");
+  }
+
+  // D) active questions, fail-closed on non-public data_class.
   const { data: questions, error: qErr } = await supabase
     .from("questions")
-    .select("id, data_class")
+    .select("id, data_class, intent_type")
     .eq("org_id", orgId)
     .eq("question_set_id", questionSetId)
     .eq("active", true);
@@ -79,6 +127,39 @@ export async function createCustomerMeasurementRun(args: {
   const activeQuestions = questions ?? [];
   if (activeQuestions.length === 0) return fail("NO_ACTIVE_QUESTIONS");
   if (activeQuestions.some((q) => q.data_class !== "public")) return fail("RESTRICTED_QUESTIONS");
+
+  if (isUnifiedDiagnosticSetName(questionSet.name)) {
+    if (
+      activeQuestions.length !== CUSTOMER_STANDARD_QUESTION_COUNT ||
+      !hasUnifiedDiagnosticIntentShape(activeQuestions.map((q) => q.intent_type))
+    ) {
+      return fail("INVALID_QUESTION_SET");
+    }
+  }
+
+  // A queued run is already authorized and funded. A retry only reads its ID.
+  const baseSameConditionRunQuery = () =>
+    supabase
+      .from("measurement_runs")
+      .select("id, total_jobs")
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("question_set_id", questionSetId)
+      .eq("run_type", "audit")
+      .eq("phase", "standalone")
+      .eq("diagnostic_scope", "customer")
+      .is("experiment_id", null);
+
+  const { data: existingActiveRun, error: activeRunError } = await baseSameConditionRunQuery()
+    .in("status", ["queued", "running"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeRunError) return fail("INTERNAL_ERROR");
+  if (existingActiveRun) {
+    return { ok: true, runId: existingActiveRun.id, plannedJobs: existingActiveRun.total_jobs };
+  }
 
   // E) provider readiness (내부 설정명은 고객에게 노출하지 않음)
   const { data: providerSettings, error: psErr } = await supabase
@@ -152,28 +233,24 @@ export async function createCustomerMeasurementRun(args: {
   });
   if (limitError) return fail(limitError);
 
-  // 4) run 생성 (재시도 시 최근 draft 재사용 → 중복 run 방지)
+  // 4) run 생성.
+  // 이미 같은 조건의 고객 측정이 queued/running이면 사용자/탭과 무관하게 그 run을 재사용한다.
+  // 아직 enqueue 전인 draft는 같은 사용자의 최근 30분 draft만 재사용한다.
+  // enqueue-run 자체도 runId 기준 idempotent라 재호출은 안전하다.
   const now = new Date();
   const runName = (args.name ?? "").trim() || defaultRunName(business.name, now);
 
   const reuseSince = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-  const { data: existingDraft } = await supabase
-    .from("measurement_runs")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("business_id", businessId)
-    .eq("question_set_id", questionSetId)
-    .eq("run_type", "audit")
-    .eq("phase", "standalone")
-    .eq("diagnostic_scope", "customer")
+  const { data: existingDraft, error: draftError } = await baseSameConditionRunQuery()
     .eq("status", "draft")
     .eq("created_by", userId)
     .gte("created_at", reuseSince)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-
+  if (draftError) return fail("INTERNAL_ERROR");
   let runId = existingDraft?.id ?? null;
+
   if (!runId) {
     // data_origin은 조직 설정값을 그대로 승계한다(NOT NULL, DB 기본값 없음).
     const { data: orgRow } = await supabase
@@ -203,8 +280,23 @@ export async function createCustomerMeasurementRun(args: {
       })
       .select("id")
       .single();
-    if (insertErr || !inserted) return fail("MEASUREMENT_NOT_READY");
-    runId = inserted.id;
+    if (insertErr || !inserted) {
+      // DB partial unique index가 동시에 들어온 같은 조건의 active run을 원자적으로 막는다.
+      // 경쟁 요청이 먼저 생성한 row를 다시 읽어 동일 run으로 수렴시킨다.
+      if (insertErr?.code !== "23505") return fail("MEASUREMENT_NOT_READY");
+
+      const { data: racedRun, error: racedRunError } =
+        await baseSameConditionRunQuery()
+          .in("status", ["draft", "queued", "running"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+      if (racedRunError || !racedRun) return fail("MEASUREMENT_NOT_READY");
+      runId = racedRun.id;
+    } else {
+      runId = inserted.id;
+    }
   }
 
   // enqueue-run은 runId 기준 idempotent → 같은 run 재호출 안전
@@ -217,4 +309,37 @@ export async function createCustomerMeasurementRun(args: {
   }
 
   return { ok: true, runId, plannedJobs };
+}
+
+export async function createCustomerMeasurementRun(args: {
+  supabase: UserClient;
+  userId: string;
+  orgId: string;
+  businessId: string;
+  questionSetId: string;
+  name?: string | null;
+}): Promise<CreateCustomerMeasurementResult> {
+  return createStandaloneAuditMeasurementRun({
+    ...args,
+    authorizationMode: "user_membership",
+  });
+}
+
+export async function createInternalObservationScheduledMeasurementRun(args: {
+  supabase: UserClient;
+  schedulerActorUserId: string;
+  orgId: string;
+  businessId: string;
+  questionSetId: string;
+  name?: string | null;
+}): Promise<CreateCustomerMeasurementResult> {
+  return createStandaloneAuditMeasurementRun({
+    supabase: args.supabase,
+    userId: args.schedulerActorUserId,
+    orgId: args.orgId,
+    businessId: args.businessId,
+    questionSetId: args.questionSetId,
+    ...(args.name !== undefined ? { name: args.name } : {}),
+    authorizationMode: "trusted_internal_scheduler",
+  });
 }

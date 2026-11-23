@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,12 +30,15 @@ export const Route = createFileRoute("/_authenticated")({
 
 const NAV = [
   { to: "/dashboard", label: "AI 노출 진단" },
+  { to: "/measurement-history", label: "측정 기록" },
   { to: "/businesses", label: "업체 등록" },
   { to: "/questions", label: "질문 생성" },
   { to: "/runs", label: "측정하기" },
 ] as const;
 
 const INTERNAL_NAV = [
+  { to: "/pilot-ops", label: "파일럿 운영" },
+  { to: "/internal-observation-pipeline", label: "내부 데이터 수집" },
   { to: "/data-assets", label: "데이터 자산" },
   { to: "/measurement-credits", label: "측정권 관리" },
 ] as const;
@@ -42,32 +46,56 @@ const INTERNAL_NAV = [
 
 
 function AuthedLayout() {
-  const { session } = useSession();
+  const { session, ready } = useSession();
+  const navigate = useNavigate();
+
+  // A cross-tab sign-out can occur after beforeLoad has finished.
+  // Redirect before showing organization onboarding or a stale customer view.
+  useEffect(() => {
+    if (ready && !session) {
+      void navigate({ to: "/auth", replace: true });
+    }
+  }, [ready, session, navigate]);
+
+  if (!ready || !session) {
+    return <div className="py-16 text-center text-sm text-muted-foreground">로그인 상태를 확인하는 중…</div>;
+  }
+
   return (
-    <OrgProvider session={session}>
+    <OrgProvider key={session.user.id} session={session}>
       <ActiveTargetBusinessProvider>
-        <Shell />
+        <Shell sessionUserId={session.user.id} />
       </ActiveTargetBusinessProvider>
     </OrgProvider>
   );
 }
 
-function Shell() {
+function Shell({ sessionUserId }: { sessionUserId: string | null }) {
   const { memberships, activeOrgId, setActiveOrgId, role, loading } = useOrg();
   const navigate = useNavigate();
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const checkDataAssetAccess = useServerFn(canViewDataAssetAdmin);
   const { data: dataAssetAccess } = useQuery({
-    queryKey: ["can-view-data-asset-admin"],
+    queryKey: ["can-view-data-asset-admin", sessionUserId],
     queryFn: () => checkDataAssetAccess({ data: undefined }),
+    enabled: !!sessionUserId,
     retry: false,
-    staleTime: Infinity,
+    staleTime: 0,
   });
   const navItems = dataAssetAccess?.allowed ? [...NAV, ...INTERNAL_NAV] : [...NAV];
 
 
 
   async function signOut() {
-    await supabase.auth.signOut();
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setIsSigningOut(false);
+      return;
+    }
+
     navigate({ to: "/auth" });
   }
 
@@ -111,15 +139,22 @@ function Shell() {
               </Select>
             )}
             {role && <Badge variant="secondary" className="hidden font-medium sm:inline-flex">{ROLE_LABELS[role]}</Badge>}
-            <Button variant="outline" size="sm" onClick={signOut}>
-              로그아웃
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={signOut}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? "로그아웃 중…" : "로그아웃"}
             </Button>
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-7 lg:px-6 lg:py-10">
-        {loading ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>
+        {loading || isSigningOut ? (
+          <p className="py-16 text-center text-sm text-muted-foreground">
+            {isSigningOut ? "로그아웃 중…" : "불러오는 중…"}
+          </p>
         ) : memberships.length === 0 ? (
           <OrgOnboarding />
         ) : (

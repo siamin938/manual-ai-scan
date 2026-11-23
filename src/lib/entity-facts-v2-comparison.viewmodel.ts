@@ -29,6 +29,23 @@ export type EntityFactsV2ComparisonTrendPointViewModel = {
   unresolvedCount: number;
 };
 
+export type EntityFactsV2ComparisonCompactSummary = {
+  validCount: number;
+  previousConfirmedCount: number;
+  currentConfirmedCount: number;
+  confirmedDeltaCount: number;
+  newlyConfirmedQuestionCount: number | null;
+  noLongerConfirmedQuestionCount: number | null;
+  sameQuestionResultCount: number | null;
+};
+
+export type EntityFactsV2ComparisonSearchScopeViewModel = {
+  custom: EntityFactsV2ComparisonMetricViewModel;
+  core: EntityFactsV2ComparisonMetricViewModel;
+  newlyConfirmedQuestionCount: number;
+  noLongerConfirmedQuestionCount: number;
+};
+
 export type EntityFactsV2ComparisonViewModel = {
   version: typeof ENTITY_FACTS_V2_COMPARISON_VIEW_MODEL_VERSION;
   mode: EntityFactsV2ComparisonDisplayMode;
@@ -39,6 +56,8 @@ export type EntityFactsV2ComparisonViewModel = {
   compatibleMeasurementCount: number | null;
   visibility: EntityFactsV2ComparisonMetricViewModel | null;
   top3: EntityFactsV2ComparisonMetricViewModel | null;
+  searchScope: EntityFactsV2ComparisonSearchScopeViewModel | null;
+  compactSummary: EntityFactsV2ComparisonCompactSummary | null;
   trendSeries: EntityFactsV2ComparisonTrendPointViewModel[];
 };
 
@@ -138,6 +157,8 @@ function unavailable(args: {
     compatibleMeasurementCount: null,
     visibility: null,
     top3: null,
+    searchScope: null,
+    compactSummary: null,
     trendSeries: [],
   };
 }
@@ -186,6 +207,8 @@ export function buildEntityFactsV2ComparisonViewModel(
         metric: dto.top3,
         comparisonAvailable: false,
       }),
+      searchScope: null,
+      compactSummary: null,
       trendSeries: [],
     };
   }
@@ -210,18 +233,23 @@ export function buildEntityFactsV2ComparisonViewModel(
         metric: dto.top3,
         comparisonAvailable: false,
       }),
+      searchScope: null,
+      compactSummary: null,
       trendSeries: [],
     };
   }
 
-  const structurallyComparable =
-    dto.status === "verified" &&
-    dto.compatibleRunCount >= 2 &&
-    dto.previousRun !== null &&
-    dto.visibility.previous !== null &&
-    dto.top3.previous !== null;
+  const previousRun = dto.previousRun;
+  const previousVisibility = dto.visibility.previous;
+  const previousTop3 = dto.top3.previous;
 
-  if (!structurallyComparable) {
+  if (
+    dto.status !== "verified" ||
+    dto.compatibleRunCount < 2 ||
+    previousRun === null ||
+    previousVisibility === null ||
+    previousTop3 === null
+  ) {
     return unavailable({
       heading: "측정 비교를 준비할 수 없습니다",
       description: "비교 조건은 확인됐지만 이전 측정 정보를 완전하게 확인할 수 없습니다.",
@@ -232,6 +260,54 @@ export function buildEntityFactsV2ComparisonViewModel(
     dto.trendEligible &&
     dto.compatibleRunCount >= 3 &&
     dto.series.length >= 3;
+  const searchScope =
+    dto.searchScope &&
+    dto.searchScope.custom.previous !== null &&
+    dto.searchScope.core.previous !== null
+      ? {
+          custom: metricViewModel({
+            label: "상세 검색 확정 노출",
+            metric: dto.searchScope.custom,
+            comparisonAvailable: true,
+          }),
+          core: metricViewModel({
+            label: "기준 검색 확정 노출",
+            metric: dto.searchScope.core,
+            comparisonAvailable: true,
+          }),
+          newlyConfirmedQuestionCount: dto.searchScope.newlyConfirmedQuestionCount,
+          noLongerConfirmedQuestionCount: dto.searchScope.noLongerConfirmedQuestionCount,
+        }
+      : null;
+
+  const currentValidCount = dto.visibility.current.validCount;
+  const previousValidCount = previousVisibility.validCount;
+  const newlyConfirmedQuestionCount =
+    searchScope?.newlyConfirmedQuestionCount ?? null;
+  const noLongerConfirmedQuestionCount =
+    searchScope?.noLongerConfirmedQuestionCount ?? null;
+  const sameQuestionResultCount =
+    currentValidCount > 0 &&
+    currentValidCount === previousValidCount &&
+    newlyConfirmedQuestionCount !== null &&
+    noLongerConfirmedQuestionCount !== null &&
+    newlyConfirmedQuestionCount + noLongerConfirmedQuestionCount <=
+      currentValidCount
+      ? currentValidCount -
+        newlyConfirmedQuestionCount -
+        noLongerConfirmedQuestionCount
+      : null;
+  const compactSummary: EntityFactsV2ComparisonCompactSummary = {
+    validCount: currentValidCount,
+    previousConfirmedCount: previousVisibility.confirmedCount,
+    currentConfirmedCount: dto.visibility.current.confirmedCount,
+    confirmedDeltaCount:
+      dto.visibility.current.confirmedCount -
+      previousVisibility.confirmedCount,
+    newlyConfirmedQuestionCount,
+    noLongerConfirmedQuestionCount,
+    sameQuestionResultCount,
+  };
 
   return {
     version: ENTITY_FACTS_V2_COMPARISON_VIEW_MODEL_VERSION,
@@ -254,6 +330,8 @@ export function buildEntityFactsV2ComparisonViewModel(
       metric: dto.top3,
       comparisonAvailable: true,
     }),
+    searchScope,
+    compactSummary,
     trendSeries: trendAvailable
       ? dto.series.map((point) => ({
           measuredAt: point.measuredAt,

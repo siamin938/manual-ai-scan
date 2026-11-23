@@ -7,6 +7,7 @@ import {
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
   ENTITY_FACTS_V2_READ_FACT_VERSION,
   ENTITY_FACTS_V2_READ_GATEWAY_VERSION,
+  ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION,
   parseEntityFactsV2AggregateForReadGateway,
   pickEntityFactsV2AutoCompetitorDisplayName,
 } from "../../src/lib/entity-facts-v2-read-gateway.types";
@@ -110,6 +111,7 @@ function validAggregate() {
 describe("Entity Facts v2 Read Gateway", () => {
   it("pins the reviewed versions", () => {
     expect(ENTITY_FACTS_V2_READ_GATEWAY_VERSION).toBe("0.1");
+    expect(ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION).toBe("0.1.1");
     expect(ENTITY_FACTS_V2_READ_FACT_VERSION).toBe("0.3");
     expect(ENTITY_FACTS_V2_READ_AGGREGATE_VERSION).toBe("0.1");
     expect(ENTITY_FACTS_V2_READ_ENGINE_VERSION).toBe(
@@ -146,6 +148,66 @@ describe("Entity Facts v2 Read Gateway", () => {
         [{ label: "솔라가드 프리미엄 THE LX 일산동구점", priority: 3 }],
       ),
     ).toBe("솔라가드 프리미엄 THE LX 일산동구점");
+  });
+
+  it("accepts persisted canonical display names that match the stored brand core", () => {
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:원투랩핑",
+        [{ label: "원투 랩핑 PPF", priority: 1 }],
+      ),
+    ).toBe("원투 랩핑 PPF");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:원투랩핑",
+        [{ label: "(주) 원투 랩핑 PPF", priority: 1 }],
+      ),
+    ).toBe("(주) 원투 랩핑 PPF");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:원투랩핑",
+        [{ label: "원투 랩핑 PPF", priority: 3 }],
+      ),
+    ).toBeNull();
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:원투랩핑",
+        [{ label: "다른 업체 PPF", priority: 1 }],
+      ),
+    ).toBeNull();
+  });
+
+  it("allows only standard Korean corporate markers around an exact auto competitor name", () => {
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:중랑자동차공업",
+        [{ label: "중랑자동차공업㈜", priority: 1 }],
+      ),
+    ).toBe("중랑자동차공업㈜");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:중랑자동차공업",
+        [{ label: "(주)중랑자동차공업", priority: 1 }],
+      ),
+    ).toBe("(주)중랑자동차공업");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:중랑자동차공업",
+        [{ label: "주식회사 중랑자동차공업", priority: 1 }],
+      ),
+    ).toBe("주식회사 중랑자동차공업");
+
+    expect(
+      pickEntityFactsV2AutoCompetitorDisplayName(
+        "auto:중랑자동차공업",
+        [{ label: "중랑자동차공업 주유소", priority: 1 }],
+      ),
+    ).toBeNull();
   });
 
   it("never uses the auto key suffix itself as a customer-visible fallback", () => {
@@ -210,6 +272,8 @@ describe("Entity Facts v2 Read Gateway", () => {
       scope: {
         runId: "33333333-3333-4333-8333-333333333333",
         runName: "최근 측정",
+        questionSetId: "44444444-4444-4444-8444-444444444444",
+        questionSetName: "AI 진단 질문 · 테스트 업체 · 2026-09-19",
         measuredAt: "2026-09-19T00:00:00.000Z",
         providers: ["openai"],
         repetitions: 1,
@@ -253,6 +317,12 @@ describe("Entity Facts v2 Read Gateway", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    expect(result.data.scope.questionSetId).toBe(
+      "44444444-4444-4444-8444-444444444444",
+    );
+    expect(result.data.scope.questionSetName).toBe(
+      "AI 진단 질문 · 테스트 업체 · 2026-09-19",
+    );
     expect(result.data.overview.visibilityLowerBoundPct).toBe(4.17);
     expect(result.data.overview.visibilityUpperBoundPct).toBe(29.17);
     expect(result.data.competitors).toEqual([
@@ -265,8 +335,9 @@ describe("Entity Facts v2 Read Gateway", () => {
       },
     ]);
     expect(serverSource).toContain(
-      "return buildEntityFactsV2ReadGatewayFromSnapshot({",
+      "const gatewayResponse = buildEntityFactsV2ReadGatewayFromSnapshot({",
     );
+    expect(serverSource).toContain("return gatewayResponse;");
   });
 
   it("projects observed source supplement into customer-safe rows", () => {
@@ -447,8 +518,18 @@ describe("Entity Facts v2 Read Gateway", () => {
     );
   });
 
-  it("reads only the exact latest standalone audit run aggregate", () => {
+  it("keeps the last representative result until the prepared unified set completes", () => {
     expect(serverSource).toContain('.from("measurement_runs")');
+    expect(serverSource).toContain("question_set_id");
+    expect(serverSource).toContain('.from("question_sets")');
+    expect(serverSource).toContain("UNIFIED_DIAGNOSTIC_SET_PREFIX");
+    expect(serverSource).toContain("baseRunQuery");
+    expect(serverSource).toContain("currentUnifiedSet");
+    expect(serverSource).toContain('.eq("question_set_id", currentUnifiedSet.id)');
+    expect(serverSource).toContain("previousRepresentativeRun");
+    expect(serverSource).toContain(
+      "A newly created unified set does not erase the last representative result.",
+    );
     expect(serverSource).toContain('.eq("run_type", "audit")');
     expect(serverSource).toContain('.eq("phase", "standalone")');
     expect(serverSource).toContain('.eq("status", "completed")');
@@ -473,16 +554,103 @@ describe("Entity Facts v2 Read Gateway", () => {
       '.eq("engine_version", ENTITY_FACTS_V2_READ_ENGINE_VERSION)',
     );
     expect(serverSource).toContain('.eq("contract_ok", true)');
+  });
+
+  it("keeps supplemental final-answer citation summary non-blocking and run-scoped", () => {
+    expect(serverSource).toContain("Supplemental final-answer citation summary");
+    expect(serverSource).toContain('.from("measurement_citations")');
+    expect(serverSource).toContain('measurements!inner(run_id)');
+    expect(serverSource).toContain('.eq("measurements.run_id", run.id)');
+    expect(serverSource).toContain("citationError");
+    expect(serverSource).toContain("gatewayResponse.data.citationSources");
+  });
+
+  it("keeps target-exposure citation co-observation non-blocking and grounded in v2 targetSeen truth", () => {
     expect(serverSource).toContain(
-      "It never falls back to an older materialized run.",
+      "Supplemental citation co-observation for v2-confirmed target exposure measurements",
     );
+    expect(serverSource).toContain('.from("measurement_entity_facts_v2")');
+    expect(serverSource).toContain('.eq("materialization_id", storage.materialization_id)');
+    expect(serverSource).toContain('jsonObject(row.facts)?.["targetSeen"] === true');
+    expect(serverSource).toContain("targetMeasurementIds.size ===");
+    expect(serverSource).toContain(
+      "gatewayResponse.data.overview.confirmedMentionCount",
+    );
+    expect(serverSource).toContain("targetExposureFactError");
+    expect(serverSource).toContain(
+      "gatewayResponse.data.targetExposureCitationSources",
+    );
+    expect(serverSource).toContain(
+      "never be presented as a cause of visibility or a direct business-source link",
+    );
+  });
+
+  it("keeps page-level target relevance verification non-blocking and separate from answer attribution", () => {
+    expect(serverSource).toContain(
+      "Page-level relevance verification for citations from currently confirmed",
+    );
+    expect(serverSource).toContain(
+      '.from("citation_page_entity_verifications")',
+    );
+    expect(serverSource).toContain(
+      '.eq("verification_status", "confirmed")',
+    );
+    expect(serverSource).toContain(
+      "ENTITY_FACTS_V2_CITATION_PAGE_VERIFIER_VERSION",
+    );
+    expect(serverSource).toContain(
+      "verifiedTargetMeasurementIds.has(row.measurement_id)",
+    );
+    expect(serverSource).toContain(
+      "gatewayResponse.data.verifiedTargetCitationPages",
+    );
+    expect(serverSource).toContain("verifiedPageError");
+    expect(serverSource).toContain("verifiedTargetPageBasisLabel");
+    expect(serverSource).toContain("verifiedPageCompletedEvent");
+    expect(serverSource).toContain("verifiedPageTriggeredEvent");
+    expect(serverSource).toContain(
+      '"citation_page_entity_verification_triggered"',
+    );
+    expect(serverSource).toContain(
+      'verifiedPageTriggeredEvent ? "pending" : "not_verified"',
+    );
+    expect(serverSource).toContain(
+      'verifiedTargetCitationPageStatus = "complete"',
+    );
+    expect(serverSource).toContain(
+      '"metadata->>materialization_id"',
+    );
+    expect(serverSource).toContain(
+      '"metadata->>verifier_version"',
+    );
+  });
+
+  it("keeps advisory target source clues non-blocking and separate from confirmed target sources", () => {
+    expect(serverSource).toContain("Advisory target-link clues");
+    expect(serverSource).toContain('.from("measurement_citation_attributions")');
+    expect(serverSource).toContain('.eq("source_run_id", run.id)');
+    expect(serverSource).toContain('.eq("canonical_key", targetCanonicalKey)');
+    expect(serverSource).toContain('.eq("attribution_level", "section")');
+    expect(serverSource).toContain("distance > 250");
+    expect(serverSource).toContain("confirmedTargetDomains.has(domain)");
+    expect(serverSource).toContain("targetReferenceError");
+    expect(serverSource).toContain("gatewayResponse.data.targetReferenceSources");
+  });
+
+  it("keeps supplemental question location metadata non-blocking", () => {
+    expect(serverSource).toContain("Supplemental question-location metadata");
+    expect(serverSource).toContain('.from("questions")');
+    expect(serverSource).toContain('.select("id, city")');
+    expect(serverSource).toContain("questionLocationError");
+    expect(serverSource).toContain("gatewayResponse.data.questionLocations");
+    expect(serverSource).toContain("return gatewayResponse;");
   });
 
   it("never reads legacy raw measurement truth in the v2 gateway", () => {
     expect(serverSource).not.toContain('.from("measurements")');
     expect(serverSource).not.toContain("was_client_mentioned");
     expect(serverSource).not.toContain("client_position");
-    expect(serverSource).not.toContain("measurement_entity_facts_v2");
+    expect(serverSource).toContain('.from("measurement_entity_facts_v2")');
     expect(serverSource).not.toContain("response_text");
   });
 
@@ -514,8 +682,9 @@ describe("Entity Facts v2 Read Gateway", () => {
     expect(serverSource).toContain("registeredCompetitorNames");
     expect(serverSource).toContain("autoCompetitorEvidence");
     expect(serverSource).toContain(
-      "return buildEntityFactsV2ReadGatewayFromSnapshot({",
+      "const gatewayResponse = buildEntityFactsV2ReadGatewayFromSnapshot({",
     );
+    expect(serverSource).toContain("return gatewayResponse;");
     expect(serverSource).toContain(
       '.from("measurement_entity_canonicalizations")',
     );

@@ -1,5 +1,12 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Database } from "@/integrations/supabase/types";
+import { CUSTOMER_STANDARD_QUESTION_COUNT } from "@/lib/customer-measurement.helpers";
+import { UNIFIED_DIAGNOSTIC_SET_PREFIX } from "@/lib/custom-question-suggestions";
+import {
+  buildUnifiedDiagnosticLayerSummary,
+  confirmedRatePct,
+  type UnifiedDiagnosticLayerMetric,
+} from "@/lib/unified-diagnostic-layer-summary";
 import {
   ENTITY_FACTS_V2_READ_AGGREGATE_VERSION,
   ENTITY_FACTS_V2_READ_ENGINE_VERSION,
@@ -52,11 +59,6 @@ type JobRow = Pick<
 type MeasurementParserRow = Pick<
   Database["public"]["Tables"]["measurements"]["Row"],
   "run_id" | "job_id" | "parser_version"
->;
-
-type RequestContractRow = Pick<
-  Database["public"]["Tables"]["measurement_request_contracts"]["Row"],
-  "job_id" | "request_fingerprint"
 >;
 
 type AggregateStorageRow = Pick<
@@ -165,6 +167,58 @@ function metricSnapshots(
       maxPct: overview.top3UpperBoundPct,
     },
   };
+}
+
+function roundPct(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function layerMetricSnapshot(
+  metric: UnifiedDiagnosticLayerMetric,
+): EntityFactsV2ComparisonMetricSnapshot {
+  const confirmedPct = confirmedRatePct(metric);
+  const maxPct =
+    metric.validCount > 0
+      ? roundPct(
+          ((metric.confirmedCount + metric.unresolvedCount) / metric.validCount) * 100,
+        )
+      : null;
+
+  return {
+    validCount: metric.validCount,
+    confirmedCount: metric.confirmedCount,
+    unresolvedCount: metric.unresolvedCount,
+    confirmedPct,
+    maxPct,
+  };
+}
+
+function questionChangeCounts(
+  current: ParsedEntityFactsV2Aggregate["questionAreas"],
+  previous: ParsedEntityFactsV2Aggregate["questionAreas"],
+): {
+  newlyConfirmedQuestionCount: number;
+  noLongerConfirmedQuestionCount: number;
+} | null {
+  if (current.length !== 24 || previous.length !== 24) return null;
+
+  const previousById = new Map(previous.map((row) => [row.questionId, row]));
+  if (previousById.size !== previous.length) return null;
+
+  let newlyConfirmedQuestionCount = 0;
+  let noLongerConfirmedQuestionCount = 0;
+
+  for (const row of current) {
+    const prior = previousById.get(row.questionId);
+    if (!prior) return null;
+
+    const currentConfirmed = row.confirmedMentionCount > 0;
+    const previousConfirmed = prior.confirmedMentionCount > 0;
+    if (currentConfirmed && !previousConfirmed) newlyConfirmedQuestionCount += 1;
+    if (!currentConfirmed && previousConfirmed) noLongerConfirmedQuestionCount += 1;
+  }
+
+  return { newlyConfirmedQuestionCount, noLongerConfirmedQuestionCount };
 }
 
 function runPoint(
@@ -287,24 +341,56 @@ export async function fetchEntityFactsV2Comparison(args: {
   const businessDTO = asBusinessDTO(business);
 
   // Keep current-run selection exactly aligned with the v2 customer dashboard.
-  const { data: currentRun, error: currentRunError } = await supabaseAdmin
-    .from("measurement_runs")
-    .select(
-      "id, question_set_id, selected_providers, repetitions, data_origin, total_jobs, completed_jobs, failed_jobs, completed_at, created_at",
-    )
+  // A prepared unified set becomes representative only after its first completed run.
+  const { data: currentUnifiedSet, error: unifiedSetError } = await supabaseAdmin
+    .from("question_sets")
+    .select("id")
     .eq("org_id", orgId)
     .eq("business_id", businessId)
-    .eq("run_type", "audit")
-    .eq("phase", "standalone")
-    .eq("diagnostic_scope", "customer")
-    .eq("status", "completed")
-    .is("experiment_id", null)
-    .order("completed_at", { ascending: false })
+    .eq("active", true)
+    .like("name", `${UNIFIED_DIAGNOSTIC_SET_PREFIX}%`)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (unifiedSetError) return { ok: false, error: "INTERNAL_ERROR" };
 
-  if (currentRunError) return { ok: false, error: "INTERNAL_ERROR" };
+  const baseCurrentRunQuery = () =>
+    supabaseAdmin
+      .from("measurement_runs")
+      .select(
+        "id, question_set_id, selected_providers, repetitions, data_origin, total_jobs, completed_jobs, failed_jobs, completed_at, created_at",
+      )
+      .eq("org_id", orgId)
+      .eq("business_id", businessId)
+      .eq("run_type", "audit")
+      .eq("phase", "standalone")
+      .eq("diagnostic_scope", "customer")
+      .eq("status", "completed")
+      .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
+      .is("experiment_id", null);
+
+  let currentRun: RunRow | null = null;
+  if (currentUnifiedSet) {
+    const { data: unifiedRun, error: unifiedRunError } = await baseCurrentRunQuery()
+      .eq("question_set_id", currentUnifiedSet.id)
+      .order("completed_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (unifiedRunError) return { ok: false, error: "INTERNAL_ERROR" };
+    currentRun = unifiedRun;
+  }
+
+  if (!currentRun) {
+    const { data: previousRepresentativeRun, error: previousRunError } =
+      await baseCurrentRunQuery()
+        .order("completed_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    if (previousRunError) return { ok: false, error: "INTERNAL_ERROR" };
+    currentRun = previousRepresentativeRun;
+  }
   if (!currentRun) {
     return {
       ok: true,
@@ -322,10 +408,12 @@ export async function fetchEntityFactsV2Comparison(args: {
     )
     .eq("org_id", orgId)
     .eq("business_id", businessId)
+    .eq("question_set_id", currentRun.question_set_id)
     .eq("run_type", "audit")
     .eq("phase", "standalone")
     .eq("diagnostic_scope", "customer")
     .eq("status", "completed")
+    .eq("total_jobs", CUSTOMER_STANDARD_QUESTION_COUNT)
     .is("experiment_id", null)
     .neq("id", currentRun.id)
     .order("completed_at", { ascending: false })
@@ -374,27 +462,18 @@ export async function fetchEntityFactsV2Comparison(args: {
   const currentAggregate = parseAggregateSnapshot(currentAggregateRows);
   if (!currentAggregate) return { ok: false, error: "INVALID_V2_DATA" };
 
+  // The optional one-to-one join keeps jobs without a durable fingerprint
+  // visible to the verifier and bounds the request URL by run IDs.
   const { data: jobs, error: jobsError } = await supabaseAdmin
     .from("measurement_jobs")
     .select(
-      "id, run_id, question_id, provider, provider_model, repetition_no, status",
+      "id, run_id, question_id, provider, provider_model, repetition_no, status, contract:measurement_request_contracts(request_fingerprint)",
     )
     .eq("org_id", orgId)
+    .eq("contract.org_id", orgId)
     .in("run_id", runIds);
 
   if (jobsError) return { ok: false, error: "INTERNAL_ERROR" };
-
-  const jobIds = (jobs ?? []).map((job) => job.id);
-  let requestContracts: RequestContractRow[] = [];
-  if (jobIds.length > 0) {
-    const { data, error } = await supabaseAdmin
-      .from("measurement_request_contracts")
-      .select("job_id, request_fingerprint")
-      .eq("org_id", orgId)
-      .in("job_id", jobIds);
-    if (error) return { ok: false, error: "INTERNAL_ERROR" };
-    requestContracts = data ?? [];
-  }
 
   // Parser version is comparison metadata only. Legacy visibility truth fields
   // such as was_client_mentioned/client_position are deliberately never read.
@@ -413,9 +492,10 @@ export async function fetchEntityFactsV2Comparison(args: {
   const measurementsByRun = groupByRun<MeasurementParserRow>(
     measurementParsers ?? [],
   );
-  const requestContractByJobId = new Map(
-    requestContracts.map((row) => [row.job_id, row.request_fingerprint]),
-  );
+  const requestContractByJobId = new Map<string, string>();
+  for (const job of jobs ?? []) {
+    if (job.contract) requestContractByJobId.set(job.id, job.contract.request_fingerprint);
+  }
 
   const currentSignature = verifiedRunContractSignature({
     run: currentRun,
@@ -501,6 +581,57 @@ export async function fetchEntityFactsV2Comparison(args: {
   const previous = compatiblePrior[0]!;
   const previousPoint = runPoint(previous.run, previous.aggregate.parsed);
   const previousMetrics = metricSnapshots(previous.aggregate.parsed);
+
+  let searchScope: NonNullable<EntityFactsV2ComparisonDTO["searchScope"]> | null = null;
+  if (currentUnifiedSet?.id === currentRun.question_set_id) {
+    const questionIds = currentAggregate.parsed.questionAreas.map((row) => row.questionId);
+    if (questionIds.length === 24 && new Set(questionIds).size === 24) {
+      const { data: questionLocationRows, error: questionLocationError } =
+        await supabaseAdmin
+          .from("questions")
+          .select("id, city")
+          .eq("org_id", orgId)
+          .eq("question_set_id", currentRun.question_set_id)
+          .in("id", questionIds);
+
+      // Search-scope detail is supplemental. Never block the verified overall comparison.
+      if (!questionLocationError && (questionLocationRows ?? []).length === 24) {
+        const questionLocations = (questionLocationRows ?? []).map((row) => ({
+          questionId: row.id,
+          city: row.city ?? null,
+        }));
+        const currentLayerSummary = buildUnifiedDiagnosticLayerSummary({
+          questionAreas: currentAggregate.parsed.questionAreas,
+          questionLocations,
+          overview: currentAggregate.parsed.overview,
+        });
+        const previousLayerSummary = buildUnifiedDiagnosticLayerSummary({
+          questionAreas: previous.aggregate.parsed.questionAreas,
+          questionLocations,
+          overview: previous.aggregate.parsed.overview,
+        });
+        const questionChanges = questionChangeCounts(
+          currentAggregate.parsed.questionAreas,
+          previous.aggregate.parsed.questionAreas,
+        );
+
+        if (currentLayerSummary && previousLayerSummary && questionChanges) {
+          searchScope = {
+            custom: buildEntityFactsV2MetricComparison(
+              layerMetricSnapshot(currentLayerSummary.custom),
+              layerMetricSnapshot(previousLayerSummary.custom),
+            ),
+            core: buildEntityFactsV2MetricComparison(
+              layerMetricSnapshot(currentLayerSummary.core),
+              layerMetricSnapshot(previousLayerSummary.core),
+            ),
+            ...questionChanges,
+          };
+        }
+      }
+    }
+  }
+
   const compatibleRunCount = compatiblePrior.length + 1;
 
   const priorSeries = compatiblePrior
@@ -531,6 +662,7 @@ export async function fetchEntityFactsV2Comparison(args: {
         currentMetrics.top3,
         previousMetrics.top3,
       ),
+      searchScope,
     },
   };
 }

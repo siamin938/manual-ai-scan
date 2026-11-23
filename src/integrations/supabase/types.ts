@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -71,6 +71,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          managed_by: string
           match_mode: string
           normalized_host: string | null
           org_id: string
@@ -86,6 +87,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          managed_by?: string
           match_mode: string
           normalized_host?: string | null
           org_id: string
@@ -101,6 +103,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          managed_by?: string
           match_mode?: string
           normalized_host?: string | null
           org_id?: string
@@ -193,6 +196,108 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      citation_page_entity_verifications: {
+        Row: {
+          business_id: string
+          canonical_url: string
+          citation_id: string
+          citation_title: string | null
+          citation_url: string
+          confidence: string
+          content_hash: string | null
+          created_at: string
+          domain: string | null
+          evidence: Json
+          fetch_status: string
+          http_status: number | null
+          id: string
+          measurement_id: string
+          org_id: string
+          page_title: string | null
+          source_run_id: string
+          verification_status: string
+          verifier_version: string
+        }
+        Insert: {
+          business_id: string
+          canonical_url: string
+          citation_id: string
+          citation_title?: string | null
+          citation_url: string
+          confidence: string
+          content_hash?: string | null
+          created_at?: string
+          domain?: string | null
+          evidence?: Json
+          fetch_status: string
+          http_status?: number | null
+          id?: string
+          measurement_id: string
+          org_id: string
+          page_title?: string | null
+          source_run_id: string
+          verification_status: string
+          verifier_version: string
+        }
+        Update: {
+          business_id?: string
+          canonical_url?: string
+          citation_id?: string
+          citation_title?: string | null
+          citation_url?: string
+          confidence?: string
+          content_hash?: string | null
+          created_at?: string
+          domain?: string | null
+          evidence?: Json
+          fetch_status?: string
+          http_status?: number | null
+          id?: string
+          measurement_id?: string
+          org_id?: string
+          page_title?: string | null
+          source_run_id?: string
+          verification_status?: string
+          verifier_version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "citation_page_entity_verifications_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citation_page_entity_verifications_citation_id_fkey"
+            columns: ["citation_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_citations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citation_page_entity_verifications_measurement_id_fkey"
+            columns: ["measurement_id"]
+            isOneToOne: false
+            referencedRelation: "measurements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citation_page_entity_verifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "citation_page_entity_verifications_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -770,6 +875,587 @@ export type Database = {
             columns: ["question_id"]
             isOneToOne: false
             referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_observation_discovery_batch_items: {
+        Row: {
+          batch_id: string
+          business_name: string
+          candidate_fingerprint: string
+          candidate_snapshot: Json
+          classification: string
+          created_at: string
+          id: string
+          review_candidate_id: string | null
+        }
+        Insert: {
+          batch_id: string
+          business_name: string
+          candidate_fingerprint: string
+          candidate_snapshot: Json
+          classification: string
+          created_at?: string
+          id?: string
+          review_candidate_id?: string | null
+        }
+        Update: {
+          batch_id?: string
+          business_name?: string
+          candidate_fingerprint?: string
+          candidate_snapshot?: Json
+          classification?: string
+          created_at?: string
+          id?: string
+          review_candidate_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_observation_discovery_batch_i_review_candidate_id_fkey"
+            columns: ["review_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "internal_observation_discovery_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_observation_discovery_batch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "internal_observation_discovery_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_observation_discovery_batches: {
+        Row: {
+          candidate_count: number | null
+          changed_count: number | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          model: string | null
+          new_count: number | null
+          org_id: string
+          provider: string | null
+          public_source_count: number | null
+          query_snapshot: Json
+          schedule_id: string | null
+          started_at: string
+          status: string
+          trigger_source: string
+          unchanged_count: number | null
+        }
+        Insert: {
+          candidate_count?: number | null
+          changed_count?: number | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          model?: string | null
+          new_count?: number | null
+          org_id: string
+          provider?: string | null
+          public_source_count?: number | null
+          query_snapshot?: Json
+          schedule_id?: string | null
+          started_at?: string
+          status: string
+          trigger_source: string
+          unchanged_count?: number | null
+        }
+        Update: {
+          candidate_count?: number | null
+          changed_count?: number | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          model?: string | null
+          new_count?: number | null
+          org_id?: string
+          provider?: string | null
+          public_source_count?: number | null
+          query_snapshot?: Json
+          schedule_id?: string | null
+          started_at?: string
+          status?: string
+          trigger_source?: string
+          unchanged_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_observation_discovery_batches_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_observation_discovery_batches_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "internal_observation_discovery_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_observation_discovery_candidates: {
+        Row: {
+          business_name: string
+          category: string
+          city: string | null
+          created_at: string
+          created_by: string | null
+          discovery_query: Json
+          discovery_source: string
+          duplicate_status: string
+          duplicate_warnings: Json
+          first_discovered_at: string
+          id: string
+          idempotency_key: string
+          last_seen_at: string
+          matched_existing_business_name: string | null
+          matched_pipeline_business_name: string | null
+          org_id: string
+          preview_generated_at: string | null
+          promoted_at: string | null
+          promoted_by: string | null
+          promoted_pipeline_item_id: string | null
+          public_profile_urls: Json
+          region: string
+          review_note: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          service: string
+          source_evidence: Json
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          business_name: string
+          category: string
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          discovery_query?: Json
+          discovery_source?: string
+          duplicate_status?: string
+          duplicate_warnings?: Json
+          first_discovered_at?: string
+          id?: string
+          idempotency_key: string
+          last_seen_at?: string
+          matched_existing_business_name?: string | null
+          matched_pipeline_business_name?: string | null
+          org_id: string
+          preview_generated_at?: string | null
+          promoted_at?: string | null
+          promoted_by?: string | null
+          promoted_pipeline_item_id?: string | null
+          public_profile_urls?: Json
+          region: string
+          review_note?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          service: string
+          source_evidence?: Json
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          business_name?: string
+          category?: string
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          discovery_query?: Json
+          discovery_source?: string
+          duplicate_status?: string
+          duplicate_warnings?: Json
+          first_discovered_at?: string
+          id?: string
+          idempotency_key?: string
+          last_seen_at?: string
+          matched_existing_business_name?: string | null
+          matched_pipeline_business_name?: string | null
+          org_id?: string
+          preview_generated_at?: string | null
+          promoted_at?: string | null
+          promoted_by?: string | null
+          promoted_pipeline_item_id?: string | null
+          public_profile_urls?: Json
+          region?: string
+          review_note?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          service?: string
+          source_evidence?: Json
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_observation_discovery_c_promoted_pipeline_item_id_fkey"
+            columns: ["promoted_pipeline_item_id"]
+            isOneToOne: false
+            referencedRelation: "internal_observation_pipeline_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_observation_discovery_candidates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_observation_discovery_schedules: {
+        Row: {
+          actor_user_id: string
+          brand_model: string | null
+          cadence: string
+          category: string
+          city: string | null
+          created_at: string
+          created_by: string | null
+          desired_count: number
+          enabled: boolean
+          id: string
+          last_completed_at: string | null
+          last_error_code: string | null
+          last_started_at: string | null
+          last_status: string | null
+          name: string
+          org_id: string
+          query_fingerprint: string
+          region: string
+          run_hour_kst: number
+          service: string
+          updated_at: string
+          updated_by: string | null
+          weekday_iso: number | null
+        }
+        Insert: {
+          actor_user_id: string
+          brand_model?: string | null
+          cadence?: string
+          category: string
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          desired_count?: number
+          enabled?: boolean
+          id?: string
+          last_completed_at?: string | null
+          last_error_code?: string | null
+          last_started_at?: string | null
+          last_status?: string | null
+          name: string
+          org_id: string
+          query_fingerprint: string
+          region: string
+          run_hour_kst?: number
+          service: string
+          updated_at?: string
+          updated_by?: string | null
+          weekday_iso?: number | null
+        }
+        Update: {
+          actor_user_id?: string
+          brand_model?: string | null
+          cadence?: string
+          category?: string
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          desired_count?: number
+          enabled?: boolean
+          id?: string
+          last_completed_at?: string | null
+          last_error_code?: string | null
+          last_started_at?: string | null
+          last_status?: string | null
+          name?: string
+          org_id?: string
+          query_fingerprint?: string
+          region?: string
+          run_hour_kst?: number
+          service?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekday_iso?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_observation_discovery_schedules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_observation_pipeline_items: {
+        Row: {
+          address: string | null
+          aliases: string[]
+          brand_model: string | null
+          business_id: string | null
+          business_name: string
+          category: string
+          city: string | null
+          created_at: string
+          created_by: string | null
+          customer_need: string | null
+          entity_facts_ready_at: string | null
+          error_code: string | null
+          error_message: string | null
+          google_maps_url: string | null
+          id: string
+          idempotency_key: string
+          measurement_approved_at: string | null
+          measurement_approved_by: string | null
+          naver_place_url: string | null
+          org_id: string
+          prepared_at: string | null
+          question_set_id: string | null
+          readiness: Json
+          reconciled_at: string | null
+          region: string
+          run_id: string | null
+          service: string
+          source_label: string | null
+          status: string
+          terminal_at: string | null
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          address?: string | null
+          aliases?: string[]
+          brand_model?: string | null
+          business_id?: string | null
+          business_name: string
+          category?: string
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_need?: string | null
+          entity_facts_ready_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          google_maps_url?: string | null
+          id?: string
+          idempotency_key: string
+          measurement_approved_at?: string | null
+          measurement_approved_by?: string | null
+          naver_place_url?: string | null
+          org_id: string
+          prepared_at?: string | null
+          question_set_id?: string | null
+          readiness?: Json
+          reconciled_at?: string | null
+          region: string
+          run_id?: string | null
+          service: string
+          source_label?: string | null
+          status?: string
+          terminal_at?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          address?: string | null
+          aliases?: string[]
+          brand_model?: string | null
+          business_id?: string | null
+          business_name?: string
+          category?: string
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_need?: string | null
+          entity_facts_ready_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          google_maps_url?: string | null
+          id?: string
+          idempotency_key?: string
+          measurement_approved_at?: string | null
+          measurement_approved_by?: string | null
+          naver_place_url?: string | null
+          org_id?: string
+          prepared_at?: string | null
+          question_set_id?: string | null
+          readiness?: Json
+          reconciled_at?: string | null
+          region?: string
+          run_id?: string | null
+          service?: string
+          source_label?: string | null
+          status?: string
+          terminal_at?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_observation_pipeline_items_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_observation_pipeline_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_observation_pipeline_items_question_set_id_fkey"
+            columns: ["question_set_id"]
+            isOneToOne: false
+            referencedRelation: "question_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_observation_pipeline_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "measurement_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_observation_pipeline_settings: {
+        Row: {
+          concurrent_run_limit: number
+          daily_run_limit: number
+          execution_enabled: boolean
+          last_scheduler_result: string | null
+          last_scheduler_tick_at: string | null
+          org_id: string
+          scheduler_activated_at: string | null
+          scheduler_activated_by: string | null
+          scheduler_actor_user_id: string | null
+          scheduler_executor_deployed: boolean
+          scheduler_executor_ready: boolean
+          scheduler_paused_at: string | null
+          scheduler_state: string
+          scheduler_stopped_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          concurrent_run_limit?: number
+          daily_run_limit?: number
+          execution_enabled?: boolean
+          last_scheduler_result?: string | null
+          last_scheduler_tick_at?: string | null
+          org_id: string
+          scheduler_activated_at?: string | null
+          scheduler_activated_by?: string | null
+          scheduler_actor_user_id?: string | null
+          scheduler_executor_deployed?: boolean
+          scheduler_executor_ready?: boolean
+          scheduler_paused_at?: string | null
+          scheduler_state?: string
+          scheduler_stopped_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          concurrent_run_limit?: number
+          daily_run_limit?: number
+          execution_enabled?: boolean
+          last_scheduler_result?: string | null
+          last_scheduler_tick_at?: string | null
+          org_id?: string
+          scheduler_activated_at?: string | null
+          scheduler_activated_by?: string | null
+          scheduler_actor_user_id?: string | null
+          scheduler_executor_deployed?: boolean
+          scheduler_executor_ready?: boolean
+          scheduler_paused_at?: string | null
+          scheduler_state?: string
+          scheduler_stopped_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_observation_pipeline_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_observation_scheduler_activation_requests: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          expires_at: string
+          id: string
+          org_id: string
+          plan_hash: string
+          plan_snapshot: Json
+          requested_at: string
+          requested_by: string
+          status: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          expires_at: string
+          id?: string
+          org_id: string
+          plan_hash: string
+          plan_snapshot: Json
+          requested_at?: string
+          requested_by: string
+          status?: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          expires_at?: string
+          id?: string
+          org_id?: string
+          plan_hash?: string
+          plan_snapshot?: Json
+          requested_at?: string
+          requested_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_observation_scheduler_activation_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -3524,7 +4210,41 @@ export type Database = {
         Args: { p_business_id: string }
         Returns: Json
       }
+      business_profile_is_shared_host_v01: {
+        Args: { p_host: string }
+        Returns: boolean
+      }
+      business_profile_naver_blog_key_v01: {
+        Args: { p_url: string }
+        Returns: string
+      }
+      business_profile_naver_place_url_v01: {
+        Args: { p_url: string }
+        Returns: string
+      }
+      business_profile_url_host_v01: {
+        Args: { p_url: string }
+        Returns: string
+      }
       can_view_data_asset_admin_v01: { Args: never; Returns: boolean }
+      claim_internal_observation_scheduler_candidate_v05: {
+        Args: { p_actor_user_id: string; p_org_id: string }
+        Returns: {
+          business_id: string
+          business_name: string
+          item_id: string
+          question_set_id: string
+        }[]
+      }
+      claim_internal_observation_scheduler_candidate_v07: {
+        Args: { p_actor_user_id: string; p_org_id: string }
+        Returns: {
+          business_id: string
+          business_name: string
+          item_id: string
+          question_set_id: string
+        }[]
+      }
       claim_measurement_jobs: {
         Args: { p_limit?: number }
         Returns: {
@@ -3572,6 +4292,16 @@ export type Database = {
       consume_measurement_market_shadow_nonce_v01: {
         Args: { p_business_id: string; p_org_id: string; p_token_hash: string }
         Returns: boolean
+      }
+      create_internal_observation_scheduler_run_v07: {
+        Args: { p_actor_user_id: string; p_item_id: string }
+        Returns: {
+          business_id: string
+          business_name: string
+          org_id: string
+          question_set_id: string
+          run_id: string
+        }[]
       }
       create_organization_with_owner: {
         Args: { p_name: string; p_slug: string }
@@ -3813,6 +4543,18 @@ export type Database = {
         Args: { p_business_id: string; p_org_id: string }
         Returns: Json
       }
+      get_internal_observation_discovery_cron_state_v094: {
+        Args: never
+        Returns: Json
+      }
+      get_internal_observation_scheduler_cron_status_v06: {
+        Args: never
+        Returns: {
+          active: boolean
+          job_exists: boolean
+          schedule: string
+        }[]
+      }
       get_measurement_credit_admin_ledger_v01: {
         Args: { p_limit?: number; p_org_id: string }
         Returns: Json
@@ -3848,6 +4590,10 @@ export type Database = {
           monthly_actual_cost_usd: number
           monthly_reserved_cost_usd: number
         }[]
+      }
+      get_pilot_ops_admin_overview_v01: {
+        Args: { p_limit?: number; p_query?: string }
+        Returns: Json
       }
       get_repeat_independent_site_observations_v01: {
         Args: { p_business_id: string; p_org_id: string }
@@ -3943,11 +4689,46 @@ export type Database = {
           region: string
         }[]
       }
+      prepare_internal_observation_candidate_v01: {
+        Args: {
+          p_actor_user_id: string
+          p_candidate_id: string
+          p_question_set_name: string
+          p_questions: Json
+        }
+        Returns: {
+          business_id: string
+          question_set_id: string
+          reused_business: boolean
+          reused_question_set: boolean
+        }[]
+      }
       preview_measurement_market_questions_candidate_v02: {
         Args: { p_business_id: string }
         Returns: Json
       }
       purge_expired_provider_payloads: { Args: never; Returns: number }
+      reconcile_internal_observation_scheduler_v07: {
+        Args: { p_org_id: string }
+        Returns: {
+          checked: number
+          completed: number
+          failed: number
+          postprocessing: number
+        }[]
+      }
+      refresh_entity_facts_v2_runtime_materialization_v01: {
+        Args: {
+          p_aggregate_row: Json
+          p_clue_supplement: Json
+          p_engine_version: string
+          p_materialization_id: string
+          p_measurement_rows: Json
+          p_observed_supplement: Json
+          p_run_id: string
+        }
+        Returns: Json
+      }
       refresh_run_progress: {
         Args: { p_run_id: string }
         Returns: Database["public"]["Enums"]["run_status"]
@@ -3972,7 +4753,19 @@ export type Database = {
         }
         Returns: string
       }
+      set_internal_observation_discovery_cron_active_v094: {
+        Args: { p_active: boolean }
+        Returns: boolean
+      }
+      set_internal_observation_scheduler_cron_active_v06: {
+        Args: { p_active: boolean }
+        Returns: boolean
+      }
       storage_object_org_id: { Args: { object_name: string }; Returns: string }
+      sync_business_profile_first_party_sources_v01: {
+        Args: { p_business_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "owner" | "admin" | "analyst" | "client_viewer"

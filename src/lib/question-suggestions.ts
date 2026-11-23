@@ -112,6 +112,12 @@ export function resolveQuestionLocation(
       };
     }
 
+    // 도 단위 Core 질문(예: 경기도 + 성남시 분당구에서 "경기 ...")은
+    // 상세 city를 숨겨 광역 region 범위로 provider에 전달한다.
+    if (containsLocationSurface(promptKey, safeRegion)) {
+      return { region: safeRegion, city: null };
+    }
+
     return { region: safeRegion, city: safeCity };
   }
 
@@ -126,6 +132,14 @@ export function resolveQuestionLocation(
     if (containsLocationSurface(promptKey, safeRegion)) {
       return { region: safeRegion, city: null };
     }
+  }
+
+  if (
+    !metroRegion &&
+    !containsLocationSurface(promptKey, onlyCity) &&
+    containsLocationSurface(promptKey, safeRegion)
+  ) {
+    return { region: safeRegion, city: null };
   }
 
   return { region: safeRegion, city: safeCity };

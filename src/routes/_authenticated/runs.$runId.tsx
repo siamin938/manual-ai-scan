@@ -6,7 +6,12 @@ import { toast } from "sonner";
 import { useOrg } from "@/lib/org";
 import { formatSeoul } from "@/lib/format";
 import { aggregateBusinessShare } from "@/lib/business-share.helpers";
-import { RESOLVER_VERSION } from "@/lib/entity-canonical-resolver";
+import { useServerFn } from "@tanstack/react-start";
+import { getEntityFactsV2ReadGateway } from "@/lib/entity-facts-v2-read-gateway.functions";
+import {
+  CANONICALIZATION_VERSION_CONFLICT,
+  resolveCanonicalizationVersion,
+} from "@/lib/canonicalization-version.helpers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RUN_STATUS_LABELS, runStatusVariant } from "./runs.index";
+import { getRunQuestionSetKind, RUN_STATUS_LABELS, runStatusVariant } from "./runs.index";
 
 
 export const Route = createFileRoute("/_authenticated/runs/$runId")({
@@ -105,6 +110,7 @@ type CanonicalRow = {
   canonical_key: string;
   canonical_display_name: string;
   resolution_status: string;
+  resolver_version: string;
 };
 
 type Source = {
@@ -200,6 +206,7 @@ function RunDetailPage() {
 
       let mentions: Mention[] = [];
       const canonicals = new Map<string, CanonicalRow>();
+      let canonicalizationVersionConflict = false;
       let sources: Source[] = [];
       if (mIds.length > 0) {
         const [mn, sr] = await Promise.all([
@@ -225,11 +232,16 @@ function RunDetailPage() {
           )
             .from("measurement_entity_canonicalizations")
             .select(
-              "measurement_mention_id, canonical_key, canonical_display_name, resolution_status",
+              "measurement_mention_id, canonical_key, canonical_display_name, resolution_status, resolver_version",
             )
-            .eq("resolver_version", RESOLVER_VERSION)
             .in("measurement_mention_id", mentionIds);
-          for (const c of cRows ?? []) canonicals.set(c.measurement_mention_id, c);
+          const canonicalRows = cRows ?? [];
+          const canonicalizationVersion = resolveCanonicalizationVersion(canonicalRows);
+          canonicalizationVersionConflict =
+            canonicalizationVersion === CANONICALIZATION_VERSION_CONFLICT;
+          if (canonicalizationVersion && !canonicalizationVersionConflict) {
+            for (const c of canonicalRows) canonicals.set(c.measurement_mention_id, c);
+          }
         }
       }
 
@@ -241,13 +253,19 @@ function RunDetailPage() {
       }
 
       let businessName = "-";
+      let questionSetName: string | null = null;
       let questionCount = 0;
       let targetBusinessId: string | null = null;
       let competitorIds = new Set<string>();
       if (run.data) {
         targetBusinessId = run.data.business_id;
-        const [b, q, comp] = await Promise.all([
+        const [b, questionSet, q, comp] = await Promise.all([
           supabase.from("businesses").select("name").eq("id", run.data.business_id).maybeSingle(),
+          supabase
+            .from("question_sets")
+            .select("id, name")
+            .eq("id", run.data.question_set_id)
+            .maybeSingle(),
           supabase
             .from("questions")
             .select("id", { count: "exact", head: true })
@@ -260,6 +278,7 @@ function RunDetailPage() {
             .eq("active", true),
         ]);
         businessName = b.data?.name ?? "-";
+        questionSetName = questionSet.data?.name ?? null;
         questionCount = q.count ?? 0;
         competitorIds = new Set((comp.data ?? []).map((c) => c.competitor_business_id));
       }
@@ -270,6 +289,7 @@ function RunDetailPage() {
         measurements: measurementList,
         mentions,
         canonicals,
+        canonicalizationVersionConflict,
         sources,
         overall: overall.data,
         byProvider: byProvider.data ?? [],
@@ -277,6 +297,7 @@ function RunDetailPage() {
         latestEvent: latestEvent.data ?? null,
         prompts,
         businessName,
+        questionSetName,
         questionCount,
         targetBusinessId,
         competitorIds,
@@ -284,7 +305,21 @@ function RunDetailPage() {
     },
   });
 
-
+  // 대시보드 AI 진단 상세와 같은 v2 확정 업체 기준(보조 조회). 페이지 run과 정확히 일치할 때만 사용한다.
+  const fetchV2Gateway = useServerFn(getEntityFactsV2ReadGateway);
+  const runBusinessId = data?.run?.business_id ?? null;
+  const v2Query = useQuery({
+    queryKey: ["run-detail-entity-facts-v2", activeOrgId, runBusinessId, runId],
+    enabled: !!activeOrgId && !!runBusinessId,
+    retry: false,
+    queryFn: () =>
+      fetchV2Gateway({ data: { orgId: activeOrgId!, businessId: runBusinessId! } }),
+  });
+  const v2Response = v2Query.data;
+  const v2ExactRun =
+    v2Response && v2Response.ok === true && v2Response.data.scope.runId === runId
+      ? v2Response.data
+      : null;
 
   if (isLoading) {
     return <p className="py-16 text-center text-sm text-muted-foreground">불러오는 중…</p>;
@@ -307,6 +342,7 @@ function RunDetailPage() {
   const inProgress = IN_PROGRESS.has(run.status);
   const showSummary = run.status === "completed" || run.status === "partial";
   const totalJobs = Number(run.total_jobs ?? 0);
+  const questionSetKind = getRunQuestionSetKind(data.questionSetName ?? "", totalJobs);
   const completedJobs = Number(run.completed_jobs ?? 0);
   const progressPct = totalJobs > 0 ? Math.min(100, (completedJobs / totalJobs) * 100) : 0;
 
@@ -327,6 +363,24 @@ function RunDetailPage() {
       },
     ];
   });
+  const v2ShareRows = v2ExactRun
+    ? [
+        {
+          key: `target:${v2ExactRun.business.id}`,
+          name: v2ExactRun.business.name,
+          count: v2ExactRun.overview.confirmedMentionCount,
+          isTarget: true,
+        },
+        ...v2ExactRun.competitors.map((c, i) => ({
+          key: `v2:${i}:${c.name}`,
+          name: c.name,
+          count: c.responseCount,
+          isTarget: false,
+        })),
+      ]
+    : null;
+  const v2ValidCount = v2ExactRun ? v2ExactRun.overview.validCount : 0;
+
   const shareRows = aggregateBusinessShare({
     mentions: approvedMentions,
     validMeasurementCount: Number(validMeasurementCount ?? 0),
@@ -338,8 +392,46 @@ function RunDetailPage() {
       <div className="flex flex-wrap items-center gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{run.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            AI 노출 측정 · 내 업체 {data.businessName}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge
+              variant={
+                questionSetKind === "unified"
+                  ? "default"
+                  : questionSetKind === "baseline"
+                    ? "outline"
+                    : "secondary"
+              }
+            >
+              {questionSetKind === "unified"
+                ? "AI 진단"
+                : questionSetKind === "custom"
+                  ? "이전 맞춤 진단"
+                  : questionSetKind === "baseline"
+                    ? "이전 기본 진단"
+                    : "일반 측정"}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {questionSetKind === "unified"
+                ? `대표 진단 · 질문 ${totalJobs}개`
+                : questionSetKind === "custom"
+                  ? `이전 맞춤 진단 · 질문 ${totalJobs}개`
+                  : questionSetKind === "baseline"
+                    ? `이전 비교 기준 · 질문 ${totalJobs}개`
+                    : `질문 ${totalJobs}개`}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">내 업체 {data.businessName}</p>
+          {data.questionSetName ? (
+            <p className="mt-1 text-xs text-muted-foreground">질문 세트 · {data.questionSetName}</p>
+          ) : null}
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            {questionSetKind === "unified"
+              ? "내 업체에 맞춘 24개 질문으로 진행한 통합 AI 진단입니다. 이 측정은 대표 노출·관찰 업체·출처·기간 비교의 기준으로 사용됩니다."
+              : questionSetKind === "custom"
+                ? "이전 방식의 맞춤 질문으로 진행한 측정입니다. 과거 이력 확인용으로 보존됩니다."
+                : questionSetKind === "baseline"
+                  ? "이전 방식의 기본 24문항 측정입니다. 과거 비교 기준 이력으로 보존됩니다."
+                  : "선택한 질문 세트로 진행한 측정입니다."}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -522,51 +614,116 @@ function RunDetailPage() {
         </CardContent>
       </Card>
 
-      {/* AI에서 함께 등장한 업체 */}
-      {showSummary ? (
+      {/* AI 답변에서 관찰된 업체 (v2 확정 업체 기준, 정확히 같은 측정일 때만) */}
+      {showSummary && v2ShareRows ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">AI에서 함께 등장한 업체</CardTitle>
+            <CardTitle className="text-base">AI 답변에서 관찰된 업체</CardTitle>
+            <p className="text-xs leading-5 text-muted-foreground">
+              AI 진단 상세와 같은 확정 업체 기준으로 정리한 목록입니다.
+            </p>
           </CardHeader>
           <CardContent>
-            {shareRows.length === 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>업체명</TableHead>
+                    <TableHead className="text-right">관찰된 질문 수</TableHead>
+                    <TableHead className="text-right">관찰률</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {v2ShareRows.map((r) => (
+                    <TableRow key={r.key}>
+                      <TableCell className="text-sm">
+                        <span className="font-medium">{r.name}</span>
+                        {r.isTarget ? (
+                          <Badge className="ml-2">내 업체</Badge>
+                        ) : (
+                          <Badge variant="outline" className="ml-2">
+                            함께 관찰
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{r.count}</TableCell>
+                      <TableCell className="text-right">
+                        {v2ValidCount > 0 ? pct((r.count / v2ValidCount) * 100) : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">
+              관찰률은 유효 답변 {v2ValidCount}건 중 해당 업체가 확인된 답변의 비율입니다. 함께
+              관찰됐다는 것이 추천 원인이라는 뜻은 아닙니다.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* AI 답변에서 관찰된 업체 */}
+      {showSummary && !v2ShareRows ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">AI 답변에서 1차 감지된 업체 후보</CardTitle>
+            <p className="text-xs leading-5 text-muted-foreground">
+              이전 방식으로 1차 감지된 업체 후보 목록입니다. 추가 업체 확인이 필요한 항목이 포함될 수
+              있으며, AI 진단 상세의 확정 업체 기준과 다를 수 있습니다.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {data.canonicalizationVersionConflict ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                아직 함께 등장한 업체가 확인되지 않았습니다. 결과 정리가 끝나면 표시됩니다.
+                이 측정의 업체 정리 버전이 여러 개 확인되어 업체 목록을 표시하지 않습니다.
+              </p>
+            ) : shareRows.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                이번 측정에서 업체로 정리된 항목이 확인되지 않았습니다.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>업체명</TableHead>
-                      <TableHead className="text-right">등장한 질문 수</TableHead>
-                      <TableHead className="text-right">등장률</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shareRows.map((s) => (
-                      <TableRow key={s.key}>
-                        <TableCell className="text-sm">
-                          <span className="font-medium">{s.display_name}</span>
-                          {s.matched_business_id && s.matched_business_id === data.targetBusinessId ? (
-                            <Badge className="ml-2">내 업체</Badge>
-                          ) : s.matched_business_id && data.competitorIds.has(s.matched_business_id) ? (
-                            <Badge variant="secondary" className="ml-2">
-                              등록 경쟁업체
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="ml-2">
-                              자동 발견
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">{s.response_count}</TableCell>
-                        <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
+              <>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>업체명</TableHead>
+                        <TableHead className="text-right">관찰된 질문 수</TableHead>
+                        <TableHead className="text-right">관찰률</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {shareRows.map((s) => (
+                        <TableRow key={s.key}>
+                          <TableCell className="text-sm">
+                            <span className="font-medium">{s.display_name}</span>
+                            {s.matched_business_id &&
+                            s.matched_business_id === data.targetBusinessId ? (
+                              <Badge className="ml-2">내 업체</Badge>
+                            ) : s.matched_business_id &&
+                              data.competitorIds.has(s.matched_business_id) ? (
+                              <Badge variant="secondary" className="ml-2">
+                                등록 경쟁업체
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="ml-2">
+                                자동 발견
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">{s.response_count}</TableCell>
+                          <TableCell className="text-right">{pct(s.answer_share_pct)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                  관찰률은 유효 질문 중 해당 업체가 한 번 이상 확인된 질문의 비율입니다. 자동 발견은
+                  사전에 등록한 경쟁업체가 아니라 이번 AI 답변에서 관찰되어 업체로 정리된 항목입니다.
+                </p>
+              </>
             )}
           </CardContent>
         </Card>
@@ -666,9 +823,12 @@ function JobDetail({
               .sort((a, b) => a.position - b.position);
             return (
               <div>
-                <p className="mb-1 text-xs font-semibold">감지된 업체 ({confirmed.length})</p>
+                <p className="mb-1 text-xs font-semibold">1차 감지 업체 후보 ({confirmed.length})</p>
+                <p className="mb-1 text-[11px] text-muted-foreground">
+                  최종 확정 업체 목록은 위 요약(AI 진단 상세와 같은 기준)을 확인해 주세요.
+                </p>
                 {confirmed.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">감지된 업체가 없습니다.</p>
+                  <p className="text-xs text-muted-foreground">1차 감지된 업체 후보가 없습니다.</p>
                 ) : (
                   <ul className="space-y-1 text-xs">
                     {confirmed.map((m) => (

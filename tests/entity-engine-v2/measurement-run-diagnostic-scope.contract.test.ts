@@ -80,7 +80,7 @@ describe("measurement run diagnostic scope contract", () => {
 
   it("makes the v2 representative gateway select customer scope only", () => {
     const selectionStart = gateway.indexOf(
-      "// Keep representative-run semantics",
+      "const { data: currentUnifiedSet",
     );
     const selectionEnd = gateway.indexOf(
       "const v2Admin",

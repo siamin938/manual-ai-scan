@@ -59,6 +59,50 @@ describe("Entity Engine v2 candidate extractor", () => {
     ]);
   });
 
+  it("extracts a safe terminal branch-suffix variant as the registered business", () => {
+    const target = {
+      id: "aefb2bb9-d0a2-4a6e-9be1-511c5cf82fb4",
+      name: "현대 엑스티어 판교점",
+      aliases: [],
+    };
+    const nodes = parseResponseStructure(
+      "- **빠른 오일 교환:** 현대엑스티어 판교",
+    );
+    const candidates = extractEntityCandidatesV2(nodes, [target]);
+    const matched = candidates.find((candidate) =>
+      candidate.matchedBusinessIds.includes(target.id),
+    );
+
+    expect(matched?.role).toBe("registered_subspan");
+    expect(matched?.identitySurface).toBe("현대엑스티어 판교");
+    expect(matched?.matchedAlias).toBe("현대 엑스티어 판교");
+  });
+
+  it("keeps a derived branch alias ambiguous when two registered rows normalize to the same branch", () => {
+    const collisionBusinesses = [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "브랜드 판교점",
+        aliases: [],
+      },
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "브랜드  판교점",
+        aliases: [],
+      },
+    ];
+    const nodes = parseResponseStructure("1. **브랜드 판교**");
+    const candidates = extractEntityCandidatesV2(nodes, collisionBusinesses);
+    const matched = candidates.find(
+      (candidate) => candidate.identitySurface === "브랜드 판교",
+    );
+
+    expect(matched?.role).toBe("registered_subspan");
+    expect(matched?.matchedBusinessIds.sort()).toEqual(
+      collisionBusinesses.map((business) => business.id).sort(),
+    );
+  });
+
   it("does not emit arbitrary unregistered paragraph text as an entity candidate", () => {
     const nodes = parseResponseStructure(
       "구로구에서 상담받기 좋은 업체를 찾아보세요.",

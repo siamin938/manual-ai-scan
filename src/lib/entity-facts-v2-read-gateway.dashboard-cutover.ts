@@ -1,6 +1,7 @@
 import type {
   EntityFactsV2ReadGatewayDTO,
   EntityFactsV2ReadQuestionAreaDTO,
+  EntityFactsV2ReadVerifiedTargetCitationPageStatus,
 } from "./entity-facts-v2-read-gateway.types";
 import {
   buildEntityFactsV2OverviewViewModel,
@@ -70,7 +71,7 @@ export const ENTITY_FACTS_V2_DASHBOARD_CUTOVER_MAP: readonly EntityFactsV2Dashbo
     {
       section: "competitor_list",
       mode: "direct_v2",
-      note: "Use v2 names/counts only. Do not synthesize legacy tier, repeat, newness or response-rate fields.",
+      note: "Use the customer read-gateway competitor rows: core v2 plus the exact-run approved cross-response supplement. Do not synthesize legacy tier, repeat, newness or response-rate fields.",
     },
     {
       section: "weak_questions",
@@ -152,6 +153,29 @@ export type EntityFactsV2DashboardSourceRow = {
   }>;
 };
 
+export type EntityFactsV2DashboardCitationSourceRow = {
+  domain: string;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+};
+
+export type EntityFactsV2DashboardTargetReferenceSourceRow = {
+  domain: string;
+  responseCount: number;
+  sampleUrl: string;
+};
+
+export type EntityFactsV2DashboardVerifiedTargetCitationPageRow = {
+  domain: string;
+  title: string | null;
+  responseCount: number;
+  citationCount: number;
+  sampleUrl: string;
+  confidence: "high" | "medium";
+  basisLabel: string;
+};
+
 export type EntityFactsV2DashboardQuestionAreaRow = {
   questionId: string;
   questionText: string;
@@ -197,6 +221,7 @@ export type EntityFactsV2DashboardCutoverModel = {
     top3: EntityFactsV2MetricViewModel;
     competitorCount: number;
     targetSourceCount: number;
+    citationSourceCount: number;
     observedSourceCount: number;
   };
   competitors: {
@@ -208,8 +233,27 @@ export type EntityFactsV2DashboardCutoverModel = {
     heading: "내 업체가 잘 보이지 않거나 추가 확인이 필요한 검색 질문";
     rows: EntityFactsV2DashboardQuestionAreaRow[];
   };
+  citationSources: {
+    heading: "AI 답변에서 실제 인용된 출처";
+    rows: EntityFactsV2DashboardCitationSourceRow[];
+  };
+  targetReferenceSources: {
+    heading: "AI 답변 내 근접 단서";
+    rows: EntityFactsV2DashboardTargetReferenceSourceRow[];
+  };
+  targetExposureCitationSources: {
+    heading: "함께 인용된 전체 출처";
+    available: boolean;
+    rows: EntityFactsV2DashboardCitationSourceRow[];
+  };
+  verifiedTargetCitationPages: {
+    heading: "페이지 내용 기준 관련 확인";
+    status: EntityFactsV2ReadVerifiedTargetCitationPageStatus;
+    available: boolean;
+    rows: EntityFactsV2DashboardVerifiedTargetCitationPageRow[];
+  };
   sources: {
-    heading: "AI 답변에서 관찰된 주요 출처";
+    heading: "업체 연결까지 확인된 출처";
     available: boolean;
     rows: EntityFactsV2DashboardSourceRow[];
     referenceSourcesAvailable: false;
@@ -326,6 +370,41 @@ export function buildEntityFactsV2DashboardCutoverModel(
       })),
     }));
 
+  const citationSources: EntityFactsV2DashboardCitationSourceRow[] =
+    (dto.citationSources ?? []).map((item) => ({
+      domain: item.domain,
+      responseCount: item.responseCount,
+      citationCount: item.citationCount,
+      sampleUrl: item.sampleUrl,
+    }));
+
+  const targetReferenceSources: EntityFactsV2DashboardTargetReferenceSourceRow[] =
+    (dto.targetReferenceSources ?? []).map((item) => ({
+      domain: item.domain,
+      responseCount: item.responseCount,
+      sampleUrl: item.sampleUrl,
+    }));
+
+  const targetExposureCitationSources: EntityFactsV2DashboardCitationSourceRow[] =
+    (dto.targetExposureCitationSources ?? []).map((item) => ({
+      domain: item.domain,
+      responseCount: item.responseCount,
+      citationCount: item.citationCount,
+      sampleUrl: item.sampleUrl,
+    }));
+
+  const verifiedTargetCitationPages:
+    EntityFactsV2DashboardVerifiedTargetCitationPageRow[] =
+    (dto.verifiedTargetCitationPages ?? []).map((item) => ({
+      domain: item.domain,
+      title: item.title,
+      responseCount: item.responseCount,
+      citationCount: item.citationCount,
+      sampleUrl: item.sampleUrl,
+      confidence: item.confidence,
+      basisLabel: item.basisLabel,
+    }));
+
   const questionGroups: EntityFactsV2DashboardQuestionGroupRow[] =
     dto.questionGroups.map((item) => ({
       intentType: item.intentType,
@@ -360,6 +439,7 @@ export function buildEntityFactsV2DashboardCutoverModel(
       top3: overviewVm.top3,
       competitorCount: dto.competitors.length,
       targetSourceCount: dto.targetSources.length,
+      citationSourceCount: citationSources.length,
       observedSourceCount: dto.observedSources.length,
     },
     competitors: {
@@ -371,8 +451,29 @@ export function buildEntityFactsV2DashboardCutoverModel(
       heading: "내 업체가 잘 보이지 않거나 추가 확인이 필요한 검색 질문",
       rows: weakQuestions,
     },
+    citationSources: {
+      heading: "AI 답변에서 실제 인용된 출처",
+      rows: citationSources,
+    },
+    targetReferenceSources: {
+      heading: "AI 답변 내 근접 단서",
+      rows: targetReferenceSources,
+    },
+    targetExposureCitationSources: {
+      heading: "함께 인용된 전체 출처",
+      available: dto.targetExposureCitationSources !== undefined,
+      rows: targetExposureCitationSources,
+    },
+    verifiedTargetCitationPages: {
+      heading: "페이지 내용 기준 관련 확인",
+      status:
+        dto.verifiedTargetCitationPageStatus ??
+        (dto.verifiedTargetCitationPages !== undefined ? "complete" : "pending"),
+      available: dto.verifiedTargetCitationPages !== undefined,
+      rows: verifiedTargetCitationPages,
+    },
     sources: {
-      heading: "AI 답변에서 관찰된 주요 출처",
+      heading: "업체 연결까지 확인된 출처",
       available: dto.observedSourcesStatus === "available",
       rows: sources,
       referenceSourcesAvailable: false,

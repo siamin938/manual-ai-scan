@@ -121,6 +121,30 @@ describe("resolveQuestionLocation", () => {
     });
   });
 
+  it("경기도 Core 질문은 성남시 분당구 상세 city를 제거한다", () => {
+    expect(
+      resolveQuestionLocation(
+        "경기에서 프리미엄 엔진오일 잘하는 업체 추천해줘",
+        "경기도",
+        "성남시 분당구",
+      ),
+    ).toEqual({
+      region: "경기도",
+      city: null,
+    });
+
+    expect(
+      resolveQuestionLocation(
+        "성남 분당에서 프리미엄 엔진오일 맡길 만한 업체 추천해줘",
+        "경기도",
+        "성남시 분당구",
+      ),
+    ).toEqual({
+      region: "경기도",
+      city: "성남시 분당구",
+    });
+  });
+
   it("단일 시 단위는 기존 city를 유지한다", () => {
     expect(resolveQuestionLocation("파주 타이어 업체 어디야?", "경기도", "파주시")).toEqual({
       region: "경기도",
