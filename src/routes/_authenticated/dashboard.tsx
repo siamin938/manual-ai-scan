@@ -1,3 +1,4 @@
+import { WebsiteLaunchComparison } from "@/components/website-launch-comparison";
 import { QuestionAnswerContext } from "@/components/diagnostic-question-answer-panel";
 import { repeatedPeerEvidence, siteDisplayName } from "@/lib/diagnostic-source-links";
 import { RepeatedPeerEvidence } from "@/components/repeated-peer-evidence";
@@ -1535,6 +1536,9 @@ function DashboardPage() {
             {renderDetailAction("sources")}
             {(detailTopic === "sources" || printExpanded) && (benchmark ? <BenchmarkSourceEvidence key={`${dto.business.id}:${dto.scope.runId}`} benchmark={benchmark} printExpanded={printExpanded} /> : <p>시장 표본 출처 자료를 아직 확인할 수 없습니다.</p>)}
             {(detailTopic === "comparison" || printExpanded) && <><DiagnosticHistory comparison={comparisonResult?.ok ? comparisonResult.data : null} measuredAt={model.measuredAt} {...(comparisonModel ? { reason: comparisonModel.description } : {})} error={comparisonQuery.isError || !!(comparisonResult && !comparisonResult.ok)} loading={comparisonQuery.isPending} />{comparisonModel?.comparisonAvailable && <ComparisonCard model={comparisonModel} basisLabel={detailBasisLabel} printExpanded={printExpanded} />}</>}
+            {(detailTopic === "comparison" || printExpanded) && dto.websiteLaunch && (
+              <WebsiteLaunchComparison key={`${dto.business.id}:${dto.websiteLaunch.publishedOn}`} review={dto.websiteLaunch} printExpanded={printExpanded} />
+            )}
             {renderDetailAction("comparison")}
           </div>
           </>}

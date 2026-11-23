@@ -1,4 +1,5 @@
-import { useId, useRef, useState } from "react";
+import { useContext, useId, useRef, useState } from "react";
+import { DiagnosticQuestionAnswerPanel, QuestionAnswerContext } from "./diagnostic-question-answer-panel";
 import { QuestionResults } from "./diagnostic-question-results";
 import { DiagnosticSourceAction } from "./diagnostic-source-action";
 import { ChevronUp, ChevronRight, MapPin } from "lucide-react";
@@ -54,7 +55,13 @@ export function DiagnosticActionGuide({ priority, dto, compact = false, inline =
   const copy = guideCopyFor(priority);
   const valid = dto.overview.validCount > 0;
   const missed = missedMeasurementQuestions(dto);
-  const question = nextMeasurementQuestion(dto, missed);
+  const review = dto.websiteLaunch;
+  const nextTest = review && review.runs[review.runs.length - 1]?.id === dto.scope.runId ? review.nextTest : null;
+  const testQuestions = nextTest ? missed.filter(q => nextTest.questionIds.includes(q.questionId)) : [];
+  const showTest = nextTest && testQuestions.length === nextTest.questionIds.length;
+  const question = nextMeasurementQuestion(dto, showTest ? testQuestions : missed);
+  const answerScope = useContext(QuestionAnswerContext);
+  const [showTestEvidence, setShowTestEvidence] = useState(false);
   const [showMissed, setShowMissed] = useState(false);
   const pages = valid && copy ? priority?.peerExamples ?? [] : [];
   const leading = pages[0];
@@ -69,7 +76,18 @@ export function DiagnosticActionGuide({ priority, dto, compact = false, inline =
     {expanded && <div id={panelId} ref={panel} tabIndex={-1} className="action-guide-panel">
       <h3>{compact ? "실행 방법" : title}</h3>
       {leading ? <DiagnosticSourceAction pages={pages} dto={dto}/> : valid && copy ? <ol className="action-guide-steps"><li><span>1</span><div>{copy.where} {branch ? <><strong>{branch}</strong> 표시가 현재 지점 정보와 맞는지 살펴보세요.</> : "현재 지점명과 지역 표시를 살펴보세요."}</div></li><li><span>2</span><div>{copy.task}{hintKind && <> {writingHints[hintKind]}</>}</div></li><li><span>3</span><div>정보가 반영된 뒤 같은 질문으로 다시 측정해 변화를 비교하세요.</div></li></ol> : <p>{task}</p>}
-      {question ? <figure className="action-guide-question" data-question-id={question.questionId}><figcaption>미등장 질문 {missed.length}개 중 다시 확인할 질문</figcaption><blockquote>{question.questionText}</blockquote><p>같은 질문으로 다시 측정해 변화를 비교하세요.</p></figure> : <p>{valid ? "이번 자료에서 비교할 미등장 질문을 찾지 못했어요. 저장된 질문과 출처를 살펴보세요." : "비교할 질문은 유효 답변을 확인한 뒤 안내합니다."}</p>}
+      {question ? <figure className="action-guide-question" data-question-id={question.questionId}>
+        {showTest && <><figcaption>다음에 시도할 일</figcaption><strong>{nextTest.instruction}</strong>
+          <p>{nextTest.reason}</p>
+          {answerScope && <details className="launch-test-proof" onToggle={e => setShowTestEvidence(e.currentTarget.open)}>
+            <summary>근거 답변 보기</summary>
+            {showTestEvidence && <DiagnosticQuestionAnswerPanel scope={answerScope} questionId={nextTest.evidenceQuestionId} />}
+          </details>}
+        </>}
+        {showTest ? <p>{nextTest.label} {testQuestions.length}개 중 다시 확인할 질문</p> :
+          <figcaption>미등장 질문 {missed.length}개 중 다시 확인할 질문</figcaption>}
+        <blockquote>{question.questionText}</blockquote><p>같은 질문으로 다시 측정해 변화를 비교하세요.</p>
+      </figure> : <p>{valid ? "이번 자료에서 비교할 미등장 질문을 찾지 못했어요. 저장된 질문과 출처를 살펴보세요." : "비교할 질문은 유효 답변을 확인한 뒤 안내합니다."}</p>}
       {missed.length > 1 && <details className="my-2 text-sm" onToggle={event => setShowMissed(event.currentTarget.open)}>
         <summary className="cursor-pointer py-2 font-semibold">미등장 질문 {missed.length}개 모두 보기</summary>
         {showMissed && <QuestionResults questions={missed}/>}
